@@ -6,7 +6,7 @@ import { MAKEUP_LOOKS } from '../src/constants/catalog';
 import { TIERS, naira } from '../src/game/economy';
 import { MARKET, canBuy, makeDesign } from '../src/game/market';
 import { NAMED_COLOURS } from '../src/game/colours';
-import { applyLook, buyDesign, displayedCount, displayCap, listingsNow, moveTo, buyFurniture, stats, newGame, nextMorning, openShop, settle, canHire, candidates, hire, train, restockAll, tick, startStyling, waiting, staffChoice, inBlackout, setGen } from '../src/game/engine';
+import { applyLook, buyDesign, displayedCount, displayCap, listingsNow, moveTo, buyFurniture, stats, newGame, nextMorning, openShop, settle, canHire, candidates, hire, train, restockAll, tick, startStyling, waiting, staffChoice, inBlackout, setGen, answerVisit, answerMessage } from '../src/game/engine';
 import { lookCost, scoreLook } from '../src/game/scoring';
 import { SHOP_MINUTES } from '../src/game/economy';
 import { Customer, GameState, StyleChoice } from '../src/game/types';
@@ -71,7 +71,7 @@ function bestLook(s: GameState, c: Customer): StyleChoice {
     if (by('necklace').length && Math.random() < 0.4) ch.necklace = pick(by('necklace')).uid;
     if (by('bag').length && Math.random() < 0.4) ch.bag = pick(by('bag')).uid;
     const f = lookCost(c, ch, s.stock).fair;
-    const sc = scoreLook(c, ch, s.stock).total - (f > c.budget * 1.05 ? 100 + (f - c.budget) / 1000 : 0);
+    const sc = scoreLook(c, ch, s.stock).total - (!c.contest && f > c.budget * 1.05 ? 100 + (f - c.budget) / 1000 : 0);
     if (sc > bestScore) { bestScore = sc; best = ch; }
   }
   return best;
@@ -90,12 +90,14 @@ for (let d = 0; d < days; d++) {
   if (!stats(s).gen && s.cash > 180_000) s = buyFurniture(s, 'smallGen');
   if (canHire(s) && s.cash > s.listing.rent * 3) s = hire(s, candidates(s)[0]);
   for (const m of s.staff) if (m.level < 9 && s.cash > s.listing.rent * 4) s = train(s, m.id);
+  for (const m of s.messages.filter((x) => x.ctx?.kind === 'invite' && !x.answered)) s = answerMessage(s, m.id, 'accept');
   s = openShop(s);
   const arrivedToday = s.arrivals.length;
   let guard = 0;
   while (s.phase === 'shop' && guard++ < 5000) {
-    const w = waiting(s).sort((a, b) => Number(b.c.cls === 'rich') - Number(a.c.cls === 'rich') || a.arrived - b.arrived);
+    const w = waiting(s).sort((a, b) => Number(!!b.c.contest) - Number(!!a.c.contest) || Number(b.c.cls === 'rich') - Number(a.c.cls === 'rich') || a.arrived - b.arrived);
     if (inBlackout(s) && !s.power.gen && stats(s).gen) s = setGen(s, true);
+    if (s.visit) s = answerVisit(s, 'welcome');
     if (!w.length || s.clock >= SHOP_MINUTES) { s = tick(s, 1); continue; }
     const c = w[0].c;
     s = startStyling(s, c.id);
@@ -107,6 +109,7 @@ for (let d = 0; d < days; d++) {
     const price = Math.min(cost.fair, Math.round(c.budget));
     const st = settle(c, score, price, cost.consumables);
     scores.push(score.total);
+    if (c.contest) console.log(`  style-off day ${s.day}: bot ${score.total} vs ${c.contest.rivalId} ${c.contest.rivalScore} (${c.cls}) notes: ${score.notes.slice(0, 3).join(' | ')}`);
     if (st.outcome === 'paid' || st.outcome === 'bargained') { acct.sales += st.paid + st.tip; acct.cogs += st.cost; acct.n++; } else acct.lostSales++;
     s = applyLook(s, c, ch, st, score);
     s = tick(s, 0);
@@ -118,6 +121,10 @@ for (let d = 0; d < days; d++) {
   }
   s = nextMorning(s);
 }
+const { ladder } = await import('../src/game/rivals');
+console.log('ladder:', ladder(s).map((r, i) => `${i + 1}.${r.id}${r.tier}`).join(' '));
+console.log('events:', s.events.map((e) => `${e.title}@${e.day}:${e.status}`).join(', '));
+console.log('save size KB', Math.round(JSON.stringify(s).length / 1024));
 console.log('messages:', s.messages.slice(0, 8).map((m) => `[${m.day}] ${m.from}: ${m.text}`).join('\n'));
 if (process.env.SAVE) {
   const { writeFileSync } = await import('fs');

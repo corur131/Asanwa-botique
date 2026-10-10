@@ -254,7 +254,7 @@ export function scoreLook(c: Customer, choice: StyleChoice, stock: Design[]): Sc
 
 function missLine(w: Customer['wants'][number]): string {
   switch (w.kind) {
-    case 'color': return `She asked for ${w.name}.`;
+    case 'color': return `She asked for the colour ${w.name}.`;
     case 'native': return 'She wanted native.';
     case 'english': return 'She wanted English wear, not native.';
     case 'gele': return 'She wanted gele.';

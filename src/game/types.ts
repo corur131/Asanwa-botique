@@ -21,6 +21,8 @@ export interface Design {
   cost: number;
   pieces: number;
   displayed: boolean;
+  /** A trending drop: looks with it score more until this day. */
+  trend?: number;
 }
 
 export type Want =
@@ -53,6 +55,98 @@ export interface Customer {
   regularId?: string;
   /** Came only for hair and/or makeup: no clothes. */
   service?: 'hair' | 'makeup' | 'both';
+  /** A style-off model: Divine's score is compared with a rival's. */
+  contest?: { eventId: string; rivalId: string; rivalScore: number; prize: number; title: string };
+}
+
+export type Speciality = 'bridal' | 'genz' | 'native' | 'cheap' | 'wigs' | 'menswear' | 'luxury' | 'thrift' | 'everyday';
+
+/** Another boutique on the ladder. Runs on the same economy as Divine's shop. */
+export interface Rival {
+  id: string;
+  owner: string;
+  shop: string;
+  handle: string;
+  /** The five with full personalities and drama; the rest are background shops that still compete. */
+  main: boolean;
+  personality: 'queen' | 'loud' | 'oldschool' | 'shady' | 'sweet' | 'pro';
+  speciality: Speciality;
+  area: string;
+  tier: number;
+  stars: number;
+  cash: number;
+  rep: number;
+  followers: number;
+  /** How good they are at the business (0.8 weak … 1.3 excellent). */
+  skill: number;
+  /** How likely to play dirty, 0..1. */
+  aggression: number;
+  /** Takings over the last 7 days. */
+  week: number[];
+  /** How they feel about Divine, -100 (enemy) … 100 (friend). */
+  feeling: number;
+  look: CharacterConfig;
+  male?: boolean;
+  /** Day they last moved shop (up or down). */
+  moved: number;
+  /** Days with cash below zero. */
+  broke: number;
+}
+
+export interface RivalPost {
+  id: string;
+  rivalId: string;
+  day: number;
+  look: CharacterConfig;
+  caption: string;
+  likes: number;
+  shade?: boolean;
+}
+
+export interface Gist {
+  id: string;
+  day: number;
+  title: string;
+  body: string;
+  about?: string;
+  hot?: boolean;
+}
+
+/** A limited fabric or piece at Yaba market: rivals buy it too. */
+export interface Drop {
+  day: number;
+  kind: StockKind;
+  itemId: string;
+  label: string;
+  fabric: FabricId;
+  color: string;
+  color2: string;
+  pattern: number;
+  price: number;
+  left: number;
+  total: number;
+  buyers: string[];
+}
+
+/** A style-off or show Divine is invited to. */
+export interface ShowEvent {
+  id: string;
+  title: string;
+  host: string;
+  day: number;
+  rivalId: string;
+  prize: number;
+  followers: number;
+  status: 'invited' | 'accepted' | 'declined' | 'won' | 'lost' | 'missed';
+}
+
+/** A rival standing in Divine's shop. */
+export interface Visit {
+  rivalId: string;
+  at: number;
+  /** A waiting customer the rival is trying to steal. */
+  target?: string;
+  line: string;
 }
 
 /** Someone inside the shop: waiting, with Divine, or with a staff member. */
@@ -186,8 +280,20 @@ export interface DayLog {
   events: string[];
 }
 
+export interface ReplyChoice {
+  id: 'classy' | 'clap' | 'ignore' | 'accept' | 'decline';
+  label: string;
+}
+
 export interface Message {
   id: number;
+  /** Group chat or DM thread this belongs to (defaults to the sender). */
+  chat?: string;
+  /** Replies Divine can pick, and what she picked. */
+  choices?: ReplyChoice[];
+  answered?: string;
+  /** What the message is about, for the reply's effect. */
+  ctx?: { kind: 'shade' | 'brag' | 'bait' | 'invite'; rivalId?: string; eventId?: string };
   /** Game minute (shop clock) it arrived, if during the day. */
   t?: number;
   day: number;
@@ -237,6 +343,18 @@ export interface GameState {
   msgSeq: number;
   /** Last message id read, per chat. */
   read: Record<string, number>;
+  rivals: Rival[];
+  /** Weekly ladder: ids in order ('you' is Divine). */
+  ranking: { week: number; order: string[] }[];
+  rivalPosts: RivalPost[];
+  gist: Gist[];
+  drop: Drop | null;
+  events: ShowEvent[];
+  visit: Visit | null;
+  /** Deborah's tip: a celebrity is coming on this day. */
+  celebDay?: number;
+  /** Times Divine has looked around Tolani's shop (Deborah notices). */
+  spying: number;
   today: DayLog;
   history: DayLog[];
   messages: Message[];

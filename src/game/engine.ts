@@ -3,6 +3,8 @@ import { generateRandomCustomer } from '../utils/randomizer';
 import { DIVINE_CAPACITY, HOUR_WEIGHTS, PATIENCE, SHOP_MINUTES, staffMinutes, NEW_SHOP_RAMP_DAYS, NEW_SHOP_START, SERVICE_FEE, SLOW_WEEK_CHANCE, STAFF, STAFF_CAPACITY, START_CASH, SUPPLIES_SHARE, MARKUP, TIERS, naira } from './economy';
 import { canBuy, entryFor, isClothing, makeDesign, pieceCost } from './market';
 import { FabricId } from '../types/character';
+import { answerRival, competition, initRivals, poacher, reactToMove, simulateRivals } from './rivals';
+import { answerInvite, contestFor, contestModel, dropStep, judge, planDrop, planEvents, planTips, visitStep, wonListing } from './encounters';
 import { POWER as POWER_CFG, addShout, coolRunning, drainRate, nepaOff, outageAt, planOutages, powerStep, source } from './power';
 import { makeCustomer } from './customers';
 import { buildLook, hairGroup, lookCost, scoreLook } from './scoring';
@@ -10,7 +12,7 @@ import { FEMALE_HAIR, MAKEUP_LOOKS } from '../constants/catalog';
 import { colourName } from './colours';
 import { FURNITURE, KIOSK_LISTING, Listing, Placed, STARTER_FURNITURE, autoPlace,
   findSpot, canPlace, ceilingCapacity, ceilingUsed, cheapestListing, furnitureById, listingsFor, newUid, prestigeRichShift, prestigeTraffic, shopStats, usesFloor, wallCapacity, wallUsed } from './shop';
-import { Customer, DayLog, Departure, Design, GameState, LedgerLine, Message, Regular, ScoreBreakdown, Settlement, StaffMember, StyleChoice } from './types';
+import { Customer, DayLog, Departure, Design, ReplyChoice, GameState, LedgerLine, Message, Regular, ScoreBreakdown, Settlement, StaffMember, StyleChoice } from './types';
 
 const pick = <T,>(a: readonly T[]): T => a[Math.floor(Math.random() * a.length)];
 const chance = (p: number) => Math.random() < p;
@@ -65,6 +67,12 @@ const STARTER: [string, string, string, string, number][] = [
   ['earrings', 'goldStuds', '#C9A163', '#C9A163', 0],
 ];
 
+export function rivalDefaults() {
+  const rivals = initRivals();
+  const base = { rivals, ranking: [] as GameState['ranking'], rivalPosts: [], gist: [], drop: null, events: [], visit: null, spying: 0 };
+  return base;
+}
+
 const freshDay = { clock: 0, arrivals: [], inShop: [], serving: null, left: [], outages: [] as GameState['outages'], shouts: [] as GameState['shouts'] };
 
 export function newGame(divine: CharacterConfig): GameState {
@@ -99,6 +107,7 @@ export function newGame(divine: CharacterConfig): GameState {
     posts: [],
     msgSeq: 0,
     read: {},
+    ...rivalDefaults(),
     today: emptyLog(1),
     history: [],
     messages: [],
@@ -120,7 +129,7 @@ export const followerTraffic = (f: number) => 1 + 0.4 * (f / (f + 3000));
 export function customersToday(s: GameState, slow: boolean) {
   const t = TIERS[s.tier];
   const ramp = Math.min(1, NEW_SHOP_START + (1 - NEW_SHOP_START) * Math.max(0, s.day - s.movedDay) / NEW_SHOP_RAMP_DAYS);
-  const traffic = prestigeTraffic(stats(s).prestige) * followerTraffic(s.followers || 0) * (1 + stats(s).traffic);
+  const traffic = prestigeTraffic(stats(s).prestige) * followerTraffic(s.followers || 0) * (1 + stats(s).traffic) * competition(s);
   return Math.max(4, Math.round(t.customers * traffic * (0.6 + (s.rep / 100) * 0.8) * (0.85 + Math.random() * 0.3) * (slow ? 0.55 : 1) * ramp));
 }
 
@@ -153,6 +162,7 @@ export function shopBonus(s: GameState, c: Customer, choice: StyleChoice): { bon
   if (!c.male && choice.makeup && st.makeupBonus) { bonus += st.makeupBonus; notes.push(`Makeup station +${st.makeupBonus}`); }
   if (c.cls === 'rich' && st.richBonus) { bonus += st.richBonus; notes.push(`Fitting room +${st.richBonus}`); }
   if (st.scoreBonus) { bonus += st.scoreBonus; notes.push(`Steamer and lighting +${st.scoreBonus}`); }
+  if (Object.values(choice).some((uid) => typeof uid === 'string' && s.stock.some((d) => d.uid === uid && (d.trend || 0) >= s.day))) { bonus += 4; notes.push('Trending fabric +4'); }
   const src = s.phase === 'shop' ? source(s) : 'grid';
   if (src === 'solar') { bonus += 2; notes.push('Cool and quiet on solar +2'); }
   if (src === 'none') { bonus -= 4; notes.push('Styled in the dark and heat -4'); }
@@ -172,7 +182,14 @@ export function openShop(s0: GameState): GameState {
   const shift = prestigeRichShift(st.prestige);
   mix[0] = Math.max(0.05, mix[0] - shift);
   mix[2] = Math.max(0, mix[2] + shift);
-  const arrivals = Array.from({ length: n }, () => ({ at: arrivalMinute(), c: makeCustomer(s, mix) })).sort((a, b) => a.at - b.at);
+  const arrivals = Array.from({ length: n }, () => ({ at: arrivalMinute(), c: makeCustomer(s, mix) }));
+  const model = contestModel(s);
+  if (model) arrivals.push(model);
+  if (s.celebDay === s.day) {
+    const c = makeCustomer(s, [0, 0, 1]);
+    arrivals.push({ at: 120 + Math.random() * 360, c: { ...c, influencer: true, budget: Math.round(c.budget * 1.5 / 10_000) * 10_000, request: `Hi! I'm ${c.name}. ${c.request} (A celebrity! Her followers will see this look.)` } });
+  }
+  arrivals.sort((a, b) => a.at - b.at);
   const outages = planOutages(s.day);
   let next: GameState = { ...s, slowWeek: slow, arrivals, outages, power: { gen: false, solar: s.power?.solar || 0 } };
   if (outageAt(next, 0)) {
@@ -222,12 +239,16 @@ export function tick(s0: GameState, minutes: number): GameState {
     const [a, ...rest] = s.arrivals;
     s = { ...s, arrivals: rest };
     // passers-by look in at a dark, hot shop and keep walking
-    if (source(s, a.at) === 'none' && chance({ poor: 0.2, middle: 0.35, rich: 0.6 }[a.c.cls])) { lostHeat++; continue; }
-    if (waiting(s).length >= waitingRoom(s)) { lostDoor++; continue; }
-    s = { ...s, inShop: [...s.inShop, { c: a.c, arrived: a.at, patience: patienceFor(s, a.c), waited: 0 }] };
+    const vip = !!a.c.contest;
+    if (!vip && source(s, a.at) === 'none' && chance({ poor: 0.2, middle: 0.35, rich: 0.6 }[a.c.cls])) { lostHeat++; continue; }
+    if (!vip && waiting(s).length >= waitingRoom(s)) { lostDoor++; continue; }
+    // a style-off model waits for you all day
+    s = { ...s, inShop: [...s.inShop, { c: a.c, arrived: a.at, patience: vip ? 9999 : patienceFor(s, a.c), waited: 0 }] };
   }
   if (lostDoor || lostHeat) s = { ...s, today: { ...s.today, lost: s.today.lost + lostDoor + lostHeat, doorLost: (s.today.doorLost || 0) + lostDoor, heatLost: (s.today.heatLost || 0) + lostHeat } };
   s = powerStep(s, s.clock, end);
+  s = dropStep(s, end - s.clock);
+  s = visitStep(s, end - s.clock);
   s = { ...s, clock: end };
   // tired of waiting: heat and darkness use patience up faster
   const step = end - s0.clock;
@@ -385,6 +406,7 @@ export function applyLook(s0: GameState, c: Customer, choice: StyleChoice, st0: 
     next = money(next, -st.cost, 'Hair and makeup supplies');
   }
   if (c.influencer && score.total >= 80) next = { ...next, followers: (next.followers || 0) + Math.round(60 + Math.random() * 120) };
+  if (c.contest) next = judge(next, c, score.total);
   next = depart(next, c, lookOut, sold);
   return next;
 }
@@ -479,12 +501,26 @@ export function closeShop(s0: GameState): GameState {
   // reputation drifts back toward 40 so it has to be earned every week
   s = { ...s, rep: clamp(s.rep - (s.rep - 40) * 0.03, 0, 100) };
   const history = [...s.history, s.today].slice(-120);
-  return { ...s, history, phase: 'evening' };
+  s = { ...s, history };
+  s = simulateRivals(s);
+  s = planEvents(s);
+  s = planTips(s);
+  return { ...s, phase: 'evening', visit: null };
 }
 
 export function nextMorning(s: GameState): GameState {
-  return { ...s, day: s.day + 1, phase: 'morning', ...freshDay, today: emptyLog(s.day + 1) };
+  return planDrop({ ...s, day: s.day + 1, phase: 'morning', ...freshDay, today: emptyLog(s.day + 1) });
 }
+
+/** A reply picked in WhatsApp. */
+export function answerMessage(s: GameState, msgId: number, choice: ReplyChoice['id']): GameState {
+  const m = s.messages.find((x) => x.id === msgId);
+  if (!m) return s;
+  if (m.ctx?.kind === 'invite') return answerInvite(s, m, choice);
+  return answerRival(s, msgId, choice);
+}
+
+export { answerVisit, buyDrop, contestFor, noteVisit, rivalShop, VISIT_CHOICES } from './encounters';
 
 function payRent(s: GameState): GameState {
   const rent = s.listing.rent;
@@ -507,6 +543,7 @@ function demote(s: GameState): GameState {
   let next: GameState = money({ ...s, tier, listing, furniture, staff, lateRent: null, movedDay: s.day, grace: listing.grace, stats: { ...s.stats, demotions: s.stats.demotions + 1 } }, (s.lateRent?.amount || 0) * 0.5, 'Half the rent debt waived');
   next = fitDisplay(next);
   next = msg(next, 'Landlord', `Time is up. Pack your things. You have been moved down to a ${t.name} on ${listing.street}, ${listing.area}. I've kept the deposit and waived half the debt.`, 'danger');
+  next = reactToMove(next, false);
   if (left.length) next = msg(next, 'Deborah', `${left.map((x) => x.name).join(' and ')} had to go. There's no space for them in the new shop.`, 'warn');
   if (furniture.some((f) => !f.placed)) next = msg(next, 'Deborah', `Some furniture didn't fit in the smaller shop, so it's in storage.`, 'warn');
   return next;
@@ -538,13 +575,17 @@ export function listingsNow(s: GameState): Listing[] {
   return listingsFor(s.tier + 1, week(s.day));
 }
 
-export function moveTo(s: GameState, l: Listing): GameState {
-  if (l.tier !== s.tier + 1 || s.cash < l.moveIn) return s;
+export function moveTo(s0: GameState, l0: Listing): GameState {
+  const fight = contestFor(s0, l0);
+  const l = fight ? { ...l0, moveIn: l0.moveIn + fight.extra } : l0;
+  if (l.tier !== s0.tier + 1 || s0.cash < l.moveIn) return s0;
+  const s = fight ? wonListing(s0, l0) : s0;
   const tier = l.tier;
   const t = TIERS[tier];
   const furniture = autoPlace(s.furniture.filter((f) => furnitureById(f.id).mount !== 'finish'), l);
   let next: GameState = money({ ...s, tier, listing: l, furniture, movedDay: s.day, grace: l.grace }, -l.moveIn, `Move-in: ${l.street}`);
   next = msg(next, 'Deborah', `We moved! Welcome to your ${t.name} on ${l.street}, ${l.area}. Rent is ${naira(l.rent)} a week and the landlord is ${l.landlord}. The shop holds up to ${t.slots} designs, so buy rails and shelves to fill it. It will be quiet for two weeks while people find us.`, 'good');
+  next = reactToMove(next, !fight);
   if (t.staff && !s.staff.length) next = msg(next, 'Deborah', `You can hire staff now! Trainees are cheap and loyal; experts are good from day one but they leave for money.`, 'info');
   return next;
 }
@@ -726,15 +767,17 @@ export function postLook(s: GameState, c: Customer, look: CharacterConfig, score
 export function chats(s: GameState) {
   const by: Record<string, { from: string; last: Message; unread: number }> = {};
   for (const m of s.messages) {
-    const c = (by[m.from] = by[m.from] || { from: m.from, last: m, unread: 0 });
+    const k = thread(m);
+    const c = (by[k] = by[k] || { from: k, last: m, unread: 0 });
     if (m.id > c.last.id) c.last = m;
-    if (m.id > (s.read?.[m.from] || 0)) c.unread += 1;
+    if (m.from !== 'You' && m.id > (s.read?.[k] || 0)) c.unread += 1;
   }
   return Object.values(by).sort((a, b) => b.last.id - a.last.id);
 }
+export const thread = (m: Message) => m.chat || m.from;
 export const unreadCount = (s: GameState) => chats(s).reduce((a, c) => a + c.unread, 0);
 export function markRead(s: GameState, from: string): GameState {
-  const top = s.messages.filter((m) => m.from === from).reduce((a, m) => Math.max(a, m.id), 0);
+  const top = s.messages.filter((m) => thread(m) === from).reduce((a, m) => Math.max(a, m.id), 0);
   if ((s.read?.[from] || 0) >= top) return s;
   return { ...s, read: { ...(s.read || {}), [from]: top } };
 }
@@ -833,10 +876,12 @@ function weeklyStaff(s0: GameState): GameState {
       const offer = Math.round((m.wage * (1 + extra / 100)) / 500) * 500;
       if (extra > limit || chance(0.02)) {
         s = { ...s, staff: s.staff.filter((x) => x.id !== m.id), hireOkDay: s.day + STAFF.hireDelayDays };
-        s = msg(s, 'Deborah', `${m.name} has left! Another boutique offered her ${naira(offer)} a week. You were paying ${naira(m.wage)}.`, 'danger');
+        const who = poacher(s);
+        s = msg(s, 'Deborah', `${m.name} has left! ${who ? who.shop : 'Another boutique'} offered her ${naira(offer)} a week. You were paying ${naira(m.wage)}.`, 'danger');
         continue;
       }
-      s = msg(s, m.name, `Another shop offered me ${naira(offer)} a week, but I'm staying with you.`, 'good');
+      const who = poacher(s);
+      s = msg(s, m.name, `${who ? `${who.owner} from ${who.shop}` : 'Another shop'} offered me ${naira(offer)} a week, but I'm staying with you.`, 'good');
       loyalty = clamp(loyalty + 2, 0, 100);
     }
     // raise demand when underpaid for their level
@@ -860,7 +905,7 @@ const KEY = 'asanwa-boutique-save-v1';
 function migrate(raw: GameState): GameState | null {
   type Old = Omit<GameState, 'version'> & { version: number; queue?: unknown; queueIndex?: unknown };
   let s = raw as unknown as Old;
-  if (s.version === 4) return s as GameState;
+  if (s.version === 4) return (s as GameState).rivals ? (s as GameState) : { ...(s as GameState), ...rivalDefaults() };
   if (s.version === 3) {
     const o = s as unknown as GameState & { blackout?: unknown };
     delete o.blackout;
@@ -872,6 +917,7 @@ function migrate(raw: GameState): GameState | null {
       power: { gen: false, solar: 0 },
       shouts: [],
       shoutSeq: 0,
+      ...rivalDefaults(),
       ...(midDay ? { ...freshDay, phase: 'morning' as const, today: emptyLog(o.day) } : {}),
     };
   }
@@ -890,6 +936,7 @@ function migrate(raw: GameState): GameState | null {
     ...(rest as unknown as GameState),
     version: 4,
     ...freshDay,
+    ...rivalDefaults(),
     power: { gen: false, solar: 0 },
     shoutSeq: 0,
     phase: midDay ? 'morning' : s.phase,

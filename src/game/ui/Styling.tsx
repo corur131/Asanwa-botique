@@ -29,7 +29,7 @@ export const RequestCard: React.FC<{ c: Customer; compact?: boolean }> = ({ c, c
     </div>
     {!compact && <p className="text-sm text-slate-200 leading-relaxed italic">"{c.request}"</p>}
     <div className="flex flex-wrap gap-1.5 mt-2">
-      <Pill tone="gold">Budget about {naira(c.budget)}</Pill>
+      {c.contest ? <Pill tone="red">Style-off: beat {c.contest.rivalScore >= 80 ? 'a strong' : 'your'} rival · prize {naira(c.contest.prize)}</Pill> : <Pill tone="gold">Budget about {naira(c.budget)}</Pill>}
       {c.wants.map((w, i) => (
         <Pill key={i}>{wantLabel(w)}</Pill>
       ))}

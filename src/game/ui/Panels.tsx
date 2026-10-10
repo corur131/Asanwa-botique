@@ -1,6 +1,6 @@
 import React, { Suspense, lazy, useState } from 'react';
 import { MARKUP, STAFF, TIERS, naira } from '../economy';
-import { POWER, fuelPerHour, Candidate, RaiseAnswer, candidates, canHire, daysToRent, displayCap, displayedCount, listingsNow, marketWage, restockAllCost, stats, waitingRoom } from '../engine';
+import { POWER, contestFor, fuelPerHour, Candidate, RaiseAnswer, candidates, canHire, daysToRent, displayCap, displayedCount, listingsNow, marketWage, restockAllCost, stats, waitingRoom } from '../engine';
 import { FURNITURE, FURNITURE_GROUPS, FurnitureDef, FurnitureGroup, Listing, ceilingCapacity, ceilingUsed, finishes, furnitureById, roomOf, wallCapacity, wallUsed } from '../shop';
 
 const FurniturePreview = lazy(() => import('../scene/Previews').then((m) => ({ default: m.FurniturePreview })));
@@ -270,7 +270,9 @@ export const MovePanel: React.FC<{ s: GameState; onMove: (l: Listing) => void }>
       <div className="rounded-lg border border-white/10 bg-white/5 p-3 text-xs text-slate-300">
         <b className="text-white">{next.name}</b>: bigger, better listings are roomier and hold more{next.staff ? `, ${next.staff} staff` : ''}{next.luxury ? ', luxury suppliers' : ''}. Your furniture comes with you; buy more rails to fill the bigger room. Listings change every week.
       </div>
-      {list.map((l) => {
+      {list.map((l0) => {
+        const fight = contestFor(s, l0);
+        const l = fight ? { ...l0, moveIn: l0.moveIn + fight.extra } : l0;
         const after = s.cash - l.moveIn;
         const risky = after < l.rent * 2;
         return (
@@ -280,13 +282,14 @@ export const MovePanel: React.FC<{ s: GameState; onMove: (l: Listing) => void }>
                 <div className="text-sm font-semibold text-white">{l.street}</div>
                 <div className="text-[11px] text-slate-400">{l.area} · <Stars n={l.stars} /> · {roomOf(l).w}×{roomOf(l).d} m floor</div>
               </div>
-              <Btn size="sm" tone="gold" onClick={() => setPick(l)}>View</Btn>
+              <Btn size="sm" tone="gold" onClick={() => setPick(l0)}>View</Btn>
             </div>
             <div className="grid grid-cols-3 gap-2 mt-2 text-[11px]">
               <div><div className="text-slate-500">Rent/week</div><div className="text-white font-semibold">{naira(l.rent)}</div></div>
               <div><div className="text-slate-500">Move-in</div><div className="text-white font-semibold">{naira(l.moveIn)}</div></div>
               <div><div className="text-slate-500">Landlord</div><div className={`font-semibold ${l.grace === 0 ? 'text-rose-300' : 'text-white'}`}>{l.grace === 0 ? 'No grace' : `${l.grace}d grace`}</div></div>
             </div>
+            {fight && <div className="text-[11px] text-amber-300 mt-1">⚔ {fight.rival.owner} ({fight.rival.shop}) wants this shop too. To get it you must outbid {fight.rival.male ? 'him' : 'her'} by {naira(fight.extra)} (included above). {fight.rival.male ? "He" : 'She'} won't be happy.</div>}
             {s.cash >= l.moveIn && risky && <div className="text-[11px] text-rose-300 mt-1">After moving you'd have {naira(after)}: less than two weeks of rent.</div>}
           </div>
         );
@@ -302,7 +305,7 @@ export const MovePanel: React.FC<{ s: GameState; onMove: (l: Listing) => void }>
           <p className="text-sm text-slate-400 mb-3">{pick.area} · {next.name} · <Stars n={pick.stars} /></p>
           <ul className="text-sm space-y-1 mb-3">
             <li>Floor: <b>{roomOf(pick).w}×{roomOf(pick).d} m</b>, {wallCapacity(pick)} m of wall{pick.stars === 1 ? ', tired and in need of paint' : pick.stars === 4 ? ', freshly done with a feature wall' : ''}</li>
-            <li>Move-in: <b>{naira(pick.moveIn)}</b> (you have {naira(s.cash)})</li>
+            <li>Move-in: <b>{naira(pick.moveIn + (contestFor(s, pick)?.extra || 0))}</b> (you have {naira(s.cash)}){contestFor(s, pick) ? `, outbidding ${contestFor(s, pick)!.rival.owner}` : ''}</li>
             <li>Rent: <b>{naira(pick.rent)}</b> every 7 days</li>
             <li>Landlord: <b>{pick.landlord}</b>, {graceText(pick.grace)}</li>
             <li>Prestige from location: <b>{pick.stars * 2}</b> (more customers, more rich ones)</li>
@@ -310,7 +313,7 @@ export const MovePanel: React.FC<{ s: GameState; onMove: (l: Listing) => void }>
           {s.cash - pick.moveIn < pick.rent * 2 && <p className="text-sm text-rose-300 mb-3">Careful: the first two weeks in a new shop are quiet, and you'd have less than two weeks of rent saved.</p>}
           <div className="flex gap-2 justify-end">
             <Btn onClick={() => setPick(null)}>Not yet</Btn>
-            <Btn tone="gold" disabled={s.cash < pick.moveIn} onClick={() => { onMove(pick); setPick(null); }}>{s.cash < pick.moveIn ? `Need ${naira(pick.moveIn)}` : 'Sign and move'}</Btn>
+            <Btn tone="gold" disabled={s.cash < pick.moveIn + (contestFor(s, pick)?.extra || 0)} onClick={() => { onMove(pick); setPick(null); }}>{s.cash < pick.moveIn + (contestFor(s, pick)?.extra || 0) ? `Need ${naira(pick.moveIn + (contestFor(s, pick)?.extra || 0))}` : 'Sign and move'}</Btn>
           </div>
         </Modal>
       )}

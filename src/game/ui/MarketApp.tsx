@@ -45,7 +45,7 @@ const Chip: React.FC<{ on?: boolean; onClick: () => void; children: React.ReactN
   <button onClick={onClick} className={`shrink-0 px-3 py-1.5 rounded-full text-xs font-semibold border ${on ? 'bg-orange-500 border-orange-500 text-white' : 'border-white/15 text-slate-200 bg-white/5'}`}>{children}</button>
 );
 
-export const MarketApp: React.FC<{ s: GameState; cart: CartLine[]; setCart: (f: (c: CartLine[]) => CartLine[]) => void; onPay: () => void }> = ({ s, cart, setCart, onPay }) => {
+export const MarketApp: React.FC<{ s: GameState; cart: CartLine[]; setCart: (f: (c: CartLine[]) => CartLine[]) => void; onPay: () => void; onBuyDrop: (n: number) => void }> = ({ s, cart, setCart, onPay, onBuyDrop }) => {
   const [view, setView] = useState<'list' | 'item' | 'cart'>('list');
   const [cat, setCat] = useState<MarketCategory>('dress');
   const [who, setWho] = useState<'f' | 'm'>('f');
@@ -234,6 +234,7 @@ export const MarketApp: React.FC<{ s: GameState; cart: CartLine[]; setCart: (f: 
         </div>
       </div>
       {flash && <div className="text-center text-xs text-emerald-300 py-1">{flash}</div>}
+      {s.drop && s.drop.day === s.day && <DropCard s={s} onBuy={(n) => { onBuyDrop(n); setFlash(`Got ${n} of the hot drop!`); setTimeout(() => setFlash(''), 2500); }} />}
       <div className="flex-1 overflow-y-auto p-3 pt-1 grid grid-cols-2 gap-2 content-start">
         {list.length === 0 && <p className="col-span-2 text-sm text-slate-500 text-center py-8">Nothing here for this filter.</p>}
         {list.map((e) => {
@@ -252,6 +253,29 @@ export const MarketApp: React.FC<{ s: GameState; cart: CartLine[]; setCart: (f: 
           );
         })}
       </div>
+    </div>
+  );
+};
+
+const DropCard: React.FC<{ s: GameState; onBuy: (n: number) => void }> = ({ s, onBuy }) => {
+  const d = s.drop!;
+  const [n, setN] = useState(1);
+  const gone = d.left <= 0;
+  const takers = d.buyers.filter((b) => b !== 'you').map((b) => s.rivals.find((r) => r.id === b)?.shop).filter(Boolean);
+  return (
+    <div className="mx-3 mt-1 mb-1 rounded-xl border border-orange-400/60 bg-gradient-to-r from-orange-500/20 to-rose-500/20 p-2.5 flex gap-2.5 items-center">
+      <Swatch d={{ color: d.color, color2: d.color2, fabric: d.fabric }} size={42} />
+      <div className="min-w-0 flex-1">
+        <div className="text-[10px] font-bold uppercase tracking-wider text-orange-300">🔥 Hot drop · {gone ? 'sold out' : `${d.left} of ${d.total} left`}</div>
+        <div className="text-sm text-white font-semibold leading-tight truncate">{d.label}</div>
+        <div className="text-[11px] text-slate-300">{naira(d.price)} each · looks with it +4 for a week{takers.length ? ` · bought by ${takers.slice(0, 2).join(', ')}` : ''}</div>
+      </div>
+      {!gone && (
+        <div className="flex flex-col items-end gap-1 shrink-0">
+          <Stepper n={n} set={(v) => setN(Math.max(1, Math.min(d.left, v)))} min={1} />
+          <button className="rounded-full bg-orange-500 text-white text-xs font-bold px-3 py-1.5 disabled:opacity-40" disabled={s.cash < d.price * n} onClick={() => { onBuy(n); setN(1); }}>Buy · {naira(d.price * n)}</button>
+        </div>
+      )}
     </div>
   );
 };

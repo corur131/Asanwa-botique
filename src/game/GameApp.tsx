@@ -38,6 +38,8 @@ export default function GameApp({ onLab }: { onLab: () => void }) {
   const [phone, setPhone] = useState(false);
   const [phoneApp, setPhoneApp] = useState<AppId>('home');
   const [chat, setChat] = useState<string | null>(null);
+  const [profile, setProfile] = useState<string | null>(null);
+  const [touring, setTouring] = useState<string | null>(null);
   const [cart, setCart] = useState<E.CartLine[]>([]);
   const [paused, setPaused] = useState(false);
   const [hidden, setHidden] = useState(false);
@@ -325,6 +327,9 @@ export default function GameApp({ onLab }: { onLab: () => void }) {
           </div>
         )}
 
+        {/* a rival is standing in the shop */}
+        {s.visit && s.phase === 'shop' && <VisitCard s={s} up={up} />}
+
         {/* what people are saying in the shop */}
         {bubbles.length > 0 && (
           <div className="fixed z-[58] left-3 bottom-36 sm:bottom-40 flex flex-col gap-1.5 w-[min(80vw,340px)] pointer-events-none">
@@ -412,7 +417,18 @@ export default function GameApp({ onLab }: { onLab: () => void }) {
               canWig={st.wigs}
               initial={drafts[current.id]}
               onChange={(ch) => setDrafts((d) => ({ ...d, [current.id]: ch }))}
-              onFinish={(choice) => setStep({ kind: 'price', c: current, choice })}
+              onFinish={(choice) => {
+                if (!current.contest) return setStep({ kind: 'price', c: current, choice });
+                // a style-off model doesn't pay: the judges score her against the rival's model
+                const c = current;
+                const score = E.scoreInShop(s, c, choice);
+                const cost = lookCost(c, choice, s.stock);
+                const won = score.total > (c.contest?.rivalScore ?? 0);
+                const result: Settlement = { price: 0, paid: 0, tip: 0, cost: cost.consumables, outcome: 'paid', line: won ? 'The judges loved it! We won!!' : 'It was close… the other model edged it.', reaction: won ? 'scream' : 'frown', repDelta: 0, becameRegular: false };
+                setStep({ kind: 'reveal', c, choice, stockBefore: s.stock, score, st: result });
+                done(c.id);
+                up((g) => E.applyLook(g, c, choice, result, score));
+              }}
               onTurnAway={() => {
                 done(current.id);
                 up((g) => E.turnAway(g, current.id));
@@ -475,8 +491,39 @@ export default function GameApp({ onLab }: { onLab: () => void }) {
           onClose={() => setPhone(false)}
           onMove={(l) => up((g) => E.moveTo(g, l))}
           staff={staffActions}
+          profile={profile}
+          setProfile={setProfile}
+          onVisit={(id) => { setPhone(false); setTouring(id); const r = s.rivals.find((x) => x.id === id); if (r) up((g) => E.noteVisit(g, r)); }}
         />
       )}
+
+      {touring && (() => {
+        const r = s.rivals.find((x) => x.id === touring);
+        if (!r) return null;
+        const fake = E.rivalShop(s, r);
+        return (
+          <div className="fixed inset-0 z-[45] bg-[#0d0e12] flex flex-col">
+            <div className="flex flex-wrap items-center gap-3 px-4 py-2 border-b border-white/10 bg-[#101219]">
+              <div className="leading-tight min-w-0 flex-1">
+                <div className="text-white font-semibold">{r.shop} <Stars n={r.stars} /></div>
+                <div className="text-[11px] text-slate-400">{r.owner} · {TIERS[r.tier].name} in {r.area} · rep {Math.round(r.rep)} · {r.followers.toLocaleString('en-NG')} followers</div>
+              </div>
+              <Btn size="sm" tone="gold" onClick={() => setTouring(null)}>Leave the shop</Btn>
+            </div>
+            <div className="relative flex-1 min-h-0">
+              <Suspense fallback={<div className="absolute inset-0 flex items-center justify-center text-slate-400 text-sm">Walking over…</div>}>
+                <ShopScene s={fake} placing={null} selected={null} onPlace={() => undefined} onSelect={() => undefined} onCustomer={() => undefined} />
+              </Suspense>
+              <div className="absolute bottom-3 left-3 right-3 sm:right-auto sm:w-96 rounded-xl border border-white/15 bg-[#12141c]/92 p-3 text-sm text-slate-200 space-y-1">
+                <div className="font-semibold text-white">What you notice</div>
+                <div>• A full look here costs about <b>{naira([15_000, 45_000, 110_000, 220_000, 400_000][r.tier] * (r.speciality === 'cheap' ? 0.6 : r.speciality === 'luxury' || r.speciality === 'bridal' ? 1.4 : 1))}</b>.</div>
+                <div>• {r.rep > s.rep ? 'Customers here look happier than yours. ' : 'Honestly, your shop gets better reviews. '}{r.tier > s.tier ? 'The shop is much bigger than yours.' : r.tier < s.tier ? "It's smaller than your shop." : "It's about your size."}</div>
+                <div>• {r.owner.split(' ')[0]} is known for <b>{({ bridal: 'bridal looks', genz: 'Gen Z wear', native: 'native and aso-ebi', cheap: 'low prices', wigs: 'wigs and glam', menswear: 'menswear', luxury: 'luxury pieces', thrift: 'thrift finds', everyday: 'everyday wear' } as const)[r.speciality]}</b>.</div>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {confirmClose && (
         <Modal onClose={() => setConfirmClose(false)}>
@@ -520,6 +567,32 @@ export default function GameApp({ onLab }: { onLab: () => void }) {
     </div>
   );
 }
+
+/** A rival in the shop: say something. */
+const VisitCard: React.FC<{ s: GameState; up: (f: (g: GameState) => GameState) => void }> = ({ s, up }) => {
+  const v = s.visit!;
+  const r = s.rivals.find((x) => x.id === v.rivalId);
+  if (!r) return null;
+  const target = v.target ? s.inShop.find((x) => x.c.id === v.target)?.c : undefined;
+  return (
+    <div className="fixed z-[57] right-3 bottom-36 sm:bottom-40 w-[min(92vw,360px)] rounded-2xl border border-pink-500/50 bg-[#1b1220]/97 shadow-2xl p-3">
+      <div className="flex items-center gap-3">
+        <span className="w-12 h-12 rounded-full overflow-hidden bg-[#2a1f2e] ring-2 ring-pink-500 shrink-0"><CharacterSvg config={r.look} idPrefix={`visit-${r.id}`} camera="portrait" /></span>
+        <div className="min-w-0">
+          <div className="text-[11px] uppercase tracking-wider text-pink-300">{r.owner} walked in</div>
+          <div className="text-[11px] text-slate-400">{r.shop}</div>
+        </div>
+      </div>
+      <p className="text-sm text-white italic mt-2">"{v.line}"</p>
+      {target && <p className="text-[11px] text-rose-300 mt-1">She's talking to {target.name}, who is waiting. Do something or {target.name} goes with her.</p>}
+      <div className="grid gap-1.5 mt-2">
+        {E.VISIT_CHOICES.map((c) => (
+          <button key={c.id} onClick={() => up((g) => E.answerVisit(g, c.id))} className={`rounded-lg px-3 py-1.5 text-sm text-left ${c.id === 'clap' ? 'bg-rose-700/80 text-white' : c.id === 'welcome' ? 'bg-emerald-700/70 text-white' : 'bg-white/10 text-slate-100'}`}>{c.label}</button>
+        ))}
+      </div>
+    </div>
+  );
+};
 
 /** NEPA status and the generator switch. */
 const PowerChip: React.FC<{ s: GameState; up: (f: (g: GameState) => GameState) => void }> = ({ s, up }) => {

@@ -1,0 +1,339 @@
+/**
+ * The other boutiques. Nineteen shops on the same economy as Divine's: they
+ * earn, pay rent, move up when they can afford it and get thrown down when they
+ * can't. Five have full personalities; fourteen are background shops that still
+ * climb and fall. Every Sunday the Top 20 ladder is published.
+ */
+import { CharacterConfig } from '../types/character';
+import { generateRandomCustomer } from '../utils/randomizer';
+import { TIERS } from './economy';
+import { GameState, Gist, Message, ReplyChoice, Rival, RivalPost } from './types';
+
+const pick = <T,>(a: readonly T[]): T => a[Math.floor(Math.random() * a.length)];
+const chance = (p: number) => Math.random() < p;
+const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
+const rand = (a: number, b: number) => a + Math.random() * (b - a);
+
+type Seed = Omit<Rival, 'cash' | 'rep' | 'followers' | 'week' | 'feeling' | 'look' | 'moved' | 'broke' | 'stars'> & { rep: number; followers: number; male?: boolean };
+
+const ROSTER: Seed[] = [
+  // the five
+  { id: 'tolani', owner: 'Tolani Adebayo', shop: 'House of Tolani', handle: 'houseoftolani', main: true, personality: 'queen', speciality: 'bridal', area: 'Victoria Island', tier: 4, skill: 1.28, aggression: 0.45, rep: 88, followers: 48_000 },
+  { id: 'amaka', owner: 'Amaka Obi', shop: "Amaka's Closet", handle: 'amakascloset_', main: true, personality: 'loud', speciality: 'genz', area: 'Yaba', tier: 1, skill: 1.02, aggression: 0.8, rep: 55, followers: 3_200 },
+  { id: 'bisi', owner: 'Iya Bisi', shop: 'Bisi Aso-Oke & Lace', handle: 'bisi_asooke', main: true, personality: 'oldschool', speciality: 'native', area: 'Surulere', tier: 1, skill: 0.98, aggression: 0.4, rep: 60, followers: 1_400 },
+  { id: 'chioma', owner: 'Chioma Eze', shop: 'Chi Cheap & Chic', handle: 'chicheapchic', main: true, personality: 'shady', speciality: 'cheap', area: 'Yaba', tier: 0, skill: 0.95, aggression: 0.9, rep: 38, followers: 900 },
+  { id: 'zainab', owner: 'Zainab Bello', shop: 'Zee Hair & Glam', handle: 'zeeglam', main: true, personality: 'sweet', speciality: 'wigs', area: 'Yaba', tier: 0, skill: 1.03, aggression: 0.3, rep: 42, followers: 1_100 },
+  // the rest of the ladder
+  { id: 'ivory', owner: 'Mrs Funke Coker', shop: 'Ivory Lane', handle: 'ivorylane.vi', main: false, personality: 'pro', speciality: 'luxury', area: 'Ikoyi', tier: 3, skill: 1.16, aggression: 0.2, rep: 80, followers: 21_000 },
+  { id: 'adeko', owner: 'Kola Ade', shop: 'Ade & Ko Couture', handle: 'adeandko', main: false, personality: 'pro', speciality: 'menswear', area: 'Lekki Phase 1', tier: 3, skill: 1.1, aggression: 0.3, rep: 76, followers: 15_000, male: true },
+  { id: 'laceroom', owner: 'Ngozi Okafor', shop: 'The Lace Room', handle: 'thelaceroom', main: false, personality: 'pro', speciality: 'native', area: 'Lekki Phase 1', tier: 2, skill: 1.08, aggression: 0.3, rep: 70, followers: 9_000 },
+  { id: 'sade', owner: 'Sade Williams', shop: 'Sade Styles', handle: 'sadestyles', main: false, personality: 'pro', speciality: 'everyday', area: 'Ikeja', tier: 2, skill: 1.0, aggression: 0.25, rep: 64, followers: 6_500 },
+  { id: 'temi', owner: 'Temi Johnson', shop: 'Glow by Temi', handle: 'glowbytemi', main: false, personality: 'pro', speciality: 'wigs', area: 'Ikeja', tier: 2, skill: 1.02, aggression: 0.35, rep: 62, followers: 7_800 },
+  { id: 'kaftan', owner: 'Musa Lawal', shop: 'Kaftan King', handle: 'kaftanking', main: false, personality: 'pro', speciality: 'menswear', area: 'Surulere', tier: 2, skill: 0.97, aggression: 0.2, rep: 58, followers: 4_100, male: true },
+  { id: 'velvet', owner: 'Ify Nwosu', shop: 'Velvet & Vibes', handle: 'velvetandvibes', main: false, personality: 'pro', speciality: 'genz', area: 'Surulere', tier: 1, skill: 1.0, aggression: 0.4, rep: 54, followers: 5_200 },
+  { id: 'ronke', owner: 'Ronke Bakare', shop: "Ronke's Rack", handle: 'ronkesrack', main: false, personality: 'pro', speciality: 'everyday', area: 'Yaba', tier: 1, skill: 0.93, aggression: 0.3, rep: 50, followers: 1_900 },
+  { id: 'owambe', owner: 'Folake Adeyemi', shop: 'Owambe Express', handle: 'owambeexpress', main: false, personality: 'pro', speciality: 'native', area: 'Ikeja', tier: 1, skill: 0.97, aggression: 0.3, rep: 52, followers: 2_600 },
+  { id: 'thrift', owner: 'Dami Ogun', shop: 'Thrift Republic', handle: 'thriftrepublic.ng', main: false, personality: 'pro', speciality: 'thrift', area: 'Yaba', tier: 1, skill: 0.95, aggression: 0.35, rep: 48, followers: 4_400 },
+  { id: 'bubu', owner: 'Halima Yusuf', shop: 'Bubu Lounge', handle: 'bubulounge', main: false, personality: 'pro', speciality: 'native', area: 'Surulere', tier: 0, skill: 0.96, aggression: 0.2, rep: 44, followers: 800 },
+  { id: 'blessing', owner: 'Mummy Blessing', shop: 'Mummy Blessing Fashion', handle: 'mummyblessingfashion', main: false, personality: 'pro', speciality: 'cheap', area: 'Yaba', tier: 0, skill: 0.86, aggression: 0.25, rep: 36, followers: 300 },
+  { id: 'genzplug', owner: 'Tobi Ade', shop: 'Gen-Z Plug', handle: 'genzplug', main: false, personality: 'pro', speciality: 'genz', area: 'Yaba', tier: 0, skill: 0.98, aggression: 0.5, rep: 40, followers: 2_200, male: true },
+  { id: 'lekkithrift', owner: 'Ebere Kalu', shop: 'Lekki Thrift Hub', handle: 'lekkithrifthub', main: false, personality: 'pro', speciality: 'thrift', area: 'Lekki Phase 1', tier: 0, skill: 0.9, aggression: 0.3, rep: 37, followers: 600 },
+];
+
+/** Daily takings before rent at skill 1 and average reputation, by shop size. Tuned in tools/rivalsim. */
+const DAILY = [24_000, 75_000, 165_000, 340_000, 600_000];
+/** Share of takings spent restocking, by shop size: big shops carry dearer stock. */
+const STOCK_SHARE = [0.45, 0.5, 0.55, 0.6, 0.62];
+/** Weekly wages for their staff. */
+const WAGES = [0, 0, 60_000, 150_000, 300_000];
+const hash = (id: string) => Array.from(id).reduce((a, c) => a + c.charCodeAt(0), 0);
+
+function lookFor(male: boolean): CharacterConfig {
+  for (let i = 0; i < 40; i++) {
+    const c = generateRandomCustomer('styled');
+    if ((c.body === 'male') === male) return c;
+  }
+  return generateRandomCustomer('styled');
+}
+
+export function initRivals(): Rival[] {
+  return ROSTER.map((r) => {
+    const { male, ...rest } = r;
+    return {
+      ...rest,
+      stars: r.tier === 0 ? 1 : r.main ? 3 : 2,
+      cash: TIERS[r.tier].rent * (r.id === 'tolani' ? 12 : 3) + TIERS[r.tier].moveIn * 0.2,
+      week: Array.from({ length: 7 }, () => DAILY[r.tier] * r.skill * 0.6),
+      feeling: r.id === 'zainab' ? 20 : r.id === 'tolani' ? 10 : 0,
+      look: lookFor(!!male),
+      male: !!male,
+      moved: -100,
+      broke: 0,
+    };
+  });
+}
+
+export const rivalById = (s: GameState, id?: string) => (s.rivals || []).find((r) => r.id === id);
+export const mainRivals = (s: GameState) => (s.rivals || []).filter((r) => r.main);
+
+// ---------------------------------------------------------------------------
+// The ladder
+// ---------------------------------------------------------------------------
+/** One number to rank boutiques: takings this week, reputation, followers, shop size. */
+export function boutiqueScore(weekTakings: number, rep: number, followers: number, tier: number) {
+  return weekTakings / 10_000 + rep * 3 + Math.sqrt(followers) * 1.5 + tier * 60;
+}
+export function playerWeek(s: GameState) {
+  return s.history.slice(-7).reduce((a, d) => a + d.income, 0);
+}
+export function playerScore(s: GameState) {
+  return boutiqueScore(playerWeek(s), s.rep, s.followers || 0, s.tier);
+}
+export function rivalScore(r: Rival) {
+  return boutiqueScore(r.week.reduce((a, b) => a + b, 0), r.rep, r.followers, r.tier);
+}
+
+export interface Rank { id: string; name: string; owner: string; score: number; tier: number; area: string; rep: number; followers: number; you?: boolean; main?: boolean }
+export function ladder(s: GameState): Rank[] {
+  const rows: Rank[] = (s.rivals || []).map((r) => ({ id: r.id, name: r.shop, owner: r.owner, score: rivalScore(r), tier: r.tier, area: r.area, rep: r.rep, followers: r.followers, main: r.main }));
+  rows.push({ id: 'you', name: 'Asanwa Boutique', owner: 'Divine', score: playerScore(s), tier: s.tier, area: s.listing.area, rep: s.rep, followers: s.followers || 0, you: true });
+  return rows.sort((a, b) => b.score - a.score);
+}
+export const playerRank = (s: GameState) => ladder(s).findIndex((r) => r.you) + 1;
+export const lastRank = (s: GameState, id: string) => {
+  const r = (s.ranking || []).slice(-1)[0];
+  return r ? r.order.indexOf(id) + 1 : 0;
+};
+
+/** Rivals near Divine (same area, similar size, better reputation) take some of her walk-ins. */
+export function competition(s: GameState): number {
+  let k = 0;
+  for (const r of s.rivals || []) {
+    if (r.area !== s.listing.area || Math.abs(r.tier - s.tier) > 1) continue;
+    if (r.rep > s.rep) k += 0.04 + (r.rep - s.rep) / 1000;
+  }
+  return Math.max(0.78, 1 - k);
+}
+
+// ---------------------------------------------------------------------------
+// Messages from rivals
+// ---------------------------------------------------------------------------
+export const GROUP = 'Lagos Fashion Babes';
+export const REPLIES: ReplyChoice[] = [
+  { id: 'classy', label: 'Stay classy' },
+  { id: 'clap', label: 'Clap back' },
+  { id: 'ignore', label: 'Ignore' },
+];
+
+function say(s: GameState, from: string, text: string, opts: Partial<Message> = {}): GameState {
+  const id = (s.msgSeq || 0) + 1;
+  const m: Message = { id, day: s.day, from, text, tone: 'info', t: s.phase === 'shop' ? Math.floor(s.clock) : undefined, ...opts };
+  return { ...s, msgSeq: id, messages: [m, ...s.messages].slice(0, 160) };
+}
+const inGroup = (s: GameState, r: Rival, text: string, opts: Partial<Message> = {}) => say(s, r.owner, text, { chat: GROUP, ...opts });
+
+function gist(s: GameState, title: string, body: string, about?: string, hot = false): GameState {
+  const g: Gist = { id: `g${s.day}-${Math.random().toString(36).slice(2, 7)}`, day: s.day, title, body, about, hot };
+  return { ...s, gist: [g, ...(s.gist || [])].slice(0, 40) };
+}
+
+function rivalPost(s: GameState, r: Rival, caption: string, shade = false): GameState {
+  const p: RivalPost = { id: `rp${s.day}-${Math.random().toString(36).slice(2, 7)}`, rivalId: r.id, day: s.day, look: lookFor(r.speciality === 'menswear' && chance(0.7)), caption, likes: Math.round(r.followers * rand(0.04, 0.12)), shade };
+  return { ...s, rivalPosts: [p, ...(s.rivalPosts || [])].slice(0, 60) };
+}
+
+const LINES = {
+  brag: {
+    queen: ['Another bride, another masterpiece. Some of us were built for this. 👑', 'Booked till December. Thank God for growth 🙏🏾', 'Some people are still learning to tie gele. I just did three brides before 10am.'],
+    loud: ['Omo! Sold out AGAIN 😂😂 Una no ready for Amaka', 'My DMs are flooded. Abeg calm down, I am one person 😩', 'Na me get Yaba this year, write it down ✍🏾'],
+    oldschool: ['Real aso-oke does not come from China. I have been doing this before some of you were born.', 'Three owambes this weekend. Experience is the best teacher.'],
+    shady: ['Why pay ₦40k when Chi Cheap & Chic will do it for ₦15k? Think about it 🤔', 'Busy busy busy. Some shops are empty though 👀'],
+    sweet: ['Grateful for every customer today 🥰 Love you all!', 'New wigs just landed ❤️ come and see!'],
+    pro: ['Good week at the shop. Grateful.', 'New collection is out.'],
+  },
+  shade: {
+    queen: ['Some people opened a kiosk and think they are a designer 😌', 'Imitation is the best form of flattery. Keep copying, darling.'],
+    loud: ['Divine, is that your shop or a container? 😂', 'Who taught Divine how to tie gele? Abeg refund them 💀', 'I saw that look you posted. My apprentice does better.'],
+    oldschool: ['These young girls think styling is TikTok. Respect your elders.', 'Divine, that lace was not real lace. Customers are not stupid.'],
+    shady: ['Divine dey charge ₦30k for wetin I do for ₦12k 😂', 'Your customer came to my shop after. Just saying 🤷🏾‍♀️'],
+    sweet: ["Divine your shop is so cute! Small, but cute 🥰", "I love that you're trying, sis ❤️"],
+    pro: ['Some new shops are pricing very aggressively.'],
+  },
+  jealous: ['Hmm. Congratulations I guess.', 'Who is sponsoring her? Just asking 👀', 'Big shop, small talent 😂', 'Let us see how long she will last there.', 'Rent there is not small o. Wish her luck 🙃', 'We move. Abeg.'],
+  welcomeUp: (name: string) => [`Congrats ${name}! 🎉`, `Ehen, ${name} don enter big league o`, `Congrats babe ❤️`],
+  mock: (name: string) => [`${name} don pack go smaller shop o 😂`, `Landlord no dey play o. Sorry ${name} 🙃`, `Abeg who saw ${name}'s new shop? Small like matchbox 💀`],
+};
+
+/** A reply to a rival: what it does depends on the choice. */
+export function answerRival(s0: GameState, msgId: number, choice: ReplyChoice['id']): GameState {
+  const m = s0.messages.find((x) => x.id === msgId);
+  if (!m || m.answered || !m.choices) return s0;
+  let s: GameState = { ...s0, messages: s0.messages.map((x) => (x.id === msgId ? { ...x, answered: choice } : x)) };
+  const r = rivalById(s, m.ctx?.rivalId);
+  const where = m.chat || m.from;
+  const mine = (text: string) => say(s, 'You', text, { chat: where, tone: 'info' });
+  const feel = (d: number) => (r ? { ...s, rivals: s.rivals.map((x) => (x.id === r.id ? { ...x, feeling: clamp(x.feeling + d, -100, 100) } : x)) } : s);
+  if (choice === 'classy') {
+    s = mine(pick(['Congrats to everyone winning. There is room for all of us ❤️', 'God bless your hustle sis. Mine is coming too 🙏🏾', 'No wahala. Let the work speak.']));
+    s = { ...feel(6), rep: clamp(s.rep + 0.5, 0, 100), followers: (s.followers || 0) + Math.round(rand(5, 25)) };
+  } else if (choice === 'clap') {
+    s = mine(pick(['At least my customers come back 😌', 'Container or not, the girls are booking. Cry about it 😂', 'You talk too much for someone with an empty shop.', 'Stay in your lane, I am busy making money 💅🏾']));
+    s = feel(-15);
+    if (chance(0.55)) {
+      const gain = Math.round(rand(60, 220));
+      s = { ...s, followers: (s.followers || 0) + gain, rep: clamp(s.rep + 1, 0, 100) };
+      s = gist(s, `${r ? r.owner : 'A rival'} and Divine drag each other in fashion group chat 🍿`, `Screenshots are everywhere. Fans say Divine won this round. Her page gained ${gain} followers overnight.`, 'you', true);
+    } else {
+      s = { ...s, rep: clamp(s.rep - 2, 0, 100) };
+      s = gist(s, `Divine of Asanwa Boutique loses her cool in group chat`, `"Very unprofessional," says one customer. Her reputation took a hit.`, 'you', true);
+    }
+  } else if (choice === 'ignore') {
+    s = feel(-2);
+  }
+  return s;
+}
+
+// ---------------------------------------------------------------------------
+// Each evening: every rival's day, and the drama that comes with it
+// ---------------------------------------------------------------------------
+export function simulateRivals(s0: GameState): GameState {
+  let s = s0;
+  if (!s.rivals?.length) return s;
+  const today = s.day;
+  const youRank = playerRank(s);
+  const rivals: Rival[] = [];
+  const news: { kind: 'up' | 'down' | 'viral' | 'scandal'; r: Rival }[] = [];
+  for (const r0 of s.rivals) {
+    const r = { ...r0, week: [...r0.week] };
+    const t = TIERS[r.tier];
+    const repK = 0.6 + (r.rep / 100) * 0.8;
+    const followK = 1 + 0.3 * (r.followers / (r.followers + 8000));
+    const ramp = Math.min(1, 0.55 + (today - r.moved) / 20);
+    // good months and bad months
+    const form = 1 + 0.2 * Math.sin(today / 9 + hash(r.id));
+    const takings = DAILY[r.tier] * r.skill * form * repK * followK * ramp * rand(0.6, 1.35) * (r.stars === 1 ? 0.9 : r.stars >= 3 ? 1.1 : 1);
+    r.week.push(takings);
+    r.week = r.week.slice(-7);
+    r.cash += takings * (1 - STOCK_SHARE[r.tier]) - t.running;
+    if (today % 7 === 0) r.cash -= t.rent * [0, 0.75, 1, 1.33, 1.75][r.stars] + WAGES[r.tier];
+    // reputation drifts toward what their skill earns
+    const target = 30 + r.skill * 45;
+    r.rep = clamp(r.rep + (target - r.rep) * 0.04 + rand(-1.5, 1.5), 5, 99);
+    r.followers = Math.round(r.followers * (1 + (r.rep - 45) / 9000) + rand(0, 6) * (r.tier + 1));
+    // bad weeks happen: stolen stock, a landlord's "service charge", a dead generator
+    if (chance(0.025)) r.cash -= takings * rand(2, 4);
+    // the odd big day or bad day
+    if (chance(0.012 * (r.main ? 1.5 : 1))) {
+      r.followers += Math.round(rand(400, 2500) * (r.tier + 1));
+      r.rep = clamp(r.rep + 5, 0, 99);
+      news.push({ kind: 'viral', r });
+    } else if (chance(0.008)) {
+      r.rep = clamp(r.rep - 9, 0, 99);
+      r.cash -= DAILY[r.tier] * 2;
+      news.push({ kind: 'scandal', r });
+    }
+    // move up when they can afford it; get thrown down when broke too long
+    const next = TIERS[r.tier + 1];
+    const appetite = 1.1 + (hash(r.id) % 6) * 0.1;
+    if (next && r.cash > next.moveIn * appetite + next.rent * 3 && today - r.moved > 14) {
+      r.cash -= next.moveIn;
+      r.tier += 1;
+      r.stars = r.skill > 1.05 ? 3 : 2;
+      r.moved = today;
+      news.push({ kind: 'up', r });
+    }
+    r.broke = r.cash < 0 ? r.broke + 1 : 0;
+    if (r.broke >= 10 && r.tier > 0) {
+      r.tier -= 1;
+      r.stars = 1;
+      r.cash = TIERS[r.tier].rent * 2;
+      r.broke = 0;
+      r.moved = today;
+      r.rep = clamp(r.rep - 6, 0, 99);
+      news.push({ kind: 'down', r });
+    } else if (r.broke >= 14) {
+      // even a kiosk owner borrows from family and keeps going
+      r.cash = TIERS[0].rent * 2;
+      r.broke = 0;
+    }
+    rivals.push(r);
+  }
+  s = { ...s, rivals };
+
+  // news about other shops
+  for (const n of news) {
+    const r = n.r;
+    if (n.kind === 'up') {
+      s = gist(s, `${r.shop} moves to a ${TIERS[r.tier].name}!`, `${r.owner} has upgraded. Sources say the rent is not small.`, r.id);
+      if (r.main) {
+        s = inGroup(s, r, pick([`Guess who just signed for a ${TIERS[r.tier].name}? 😌🔑`, `New shop, new level. ${TIERS[r.tier].name} babyyyy 🎉`, `God did! We have moved to a ${TIERS[r.tier].name} 🙏🏾`]), { ctx: { kind: 'brag', rivalId: r.id } });
+        for (const o of mainRivals(s).filter((x) => x.id !== r.id && chance(0.5))) s = inGroup(s, o, chance(0.5) ? pick(LINES.jealous) : pick(LINES.welcomeUp(r.owner.split(' ')[0])));
+      }
+    } else if (n.kind === 'down') {
+      s = gist(s, `Landlord locks ${r.shop}!`, `${r.owner} could not pay rent and has moved to a ${TIERS[r.tier].name}. Lagos is hard o.`, r.id, true);
+      for (const o of mainRivals(s).filter((x) => x.id !== r.id && chance(0.35))) s = inGroup(s, o, pick(LINES.mock(r.owner.split(' ')[0])));
+    } else if (n.kind === 'viral') {
+      s = gist(s, `${r.shop} goes viral 🔥`, `A look from ${r.owner}'s shop is all over Gidigram.`, r.id);
+      if (r.main) s = rivalPost(s, r, pick(LINES.brag[r.personality]));
+    } else {
+      s = gist(s, `Customer drags ${r.shop} online`, `"They spoilt my wedding look," says a bride. ${r.owner} has not responded.`, r.id, true);
+    }
+  }
+
+  // everyday chatter, brags and shade at Divine
+  for (const r of mainRivals(s)) {
+    if (chance(0.18)) s = inGroup(s, r, pick(LINES.brag[r.personality]), { ctx: { kind: 'brag', rivalId: r.id } });
+    if (chance(0.3)) s = rivalPost(s, r, pick(LINES.brag[r.personality]));
+    // shade: more when Divine is doing well, and from those who dislike her
+    const threat = s.today.bestScore >= 85 || lastRank(s, 'you') > youRank ? 0.12 : 0.04;
+    if (chance(threat * (0.4 + r.aggression) * (r.feeling < 0 ? 1.5 : 1))) {
+      const line = pick(LINES.shade[r.personality]);
+      if (chance(0.5)) s = inGroup(s, r, line, { choices: REPLIES, ctx: { kind: 'shade', rivalId: r.id } });
+      else s = say(s, r.owner, line, { choices: REPLIES, ctx: { kind: 'bait', rivalId: r.id } });
+      if (chance(0.3)) s = rivalPost(s, r, `Some people in ${s.listing.area} should stick to selling pure water 😂 #notsubbing`, true);
+    }
+  }
+  for (const r of s.rivals.filter((x) => !x.main && chance(0.05))) s = rivalPost(s, r, pick(LINES.brag.pro));
+
+  // Sunday: the Top 20
+  if (today % 7 === 0) s = publishLadder(s);
+  return s;
+}
+
+export function publishLadder(s0: GameState): GameState {
+  let s = s0;
+  const rows = ladder(s);
+  const order = rows.map((r) => r.id);
+  const prev = lastRank(s, 'you');
+  const now = order.indexOf('you') + 1;
+  s = { ...s, ranking: [...(s.ranking || []), { week: Math.floor(s.day / 7), order }].slice(-12) };
+  const top3 = rows.slice(0, 3).map((r, i) => `${i + 1}. ${r.name}`).join(', ');
+  s = gist(s, `Top 20 Boutiques in Lagos: week ${Math.floor(s.day / 7)}`, `${top3}. Asanwa Boutique is #${now}${prev ? ` (${prev > now ? `up from #${prev}` : prev < now ? `down from #${prev}` : 'no change'})` : ''}.`, undefined, true);
+  s = say(s, 'GistLagos', `🏆 This week's Top 20 Boutiques is out! #1 ${rows[0].name}. Asanwa Boutique: #${now}.`, { chat: GROUP });
+  if (prev && now < prev) {
+    const passed = rows.slice(now, prev).map((r) => rivalById(s, r.id)).filter((r): r is Rival => !!r && r.main);
+    for (const r of passed.slice(0, 2)) s = inGroup(s, r, pick(LINES.jealous), { choices: REPLIES, ctx: { kind: 'shade', rivalId: r.id } });
+    s = say(s, 'Deborah', `Sis!! You're #${now} on the Top 20 now! Tolani was asking me who your landlord is 👀`, { tone: 'good' });
+  }
+  return s;
+}
+
+/** When Divine moves into a bigger shop, the group chat reacts. */
+export function reactToMove(s0: GameState, up: boolean): GameState {
+  let s = s0;
+  if (!s.rivals?.length) return s;
+  if (up) {
+    s = gist(s, `Asanwa Boutique moves to ${s.listing.area}!`, `Divine has signed for a ${TIERS[s.tier].name} on ${s.listing.street}. Her rivals are watching.`, 'you');
+    for (const r of mainRivals(s).filter(() => chance(0.6))) s = inGroup(s, r, r.feeling > 30 ? pick(LINES.welcomeUp('Divine')) : pick(LINES.jealous), r.feeling < 10 ? { choices: REPLIES, ctx: { kind: 'shade', rivalId: r.id } } : {});
+  } else {
+    s = gist(s, `Landlord throws Asanwa Boutique out!`, `Divine has moved to a ${TIERS[s.tier].name}. Rivals are laughing in the group chat.`, 'you', true);
+    for (const r of mainRivals(s).filter((x) => x.feeling < 20 && chance(0.6))) s = inGroup(s, r, pick(LINES.mock('Divine')), { choices: REPLIES, ctx: { kind: 'shade', rivalId: r.id } });
+  }
+  return s;
+}
+
+/** A rival's name for staff-poaching messages. */
+export function poacher(s: GameState): Rival | undefined {
+  const near = (s.rivals || []).filter((r) => r.tier >= s.tier && r.tier <= s.tier + 2);
+  return near.length ? pick(near) : undefined;
+}

@@ -96,6 +96,19 @@ export const Reveal: React.FC<{ state: GameState; c: Customer; choice: StyleChoi
             </ul>
           )}
         </div>
+        {c.contest ? (
+          <div className={`rounded-xl border p-4 text-sm ${score.total > c.contest.rivalScore ? 'border-emerald-500/50 bg-emerald-500/10' : 'border-rose-500/50 bg-rose-500/10'}`}>
+            <div className="text-[11px] uppercase tracking-wider text-slate-400 mb-1">{c.contest.title}: the judges' scores</div>
+            <div className="flex items-center justify-around text-center">
+              <div><div className="text-3xl font-bold text-white">{score.total}</div><div className="text-xs text-slate-400">You</div></div>
+              <div className="text-slate-500">vs</div>
+              <div><div className="text-3xl font-bold text-white">{c.contest.rivalScore}</div><div className="text-xs text-slate-400">Your rival</div></div>
+            </div>
+            <div className={`text-center font-bold mt-2 ${score.total > c.contest.rivalScore ? 'text-emerald-300' : 'text-rose-300'}`}>
+              {score.total > c.contest.rivalScore ? `You win ₦${c.contest.prize.toLocaleString('en-NG')}!` : 'You lost this one.'}
+            </div>
+          </div>
+        ) : (
         <div className="rounded-xl border border-white/10 bg-[#15171f] p-4 text-sm space-y-1">
           {sold ? (
             <>
@@ -116,6 +129,7 @@ export const Reveal: React.FC<{ state: GameState; c: Customer; choice: StyleChoi
           </div>
           {st.becameRegular && <div className="text-emerald-300 text-xs pt-1">{c.name} loved it and will come back as a regular.</div>}
         </div>
+        )}
         {sold && score.total >= 70 && onPost && (
           <button
             disabled={posted || !canPost}

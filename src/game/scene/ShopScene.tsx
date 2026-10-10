@@ -305,6 +305,12 @@ export default function ShopScene(p: SceneProps) {
       );
     }
   }
+  if (s.phase === 'shop' && s.visit) {
+    const r = s.rivals?.find((x) => x.id === s.visit!.rivalId);
+    const target = s.visit.target ? lastSpot.current[s.visit.target] : undefined;
+    const near: Cell = target ? [Math.min(r ? room(s.listing).w - 1 : 0, target[0] + 1), target[1]] : [sp.door[0], room(s.listing).d - 1];
+    if (r) people.push(<Walker key={`visit-${r.id}-${s.visit.at}`} look={lookToFigure(r.look)} spawn={sp.outside} target={near} blocked={blocked} w={room(s.listing).w} d={room(s.listing).d} highlight />);
+  }
   for (const l of s.left || []) {
     if (gone.current.has(l.key)) continue;
     people.push(
