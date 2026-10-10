@@ -6,8 +6,9 @@ import { MAKEUP_LOOKS } from '../src/constants/catalog';
 import { TIERS, naira } from '../src/game/economy';
 import { MARKET, canBuy, makeDesign } from '../src/game/market';
 import { NAMED_COLOURS } from '../src/game/colours';
-import { applyLook, buyDesign, closeShop, displayedCount, displayCap, listingsNow, moveTo, buyFurniture, stats, newGame, nextMorning, openShop, settle, staffServe, canHire, candidates, hire, train, restockAll } from '../src/game/engine';
+import { applyLook, buyDesign, displayedCount, displayCap, listingsNow, moveTo, buyFurniture, stats, newGame, nextMorning, openShop, settle, canHire, candidates, hire, train, restockAll, tick, startStyling, waiting, staffChoice } from '../src/game/engine';
 import { lookCost, scoreLook } from '../src/game/scoring';
+import { SHOP_MINUTES } from '../src/game/economy';
 import { Customer, GameState, StyleChoice } from '../src/game/types';
 
 const days = Number(process.argv[2] || 60);
@@ -39,7 +40,21 @@ function restockBot(s: GameState): GameState {
   return s;
 }
 
+// how fast the bot styles: minutes of shop time per full look (a real player: ~60-90 seconds)
+const SPEED = Number(process.env.SPEED || 65);
+
 function bestLook(s: GameState, c: Customer): StyleChoice {
+  if (c.service) {
+    let best: StyleChoice = {};
+    let bs = -1;
+    for (let i = 0; i < 12; i++) {
+      const ch = staffChoice(s, c)!;
+      if (!c.male && c.service !== 'hair') ch.makeup = { ...MAKEUP_LOOKS.find((l) => l.id === (c.wants.some((w) => w.kind === 'glam') ? 'owambe' : 'natural'))!.makeup };
+      const sc = scoreLook(c, ch, s.stock).total;
+      if (sc > bs) { bs = sc; best = ch; }
+    }
+    return best;
+  }
   const shown = s.stock.filter((d) => d.displayed && d.pieces > 0);
   const by = (k: string) => shown.filter((d) => d.kind === k);
   let best: StyleChoice = {};
@@ -74,24 +89,28 @@ for (let d = 0; d < days; d++) {
   if (canHire(s) && s.cash > s.listing.rent * 3) s = hire(s, candidates(s)[0]);
   for (const m of s.staff) if (m.level < 9 && s.cash > s.listing.rent * 4) s = train(s, m.id);
   s = openShop(s);
-  let mine = 0;
-  while (s.queueIndex < s.queue.length) {
-    const c = s.queue[s.queueIndex];
-    if (mine >= 8) { s = staffServe(s, c).state; continue; }
-    mine++;
+  const arrivedToday = s.arrivals.length;
+  let guard = 0;
+  while (s.phase === 'shop' && guard++ < 5000) {
+    const w = waiting(s).sort((a, b) => Number(b.c.cls === 'rich') - Number(a.c.cls === 'rich') || a.arrived - b.arrived);
+    if (!w.length || s.clock >= SHOP_MINUTES) { s = tick(s, 1); continue; }
+    const c = w[0].c;
+    s = startStyling(s, c.id);
     const ch = bestLook(s, c);
+    const dur = (c.service ? SPEED * 0.5 : SPEED) * (0.75 + Math.random() * 0.5);
+    for (let m = 0; m < dur; m++) s = tick(s, 1);
     const score = scoreLook(c, ch, s.stock);
     const cost = lookCost(c, ch, s.stock);
     const price = Math.min(cost.fair, Math.round(c.budget));
     const st = settle(c, score, price, cost.consumables);
     scores.push(score.total);
-    if (process.env.DEBUG && d < 3) console.log(c.cls, c.occasion, c.wants.map((w) => w.kind).join(','), JSON.stringify({ ...score, notes: undefined }), score.notes.join(' | '), 'fair', cost.fair, 'budget', c.budget);
     if (st.outcome === 'paid' || st.outcome === 'bargained') { acct.sales += st.paid + st.tip; acct.cogs += st.cost; acct.n++; } else acct.lostSales++;
     s = applyLook(s, c, ch, st, score);
+    s = tick(s, 0);
   }
-  s = closeShop(s);
+  (s as GameState & { _arr?: number })._arr = arrivedToday;
   if (s.day % 7 === 0 || s.day === days) {
-    console.log(`day ${s.day} ${TIERS[s.tier].name.padEnd(12)} cash ${naira(s.cash).padStart(12)} rep ${s.rep.toFixed(0).padStart(3)} served ${s.today.served}/${s.queue.length} stock ${s.stock.length} staff ${s.staff.length} avgScore ${Math.round(scores.slice(-40).reduce((a, b) => a + b, 0) / Math.min(40, scores.length))} | wk sales ${acct.sales} cogs ${acct.cogs} n ${acct.n} lost ${acct.lostSales} stockSpend ${acct.stockSpend} stockVal ${stockVal(s)}`);
+    console.log(`day ${s.day} ${TIERS[s.tier].name.padEnd(12)} cash ${naira(s.cash).padStart(12)} rep ${s.rep.toFixed(0).padStart(3)} served ${s.today.served}/${(s as GameState & { _arr?: number })._arr} lost ${s.today.lost} stock ${s.stock.length} staff ${s.staff.length} avgScore ${Math.round(scores.slice(-40).reduce((a, b) => a + b, 0) / Math.min(40, scores.length))} | wk sales ${acct.sales} cogs ${acct.cogs} n ${acct.n} lost ${acct.lostSales} stockSpend ${acct.stockSpend} stockVal ${stockVal(s)}`);
     Object.assign(acct, { sales: 0, cogs: 0, n: 0, lostSales: 0, stockSpend: 0 });
   }
   s = nextMorning(s);

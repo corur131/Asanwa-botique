@@ -52,7 +52,7 @@ export const PriceModal: React.FC<{ state: GameState; c: Customer; choice: Style
 
 const REACTION_EMOJI = { scream: 'Screams with joy', smile: 'Big smile', okay: 'Nods', frown: 'Frowns', cry: 'Upset' } as const;
 
-export const Reveal: React.FC<{ state: GameState; c: Customer; choice: StyleChoice; stockBefore: GameState['stock']; score: ScoreBreakdown; st: Settlement; onNext: () => void }> = ({ c, choice, stockBefore, score, st, onNext }) => {
+export const Reveal: React.FC<{ state: GameState; c: Customer; choice: StyleChoice; stockBefore: GameState['stock']; score: ScoreBreakdown; st: Settlement; onNext: () => void; canPost?: boolean; posted?: boolean; onPost?: () => void }> = ({ c, choice, stockBefore, score, st, onNext, canPost, posted, onPost }) => {
   const after = buildLook(c, choice, stockBefore);
   const sold = st.outcome === 'paid' || st.outcome === 'bargained';
   const tone = score.total >= 80 ? 'text-emerald-300' : score.total >= 62 ? 'text-amber-300' : 'text-rose-300';
@@ -105,7 +105,7 @@ export const Reveal: React.FC<{ state: GameState; c: Customer; choice: StyleChoi
               <div className="flex justify-between"><span className="text-slate-400">Hair and makeup supplies</span><span className="text-rose-300">−{naira(st.cost)}</span></div>
             </>
           ) : (
-            <div className="text-rose-300">{st.outcome === 'walked' ? 'She walked out without buying.' : 'She refused to buy. The clothes go back on the rail.'}</div>
+            <div className="text-rose-300">{st.outcome === 'walked' ? `${c.male ? 'He' : 'She'} walked out without paying.` : c.service ? `${c.male ? 'He' : 'She'} refused to pay for the work.` : `${c.male ? 'He' : 'She'} refused to buy. The clothes go back on the rail.`}</div>
           )}
           <div className="flex justify-between pt-1 border-t border-white/10">
             <span className="text-slate-400">Reputation</span>
@@ -116,8 +116,17 @@ export const Reveal: React.FC<{ state: GameState; c: Customer; choice: StyleChoi
           </div>
           {st.becameRegular && <div className="text-emerald-300 text-xs pt-1">{c.name} loved it and will come back as a regular.</div>}
         </div>
+        {sold && score.total >= 70 && onPost && (
+          <button
+            disabled={posted || !canPost}
+            onClick={onPost}
+            className="w-full rounded-xl py-3 font-bold text-white bg-gradient-to-r from-yellow-500 via-pink-500 to-purple-600 disabled:opacity-60"
+          >
+            {posted ? 'Posted to Gidigram ✓' : canPost ? 'Post to Gidigram' : 'Posted 3 looks today already'}
+          </button>
+        )}
         <Btn tone="gold" size="lg" className="w-full" onClick={onNext}>
-          Next customer →
+          Back to the shop floor →
         </Btn>
       </div>
     </div>

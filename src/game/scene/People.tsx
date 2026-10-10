@@ -264,7 +264,8 @@ export type Cell = [number, number];
 /** A* over the floor grid; outside cells (z >= d) are always walkable. */
 export function findPath(blocked: boolean[][], from: Cell, to: Cell, w: number, d: number): Cell[] {
   const key = (c: Cell) => `${c[0]},${c[1]}`;
-  const free = (x: number, z: number) => x >= 0 && x < w && z >= 0 && z <= d + 2 && (z >= d || !blocked[z]?.[x]);
+  const free = (x: number, z: number) => x >= -1 && x <= w && z >= 0 && z <= d + 5 && (z >= d ? true : x >= 0 && x < w && !blocked[z]?.[x]);
+  const door = Math.floor(w / 2);
   const open: { c: Cell; g: number; f: number }[] = [{ c: from, g: 0, f: 0 }];
   const came = new Map<string, Cell>();
   const gs = new Map<string, number>([[key(from), 0]]);
@@ -287,6 +288,9 @@ export function findPath(blocked: boolean[][], from: Cell, to: Cell, w: number, 
       const n: Cell = [cur.c[0] + dx, cur.c[1] + dz];
       const nk = key(n);
       if (!free(n[0], n[1]) && nk !== goal) continue;
+      // the front wall: only through the door
+      if (((cur.c[1] === d - 1 && n[1] === d) || (cur.c[1] === d && n[1] === d - 1)) && n[0] !== door) continue;
+      if (n[1] < d && (n[0] < 0 || n[0] >= w)) continue;
       const g = cur.g + 1;
       if (g < (gs.get(nk) ?? 1e9)) {
         gs.set(nk, g);

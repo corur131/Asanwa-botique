@@ -1,18 +1,10 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { OrbitControls } from '@react-three/drei';
 import { GameState } from '../types';
 import { ROOMS, cellsBlocked, footprint, furnitureById, wallLayout, Placed, canPlace } from '../shop';
 import { CeilingPiece, FloorPiece, WallPiece, B } from './Furniture3D';
 import { Cell, FigureLook, Walker, lookToFigure } from './People';
-import { CharacterConfig } from '../../types/character';
-
-export interface Leaver {
-  key: string;
-  look: CharacterConfig;
-  from?: Cell;
-  bag?: boolean;
-}
 
 export interface SceneProps {
   s: GameState;
@@ -21,10 +13,10 @@ export interface SceneProps {
   selected: string | null;
   onPlace: (x: number, z: number) => void;
   onSelect: (uid: string | null) => void;
-  onCustomer: (index: number) => void;
-  leavers: Leaver[];
-  onLeft: (key: string) => void;
+  onCustomer: (id: string) => void;
   night?: boolean;
+  /** NEPA took light. */
+  dark?: boolean;
 }
 
 /** Cells where people stand: the styling spot, Divine's spot, waiting spots, staff spots. */
@@ -60,7 +52,17 @@ export function spots(s: GameState) {
   const waitPool: Cell[] = [];
   for (const st of seats) for (const c of near([st.x, st.z + 1], all).slice(0, furnitureById(st.id).seats || 1)) { waitPool.push(c); taken.add(`${c[0]},${c[1]}`); }
   for (const c of near([r.w - 1, r.d - 1], all)) { waitPool.push(c); taken.add(`${c[0]},${c[1]}`); }
-  return { door, outside, style, divine, wait: waitPool, staff: near([0, 0], all).slice(0, 6) };
+  const staff = near([0, 0], all).slice(0, 6);
+  staff.forEach((c) => taken.add(`${c[0]},${c[1]}`));
+  const staffClient = staff.map((c) => {
+    const n = near(c, all)[0] || c;
+    taken.add(`${n[0]},${n[1]}`);
+    return n;
+  });
+  const wait = waitPool.filter((c) => !staff.some((x) => x[0] === c[0] && x[1] === c[1]) && !staffClient.some((x) => x[0] === c[0] && x[1] === c[1]));
+  // overflow queue on the pavement outside the door
+  const street: Cell[] = Array.from({ length: 12 }, (_, k) => [door[0] + [1, -1, 2, -2][k % 4], r.d + 1 + Math.floor(k / 4)] as Cell);
+  return { door, outside, style, divine, wait, staff, staffClient, street };
 }
 
 function Room({ s }: { s: GameState }) {
@@ -208,6 +210,10 @@ export default function ShopScene(p: SceneProps) {
 
   // people
   const divineLook = useMemo<FigureLook>(() => lookToFigure(s.divine), [s.divine]);
+  const lastSpot = useRef<Record<string, Cell>>({});
+  const gone = useRef<Set<string> | null>(null);
+  if (gone.current === null) gone.current = new Set((s.left || []).map((l) => l.key));
+  const [, rerender] = useState(0);
   const people: React.ReactNode[] = [];
   people.push(<Walker key="divine" look={divineLook} spawn={sp.divine} target={sp.divine} blocked={blocked} w={r.w} d={r.d} />);
   s.staff.forEach((m, i) => {
@@ -215,33 +221,60 @@ export default function ShopScene(p: SceneProps) {
     people.push(<Walker key={m.id} look={lookToFigure(m.look)} spawn={c} target={c} blocked={blocked} w={r.w} d={r.d} />);
   });
   if (s.phase === 'shop') {
-    const waiting = s.queue.slice(s.queueIndex);
-    waiting.slice(0, 1 + sp.wait.length).forEach((c, i) => {
-      const target = i === 0 ? sp.style : sp.wait[i - 1];
+    let k = 0;
+    const queue = [...s.inShop].sort((a, b) => a.arrived - b.arrived);
+    for (const v of queue) {
+      let target: Cell;
+      if (v.by === 'divine') target = sp.style;
+      else if (v.by) {
+        const i = s.staff.findIndex((m) => m.id === v.by);
+        target = sp.staffClient[i] || sp.style;
+      } else {
+        target = sp.wait[k] || sp.street[k - sp.wait.length] || sp.outside;
+        k++;
+      }
+      lastSpot.current[v.c.id] = target;
+      const mine = v.by === 'divine';
+      const clickable = !v.by || mine;
       people.push(
         <Walker
-          key={c.id}
-          look={lookToFigure(c.look)}
+          key={v.c.id}
+          look={lookToFigure(v.c.look)}
           spawn={sp.outside}
           target={target}
           blocked={blocked}
           w={r.w}
           d={r.d}
-          delay={s.queueIndex === 0 ? i * 0.9 : 0}
-          highlight={i === 0}
-          onClick={() => p.onCustomer(s.queueIndex + i)}
+          highlight={mine || (!s.serving && !v.by && k === 1)}
+          onClick={clickable ? () => p.onCustomer(v.c.id) : undefined}
         />,
       );
-    });
+    }
   }
-  p.leavers.forEach((l) => {
-    people.push(<Walker key={`out-${l.key}`} look={lookToFigure(l.look)} spawn={l.from || sp.style} target={sp.outside} blocked={blocked} w={r.w} d={r.d} carryBag={!!l.bag} onArrive={() => p.onLeft(l.key)} />);
-  });
+  for (const l of s.left || []) {
+    if (gone.current.has(l.key)) continue;
+    people.push(
+      <Walker
+        key={`out-${l.key}`}
+        look={lookToFigure(l.look)}
+        spawn={lastSpot.current[l.id] || sp.style}
+        target={sp.outside}
+        blocked={blocked}
+        w={r.w}
+        d={r.d}
+        carryBag={l.bag}
+        onArrive={() => {
+          gone.current!.add(l.key);
+          rerender((n) => n + 1);
+        }}
+      />,
+    );
+  }
 
   return (
     <Canvas shadows dpr={[1, 1.75]} camera={{ fov: 32, position: [cx + dist * 0.75, dist * 0.95, cz + dist * 1.05], near: 0.1, far: 200 }} style={{ background: p.night ? 'linear-gradient(#0b0d1a,#1a1630)' : 'linear-gradient(#24305a,#3a4a7a)' }}>
-      <ambientLight intensity={p.night ? 0.35 : 0.6} />
-      <hemisphereLight args={['#FFF4E0', '#3A3A50', p.night ? 0.3 : 0.55]} />
+      <ambientLight intensity={p.night ? 0.35 : p.dark ? 0.3 : 0.6} />
+      <hemisphereLight args={['#FFF4E0', '#3A3A50', p.night ? 0.3 : p.dark ? 0.25 : 0.55]} />
       <directionalLight position={[cx + 6, 12, cz + 8]} intensity={p.night ? 0.4 : 1.2} castShadow shadow-mapSize={[1024, 1024]} shadow-camera-left={-12} shadow-camera-right={12} shadow-camera-top={12} shadow-camera-bottom={-12} />
       <OrbitControls target={[cx, 0.6, cz]} enablePan={false} minPolarAngle={0.45} maxPolarAngle={1.2} minDistance={dist * 0.45} maxDistance={dist * 1.8} />
       <Room s={s} />

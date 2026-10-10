@@ -51,6 +51,49 @@ export interface Customer {
   male: boolean;
   influencer: boolean;
   regularId?: string;
+  /** Came only for hair and/or makeup: no clothes. */
+  service?: 'hair' | 'makeup' | 'both';
+}
+
+/** Someone inside the shop: waiting, with Divine, or with a staff member. */
+export interface Visitor {
+  c: Customer;
+  /** Game minute they walked in. */
+  arrived: number;
+  /** Minutes they will wait before walking out. */
+  patience: number;
+  /** 'divine' or a staff id once someone is styling them. */
+  by?: string;
+  /** Staff finish at this minute. */
+  until?: number;
+  /** Divine asked staff to take this one. */
+  forStaff?: boolean;
+}
+
+/** Someone walking out, for the 3D scene. */
+export interface Departure {
+  key: string;
+  id: string;
+  look: CharacterConfig;
+  bag: boolean;
+}
+
+export interface LedgerLine {
+  day: number;
+  t: number;
+  label: string;
+  amount: number;
+}
+
+export interface Post {
+  id: string;
+  day: number;
+  look: CharacterConfig;
+  name: string;
+  caption: string;
+  score: number;
+  likes: number;
+  gained: number;
 }
 
 export interface Regular {
@@ -124,10 +167,17 @@ export interface DayLog {
   bestScore: number;
   repChange: number;
   staffServed: number;
+  impatient?: number;
+  doorLost?: number;
+  heatLost?: number;
+  closedOn?: number;
   events: string[];
 }
 
 export interface Message {
+  id: number;
+  /** Game minute (shop clock) it arrived, if during the day. */
+  t?: number;
   day: number;
   from: string;
   text: string;
@@ -135,7 +185,7 @@ export interface Message {
 }
 
 export interface GameState {
-  version: 2;
+  version: 3;
   /** The shop she rents now. */
   listing: Listing;
   /** Furniture she owns: placed in the room or in storage. */
@@ -155,8 +205,21 @@ export interface GameState {
   divine: CharacterConfig;
   slowWeek: boolean;
   phase: 'morning' | 'shop' | 'evening';
-  queue: Customer[];
-  queueIndex: number;
+  /** Shop clock: game minutes since 8:00am. The shop shuts at 720 (8:00pm). */
+  clock: number;
+  /** Customers still to come today, by minute. */
+  arrivals: { at: number; c: Customer }[];
+  inShop: Visitor[];
+  /** Customer id Divine is styling. */
+  serving: string | null;
+  left: Departure[];
+  blackout: { from: number; to: number } | null;
+  ledger: LedgerLine[];
+  followers: number;
+  posts: Post[];
+  msgSeq: number;
+  /** Last message id read, per chat. */
+  read: Record<string, number>;
   today: DayLog;
   history: DayLog[];
   messages: Message[];

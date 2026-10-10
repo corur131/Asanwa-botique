@@ -15,6 +15,8 @@ type Tab = 'outfit' | 'feet' | 'extras' | 'hair' | 'face';
 const wantLabel = (w: Want) =>
   ({ color: `Colour: ${(w as { name?: string }).name}`, native: 'Native', english: 'English wear', gele: 'Gele', noHeels: 'No heels', fitted: 'Show her shape', covered: 'Nothing short or open', jacket: 'Jacket', hair: `Hair: ${(w as { group?: string }).group}`, glam: 'Full glam', naturalFace: 'Light makeup' })[w.kind];
 
+const SERVICE_LABEL = { hair: 'Hair only', makeup: 'Makeup only', both: 'Hair & makeup only' } as const;
+
 export const RequestCard: React.FC<{ c: Customer; compact?: boolean }> = ({ c, compact }) => (
   <div className="rounded-xl border border-amber-500/25 bg-gradient-to-br from-amber-500/10 to-transparent p-4">
     <div className="flex flex-wrap items-center gap-2 mb-2">
@@ -22,6 +24,7 @@ export const RequestCard: React.FC<{ c: Customer; compact?: boolean }> = ({ c, c
       <Pill tone={CLASS_TONE[c.cls]}>{CLASS_LABEL[c.cls]}</Pill>
       <Pill tone="purple">{OCCASION_LABEL[c.occasion]}</Pill>
       {c.regularId && <Pill tone="green">Regular</Pill>}
+      {c.service && <Pill tone="blue">{c.male ? 'Haircut only' : SERVICE_LABEL[c.service]}</Pill>}
       {c.influencer && <Pill tone="red">Influencer: posts about you</Pill>}
     </div>
     {!compact && <p className="text-sm text-slate-200 leading-relaxed italic">"{c.request}"</p>}
@@ -34,41 +37,7 @@ export const RequestCard: React.FC<{ c: Customer; compact?: boolean }> = ({ c, c
   </div>
 );
 
-export const Styling: React.FC<{
-  state: GameState;
-  customer: Customer;
-  served: number;
-  onFinish: (choice: StyleChoice) => void;
-  onTurnAway: () => void;
-  onSendToStaff: (() => void) | null;
-  canWig?: boolean;
-}> = ({ state, customer: c, served, onFinish, onTurnAway, onSendToStaff, canWig = true }) => {
-  const [choice, setChoice] = useState<StyleChoice>({});
-  const [tab, setTab] = useState<Tab>('outfit');
-  const [camera, setCamera] = useState<CameraView>('full');
-  const [showBefore, setShowBefore] = useState(false);
-
-  const shown = useMemo(() => state.stock.filter((d) => d.displayed && d.pieces > 0 && (() => {
-    const e = entryFor(d.kind, d.itemId);
-    return !!e && (e.for === 'both' || e.for === (c.male ? 'm' : 'f'));
-  })()), [state.stock, c.male]);
-  const kind = (k: Design['kind']) => shown.filter((d) => d.kind === k);
-
-  const look = useMemo(() => buildLook(c, choice, state.stock), [c, choice, state.stock]);
-  const cost = lookCost(c, choice, state.stock);
-  const chosen = designsOf(choice, state.stock);
-
-  const toggle = (slot: keyof StyleChoice, uid: string) => {
-    setChoice((ch) => {
-      const next = { ...ch, [slot]: ch[slot] === uid ? undefined : uid };
-      if (slot === 'dress' && next.dress) { next.top = undefined; next.bottom = undefined; }
-      if ((slot === 'top' || slot === 'bottom') && next[slot]) next.dress = undefined;
-      return next;
-    });
-  };
-  const setMakeup = (m: Partial<Makeup>) => setChoice((ch) => ({ ...ch, makeup: { ...(ch.makeup || MAKEUP_LOOKS[0].makeup), ...m } }));
-
-  const ItemList: React.FC<{ title: string; slot: keyof StyleChoice; items: Design[]; empty?: string }> = ({ title, slot, items, empty }) => (
+const ItemList: React.FC<{ title: string; slot: keyof StyleChoice; items: Design[]; empty?: string; choice: StyleChoice; toggle: (slot: keyof StyleChoice, uid: string) => void }> = ({ title, slot, items, empty, choice, toggle }) => (
     <div>
       <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">{title}</div>
       {items.length === 0 ? (
@@ -97,10 +66,59 @@ export const Styling: React.FC<{
     </div>
   );
 
+
+export const Styling: React.FC<{
+  state: GameState;
+  customer: Customer;
+  onFinish: (choice: StyleChoice) => void;
+  onTurnAway: () => void;
+  onSendToStaff: (() => void) | null;
+  canWig?: boolean;
+  /** Keeps work in progress if she steps back to the shop floor. */
+  initial?: StyleChoice;
+  onChange?: (choice: StyleChoice) => void;
+}> = ({ state, customer: c, onFinish, onTurnAway, onSendToStaff, canWig = true, initial, onChange }) => {
+  const [choice, setChoiceRaw] = useState<StyleChoice>(initial || {});
+  const setChoice: typeof setChoiceRaw = (f) => setChoiceRaw((ch) => {
+    const next = typeof f === 'function' ? f(ch) : f;
+    onChange?.(next);
+    return next;
+  });
+  const [tab, setTab] = useState<Tab>(c.service ? (c.service === 'makeup' ? 'face' : 'hair') : 'outfit');
+  const [camera, setCamera] = useState<CameraView>('full');
+  const [showBefore, setShowBefore] = useState(false);
+
+  const shown = useMemo(() => state.stock.filter((d) => d.displayed && d.pieces > 0 && (() => {
+    const e = entryFor(d.kind, d.itemId);
+    return !!e && (e.for === 'both' || e.for === (c.male ? 'm' : 'f'));
+  })()), [state.stock, c.male]);
+  const kind = (k: Design['kind']) => shown.filter((d) => d.kind === k);
+
+  const look = useMemo(() => buildLook(c, choice, state.stock), [c, choice, state.stock]);
+  const preview = useMemo(() => <CharacterSvg config={showBefore ? c.look : look} idPrefix={`sty-${c.id}`} camera={camera} />, [showBefore, c, look, camera]);
+  const cost = lookCost(c, choice, state.stock);
+  const chosen = designsOf(choice, state.stock);
+
+  const toggle = (slot: keyof StyleChoice, uid: string) => {
+    setChoice((ch) => {
+      const next = { ...ch, [slot]: ch[slot] === uid ? undefined : uid };
+      if (slot === 'dress' && next.dress) { next.top = undefined; next.bottom = undefined; }
+      if ((slot === 'top' || slot === 'bottom') && next[slot]) next.dress = undefined;
+      return next;
+    });
+  };
+  const setMakeup = (m: Partial<Makeup>) => setChoice((ch) => ({ ...ch, makeup: { ...(ch.makeup || MAKEUP_LOOKS[0].makeup), ...m } }));
+
   const hairList = c.male ? MALE_HAIR : FEMALE_HAIR;
   const hairColours = HAIR_COLORS.map((h) => ({ name: h.label, color: HAIR_PALETTES[h.id].ends || HAIR_PALETTES[h.id].strandHighlight, id: h.id }));
   const mk = choice.makeup;
-  const tired = served >= 8;
+  const serviceOnly = !!c.service;
+  const tabs: [Tab, string][] = serviceOnly
+    ? [...(c.service !== 'makeup' ? [['hair', c.male ? 'Hair & beard' : 'Hair'] as [Tab, string]] : []), ...(c.service !== 'hair' && !c.male ? [['face', 'Makeup'] as [Tab, string]] : [])]
+    : [['outfit', 'Outfit'], ['feet', 'Shoes & bags'], ['extras', 'Jewellery & head'], ['hair', c.male ? 'Hair & beard' : 'Hair'], ...(c.male ? [] : [['face', 'Makeup'] as [Tab, string]])];
+  const hasOutfit = !!(chosen.dress || chosen.top || chosen.bottom);
+  const didService = !!choice.hair || !!choice.makeup || !!choice.beard;
+  const canFinish = serviceOnly ? didService : hasOutfit || didService;
 
   return (
     <div className="grid lg:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)] gap-4 p-4">
@@ -121,7 +139,7 @@ export const Styling: React.FC<{
             </Chip>
           </div>
           <div className="max-w-[420px] mx-auto">
-            <CharacterSvg config={showBefore ? c.look : look} idPrefix={`sty-${c.id}`} camera={camera} />
+            {preview}
           </div>
         </div>
       </div>
@@ -129,41 +147,36 @@ export const Styling: React.FC<{
       {/* right: tools */}
       <div className="min-w-0 flex flex-col">
         <div className="flex flex-wrap gap-1.5 mb-3">
-          {([
-            ['outfit', 'Outfit'],
-            ['feet', 'Shoes & bags'],
-            ['extras', 'Jewellery & head'],
-            ['hair', c.male ? 'Hair & beard' : 'Hair'],
-            ...(c.male ? [] : [['face', 'Makeup']]),
-          ] as [Tab, string][]).map(([id, label]) => (
+          {tabs.map(([id, label]) => (
             <Btn key={id} size="sm" tone={tab === id ? 'gold' : 'ghost'} onClick={() => setTab(id)}>
               {label}
             </Btn>
           ))}
         </div>
 
+        {serviceOnly && <p className="text-xs text-sky-200 mb-2 rounded-lg border border-sky-500/30 bg-sky-500/10 p-2">{c.name} is not buying clothes today. Just do {c.male ? 'his' : 'her'} {c.service === 'makeup' ? 'face' : c.service === 'both' ? 'hair and face' : 'hair'}, then finish.</p>}
         <div className="flex-1 overflow-y-auto max-h-[56vh] pr-1">
           {tab === 'outfit' && (
             <>
-              <ItemList title={c.male ? 'Native sets & kaftans' : 'Dresses & gowns'} slot="dress" items={kind('dress')} />
-              <ItemList title="Tops" slot="top" items={kind('top')} />
-              <ItemList title="Bottoms" slot="bottom" items={kind('bottom')} />
-              <ItemList title="Outerwear" slot="outer" items={kind('outer')} empty="No jackets on display." />
+              <ItemList title={c.male ? 'Native sets & kaftans' : 'Dresses & gowns'} choice={choice} toggle={toggle} slot="dress" items={kind('dress')} />
+              <ItemList title="Tops" choice={choice} toggle={toggle} slot="top" items={kind('top')} />
+              <ItemList title="Bottoms" choice={choice} toggle={toggle} slot="bottom" items={kind('bottom')} />
+              <ItemList title="Outerwear" choice={choice} toggle={toggle} slot="outer" items={kind('outer')} empty="No jackets on display." />
             </>
           )}
           {tab === 'feet' && (
             <>
-              <ItemList title="Shoes" slot="shoes" items={kind('shoes')} />
-              <ItemList title="Bags" slot="bag" items={kind('bag')} empty="No bags on display." />
+              <ItemList title="Shoes" choice={choice} toggle={toggle} slot="shoes" items={kind('shoes')} />
+              <ItemList title="Bags" choice={choice} toggle={toggle} slot="bag" items={kind('bag')} empty="No bags on display." />
             </>
           )}
           {tab === 'extras' && (
             <>
-              <ItemList title="Headwear" slot="headwear" items={kind('headwear')} empty="No headwear on display." />
-              {!c.male && <ItemList title="Earrings" slot="earrings" items={kind('earrings')} empty="No earrings on display." />}
-              <ItemList title="Necklaces" slot="necklace" items={kind('necklace')} empty="No necklaces on display." />
-              <ItemList title="Wrist" slot="wrist" items={kind('wrist')} empty="No wristwear on display." />
-              <ItemList title="Eyewear" slot="glasses" items={kind('glasses')} empty="No eyewear on display." />
+              <ItemList title="Headwear" choice={choice} toggle={toggle} slot="headwear" items={kind('headwear')} empty="No headwear on display." />
+              {!c.male && <ItemList title="Earrings" choice={choice} toggle={toggle} slot="earrings" items={kind('earrings')} empty="No earrings on display." />}
+              <ItemList title="Necklaces" choice={choice} toggle={toggle} slot="necklace" items={kind('necklace')} empty="No necklaces on display." />
+              <ItemList title="Wrist" choice={choice} toggle={toggle} slot="wrist" items={kind('wrist')} empty="No wristwear on display." />
+              <ItemList title="Eyewear" choice={choice} toggle={toggle} slot="glasses" items={kind('glasses')} empty="No eyewear on display." />
             </>
           )}
           {tab === 'hair' && (
@@ -257,8 +270,8 @@ export const Styling: React.FC<{
             <span className="text-slate-400">
               Pieces used: <b className="text-slate-100">{Object.keys(chosen).length}</b> · Goods {naira(cost.goods)} · Hair {naira(cost.hair)}
             </span>
-            {Object.keys(chosen).length === 0 ? (
-              <span className="text-slate-500">Pick clothes from the rail to see the price</span>
+            {!canFinish ? (
+              <span className="text-slate-500">{serviceOnly ? `Do the ${c.service === 'makeup' ? 'makeup' : 'hair'} to see the price` : 'Pick clothes from the rail to see the price'}</span>
             ) : (
               <span className={cost.fair > c.budget * 1.05 ? 'text-rose-300 font-semibold' : 'text-emerald-300 font-semibold'}>
                 Fair price {naira(cost.low)}–{naira(cost.high)} {cost.fair > c.budget * 1.05 ? '· over her budget!' : ''}
@@ -274,11 +287,11 @@ export const Styling: React.FC<{
                 Send to staff
               </Btn>
             )}
-            <Btn tone="gold" onClick={() => onFinish(choice)} disabled={!chosen.dress && !chosen.top && !chosen.bottom}>
+            <Btn tone="gold" onClick={() => onFinish(serviceOnly ? { hair: choice.hair, hairColor: choice.hairColor, makeup: choice.makeup, makeupLook: choice.makeupLook, beard: choice.beard } : choice)} disabled={!canFinish}>
               Finish look →
             </Btn>
           </div>
-          {tired && <p className="text-[11px] text-amber-300 mt-2">Divine has styled 8 people today. Everyone after this goes to staff or leaves.</p>}
+          {!serviceOnly && !hasOutfit && didService && <p className="text-[11px] text-amber-300 mt-2">No clothes picked. {c.name} came for a full look, so the score will be low.</p>}
         </div>
       </div>
     </div>

@@ -122,7 +122,40 @@ const itemOcc = (d: Design) => {
 };
 const occFit = (occ: Occasion[], target: Occasion) => (occ.includes(target) ? 1 : occ.some((o) => NEAR[target]?.includes(o)) ? 0.6 : 0.15);
 
+/** Hair or makeup only: judged on what they asked for and how well it suits the occasion. */
+function scoreService(c: Customer, choice: StyleChoice): ScoreBreakdown {
+  const notes: string[] = [];
+  const glam = glamLevel(choice.makeup);
+  let hit = 0;
+  for (const w of c.wants) {
+    let ok = 0;
+    if (w.kind === 'hair') ok = choice.hair && (w.group === 'male' || hairGroup(choice.hair) === w.group) ? 1 : 0;
+    if (w.kind === 'glam') ok = glam >= 0.7 ? 1 : glam >= 0.5 ? 0.5 : 0;
+    if (w.kind === 'naturalFace') ok = glam > 0.05 && glam <= 0.4 ? 1 : glam <= 0.55 ? 0.5 : 0;
+    if (ok < 1) notes.push(missLine(w));
+    hit += ok;
+  }
+  hit = c.wants.length ? hit / c.wants.length : 1;
+  const wantsFace = c.service !== 'hair' && !c.male;
+  const wantsHair = c.service !== 'makeup';
+  let quality = 1;
+  if (wantsHair && !choice.hair) { quality -= 0.5; notes.push(c.male ? 'You did not touch his hair.' : 'You did not do her hair.'); }
+  if (wantsFace) {
+    const fit = 1 - Math.min(1, Math.abs(glam - GLAM_WANTED[c.occasion]) * 1.6);
+    quality = quality * 0.5 + fit * 0.5;
+    if (glam < 0.02) notes.push('No makeup.');
+  }
+  const mood = Math.round((Math.random() - 0.5) * 4);
+  const occasion = 35 * quality;
+  const request = 25 * hit;
+  const complete = 15 * hit;
+  const total = Math.max(0, Math.min(100, Math.round(25 + occasion + 40 * hit + mood)));
+  const said = c.male ? notes.map((n) => n.replace(/\bShe\b/g, 'He').replace(/\bshe\b/g, 'he').replace(/\bher\b/g, 'his')) : notes;
+  return { total, occasion: Math.round(occasion), request: Math.round(request), cls: 15, complete: Math.round(complete), harmony: 10, notes: said };
+}
+
 export function scoreLook(c: Customer, choice: StyleChoice, stock: Design[]): ScoreBreakdown {
+  if (c.service) return scoreService(c, choice);
   const d = designsOf(choice, stock);
   const notes: string[] = [];
   const main = [d.dress, d.top, d.bottom].filter(Boolean) as Design[];
@@ -169,7 +202,7 @@ export function scoreLook(c: Customer, choice: StyleChoice, stock: Design[]): Sc
       case 'fitted': ok = main.length && main.every((x) => FITTED.has(x.itemId)) ? 1 : main.some((x) => FITTED.has(x.itemId)) ? 0.5 : 0; break;
       case 'covered': ok = main.length && !main.some((x) => REVEALING.has(x.itemId)) ? 1 : 0; break;
       case 'jacket': ok = d.outer ? 1 : 0; break;
-      case 'hair': ok = choice.hair && hairGroup(choice.hair) === w.group ? 1 : 0; break;
+      case 'hair': ok = choice.hair && (w.group === 'male' || hairGroup(choice.hair) === w.group) ? 1 : 0; break;
       case 'glam': ok = glam >= 0.7 ? 1 : glam >= 0.5 ? 0.5 : 0; break;
       case 'naturalFace': ok = glam > 0.05 && glam <= 0.4 ? 1 : glam <= 0.55 ? 0.5 : 0; break;
     }
@@ -229,7 +262,7 @@ function missLine(w: Customer['wants'][number]): string {
     case 'fitted': return 'She wanted something that shows her shape.';
     case 'covered': return 'Too short or open for what she asked.';
     case 'jacket': return 'No jacket.';
-    case 'hair': return `She wanted ${w.group === 'wig' ? 'a wig' : w.group === 'natural' ? 'natural hair' : w.group}.`;
+    case 'hair': if (w.group === 'male') return 'She wanted a fresh cut.'; return `She wanted ${w.group === 'wig' ? 'a wig' : w.group === 'natural' ? 'natural hair' : w.group}.`;
     case 'glam': return 'She wanted full glam.';
     case 'naturalFace': return 'She wanted light makeup.';
   }

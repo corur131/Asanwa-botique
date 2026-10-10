@@ -18,12 +18,21 @@ export interface ShopTier {
 }
 
 export const TIERS: ShopTier[] = [
-  { name: 'Kiosk', slots: 12, rent: 30_000, moveIn: 0, customers: 5, mix: [0.7, 0.27, 0.03], staff: 0, running: 1_500, luxury: false, blurb: 'A container kiosk on Herbert Macaulay Way, Yaba.' },
-  { name: 'Small shop', slots: 25, rent: 120_000, moveIn: 100_000, customers: 7, mix: [0.55, 0.38, 0.07], staff: 0, running: 3_000, luxury: false, blurb: 'A proper shop in a Yaba plaza, with a fitting room.' },
-  { name: 'Boutique', slots: 45, rent: 330_000, moveIn: 500_000, customers: 10, mix: [0.42, 0.46, 0.12], staff: 2, running: 6_000, luxury: true, blurb: 'A bright boutique in Surulere with a big mirror wall.' },
-  { name: 'Big boutique', slots: 70, rent: 600_000, moveIn: 3_000_000, customers: 14, mix: [0.32, 0.5, 0.18], staff: 4, running: 12_000, luxury: true, blurb: 'Two floors on Admiralty Way, Lekki.' },
-  { name: 'Flagship', slots: 100, rent: 850_000, moveIn: 8_500_000, customers: 18, mix: [0.25, 0.5, 0.25], staff: 6, running: 25_000, luxury: true, blurb: 'The flagship store on Victoria Island. Celebrities come here.' },
+  { name: 'Kiosk', slots: 12, rent: 30_000, moveIn: 0, customers: 9, mix: [0.7, 0.27, 0.03], staff: 0, running: 1_500, luxury: false, blurb: 'A container kiosk on Herbert Macaulay Way, Yaba.' },
+  { name: 'Small shop', slots: 25, rent: 120_000, moveIn: 100_000, customers: 12, mix: [0.55, 0.38, 0.07], staff: 0, running: 3_000, luxury: false, blurb: 'A proper shop in a Yaba plaza, with a fitting room.' },
+  { name: 'Boutique', slots: 45, rent: 330_000, moveIn: 500_000, customers: 16, mix: [0.42, 0.46, 0.12], staff: 2, running: 6_000, luxury: true, blurb: 'A bright boutique in Surulere with a big mirror wall.' },
+  { name: 'Big boutique', slots: 70, rent: 600_000, moveIn: 3_000_000, customers: 21, mix: [0.32, 0.5, 0.18], staff: 4, running: 12_000, luxury: true, blurb: 'Two floors on Admiralty Way, Lekki.' },
+  { name: 'Flagship', slots: 100, rent: 850_000, moveIn: 8_500_000, customers: 27, mix: [0.25, 0.5, 0.25], staff: 6, running: 25_000, luxury: true, blurb: 'The flagship store on Victoria Island. Celebrities come here.' },
 ];
+
+/** The shop is open 8am–8pm: 720 game minutes, one per real second. */
+export const SHOP_MINUTES = 720;
+/** How busy each hour is, 8am first. Lunch and after work are the rush. */
+export const HOUR_WEIGHTS = [0.45, 0.7, 0.9, 1, 1.35, 1.25, 0.9, 0.85, 1.1, 1.45, 1.5, 0.75];
+/** Minutes a customer waits before walking out. */
+export const PATIENCE: Record<CustomerClass, number> = { poor: 80, middle: 65, rich: 45 };
+/** Minutes a staff member takes for one customer at a level. */
+export const staffMinutes = (level: number) => Math.max(30, 90 - 6 * level);
 
 export const START_CASH = 200_000;
 export const MARKUP = 1.35;
@@ -40,6 +49,14 @@ export const BUDGET: Record<CustomerClass, [number, number]> = {
   poor: [6_000, 18_000],
   middle: [20_000, 60_000],
   rich: [100_000, 300_000],
+};
+
+/** Customers who only want hair or makeup done. */
+export const SERVICE_SHARE = { female: 0.22, male: 0.15 };
+export const SERVICE_BUDGET: Record<CustomerClass, [number, number]> = {
+  poor: [4_000, 9_000],
+  middle: [9_000, 26_000],
+  rich: [30_000, 90_000],
 };
 
 /** Wholesale cost multiplier by fabric. */

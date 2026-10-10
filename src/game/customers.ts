@@ -1,8 +1,9 @@
 import { Occasion } from '../constants/catalog';
 import { generateRandomCustomer } from '../utils/randomizer';
-import { BUDGET } from './economy';
+import { BUDGET, SERVICE_BUDGET, SERVICE_SHARE } from './economy';
 import { WANTED_COLOURS } from './colours';
 import { Customer, CustomerClass, GameState, Regular, Want } from './types';
+import { shopStats } from './shop';
 
 const pick = <T,>(a: readonly T[]): T => a[Math.floor(Math.random() * a.length)];
 const chance = (p: number) => Math.random() < p;
@@ -71,13 +72,13 @@ function wantLine(w: Want, male: boolean): string {
     case 'fitted': return pick(['Make it show my shape.', 'I want something that hugs my body.']);
     case 'covered': return pick(['Nothing too short or open.', 'Keep it decent please, nothing short.']);
     case 'jacket': return male ? 'Add a jacket.' : pick(['Add a jacket on top.', 'I want a jacket or something on top.']);
-    case 'hair': return { wig: 'Install a fine wig for me.', braids: 'Do braids for me.', natural: 'I want my natural hair, styled.', updo: 'Pack my hair up.', twists: 'I want twists.', locs: 'I want locs.' }[w.group] || 'Do something with my hair.';
+    case 'hair': if (w.group === 'male') return 'Make the cut sharp.'; return { wig: 'Install a fine wig for me.', braids: 'Do braids for me.', natural: 'I want my natural hair, styled.', updo: 'Pack my hair up.', twists: 'I want twists.', locs: 'I want locs.' }[w.group] || 'Do something with my hair.';
     case 'glam': return pick(['Full glam, I want to slay.', 'Beat my face well well.']);
     case 'naturalFace': return pick(['Light makeup only.', "Soft makeup, I don't like heavy face."]);
   }
 }
 
-function wantsFor(occasion: Occasion, male: boolean, cls: CustomerClass): Want[] {
+function wantsFor(occasion: Occasion, male: boolean, cls: CustomerClass, wigs: boolean): Want[] {
   const pool: Want[] = [];
   const colour = pick(WANTED_COLOURS);
   pool.push({ kind: 'color', color: colour.color, name: colour.name });
@@ -92,7 +93,7 @@ function wantsFor(occasion: Occasion, male: boolean, cls: CustomerClass): Want[]
     if (['party', 'dateNight', 'birthday', 'redCarpet'].includes(occasion)) pool.push({ kind: 'fitted' }, { kind: 'glam' });
     if (['owambe', 'wedding'].includes(occasion)) pool.push({ kind: 'noHeels' }, { kind: 'glam' });
     if (['church', 'office', 'casual', 'brunch'].includes(occasion)) pool.push({ kind: 'naturalFace' });
-    pool.push({ kind: 'hair', group: pick(['wig', 'braids', 'natural', 'updo']) });
+    pool.push({ kind: 'hair', group: pick(wigs ? ['wig', 'braids', 'natural', 'updo'] : ['braids', 'natural', 'updo', 'twists']) });
   }
   if (['office', 'dateNight', 'casual'].includes(occasion)) pool.push({ kind: 'jacket' });
   const n = cls === 'poor' ? (chance(0.5) ? 1 : 0) : chance(0.6) ? 2 : 1;
@@ -118,11 +119,27 @@ function classFor(state: GameState, mix: [number, number, number]): CustomerClas
 
 const roundBudget = (b: number) => (b >= 100_000 ? Math.round(b / 10_000) * 10_000 : Math.round(b / 1_000) * 1_000);
 
+const SERVICE_INTRO = {
+  hair: ["I didn't come for clothes today, just my hair.", 'Only my hair today, I already have my outfit.', "Abeg I just want to make my hair. I have clothes at home."],
+  makeup: ['I just want makeup, my dress is ready.', "Only my face today. I'm wearing my own outfit.", 'Just makeup please, nothing else.'],
+  both: ['Hair and makeup only, I have my outfit already.', "I'm not buying clothes today. Just do my hair and face."],
+  male: ['Just a fresh cut, nothing else.', 'Only haircut and beard today, my guy.', "I just want to look clean. Cut only."],
+};
+
+function serviceWants(kind: NonNullable<Customer['service']>, occasion: Occasion, male: boolean, cls: CustomerClass, wigs: boolean): Want[] {
+  if (male) return [{ kind: 'hair', group: 'male' }];
+  const out: Want[] = [];
+  if (kind !== 'makeup') out.push({ kind: 'hair', group: pick(cls === 'poor' || !wigs ? ['braids', 'natural', 'updo', 'twists', 'locs'] : ['wig', 'wig', 'braids', 'natural', 'updo', 'twists', 'locs']) });
+  if (kind !== 'hair') out.push(['owambe', 'wedding', 'party', 'redCarpet', 'birthday', 'dateNight'].includes(occasion) ? { kind: 'glam' } : { kind: 'naturalFace' });
+  return out;
+}
+
 export function buildRequest(c: Omit<Customer, 'request'>, regular?: Regular): string {
   const intro = pick((c.male ? INTRO_M[c.occasion] : null) || INTRO_F[c.occasion]);
   const parts = [regular ? pick([`Divine! It's me again, ${c.name}.`, `I'm back o! ${c.name}, remember me?`]) : '', intro];
+  if (c.service) parts.push(pick(c.male ? SERVICE_INTRO.male : SERVICE_INTRO[c.service]));
   c.wants.forEach((w) => parts.push(wantLine(w, c.male)));
-  if (regular?.tasteKnown) parts.push(`You know I love ${c.taste.favName}.`);
+  if (regular?.tasteKnown && !c.service) parts.push(`You know I love ${c.taste.favName}.`);
   parts.push(pick(BUDGET_LINE[c.cls]).replace('{b}', `₦${c.budget.toLocaleString('en-NG')}`));
   return parts.filter(Boolean).join(' ');
 }
@@ -151,7 +168,10 @@ export function makeCustomer(state: GameState, mix: [number, number, number]): C
   const male = rolled.body === 'male';
   const look = regular ? rolled : { ...rolled, wardrobe: everydayWardrobe(male), outfit: undefined, accessories: { ...(rolled.accessories || {}), headwear: 'none', shoes: male ? 'slides' : 'flats' } as typeof rolled.accessories };
   const occasion = pick(OCCASIONS[cls]);
-  const [lo, hi] = BUDGET[cls];
+  // nobody asks for a wig install before there's a hair station
+  const wigs = shopStats(state.furniture, state.tier, state.listing.stars).wigs;
+  const service: Customer['service'] = chance(male ? SERVICE_SHARE.male : SERVICE_SHARE.female) ? (male ? 'hair' : pick(['hair', 'hair', 'makeup', 'both'] as const)) : undefined;
+  const [lo, hi] = (service ? SERVICE_BUDGET : BUDGET)[cls];
   const budget = roundBudget(lo + Math.random() * (hi - lo));
   const fav = regular ? { favColor: regular.favColor, favName: regular.favName } : (() => { const c = pick(WANTED_COLOURS); return { favColor: c.color, favName: c.name }; })();
   const base = {
@@ -160,7 +180,8 @@ export function makeCustomer(state: GameState, mix: [number, number, number]): C
     cls,
     occasion,
     budget,
-    wants: wantsFor(occasion, male, cls),
+    wants: service ? serviceWants(service, occasion, male, cls, wigs) : wantsFor(occasion, male, cls, wigs),
+    service,
     taste: fav,
     look,
     male,
