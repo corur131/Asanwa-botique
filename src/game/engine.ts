@@ -8,7 +8,7 @@ import { buildLook, hairGroup, lookCost, scoreLook } from './scoring';
 import { FEMALE_HAIR, MAKEUP_LOOKS } from '../constants/catalog';
 import { colourName } from './colours';
 import { FURNITURE, KIOSK_LISTING, Listing, Placed, STARTER_FURNITURE, autoPlace,
-  findSpot, canPlace, cheapestListing, furnitureById, listingsFor, newUid, prestigeRichShift, prestigeTraffic, shopStats, usesFloor, wallCapacity, wallUsed } from './shop';
+  findSpot, canPlace, ceilingCapacity, ceilingUsed, cheapestListing, furnitureById, listingsFor, newUid, prestigeRichShift, prestigeTraffic, shopStats, usesFloor, wallCapacity, wallUsed } from './shop';
 import { Customer, DayLog, Departure, Design, GameState, LedgerLine, Message, Regular, ScoreBreakdown, Settlement, StaffMember, StyleChoice } from './types';
 
 const pick = <T,>(a: readonly T[]): T => a[Math.floor(Math.random() * a.length)];
@@ -117,7 +117,7 @@ export const followerTraffic = (f: number) => 1 + 0.4 * (f / (f + 3000));
 export function customersToday(s: GameState, slow: boolean) {
   const t = TIERS[s.tier];
   const ramp = Math.min(1, NEW_SHOP_START + (1 - NEW_SHOP_START) * Math.max(0, s.day - s.movedDay) / NEW_SHOP_RAMP_DAYS);
-  const traffic = prestigeTraffic(stats(s).prestige) * followerTraffic(s.followers || 0);
+  const traffic = prestigeTraffic(stats(s).prestige) * followerTraffic(s.followers || 0) * (1 + stats(s).traffic);
   return Math.max(4, Math.round(t.customers * traffic * (0.6 + (s.rep / 100) * 0.8) * (0.85 + Math.random() * 0.3) * (slow ? 0.55 : 1) * ramp));
 }
 
@@ -149,6 +149,7 @@ export function shopBonus(s: GameState, c: Customer, choice: StyleChoice): { bon
   if (choice.hair && st.hairBonus) { bonus += st.hairBonus; notes.push(`Hair station +${st.hairBonus}`); }
   if (!c.male && choice.makeup && st.makeupBonus) { bonus += st.makeupBonus; notes.push(`Makeup station +${st.makeupBonus}`); }
   if (c.cls === 'rich' && st.richBonus) { bonus += st.richBonus; notes.push(`Fitting room +${st.richBonus}`); }
+  if (st.scoreBonus) { bonus += st.scoreBonus; notes.push(`Steamer and lighting +${st.scoreBonus}`); }
   return { bonus: Math.min(10, bonus), notes };
 }
 
@@ -178,13 +179,15 @@ export const divineCapacity = DIVINE_CAPACITY;
 export const staffCapacity = (s: GameState) => s.staff.length * STAFF_CAPACITY;
 
 export const inBlackout = (s: GameState, t = s.clock) => !!s.blackout && t >= s.blackout.from && t < s.blackout.to;
+/** Fans and AC only work when there is light or a generator. */
+export const coolNow = (s: GameState) => (inBlackout(s) && !stats(s).generator ? 0 : stats(s).cool);
 export const waiting = (s: GameState) => s.inShop.filter((v) => !v.by);
 export const visitor = (s: GameState, id: string | null) => (id ? s.inShop.find((v) => v.c.id === id) : undefined);
 export const shopClosing = (s: GameState) => s.phase === 'shop' && s.clock >= SHOP_MINUTES;
 
 function patienceFor(s: GameState, c: Customer) {
   const st = stats(s);
-  let p = PATIENCE[c.cls] * (1 + Math.min(0.4, 0.1 * st.seats)) * (st.repBoost ? 1.15 : 1);
+  let p = PATIENCE[c.cls] * (1 + Math.min(0.4, 0.1 * st.seats)) * (1 + coolNow(s) * 0.6) * (1 + st.patience);
   if (c.regularId) p += 20;
   return Math.round(p);
 }
@@ -326,7 +329,8 @@ export function settle(c: Customer, score: ScoreBreakdown, price: number, suppli
 }
 
 /** Applies a finished look: stock leaves the shop, money and reputation move, the customer walks out. */
-export function applyLook(s0: GameState, c: Customer, choice: StyleChoice, st: Settlement, score: ScoreBreakdown): GameState {
+export function applyLook(s0: GameState, c: Customer, choice: StyleChoice, st0: Settlement, score: ScoreBreakdown): GameState {
+  let st = st0;
   const s = s0;
   const sold = st.outcome === 'paid' || st.outcome === 'bargained';
   let stock = s.stock;
@@ -356,12 +360,13 @@ export function applyLook(s0: GameState, c: Customer, choice: StyleChoice, st: S
   if (c.influencer) today.events = [...today.events, score.total >= 80 ? `${c.name} posted your work to her followers. Reputation up!` : score.total < 60 ? `${c.name} dragged your shop online. Reputation down.` : `${c.name} posted, nothing special.`];
   let next: GameState = {
     ...s,
-    rep: clamp(s.rep + (st.repDelta > 0 ? st.repDelta * (1 + stats(s).repBoost) : st.repDelta), 0, 100),
+    rep: clamp(s.rep + (st.repDelta > 0 ? st.repDelta * (1 + coolNow(s) * 0.6) : st.repDelta), 0, 100),
     stock,
     regulars,
     today,
     stats: { ...s.stats, served: s.stats.served + (sold ? 1 : 0), totalEarned: s.stats.totalEarned + (sold ? st.paid + st.tip - st.cost : 0), bestScore: Math.max(s.stats.bestScore, score.total) },
   };
+  if (sold && st.tip && stats(s).tipBonus) st = { ...st, tip: Math.round((st.tip * (1 + stats(s).tipBonus)) / 100) * 100 };
   if (sold) {
     next = money(next, st.paid + st.tip, `${c.name}${c.service ? ` (${c.service === 'makeup' ? 'makeup' : c.service === 'both' ? 'hair & makeup' : 'hair'})` : ''}${st.tip ? ', with tip' : ''}`);
     next = money(next, -st.cost, 'Hair and makeup supplies');
@@ -477,7 +482,7 @@ function demote(s: GameState): GameState {
   const tier = s.tier - 1;
   const t = TIERS[tier];
   const listing = cheapestListing(tier, week(s.day));
-  const furniture = autoPlace(s.furniture.map((f) => ({ ...f, placed: true })), listing);
+  const furniture = autoPlace(s.furniture.filter((f) => furnitureById(f.id).mount !== 'finish').map((f) => ({ ...f, placed: true })), listing);
   const staff = s.staff.slice(0, t.staff);
   const left = s.staff.slice(t.staff);
   let next: GameState = money({ ...s, tier, listing, furniture, staff, lateRent: null, movedDay: s.day, grace: listing.grace, stats: { ...s.stats, demotions: s.stats.demotions + 1 } }, (s.lateRent?.amount || 0) * 0.5, 'Half the rent debt waived');
@@ -518,7 +523,7 @@ export function moveTo(s: GameState, l: Listing): GameState {
   if (l.tier !== s.tier + 1 || s.cash < l.moveIn) return s;
   const tier = l.tier;
   const t = TIERS[tier];
-  const furniture = autoPlace(s.furniture, l);
+  const furniture = autoPlace(s.furniture.filter((f) => furnitureById(f.id).mount !== 'finish'), l);
   let next: GameState = money({ ...s, tier, listing: l, furniture, movedDay: s.day, grace: l.grace }, -l.moveIn, `Move-in: ${l.street}`);
   next = msg(next, 'Deborah', `We moved! Welcome to your ${t.name} on ${l.street}, ${l.area}. Rent is ${naira(l.rent)} a week and the landlord is ${l.landlord}. The shop holds up to ${t.slots} designs, so buy rails and shelves to fill it. It will be quiet for two weeks while people find us.`, 'good');
   if (t.staff && !s.staff.length) next = msg(next, 'Deborah', `You can hire staff now! Trainees are cheap and loyal; experts are good from day one but they leave for money.`, 'info');
@@ -532,12 +537,30 @@ export function buyFurniture(s: GameState, id: string): GameState {
   const f = furnitureById(id);
   if (!f || s.cash < f.price || (f.minTier || 0) > s.tier) return s;
   const item: Placed = { uid: newUid(), id, x: 0, z: 0, rot: 0, placed: false };
+  let furniture = s.furniture;
   let placedItem: Placed = item;
-  if (f.mount === 'ceiling') placedItem = { ...item, placed: true };
-  else if (f.mount === 'wall') {
-    if (wallUsed(s.furniture) + f.w <= wallCapacity(s.listing)) placedItem = { ...item, placed: true, x: wallUsed(s.furniture) };
-  } else placedItem = findSpot(s.furniture, s.listing, item) || item;
-  return money({ ...s, furniture: [...s.furniture, placedItem] }, -f.price, f.name);
+  if (f.mount === 'finish') {
+    // new paint goes over the old paint; new flooring replaces the old floor
+    furniture = furniture.filter((p) => { const o = furnitureById(p.id); return o.mount !== 'finish' || (f.paint ? !o.paint : !o.floorTiles); });
+    placedItem = { ...item, placed: true };
+  } else if (f.mount === 'ceiling') {
+    if (ceilingUsed(furniture) < ceilingCapacity(s.listing)) placedItem = { ...item, placed: true };
+  } else if (f.mount === 'wall') {
+    if (wallUsed(furniture) + f.w <= wallCapacity(s.listing)) placedItem = { ...item, placed: true, x: wallUsed(furniture) };
+  } else placedItem = findSpot(furniture, s.listing, item) || item;
+  return money({ ...s, furniture: [...furniture, placedItem] }, -f.price, f.name);
+}
+
+/** Turn a piece 90 degrees where it stands (or the nearest spot it fits). */
+export function rotateFurniture(s: GameState, uid: string): GameState {
+  const p = s.furniture.find((f) => f.uid === uid);
+  if (!p || !p.placed || furnitureById(p.id).mount !== 'floor') return s;
+  const rot = (p.rot ? 0 : 1) as 0 | 1;
+  for (const [dx, dz] of [[0, 0], [-1, 0], [0, -1], [-1, -1], [1, 0], [0, 1]]) {
+    const cand: Placed = { ...p, rot, x: p.x + dx, z: p.z + dz };
+    if (canPlace(s.furniture, s.listing, cand)) return { ...s, furniture: s.furniture.map((f) => (f.uid === uid ? cand : f)) };
+  }
+  return s;
 }
 
 export function placeFurniture(s: GameState, uid: string, x: number, z: number, rot: 0 | 1): GameState {
@@ -557,7 +580,10 @@ export function installFurniture(s: GameState, uid: string): GameState {
     if (wallUsed(s.furniture) + f.w > wallCapacity(s.listing)) return s;
     return { ...s, furniture: s.furniture.map((x) => (x.uid === uid ? { ...x, placed: true, x: wallUsed(s.furniture) } : x)) };
   }
-  if (f.mount === 'ceiling') return { ...s, furniture: s.furniture.map((x) => (x.uid === uid ? { ...x, placed: true } : x)) };
+  if (f.mount === 'ceiling') {
+    if (ceilingUsed(s.furniture) >= ceilingCapacity(s.listing)) return s;
+    return { ...s, furniture: s.furniture.map((x) => (x.uid === uid ? { ...x, placed: true } : x)) };
+  }
   const spot = autoPlace([...s.furniture.filter((x) => x.placed), { ...p }], s.listing).find((x) => x.uid === uid)!;
   if (!spot.placed) return s;
   return { ...s, furniture: s.furniture.map((x) => (x.uid === uid ? spot : x)) };

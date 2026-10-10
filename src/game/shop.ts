@@ -1,6 +1,6 @@
 /**
  * The physical shop: listings to rent, the room's floor grid, and furniture.
- * Display space comes from furniture, up to the shop size's limit (TIERS[t].slots).
+ * Display space comes from furniture; floor and wall space are the only limits.
  * Prestige = listing stars + what is inside; it drives customer numbers and how many are rich.
  */
 import { TIERS } from './economy';
@@ -134,7 +134,9 @@ export const room = (k: RoomKey): RoomStyle => (typeof k === 'number' ? roomOf({
 // ---------------------------------------------------------------------------
 // Furniture
 // ---------------------------------------------------------------------------
-export type Mount = 'floor' | 'wall' | 'ceiling';
+export type Mount = 'floor' | 'wall' | 'ceiling' | 'finish';
+export type FurnitureGroup = 'Display' | 'Mirrors' | 'Hair & makeup' | 'Seating' | 'Comfort & power' | 'Lighting' | 'Decor' | 'Paint & floor';
+export const FURNITURE_GROUPS: FurnitureGroup[] = ['Display', 'Mirrors', 'Hair & makeup', 'Seating', 'Comfort & power', 'Lighting', 'Decor', 'Paint & floor'];
 export interface FurnitureDef {
   id: string;
   name: string;
@@ -142,16 +144,33 @@ export interface FurnitureDef {
   w: number;
   d: number;
   mount: Mount;
-  group: 'Display' | 'Mirrors' | 'Hair & makeup' | 'Seating' | 'Comfort' | 'Decor';
+  group: FurnitureGroup;
+  /** Items it can show. */
   slots?: number;
   mirror?: number;
   hairBonus?: number;
   makeupBonus?: number;
   seats?: number;
-  repBoost?: number;
+  /** Cooling, 0..1: customers wait longer and reputation grows faster. Needs light or a generator. */
+  cool?: number;
+  /** Keeps the shop running when NEPA takes light. */
   generator?: boolean;
   wigs?: boolean;
   richBonus?: number;
+  /** Customers wait this much longer (0.15 = 15%). */
+  patience?: number;
+  /** More people walk in (0.05 = 5%). */
+  traffic?: number;
+  /** Points added to every look's score. */
+  scoreBonus?: number;
+  /** Bigger tips. */
+  tipBonus?: number;
+  /** People can walk over it (rugs). */
+  walkable?: boolean;
+  /** Paint: wall and lower-wall colours. */
+  paint?: [string, string];
+  /** Flooring: two tile colours. */
+  floorTiles?: [string, string];
   prestige: number;
   minTier?: number;
   starter?: boolean;
@@ -159,46 +178,100 @@ export interface FurnitureDef {
 }
 
 export const FURNITURE: FurnitureDef[] = [
-  // display
-  { id: 'rustyRail', name: 'Rusty rail', price: 4_000, w: 2, d: 1, mount: 'floor', group: 'Display', slots: 8, prestige: -1, starter: true, note: '8 designs. Squeaks when you touch it.' },
-  { id: 'woodTable', name: 'Wobbly table', price: 3_000, w: 1, d: 1, mount: 'floor', group: 'Display', slots: 4, prestige: 0, starter: true, note: '4 designs.' },
-  { id: 'chromeRail', name: 'Chrome rail', price: 25_000, w: 2, d: 1, mount: 'floor', group: 'Display', slots: 8, prestige: 1, note: '8 designs.' },
-  { id: 'shoeRack', name: 'Shoe rack', price: 15_000, w: 1, d: 1, mount: 'floor', group: 'Display', slots: 5, prestige: 0, note: '5 designs.' },
-  { id: 'wallShelf', name: 'Wall shelves', price: 20_000, w: 2, d: 1, mount: 'wall', group: 'Display', slots: 6, prestige: 1, note: '6 designs, takes no floor space.' },
-  { id: 'mannequin', name: 'Mannequin', price: 30_000, w: 1, d: 1, mount: 'floor', group: 'Display', slots: 2, prestige: 2, note: '2 designs. Makes the shop look serious.' },
-  { id: 'jewelCounter', name: 'Glass jewellery counter', price: 70_000, w: 2, d: 1, mount: 'floor', group: 'Display', slots: 8, prestige: 2, minTier: 1, note: '8 designs, lit glass top.' },
-  { id: 'goldRail', name: 'Gold display rail', price: 140_000, w: 2, d: 1, mount: 'floor', group: 'Display', slots: 10, prestige: 3, minTier: 2, note: '10 designs.' },
-  { id: 'displayWall', name: 'Lit display wall', price: 450_000, w: 3, d: 1, mount: 'wall', group: 'Display', slots: 16, prestige: 5, minTier: 3, note: '16 designs on a glowing wall.' },
+  // display: every rack has its own capacity and takes its own floor space
+  { id: 'rustyRail', name: 'Rusty rail', price: 4_000, w: 2, d: 1, mount: 'floor', group: 'Display', slots: 10, prestige: -1, starter: true, note: 'Holds 10. Squeaks when you touch it.' },
+  { id: 'woodTable', name: 'Wobbly table', price: 3_000, w: 1, d: 1, mount: 'floor', group: 'Display', slots: 4, prestige: 0, starter: true, note: 'Holds 4 folded.' },
+  { id: 'rollingRail', name: 'Rolling rail', price: 12_000, w: 1, d: 1, mount: 'floor', group: 'Display', slots: 8, prestige: 0, note: 'Holds 8. Small, on wheels, fits anywhere.' },
+  { id: 'chromeRail', name: 'Chrome rail', price: 25_000, w: 2, d: 1, mount: 'floor', group: 'Display', slots: 15, prestige: 1, note: 'Holds 15. The standard shop rail.' },
+  { id: 'zRack', name: 'Z-rack', price: 38_000, w: 2, d: 1, mount: 'floor', group: 'Display', slots: 20, prestige: 1, note: 'Holds 20 on a sloped double bar.' },
+  { id: 'doubleRail', name: 'Two-tier rail', price: 48_000, w: 2, d: 1, mount: 'floor', group: 'Display', slots: 24, prestige: 1, minTier: 1, note: 'Holds 24: tops above, skirts below.' },
+  { id: 'roundRack', name: 'Round rack', price: 60_000, w: 2, d: 2, mount: 'floor', group: 'Display', slots: 30, prestige: 1, minTier: 1, note: 'Holds 30 all the way round. Needs space.' },
+  { id: 'nestingTables', name: 'Nesting tables', price: 30_000, w: 2, d: 1, mount: 'floor', group: 'Display', slots: 12, prestige: 1, note: 'Holds 12 folded, at three heights.' },
+  { id: 'shoeRack', name: 'Shoe rack', price: 15_000, w: 1, d: 1, mount: 'floor', group: 'Display', slots: 8, prestige: 0, note: 'Holds 8.' },
+  { id: 'spinner', name: 'Accessory spinner', price: 22_000, w: 1, d: 1, mount: 'floor', group: 'Display', slots: 10, prestige: 1, note: 'Holds 10 small pieces: jewellery, glasses, caps.' },
+  { id: 'mannequin', name: 'Mannequin', price: 30_000, w: 1, d: 1, mount: 'floor', group: 'Display', slots: 2, prestige: 2, traffic: 0.03, note: 'Holds 2. Dressed up, it pulls people in.' },
+  { id: 'woodShelving', name: 'Wooden shelving unit', price: 55_000, w: 2, d: 1, mount: 'floor', group: 'Display', slots: 18, prestige: 2, minTier: 1, note: 'Holds 18 on warm wood shelves.' },
+  { id: 'jewelCounter', name: 'Glass jewellery counter', price: 70_000, w: 2, d: 1, mount: 'floor', group: 'Display', slots: 12, prestige: 2, minTier: 1, tipBonus: 0.05, note: 'Holds 12 under a lit glass top. Doubles as your till.' },
+  { id: 'goldRail', name: 'Gold display rail', price: 140_000, w: 2, d: 1, mount: 'floor', group: 'Display', slots: 20, prestige: 3, minTier: 2, note: 'Holds 20 on a white plinth.' },
+  { id: 'islandTable', name: 'Display island', price: 220_000, w: 2, d: 2, mount: 'floor', group: 'Display', slots: 28, prestige: 3, minTier: 2, note: 'Holds 28. A lit island in the middle of the floor.' },
+  { id: 'glassCabinet', name: 'Glass cabinet', price: 300_000, w: 2, d: 1, mount: 'floor', group: 'Display', slots: 16, prestige: 4, minTier: 3, note: 'Holds 16 behind lit glass.' },
+  { id: 'wallShelf', name: 'Wall shelves', price: 20_000, w: 2, d: 1, mount: 'wall', group: 'Display', slots: 8, prestige: 1, note: 'Holds 8. Uses no floor space.' },
+  { id: 'wallRail', name: 'Wall hanging bar', price: 18_000, w: 2, d: 1, mount: 'wall', group: 'Display', slots: 10, prestige: 0, note: 'Holds 10 hung flat on the wall.' },
+  { id: 'shoeWall', name: 'Shoe wall', price: 35_000, w: 2, d: 1, mount: 'wall', group: 'Display', slots: 12, prestige: 1, note: 'Holds 12 on angled ledges.' },
+  { id: 'slatwall', name: 'Slatwall panel', price: 55_000, w: 3, d: 1, mount: 'wall', group: 'Display', slots: 18, prestige: 1, minTier: 1, note: 'Holds 18 on hooks and shelves.' },
+  { id: 'displayWall', name: 'Lit display wall', price: 450_000, w: 3, d: 1, mount: 'wall', group: 'Display', slots: 30, prestige: 5, minTier: 3, note: 'Holds 30 on a glowing wall.' },
   // mirrors
   { id: 'crackedMirror', name: 'Cracked mirror', price: 2_000, w: 1, d: 1, mount: 'wall', group: 'Mirrors', mirror: 0, prestige: -1, starter: true, note: 'Customers can barely see themselves.' },
+  { id: 'wallMirror', name: 'Long wall mirror', price: 12_000, w: 1, d: 1, mount: 'wall', group: 'Mirrors', mirror: 1, prestige: 0, note: '+1 to every score.' },
   { id: 'standMirror', name: 'Standing mirror', price: 30_000, w: 1, d: 1, mount: 'floor', group: 'Mirrors', mirror: 2, prestige: 1, note: '+2 to every score.' },
+  { id: 'archMirror', name: 'Arched floor mirror', price: 65_000, w: 1, d: 1, mount: 'floor', group: 'Mirrors', mirror: 2, prestige: 2, note: '+2 to every score, and it looks expensive.' },
   { id: 'goldMirror', name: 'Gold-frame mirror', price: 120_000, w: 1, d: 1, mount: 'floor', group: 'Mirrors', mirror: 3, prestige: 2, minTier: 1, note: '+3 to every score.' },
   { id: 'mirrorWall', name: 'Mirror wall', price: 600_000, w: 3, d: 1, mount: 'wall', group: 'Mirrors', mirror: 5, prestige: 4, minTier: 2, note: '+5 to every score. The selfie spot.' },
   // hair and makeup
-  { id: 'plasticChair', name: 'Plastic chair', price: 1_500, w: 1, d: 1, mount: 'floor', group: 'Seating', seats: 1, prestige: -1, starter: true, note: 'One person can wait.' },
   { id: 'hairStation', name: 'Hair station', price: 45_000, w: 1, d: 1, mount: 'floor', group: 'Hair & makeup', hairBonus: 1, wigs: true, prestige: 1, note: 'Needed to install wigs. +1 on hair.' },
+  { id: 'hoodDryer', name: 'Hood dryer', price: 35_000, w: 1, d: 1, mount: 'floor', group: 'Hair & makeup', hairBonus: 2, prestige: 1, note: '+2 on hair: sets braids and curls properly.' },
   { id: 'salonChair', name: 'Salon chair and dryer', price: 160_000, w: 1, d: 1, mount: 'floor', group: 'Hair & makeup', hairBonus: 3, wigs: true, prestige: 2, minTier: 1, note: 'Installs wigs. +3 on hair.' },
   { id: 'ringLight', name: 'Ring light', price: 18_000, w: 1, d: 1, mount: 'floor', group: 'Hair & makeup', makeupBonus: 1, prestige: 1, note: '+1 on made-up looks.' },
   { id: 'makeupStation', name: 'Makeup station', price: 75_000, w: 2, d: 1, mount: 'floor', group: 'Hair & makeup', makeupBonus: 3, prestige: 2, note: '+3 on made-up looks.' },
+  { id: 'vanity', name: 'Hollywood vanity', price: 200_000, w: 2, d: 1, mount: 'floor', group: 'Hair & makeup', makeupBonus: 4, prestige: 3, minTier: 2, note: '+4 on made-up looks. Bulbs all round the mirror.' },
+  { id: 'steamer', name: 'Clothes steamer', price: 25_000, w: 1, d: 1, mount: 'floor', group: 'Hair & makeup', scoreBonus: 1, prestige: 0, note: 'No creases: +1 to every look.' },
   // seating
+  { id: 'plasticChair', name: 'Plastic chair', price: 1_500, w: 1, d: 1, mount: 'floor', group: 'Seating', seats: 1, prestige: -1, starter: true, note: 'One person can wait.' },
+  { id: 'stool', name: 'Padded stool', price: 9_000, w: 1, d: 1, mount: 'floor', group: 'Seating', seats: 1, prestige: 0, note: 'One person waits, and it doesn\'t look cheap.' },
   { id: 'bench', name: 'Wooden bench', price: 20_000, w: 2, d: 1, mount: 'floor', group: 'Seating', seats: 3, prestige: 0, note: 'Three people can wait.' },
+  { id: 'ottoman', name: 'Round ottoman', price: 35_000, w: 1, d: 1, mount: 'floor', group: 'Seating', seats: 2, prestige: 1, note: 'Two people wait. Shoe try-ons too.' },
   { id: 'sofa', name: 'Sofa', price: 110_000, w: 2, d: 1, mount: 'floor', group: 'Seating', seats: 4, prestige: 2, minTier: 1, note: 'Four people wait in comfort.' },
-  { id: 'velvetSofa', name: 'Velvet lounge sofa', price: 380_000, w: 3, d: 1, mount: 'floor', group: 'Seating', seats: 6, prestige: 4, minTier: 3, note: 'Six people, and the rich ones love it.' },
-  // comfort
-  { id: 'fan', name: 'Standing fan', price: 15_000, w: 1, d: 1, mount: 'floor', group: 'Comfort', repBoost: 0.1, prestige: 0, note: 'Reputation grows 10% faster.' },
-  { id: 'ac', name: 'Split AC', price: 220_000, w: 1, d: 1, mount: 'wall', group: 'Comfort', repBoost: 0.25, prestige: 2, minTier: 1, note: 'Reputation grows 25% faster.' },
-  { id: 'generator', name: 'Generator', price: 160_000, w: 1, d: 1, mount: 'floor', group: 'Comfort', generator: true, prestige: 0, note: 'No lost customers when NEPA takes light.' },
+  { id: 'velvetSofa', name: 'Velvet lounge sofa', price: 380_000, w: 3, d: 1, mount: 'floor', group: 'Seating', seats: 6, prestige: 4, minTier: 3, richBonus: 1, note: 'Six people, and the rich ones love it.' },
+  // comfort and power
+  { id: 'fan', name: 'Standing fan', price: 15_000, w: 1, d: 1, mount: 'floor', group: 'Comfort & power', cool: 0.15, prestige: 0, note: 'A bit cooler: people wait longer. Off when NEPA takes light.' },
+  { id: 'ceilingFan', name: 'Ceiling fan', price: 28_000, w: 1, d: 1, mount: 'ceiling', group: 'Comfort & power', cool: 0.2, prestige: 0, note: 'Cooler, and no floor space. Needs light.' },
+  { id: 'ac', name: 'Split AC', price: 220_000, w: 1, d: 1, mount: 'wall', group: 'Comfort & power', cool: 0.4, prestige: 2, minTier: 1, note: 'Cold shop: people wait much longer, reputation grows faster. Needs light.' },
+  { id: 'standingAc', name: 'Standing AC', price: 380_000, w: 1, d: 1, mount: 'floor', group: 'Comfort & power', cool: 0.55, prestige: 2, minTier: 2, note: 'The coldest shop on the street. Needs light.' },
+  { id: 'smallGen', name: '"I better pass my neighbour" generator', price: 70_000, w: 1, d: 1, mount: 'floor', group: 'Comfort & power', generator: true, prestige: -1, note: 'Keeps the lights on when NEPA strikes. Loud.' },
+  { id: 'generator', name: 'Soundproof generator', price: 260_000, w: 1, d: 1, mount: 'floor', group: 'Comfort & power', generator: true, prestige: 1, minTier: 1, note: 'Power through every blackout, quietly.' },
+  { id: 'inverter', name: 'Inverter and solar', price: 520_000, w: 1, d: 1, mount: 'wall', group: 'Comfort & power', generator: true, prestige: 2, minTier: 2, note: 'Silent power from the sun. Very classy.' },
+  { id: 'waterDispenser', name: 'Water dispenser', price: 18_000, w: 1, d: 1, mount: 'floor', group: 'Comfort & power', patience: 0.12, prestige: 0, note: 'Cold water for waiting customers: they wait 12% longer.' },
+  { id: 'speaker', name: 'Bluetooth speaker', price: 12_000, w: 1, d: 1, mount: 'floor', group: 'Comfort & power', traffic: 0.05, patience: 0.05, prestige: 0, note: 'Afrobeats pulls people in from the street.' },
+  { id: 'tv', name: 'Wall TV (fashion channel)', price: 120_000, w: 2, d: 1, mount: 'wall', group: 'Comfort & power', patience: 0.2, prestige: 1, minTier: 1, note: 'Runway shows on loop: people wait 20% longer.' },
+  { id: 'diffuser', name: 'Scent diffuser', price: 15_000, w: 1, d: 1, mount: 'floor', group: 'Comfort & power', patience: 0.05, tipBonus: 0.05, prestige: 1, note: 'The shop smells like money. Slightly bigger tips.' },
+  // lighting
+  { id: 'bareBulb', name: 'Bare bulb', price: 500, w: 1, d: 1, mount: 'ceiling', group: 'Lighting', prestige: -1, starter: true, note: 'One bulb on a wire.' },
+  { id: 'tubeLight', name: 'Fluorescent tube', price: 4_000, w: 1, d: 1, mount: 'ceiling', group: 'Lighting', prestige: 0, note: 'Bright, white, honest.' },
+  { id: 'pendants', name: 'Pendant lights', price: 60_000, w: 1, d: 1, mount: 'ceiling', group: 'Lighting', prestige: 2, minTier: 1, note: 'Warm and stylish.' },
+  { id: 'trackLights', name: 'Track spotlights', price: 85_000, w: 1, d: 1, mount: 'ceiling', group: 'Lighting', prestige: 2, scoreBonus: 1, minTier: 1, note: 'Spotlights make colours pop: +1 to every look.' },
+  { id: 'ledStrip', name: 'LED light strip', price: 35_000, w: 2, d: 1, mount: 'wall', group: 'Lighting', prestige: 1, note: 'A soft glow along the wall.' },
+  { id: 'chandelier', name: 'Crystal chandelier', price: 500_000, w: 1, d: 1, mount: 'ceiling', group: 'Lighting', prestige: 5, minTier: 3, note: 'Pure luxury.' },
   // decor
   { id: 'cardboardSign', name: 'Cardboard sign', price: 500, w: 1, d: 1, mount: 'wall', group: 'Decor', prestige: -1, starter: true, note: '"Divine Styles" in marker.' },
-  { id: 'bareBulb', name: 'Bare bulb', price: 500, w: 1, d: 1, mount: 'ceiling', group: 'Decor', prestige: -1, starter: true, note: 'One bulb on a wire.' },
-  { id: 'plant', name: 'Potted plant', price: 8_000, w: 1, d: 1, mount: 'floor', group: 'Decor', prestige: 1, note: 'Prestige +1.' },
-  { id: 'rug', name: 'Rug', price: 20_000, w: 2, d: 2, mount: 'floor', group: 'Decor', prestige: 1, note: 'Prestige +1. People can walk on it.' },
-  { id: 'wallArt', name: 'Framed fashion prints', price: 25_000, w: 1, d: 1, mount: 'wall', group: 'Decor', prestige: 1, note: 'Prestige +1.' },
-  { id: 'shopSign', name: 'Lit shop sign', price: 40_000, w: 2, d: 1, mount: 'wall', group: 'Decor', prestige: 2, note: 'Prestige +2.' },
-  { id: 'pendants', name: 'Pendant lights', price: 60_000, w: 1, d: 1, mount: 'ceiling', group: 'Decor', prestige: 2, minTier: 1, note: 'Prestige +2. Replaces the bare bulb look.' },
-  { id: 'fittingRoom', name: 'Fitting room', price: 180_000, w: 2, d: 2, mount: 'floor', group: 'Decor', prestige: 3, richBonus: 2, minTier: 1, note: 'Prestige +3, rich clients score +2.' },
-  { id: 'neon', name: 'Neon "Divine" sign', price: 90_000, w: 2, d: 1, mount: 'wall', group: 'Decor', prestige: 3, minTier: 2, note: 'Prestige +3. Very Instagram.' },
-  { id: 'chandelier', name: 'Crystal chandelier', price: 500_000, w: 1, d: 1, mount: 'ceiling', group: 'Decor', prestige: 5, minTier: 3, note: 'Prestige +5.' },
+  { id: 'paintedSign', name: 'Hand-painted sign', price: 10_000, w: 2, d: 1, mount: 'wall', group: 'Decor', prestige: 1, traffic: 0.04, note: 'A proper sign: more people find you.' },
+  { id: 'shopSign', name: 'Lightbox sign', price: 40_000, w: 2, d: 1, mount: 'wall', group: 'Decor', prestige: 2, traffic: 0.08, note: 'Lit at night: more walk-ins.' },
+  { id: 'neon', name: 'Neon "Divine" sign', price: 90_000, w: 2, d: 1, mount: 'wall', group: 'Decor', prestige: 3, traffic: 0.12, minTier: 2, note: 'Very Instagram: more walk-ins.' },
+  { id: 'wallArt', name: 'Framed fashion prints', price: 25_000, w: 1, d: 1, mount: 'wall', group: 'Decor', prestige: 1, note: 'Art that says "we know fashion".' },
+  { id: 'ankaraArt', name: 'Ankara wall art', price: 30_000, w: 2, d: 1, mount: 'wall', group: 'Decor', prestige: 1, note: 'Bold Ankara panels.' },
+  { id: 'clock', name: 'Wall clock', price: 6_000, w: 1, d: 1, mount: 'wall', group: 'Decor', prestige: 0, note: 'Tick tock.' },
+  { id: 'plant', name: 'Potted plant', price: 8_000, w: 1, d: 1, mount: 'floor', group: 'Decor', prestige: 1, note: 'A bit of green.' },
+  { id: 'snakePlant', name: 'Tall snake plant', price: 15_000, w: 1, d: 1, mount: 'floor', group: 'Decor', prestige: 1, note: 'Tall, tidy, impossible to kill.' },
+  { id: 'palm', name: 'Indoor palm', price: 45_000, w: 1, d: 1, mount: 'floor', group: 'Decor', prestige: 2, minTier: 1, note: 'Resort energy.' },
+  { id: 'flowers', name: 'Fresh flowers', price: 10_000, w: 1, d: 1, mount: 'floor', group: 'Decor', prestige: 1, note: 'Roses on a little stand.' },
+  { id: 'rug', name: 'Ankara rug', price: 20_000, w: 2, d: 2, mount: 'floor', group: 'Decor', walkable: true, prestige: 1, note: 'People can walk on it.' },
+  { id: 'fluffyRug', name: 'Round fluffy rug', price: 45_000, w: 2, d: 2, mount: 'floor', group: 'Decor', walkable: true, prestige: 2, minTier: 1, note: 'Soft and pink. People can walk on it.' },
+  { id: 'persianRug', name: 'Persian rug', price: 150_000, w: 3, d: 2, mount: 'floor', group: 'Decor', walkable: true, prestige: 3, minTier: 2, note: 'Deep red and gold. People can walk on it.' },
+  { id: 'curtainCorner', name: 'Curtain changing corner', price: 25_000, w: 1, d: 1, mount: 'floor', group: 'Decor', richBonus: 1, prestige: 1, note: 'Somewhere private to try on: rich clients +1.' },
+  { id: 'fittingRoom', name: 'Fitting room', price: 180_000, w: 2, d: 2, mount: 'floor', group: 'Decor', prestige: 3, richBonus: 2, minTier: 1, note: 'Rich clients score +2.' },
+  { id: 'windowPodium', name: 'Window display podium', price: 90_000, w: 2, d: 1, mount: 'floor', group: 'Decor', prestige: 2, traffic: 0.1, minTier: 1, note: 'Two dressed forms on a podium: more walk-ins.' },
+  // paint and floor: one of each at a time, and they stay behind when you move
+  { id: 'paintWhite', name: 'Fresh white paint', price: 15_000, w: 1, d: 1, mount: 'finish', group: 'Paint & floor', paint: ['#F2EEE6', '#D9D2C4'], prestige: 1, note: 'Clean and bright. Stays with the shop when you move.' },
+  { id: 'paintBlush', name: 'Blush pink paint', price: 20_000, w: 1, d: 1, mount: 'finish', group: 'Paint & floor', paint: ['#F2CACC', '#DCA4AA'], prestige: 1, note: 'Soft and girly.' },
+  { id: 'paintSage', name: 'Sage green paint', price: 20_000, w: 1, d: 1, mount: 'finish', group: 'Paint & floor', paint: ['#B9C9AE', '#93A688'], prestige: 1, note: 'Calm and fresh.' },
+  { id: 'paintTerracotta', name: 'Terracotta paint', price: 20_000, w: 1, d: 1, mount: 'finish', group: 'Paint & floor', paint: ['#C8775A', '#A65C44'], prestige: 1, note: 'Warm and earthy.' },
+  { id: 'paintNavy', name: 'Deep navy paint', price: 25_000, w: 1, d: 1, mount: 'finish', group: 'Paint & floor', paint: ['#26365A', '#1A2640'], prestige: 1, note: 'Moody: colours pop against it.' },
+  { id: 'ankaraWallpaper', name: 'Ankara wallpaper', price: 60_000, w: 1, d: 1, mount: 'finish', group: 'Paint & floor', paint: ['#D8892F', '#2F5D3A'], prestige: 2, minTier: 1, note: 'Bold print on every wall.' },
+  { id: 'goldWallpaper', name: 'Gold damask wallpaper', price: 120_000, w: 1, d: 1, mount: 'finish', group: 'Paint & floor', paint: ['#E8D9B0', '#C9A163'], prestige: 3, minTier: 2, note: 'Old money.' },
+  { id: 'vinylFloor', name: 'Vinyl tiles', price: 25_000, w: 1, d: 1, mount: 'finish', group: 'Paint & floor', floorTiles: ['#D8D2C6', '#C6BEB0'], prestige: 1, note: 'Covers the cracked floor.' },
+  { id: 'woodFloor', name: 'Wood laminate', price: 60_000, w: 1, d: 1, mount: 'finish', group: 'Paint & floor', floorTiles: ['#A97A50', '#996C44'], prestige: 2, minTier: 1, note: 'Warm wood underfoot.' },
+  { id: 'terrazzo', name: 'Terrazzo floor', price: 90_000, w: 1, d: 1, mount: 'finish', group: 'Paint & floor', floorTiles: ['#E6E0D6', '#D6CEC0'], prestige: 2, minTier: 1, note: 'Speckled stone, very Lagos.' },
+  { id: 'herringbone', name: 'Herringbone wood', price: 180_000, w: 1, d: 1, mount: 'finish', group: 'Paint & floor', floorTiles: ['#8A5E3A', '#B4865A'], prestige: 3, minTier: 2, note: 'Designer wood floor.' },
+  { id: 'marbleFloor', name: 'Polished marble', price: 300_000, w: 1, d: 1, mount: 'finish', group: 'Paint & floor', floorTiles: ['#F4F0EA', '#E2DAD0'], prestige: 3, minTier: 3, note: 'Shiny white marble.' },
 ];
 export const furnitureById = (id: string) => FURNITURE.find((f) => f.id === id)!;
 
@@ -217,7 +290,17 @@ export const footprint = (p: Pick<Placed, 'id' | 'rot'>) => {
 };
 
 /** Wall and ceiling items take a wall position, not floor cells. */
-export const usesFloor = (id: string) => furnitureById(id).mount === 'floor' && id !== 'rug';
+export const usesFloor = (id: string) => furnitureById(id).mount === 'floor' && !furnitureById(id).walkable;
+
+/** How many lights and fans the ceiling can take. */
+export const ceilingCapacity = (k: RoomKey) => Math.max(2, Math.floor(room(k).w / 2.4));
+export const ceilingUsed = (items: Placed[]) => items.filter((p) => p.placed && furnitureById(p.id).mount === 'ceiling').length;
+
+/** The paint and the floor the shop has now (the newest of each). */
+export function finishes(items: Placed[]) {
+  const on = items.filter((p) => p.placed && furnitureById(p.id).mount === 'finish').map((p) => furnitureById(p.id));
+  return { paint: [...on].reverse().find((f) => f.paint), floor: [...on].reverse().find((f) => f.floorTiles) };
+}
 
 /** Wall items go along the back wall, then the left wall (the two tall walls). */
 export const wallCapacity = (k: RoomKey) => room(k).w + room(k).d - 1;
@@ -256,10 +339,34 @@ export function canPlace(items: Placed[], tier: RoomKey, p: Placed): boolean {
   if (f.mount !== 'floor') return true;
   const { w, d } = footprint(p);
   if (p.x < 0 || p.z < 0 || p.x + w > r.w || p.z + d > r.d - 1) return false;
-  if (p.id === 'rug') return true;
+  if (f.walkable) return true;
   const g = cellsBlocked(items, tier, p.uid);
   for (let z = p.z; z < p.z + d; z++) for (let x = p.x; x < p.x + w; x++) if (g[z][x]) return false;
-  return true;
+  // nothing may wall off part of the floor: every free cell must still be reachable from the door
+  for (let z = p.z; z < p.z + d; z++) for (let x = p.x; x < p.x + w; x++) g[z][x] = true;
+  return allReachable(g, r.w, r.d);
+}
+
+function allReachable(g: boolean[][], w: number, d: number) {
+  const seen = g.map((row) => row.map(() => false));
+  const door: [number, number] = [Math.floor(w / 2), d - 1];
+  if (g[door[1]][door[0]]) return false;
+  const stack = [door];
+  seen[door[1]][door[0]] = true;
+  let n = 0;
+  while (stack.length) {
+    const [x, z] = stack.pop()!;
+    n++;
+    for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      const nx = x + dx;
+      const nz = z + dz;
+      if (nx < 0 || nz < 0 || nx >= w || nz >= d || seen[nz][nx] || g[nz][nx]) continue;
+      seen[nz][nx] = true;
+      stack.push([nx, nz]);
+    }
+  }
+  const free = g.reduce((a, row) => a + row.filter((b) => !b).length, 0);
+  return n === free;
 }
 
 /** First free floor spot for one new item, leaving everything else where it is. */
@@ -284,7 +391,8 @@ export function autoPlace(items: Placed[], tier: RoomKey): Placed[] {
   const order = [...items].sort((a, b) => furnitureById(b.id).w * furnitureById(b.id).d - furnitureById(a.id).w * furnitureById(a.id).d);
   for (const it of order) {
     const f = furnitureById(it.id);
-    if (f.mount === 'ceiling') { out.push({ ...it, placed: true, x: 0, z: 0 }); continue; }
+    if (f.mount === 'finish') { out.push(it); continue; }
+    if (f.mount === 'ceiling') { const ok = out.filter((o) => o.placed && furnitureById(o.id).mount === 'ceiling').length < ceilingCapacity(tier); out.push({ ...it, placed: ok, x: 0, z: 0 }); continue; }
     if (f.mount === 'wall') {
       const ok = wall + f.w <= cap;
       out.push({ ...it, placed: ok, x: wall, z: 0 });
@@ -314,37 +422,50 @@ export interface ShopStats {
   hairBonus: number;
   makeupBonus: number;
   seats: number;
+  /** How cool the shop is, 0..1 (only while there is power). */
+  cool: number;
   repBoost: number;
   generator: boolean;
   wigs: boolean;
   richBonus: number;
+  patience: number;
+  traffic: number;
+  scoreBonus: number;
+  tipBonus: number;
   furniturePrestige: number;
   prestige: number;
 }
 
-/** Most designs a shop can show: bigger, better listings hold more. */
-export const displayLimit = (tier: number, stars: number) => Math.round(TIERS[tier].slots * (1 + (Math.max(1, stars) - 1) * 0.12));
-
 export function shopStats(items: Placed[], tier: number, stars: number): ShopStats {
-  const placed = items.filter((p) => p.placed).map((p) => furnitureById(p.id));
+  const fin = finishes(items);
+  // only the newest paint and floor count
+  const placed = items.filter((p) => p.placed).map((p) => furnitureById(p.id)).filter((f) => f.mount !== 'finish' || f === fin.paint || f === fin.floor);
   const sum = (k: keyof FurnitureDef) => placed.reduce((a, f) => a + ((f[k] as number) || 0), 0);
   const max = (k: keyof FurnitureDef) => placed.reduce((a, f) => Math.max(a, (f[k] as number) || 0), 0);
-  // pendant lights replace the bare bulb's ugliness
+  // better pieces cancel the starter junk's ugliness
   let fp = sum('prestige');
-  if (placed.some((f) => f.id === 'pendants' || f.id === 'chandelier') && placed.some((f) => f.id === 'bareBulb')) fp += 1;
-  if (placed.some((f) => f.id === 'shopSign' || f.id === 'neon') && placed.some((f) => f.id === 'cardboardSign')) fp += 1;
-  if (placed.some((f) => (f.mirror || 0) > 0) && placed.some((f) => f.id === 'crackedMirror')) fp += 1;
+  const has = (...ids: string[]) => placed.some((f) => ids.includes(f.id));
+  if (has('pendants', 'chandelier', 'trackLights', 'tubeLight') && has('bareBulb')) fp += 1;
+  if (has('paintedSign', 'shopSign', 'neon') && has('cardboardSign')) fp += 1;
+  if (placed.some((f) => (f.mirror || 0) > 0) && has('crackedMirror')) fp += 1;
+  if (has('stool', 'bench', 'ottoman', 'sofa', 'velvetSofa') && has('plasticChair')) fp += 1;
   const furniturePrestige = Math.min(fp, 4 + tier * 4);
+  const cool = Math.min(0.8, sum('cool'));
   return {
-    display: Math.min(displayLimit(tier, stars), sum('slots')),
+    display: sum('slots'),
     mirror: max('mirror'),
     hairBonus: max('hairBonus'),
     makeupBonus: max('makeupBonus'),
     seats: sum('seats'),
-    repBoost: Math.max(...placed.map((f) => f.repBoost || 0), 0),
+    cool,
+    repBoost: cool * 0.6,
     generator: placed.some((f) => f.generator),
     wigs: placed.some((f) => f.wigs),
-    richBonus: max('richBonus'),
+    richBonus: Math.min(3, sum('richBonus')),
+    patience: Math.min(0.5, sum('patience')),
+    traffic: Math.min(0.3, sum('traffic')),
+    scoreBonus: Math.min(2, sum('scoreBonus')),
+    tipBonus: Math.min(0.2, sum('tipBonus')),
     furniturePrestige,
     prestige: stars * 2 + furniturePrestige,
   };

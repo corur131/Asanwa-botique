@@ -12,6 +12,7 @@ import { Styling } from './ui/Styling';
 import { PriceModal, Reveal } from './ui/Checkout';
 import { FurniturePanel, RailPanel, Stars, StaffActions } from './ui/Panels';
 import { AppId, Phone } from './ui/Phone';
+import { furnitureById } from './shop';
 import { armSound, pop, useSound } from './sound';
 
 const ShopScene = lazy(() => import('./scene/ShopScene'));
@@ -33,7 +34,7 @@ export default function GameApp({ onLab }: { onLab: () => void }) {
   const [menu, setMenu] = useState(false);
   const [confirmNew, setConfirmNew] = useState(false);
   const [selected, setSelected] = useState<string | null>(null);
-  const [placing, setPlacing] = useState<{ uid: string; rot: 0 | 1 } | null>(null);
+  const [placing, setPlacing] = useState<{ uid: string; rot: 0 | 1; drag?: boolean } | null>(null);
   const [phone, setPhone] = useState(false);
   const [phoneApp, setPhoneApp] = useState<AppId>('home');
   const [chat, setChat] = useState<string | null>(null);
@@ -45,6 +46,17 @@ export default function GameApp({ onLab }: { onLab: () => void }) {
   const seenMsg = useRef<number>(s?.msgSeq || 0);
   const sound = useSound();
   useEffect(() => armSound(), []);
+  // R turns the piece you're holding (or the one you tapped)
+  useEffect(() => {
+    const on = (e: KeyboardEvent) => {
+      if (e.key !== 'r' && e.key !== 'R') return;
+      if ((e.target as HTMLElement)?.tagName === 'INPUT') return;
+      if (placing) setPlacing({ ...placing, rot: placing.rot ? 0 : 1 });
+      else if (selected) setS((g) => (g && g.phase === 'morning' ? E.rotateFurniture(g, selected) : g));
+    };
+    window.addEventListener('keydown', on);
+    return () => window.removeEventListener('keydown', on);
+  }, [placing, selected]);
   const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -95,6 +107,9 @@ export default function GameApp({ onLab }: { onLab: () => void }) {
   const unread = E.unreadCount(s);
   const closing = E.shopClosing(s);
   const dark = E.inBlackout(s) && s.phase === 'shop';
+  const selectedPiece = selected ? (() => { const p = s.furniture.find((x) => x.uid === selected && x.placed); return p ? furnitureById(p.id) : null; })() : null;
+  // on a phone the side panel covers the shop, so no dragging under it
+  const panelCovers = !!panel && typeof window !== 'undefined' && window.innerWidth < 640;
 
   const restore = async (f: File) => {
     const parsed = E.parseSave(await f.text());
@@ -176,10 +191,14 @@ export default function GameApp({ onLab }: { onLab: () => void }) {
               up((g) => E.placeFurniture(g, placing.uid, x, z, placing.rot));
               setPlacing(null);
             }}
-            onSelect={(uid) => {
+            onSelect={(uid) => setSelected(uid)}
+            editable={s.phase === 'morning' && !panelCovers}
+            onPickUp={(uid) => {
+              const p = s.furniture.find((x) => x.uid === uid);
               setSelected(uid);
-              if (uid && s.phase === 'morning') setPanel('furniture');
+              setPlacing({ uid, rot: p?.rot || 0, drag: true });
             }}
+            onCancel={() => setPlacing(null)}
             onCustomer={styleCustomer}
           />
         </Suspense>
@@ -211,11 +230,27 @@ export default function GameApp({ onLab }: { onLab: () => void }) {
           </button>
         )}
 
-        {placing && (
+        {placing && !placing.drag && (
           <div className="absolute top-3 left-1/2 -translate-x-1/2 z-20 rounded-xl border border-amber-500/50 bg-[#12141c]/95 p-2 flex items-center gap-2 text-sm">
             <span className="text-amber-200 px-1">Tap a free spot to drop it</span>
             <Btn size="sm" onClick={() => setPlacing({ ...placing, rot: placing.rot ? 0 : 1 })}>Rotate</Btn>
             <Btn size="sm" onClick={() => setPlacing(null)}>Cancel</Btn>
+          </div>
+        )}
+        {placing?.drag && (
+          <div className="absolute top-3 left-1/2 -translate-x-1/2 z-20 rounded-xl border border-amber-500/50 bg-[#12141c]/95 px-3 py-2 text-sm text-amber-200 pointer-events-none">
+            Drag to a green spot and let go · press R to turn it
+          </div>
+        )}
+        {/* the piece you tapped */}
+        {selectedPiece && !placing && s.phase === 'morning' && (
+          <div className="absolute top-3 left-1/2 -translate-x-1/2 z-20 rounded-xl border border-amber-500/50 bg-[#12141c]/95 p-2 flex flex-wrap items-center gap-2 text-sm max-w-[92vw]">
+            <span className="text-white font-semibold px-1">{selectedPiece.name}</span>
+            {selectedPiece.mount === 'floor' && <Btn size="sm" onClick={() => up((g) => E.rotateFurniture(g, selected!))}>↻ Rotate</Btn>}
+            {selectedPiece.mount === 'floor' && <Btn size="sm" onClick={() => { const p = s.furniture.find((x) => x.uid === selected); setPlacing({ uid: selected!, rot: p?.rot || 0 }); }}>Move</Btn>}
+            <Btn size="sm" onClick={() => { up((g) => E.storeFurniture(g, selected!)); setSelected(null); }}>Store</Btn>
+            <Btn size="sm" onClick={() => { up((g) => E.sellFurniture(g, selected!)); setSelected(null); }}>Sell · {naira(selectedPiece.price * 0.4)}</Btn>
+            <Btn size="sm" tone="gold" onClick={() => setSelected(null)}>Done</Btn>
           </div>
         )}
 

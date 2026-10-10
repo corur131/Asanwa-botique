@@ -2,14 +2,18 @@ import React, { useMemo, useRef, useState } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { OrbitControls } from '@react-three/drei';
 import { GameState } from '../types';
-import { RoomStyle, room, cellsBlocked, footprint, furnitureById, wallLayout, Placed, canPlace } from '../shop';
+import { RoomStyle, finishes, room, cellsBlocked, footprint, furnitureById, wallLayout, Placed, canPlace } from '../shop';
 import { CeilingPiece, FloorPiece, WallPiece, B } from './Furniture3D';
 import { Cell, FigureLook, Walker, lookToFigure } from './People';
 
 export interface SceneProps {
   s: GameState;
   /** uid of a furniture piece being moved, with its rotation. */
-  placing: { uid: string; rot: 0 | 1 } | null;
+  placing: { uid: string; rot: 0 | 1; drag?: boolean } | null;
+  /** Morning: furniture can be dragged. */
+  editable?: boolean;
+  onPickUp?: (uid: string) => void;
+  onCancel?: () => void;
   selected: string | null;
   onPlace: (x: number, z: number) => void;
   onSelect: (uid: string | null) => void;
@@ -65,7 +69,7 @@ export function spots(s: GameState) {
   return { door, outside, style, divine, wait, staff, staffClient, street };
 }
 
-export function Room({ r, tier }: { r: RoomStyle; tier: number }) {
+export function Room({ r, tier, painted }: { r: RoomStyle; tier: number; painted?: boolean }) {
   const H = r.height;
   const tiles = useMemo(() => {
     const out: React.ReactNode[] = [];
@@ -107,10 +111,10 @@ export function Room({ r, tier }: { r: RoomStyle; tier: number }) {
       <B p={[r.w / 2, H - 0.05, 0.01]} s={[r.w, 0.1, 0.03]} c={r.trim} m={r.kind === 'marble' || r.kind === 'flagship' ? 0.8 : 0} />
       <B p={[0.01, H - 0.05, r.d / 2]} s={[0.03, 0.1, r.d]} c={r.trim} m={r.kind === 'marble' || r.kind === 'flagship' ? 0.8 : 0} />
       {ridges &&
-        Array.from({ length: Math.floor(r.w / 0.25) }, (_, i) => <B key={`rb${i}`} p={[0.12 + i * 0.25, H / 2, 0.01]} s={[0.05, H, 0.03]} c="#4E6670" m={0.3} r={0.6} />)}
+        Array.from({ length: Math.floor(r.w / 0.25) }, (_, i) => <B key={`rb${i}`} p={[0.12 + i * 0.25, H / 2, 0.01]} s={[0.05, H, 0.03]} c={painted ? r.wallLow : '#4E6670'} m={0.3} r={0.6} />)}
       {ridges &&
-        Array.from({ length: Math.floor(r.d / 0.25) }, (_, i) => <B key={`rl${i}`} p={[0.01, H / 2, 0.12 + i * 0.25]} s={[0.03, H, 0.05]} c="#4E6670" m={0.3} r={0.6} />)}
-      {ridges && (
+        Array.from({ length: Math.floor(r.d / 0.25) }, (_, i) => <B key={`rl${i}`} p={[0.01, H / 2, 0.12 + i * 0.25]} s={[0.03, H, 0.05]} c={painted ? r.wallLow : "#4E6670"} m={0.3} r={0.6} />)}
+      {ridges && !painted && (
         <>
           {/* rust and peeling paint */}
           <B p={[1.2, 0.9, 0.03]} s={[0.6, 0.4, 0.01]} c="#8A4B2A" o={0.7} />
@@ -155,7 +159,7 @@ export function Room({ r, tier }: { r: RoomStyle; tier: number }) {
   );
 }
 
-function Furniture({ s, selected, placing, onSelect }: Pick<SceneProps, 's' | 'selected' | 'placing' | 'onSelect'>) {
+function Furniture({ s, selected, placing, onSelect, editable, onPickUp }: Pick<SceneProps, 's' | 'selected' | 'placing' | 'onSelect' | 'editable' | 'onPickUp'>) {
   const r = room(s.listing);
   const wl = wallLayout(s.furniture, s.listing);
   // colours of displayed stock, shared out to display furniture
@@ -178,6 +182,11 @@ function Furniture({ s, selected, placing, onSelect }: Pick<SceneProps, 's' | 's
           e.stopPropagation();
           onSelect(p.uid);
         };
+        const grab = (e: { stopPropagation: () => void }) => {
+          if (!editable || !onPickUp) return;
+          e.stopPropagation();
+          onPickUp(p.uid);
+        };
         if (f.mount === 'wall') {
           const at = wl[p.uid];
           if (!at) return null;
@@ -191,13 +200,14 @@ function Furniture({ s, selected, placing, onSelect }: Pick<SceneProps, 's' | 's
         }
         const { w, d } = footprint(p);
         return (
-          <group key={p.uid} position={[p.x + w / 2, 0, p.z + d / 2]} rotation={[0, p.rot ? -Math.PI / 2 : 0, 0]} onClick={click}>
-            <FloorPiece id={p.id} colors={colors} selected={selected === p.uid} />
+          <group key={p.uid} position={[p.x + w / 2, 0, p.z + d / 2]} rotation={[0, p.rot ? -Math.PI / 2 : 0, 0]} onClick={editable ? undefined : click} onPointerDown={grab} onPointerOver={() => editable && (document.body.style.cursor = 'grab')} onPointerOut={() => (document.body.style.cursor = '')}>
+            <FloorPiece id={p.id} colors={colors} />
+            {selected === p.uid && <B p={[0, 0.012, 0]} s={[f.w - 0.04, 0.02, f.d - 0.04]} c="#F59E0B" e="#F59E0B" ei={0.6} o={0.5} />}
           </group>
         );
       })}
       {ceiling.map((p, i) => (
-        <CeilingPiece key={p.uid} id={p.id} h={r.height} at={[r.w / 2 + (i - (ceiling.length - 1) / 2) * 1.6, 0, r.d / 2 - 0.3]} />
+        <CeilingPiece key={p.uid} id={p.id} h={r.height} at={[((i + 1) * r.w) / (ceiling.length + 1), 0, r.d / 2 - 0.3]} />
       ))}
     </group>
   );
@@ -223,7 +233,21 @@ function PlacingGhost({ s, placing, cell }: { s: GameState; placing: NonNullable
 export default function ShopScene(p: SceneProps) {
   const { s } = p;
   const r = room(s.listing);
+  const fin = finishes(s.furniture);
+  const dressed: RoomStyle = { ...r, ...(fin.paint?.paint ? { wall: fin.paint.paint[0], wallLow: fin.paint.paint[1] } : {}), ...(fin.floor?.floorTiles ? { floor: fin.floor.floorTiles[0], floor2: fin.floor.floorTiles[1] } : {}) };
   const [cell, setCell] = useState<Cell | null>(null);
+  const pickedUid = useRef<string | null>(null);
+  if (p.placing && pickedUid.current !== p.placing.uid) {
+    pickedUid.current = p.placing.uid;
+    const fp = s.furniture.find((x) => x.uid === p.placing!.uid);
+    if (fp && fp.placed && cell?.[0] !== fp.x) setCell([fp.x, fp.z]);
+  }
+  if (!p.placing && pickedUid.current) pickedUid.current = null;
+  const drop = () => {
+    if (!p.placing?.drag) return;
+    if (cell) p.onPlace(cell[0], cell[1]);
+    else p.onCancel?.();
+  };
   const blocked = useMemo(() => cellsBlocked(s.furniture, s.listing), [s.furniture, s.listing]);
   const sp = useMemo(() => spots(s), [s.furniture, s.listing]); // eslint-disable-line react-hooks/exhaustive-deps
   const cx = r.w / 2;
@@ -294,13 +318,14 @@ export default function ShopScene(p: SceneProps) {
   }
 
   return (
+    <div style={{ width: '100%', height: '100%', touchAction: 'none' }} onPointerUp={drop}>
     <Canvas shadows dpr={[1, 1.75]} camera={{ fov: 32, position: [cx + dist * 0.75, dist * 0.95, cz + dist * 1.05], near: 0.1, far: 200 }} style={{ background: p.night ? 'linear-gradient(#0b0d1a,#1a1630)' : 'linear-gradient(#24305a,#3a4a7a)' }}>
       <ambientLight intensity={p.night ? 0.35 : p.dark ? 0.3 : 0.6} />
       <hemisphereLight args={['#FFF4E0', '#3A3A50', p.night ? 0.3 : p.dark ? 0.25 : 0.55]} />
       <directionalLight position={[cx + 6, 12, cz + 8]} intensity={p.night ? 0.4 : 1.2} castShadow shadow-mapSize={[1024, 1024]} shadow-camera-left={-12} shadow-camera-right={12} shadow-camera-top={12} shadow-camera-bottom={-12} />
-      <OrbitControls target={[cx, 0.6, cz]} enablePan={false} minPolarAngle={0.45} maxPolarAngle={1.2} minDistance={dist * 0.45} maxDistance={dist * 1.8} />
-      <Room r={r} tier={s.tier} />
-      <Furniture s={s} selected={p.selected} placing={p.placing} onSelect={p.onSelect} />
+      <OrbitControls enabled={!p.placing} target={[cx, 0.6, cz]} enablePan={false} minPolarAngle={0.45} maxPolarAngle={1.2} minDistance={dist * 0.45} maxDistance={dist * 1.8} />
+      <Room r={dressed} tier={s.tier} painted={!!fin.paint} />
+      <Furniture s={s} selected={p.selected} placing={p.placing} onSelect={p.onSelect} editable={p.editable} onPickUp={p.onPickUp} />
       {people}
       {p.placing && <PlacingGhost s={s} placing={p.placing} cell={cell} />}
       {/* invisible floor to catch clicks and the placing cursor */}
@@ -323,6 +348,7 @@ export default function ShopScene(p: SceneProps) {
         <meshBasicMaterial visible={false} />
       </mesh>
     </Canvas>
+    </div>
   );
 }
 
