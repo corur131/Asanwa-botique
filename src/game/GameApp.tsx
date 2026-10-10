@@ -6,7 +6,7 @@ import { CharacterConfig, SkinToneId } from '../types/character';
 import { SHOP_MINUTES, TIERS, naira } from './economy';
 import * as E from './engine';
 import { lookCost, buildLook } from './scoring';
-import { Customer, GameState, ScoreBreakdown, Settlement, StyleChoice, Visitor } from './types';
+import { Customer, GameState, ScoreBreakdown, Settlement, Shout, StyleChoice, Visitor } from './types';
 import { Bar, Btn, Card, Chip, Modal, Pill } from './ui/kit';
 import { Styling } from './ui/Styling';
 import { PriceModal, Reveal } from './ui/Checkout';
@@ -42,6 +42,8 @@ export default function GameApp({ onLab }: { onLab: () => void }) {
   const [paused, setPaused] = useState(false);
   const [hidden, setHidden] = useState(false);
   const [confirmClose, setConfirmClose] = useState(false);
+  const [bubbles, setBubbles] = useState<Shout[]>([]);
+  const seenShout = useRef<number>(s?.shoutSeq || 0);
   const [toast, setToast] = useState<{ from: string; text: string } | null>(null);
   const seenMsg = useRef<number>(s?.msgSeq || 0);
   const sound = useSound();
@@ -97,6 +99,17 @@ export default function GameApp({ onLab }: { onLab: () => void }) {
     }
   }, [s?.msgSeq]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // NEPA news and customer complaints pop up for a few seconds
+  useEffect(() => {
+    if (!s) return;
+    const fresh = (s.shouts || []).filter((x) => x.id > seenShout.current);
+    if (!fresh.length) return;
+    seenShout.current = s.shoutSeq;
+    if (fresh.some((x) => x.tone !== 'good')) pop();
+    setBubbles((b) => [...b, ...fresh].slice(-4));
+    fresh.forEach((x) => window.setTimeout(() => setBubbles((b) => b.filter((y) => y.id !== x.id)), x.tone === 'nepa' ? 6000 : 4500));
+  }, [s?.shoutSeq]); // eslint-disable-line react-hooks/exhaustive-deps
+
   if (!s) return <NewGame onStart={(cfg) => { const g = E.newGame(cfg); seenMsg.current = g.msgSeq; setS(g); }} onLab={onLab} />;
 
   const up = (f: (g: GameState) => GameState) => setS((g) => (g ? f(g) : g));
@@ -106,7 +119,9 @@ export default function GameApp({ onLab }: { onLab: () => void }) {
   const queue = E.waiting(s).sort((a, b) => a.arrived - b.arrived);
   const unread = E.unreadCount(s);
   const closing = E.shopClosing(s);
-  const dark = E.inBlackout(s) && s.phase === 'shop';
+  const src = s.phase === 'shop' ? E.source(s) : 'grid';
+  const dark = src === 'none';
+  const nepaOff = s.phase === 'shop' && E.inBlackout(s);
   const selectedPiece = selected ? (() => { const p = s.furniture.find((x) => x.uid === selected && x.placed); return p ? furnitureById(p.id) : null; })() : null;
   // on a phone the side panel covers the shop, so no dragging under it
   const panelCovers = !!panel && typeof window !== 'undefined' && window.innerWidth < 640;
@@ -185,7 +200,7 @@ export default function GameApp({ onLab }: { onLab: () => void }) {
             placing={placing}
             selected={selected}
             night={s.phase === 'evening'}
-            dark={dark && !st.generator}
+            dark={dark}
             onPlace={(x, z) => {
               if (!placing) return;
               up((g) => E.placeFurniture(g, placing.uid, x, z, placing.rot));
@@ -214,12 +229,12 @@ export default function GameApp({ onLab }: { onLab: () => void }) {
 
         {/* the clock */}
         {s.phase === 'shop' && (
-          <div className="absolute top-3 right-3 sm:left-1/2 sm:right-auto sm:-translate-x-1/2 z-10 rounded-2xl border border-white/15 bg-[#12141c]/92 backdrop-blur px-3 py-2 flex items-center gap-3">
+          <div className="absolute top-3 right-3 left-3 sm:left-1/2 sm:right-auto sm:-translate-x-1/2 z-10 rounded-2xl border border-white/15 bg-[#12141c]/92 backdrop-blur px-3 py-2 flex flex-wrap items-center gap-x-3 gap-y-1.5 sm:w-max">
             <div className="leading-tight">
               <div className={`text-xl font-bold tabular-nums ${closing ? 'text-rose-300' : 'text-white'}`}>{E.clockText(s.clock)}</div>
               <div className="w-24 h-1 rounded-full bg-white/10 mt-1 overflow-hidden"><div className="h-full bg-amber-400" style={{ width: `${(s.clock / SHOP_MINUTES) * 100}%` }} /></div>
             </div>
-            {dark && <Pill tone="red">{st.generator ? 'Gen on' : 'No light'}</Pill>}
+            <PowerChip s={s} up={up} />
             <Btn size="sm" onClick={() => setPaused((p) => !p)}>{paused ? '▶ Play' : '❚❚ Pause'}</Btn>
             {!s.inShop.length && !s.serving && !closing && s.arrivals.length > 0 && <Btn size="sm" tone="ghost" onClick={() => up(E.skipAhead)}>Skip ⏩</Btn>}
           </div>
@@ -310,6 +325,18 @@ export default function GameApp({ onLab }: { onLab: () => void }) {
           </div>
         )}
 
+        {/* what people are saying in the shop */}
+        {bubbles.length > 0 && (
+          <div className="fixed z-[58] left-3 bottom-36 sm:bottom-40 flex flex-col gap-1.5 w-[min(80vw,340px)] pointer-events-none">
+            {bubbles.map((b) => (
+              <div key={b.id} className={`rounded-2xl px-3 py-2 text-sm shadow-xl border ${b.tone === 'nepa' ? 'bg-slate-900/95 border-amber-400/60 text-amber-200 font-semibold' : b.tone === 'complain' ? 'bg-rose-950/95 border-rose-500/50 text-rose-100' : b.tone === 'warn' ? 'bg-amber-950/95 border-amber-500/50 text-amber-100' : 'bg-emerald-950/95 border-emerald-500/40 text-emerald-100'}`}>
+                <span className="block text-[10px] uppercase tracking-wider opacity-70">{b.who}</span>
+                {b.text}
+              </div>
+            ))}
+          </div>
+        )}
+
         {/* toast */}
         {toast && (
           <button onClick={() => { setToast(null); setStyling(false); openPhone('chats', toast.from); }} className="fixed z-[60] top-3 left-1/2 -translate-x-1/2 w-[min(92vw,380px)] rounded-2xl bg-[#1f2c33]/97 border border-white/10 shadow-2xl p-3 text-left flex gap-3 animate-[fadeIn_.2s_ease-out]">
@@ -371,6 +398,7 @@ export default function GameApp({ onLab }: { onLab: () => void }) {
               {s.phase === 'shop' ? E.clockText(s.clock) : 'Closed'} <span className="text-xs text-slate-400 font-normal">· {queue.length} waiting · {naira(s.cash)}</span>
             </span>
             <div className="flex gap-2">
+              {s.phase === 'shop' && nepaOff && <PowerChip s={s} up={up} />}
               {s.phase === 'shop' && <Btn size="sm" onClick={() => setPaused((p) => !p)}>{paused ? '▶' : '❚❚'}</Btn>}
               {step.kind === 'style' && <Btn size="sm" onClick={() => setStyling(false)}>Shop floor</Btn>}
             </div>
@@ -493,6 +521,23 @@ export default function GameApp({ onLab }: { onLab: () => void }) {
   );
 }
 
+/** NEPA status and the generator switch. */
+const PowerChip: React.FC<{ s: GameState; up: (f: (g: GameState) => GameState) => void }> = ({ s, up }) => {
+  const st = E.stats(s);
+  const src = E.source(s);
+  const off = E.inBlackout(s);
+  if (!off) return <span className="text-xs text-emerald-300 font-semibold">⚡ NEPA</span>;
+  return (
+    <span className="flex items-center gap-1.5">
+      {src === 'solar' && <Pill tone="green">☀ Solar {Math.round(s.power.solar)}m</Pill>}
+      {src === 'gen' && <Pill tone="gold">⛽ Gen on</Pill>}
+      {src === 'none' && <Pill tone="red">No light</Pill>}
+      {st.gen && !s.power.gen && <Btn size="sm" tone="gold" onClick={() => up((g) => E.setGen(g, true))}>Start gen · {naira(E.fuelPerHour(s))}/hr</Btn>}
+      {st.gen && s.power.gen && <Btn size="sm" onClick={() => up((g) => E.setGen(g, false))}>Stop gen</Btn>}
+    </span>
+  );
+};
+
 const PhoneButton: React.FC<{ unread: number; onClick: () => void }> = ({ unread, onClick }) => (
   <button onClick={onClick} className="relative rounded-lg px-3 py-1.5 text-sm font-semibold bg-white/5 border border-white/15 text-white hover:bg-white/10">
     📱 Phone
@@ -501,7 +546,7 @@ const PhoneButton: React.FC<{ unread: number; onClick: () => void }> = ({ unread
 );
 
 const WaitChip: React.FC<{ v: Visitor; clock: number; disabled: boolean; onClick: () => void; onStaff?: () => void }> = ({ v, clock, disabled, onClick, onStaff }) => {
-  const left = Math.max(0, 1 - (clock - v.arrived) / v.patience);
+  const left = Math.max(0, 1 - (v.waited ?? clock - v.arrived) / v.patience);
   return (
     <div className={`shrink-0 w-36 rounded-xl border px-2.5 py-2 ${disabled ? 'border-white/10 bg-white/5 opacity-60' : 'border-white/15 bg-white/5 hover:border-amber-400/60'}`}>
       <button className="w-full text-left" onClick={onClick} disabled={disabled}>

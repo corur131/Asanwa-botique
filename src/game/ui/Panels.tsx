@@ -1,6 +1,6 @@
 import React, { Suspense, lazy, useState } from 'react';
 import { MARKUP, STAFF, TIERS, naira } from '../economy';
-import { Candidate, RaiseAnswer, candidates, canHire, daysToRent, displayCap, displayedCount, listingsNow, marketWage, restockAllCost, stats, waitingRoom } from '../engine';
+import { POWER, fuelPerHour, Candidate, RaiseAnswer, candidates, canHire, daysToRent, displayCap, displayedCount, listingsNow, marketWage, restockAllCost, stats, waitingRoom } from '../engine';
 import { FURNITURE, FURNITURE_GROUPS, FurnitureDef, FurnitureGroup, Listing, ceilingCapacity, ceilingUsed, finishes, furnitureById, roomOf, wallCapacity, wallUsed } from '../shop';
 
 const FurniturePreview = lazy(() => import('../scene/Previews').then((m) => ({ default: m.FurniturePreview })));
@@ -133,7 +133,8 @@ export const ShopStatsCard: React.FC<{ s: GameState }> = ({ s }) => {
         ['Waiting room', `${waitingRoom(s)}`, `people · they wait ${pct(Math.min(0.4, 0.1 * st.seats) + st.patience)} longer`],
         ['Look bonus', `+${st.mirror + st.scoreBonus}`, `mirror +${st.mirror}${st.scoreBonus ? `, steamer/lights +${st.scoreBonus}` : ''}`],
         ['Hair / makeup', `+${st.hairBonus} / +${st.makeupBonus}`, st.wigs ? 'wigs: yes' : 'wigs: need a hair station'],
-        ['Cooling', st.cool ? pct(st.cool) : 'Hot', st.generator ? 'generator: stays on in blackouts' : st.cool ? 'goes off when NEPA takes light' : 'buy a fan or AC'],
+        ['Cooling', st.cool ? pct(st.cool) : 'Hot', st.cool ? 'off in blackouts unless solar or gen' : 'buy a fan or AC: customers complain of heat'],
+        ['Power', st.solarPanels ? `${st.solarPanels} solar` : st.gen ? 'Generator' : 'NEPA only', `${st.gen ? `${st.gen === 'big' ? 'big' : 'small'} gen (${naira(fuelPerHour(s))}/hr)` : 'no gen'} · solar ${Math.round(s.power?.solar || 0)}/${st.solarPanels * POWER.minutesPerPanel} min${st.solarPanels >= POWER.acPanels ? ' · runs AC' : ''}`],
         ['Walk-ins', st.traffic ? pct(st.traffic) : '+0%', 'signs, music, window display'],
         ['Tips', st.tipBonus ? pct(st.tipBonus) : '+0%', 'counter, scent'],
       ].map(([k, v, n]) => (

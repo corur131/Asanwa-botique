@@ -159,7 +159,7 @@ export function Room({ r, tier, painted }: { r: RoomStyle; tier: number; painted
   );
 }
 
-function Furniture({ s, selected, placing, onSelect, editable, onPickUp }: Pick<SceneProps, 's' | 'selected' | 'placing' | 'onSelect' | 'editable' | 'onPickUp'>) {
+function Furniture({ s, selected, placing, onSelect, editable, onPickUp, dark }: Pick<SceneProps, 's' | 'selected' | 'placing' | 'onSelect' | 'editable' | 'onPickUp' | 'dark'>) {
   const r = room(s.listing);
   const wl = wallLayout(s.furniture, s.listing);
   // colours of displayed stock, shared out to display furniture
@@ -175,7 +175,7 @@ function Furniture({ s, selected, placing, onSelect, editable, onPickUp }: Pick<
     <group>
       {s.furniture.filter((p) => p.placed).map((p) => {
         const f = furnitureById(p.id);
-        if (f.mount === 'ceiling') return null;
+        if (f.mount === 'ceiling' || f.mount === 'finish' || f.mount === 'roof') return null;
         if (placing?.uid === p.uid) return null;
         const colors = f.slots ? take(f.slots) : [];
         const click = (e: { stopPropagation: () => void }) => {
@@ -206,8 +206,16 @@ function Furniture({ s, selected, placing, onSelect, editable, onPickUp }: Pick<
           </group>
         );
       })}
+      {/* solar panels on a frame beside the shop */}
+      {s.furniture.filter((p) => furnitureById(p.id).mount === 'roof').map((p, i) => (
+        <group key={p.uid} position={[r.w + 0.9, 0, 0.6 + i * 0.95]}>
+          <B p={[0, 0.6, 0]} s={[0.06, 1.2, 0.06]} c="#888" m={0.6} />
+          <B p={[0, 1.25, 0]} s={[1.0, 0.04, 0.8]} c="#1B2A4A" m={0.5} r={0.2} rot={[0, 0, 0.35]} />
+          <B p={[0, 1.27, 0]} s={[0.95, 0.01, 0.75]} c="#2C4A7A" m={0.7} r={0.15} rot={[0, 0, 0.35]} />
+        </group>
+      ))}
       {ceiling.map((p, i) => (
-        <CeilingPiece key={p.uid} id={p.id} h={r.height} at={[((i + 1) * r.w) / (ceiling.length + 1), 0, r.d / 2 - 0.3]} />
+        <CeilingPiece key={p.uid} id={p.id} off={dark} h={r.height} at={[((i + 1) * r.w) / (ceiling.length + 1), 0, r.d / 2 - 0.3]} />
       ))}
     </group>
   );
@@ -320,12 +328,12 @@ export default function ShopScene(p: SceneProps) {
   return (
     <div style={{ width: '100%', height: '100%', touchAction: 'none' }} onPointerUp={drop}>
     <Canvas shadows dpr={[1, 1.75]} camera={{ fov: 32, position: [cx + dist * 0.75, dist * 0.95, cz + dist * 1.05], near: 0.1, far: 200 }} style={{ background: p.night ? 'linear-gradient(#0b0d1a,#1a1630)' : 'linear-gradient(#24305a,#3a4a7a)' }}>
-      <ambientLight intensity={p.night ? 0.35 : p.dark ? 0.3 : 0.6} />
-      <hemisphereLight args={['#FFF4E0', '#3A3A50', p.night ? 0.3 : p.dark ? 0.25 : 0.55]} />
-      <directionalLight position={[cx + 6, 12, cz + 8]} intensity={p.night ? 0.4 : 1.2} castShadow shadow-mapSize={[1024, 1024]} shadow-camera-left={-12} shadow-camera-right={12} shadow-camera-top={12} shadow-camera-bottom={-12} />
+      <ambientLight intensity={p.night ? 0.35 : p.dark ? 0.14 : 0.6} />
+      <hemisphereLight args={['#FFF4E0', '#3A3A50', p.night ? 0.3 : p.dark ? 0.12 : 0.55]} />
+      <directionalLight position={[cx + 6, 12, cz + 8]} intensity={p.night ? 0.4 : p.dark ? 0.35 : 1.2} castShadow shadow-mapSize={[1024, 1024]} shadow-camera-left={-12} shadow-camera-right={12} shadow-camera-top={12} shadow-camera-bottom={-12} />
       <OrbitControls enabled={!p.placing} target={[cx, 0.6, cz]} enablePan={false} minPolarAngle={0.45} maxPolarAngle={1.2} minDistance={dist * 0.45} maxDistance={dist * 1.8} />
       <Room r={dressed} tier={s.tier} painted={!!fin.paint} />
-      <Furniture s={s} selected={p.selected} placing={p.placing} onSelect={p.onSelect} editable={p.editable} onPickUp={p.onPickUp} />
+      <Furniture s={s} selected={p.selected} placing={p.placing} onSelect={p.onSelect} editable={p.editable} onPickUp={p.onPickUp} dark={p.dark} />
       {people}
       {p.placing && <PlacingGhost s={s} placing={p.placing} cell={cell} />}
       {/* invisible floor to catch clicks and the placing cursor */}

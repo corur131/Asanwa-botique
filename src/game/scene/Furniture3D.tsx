@@ -735,13 +735,14 @@ export function WallPiece({ id, colors }: { id: string; colors: string[] }) {
   }
 }
 
-export function CeilingPiece({ id, h, at }: { id: string; h: number; at: V3 }) {
+export function CeilingPiece({ id, h, at, off }: { id: string; h: number; at: V3; off?: boolean }) {
+  const glowK = off ? 0 : 1;
   if (id === 'bareBulb')
     return (
       <group position={at}>
         <B p={[0, h - 0.3, 0]} s={[0.01, 0.6, 0.01]} c="#111" />
-        <Ball p={[0, h - 0.65, 0]} r={0.06} c="#FFF2C0" e="#FFE29A" ei={2} />
-        <pointLight position={[0, h - 0.75, 0]} intensity={3} distance={6} color="#FFD58A" />
+        <Ball p={[0, h - 0.65, 0]} r={0.06} c="#FFF2C0" e="#FFE29A" ei={2 * glowK} />
+        {!off && <pointLight position={[0, h - 0.75, 0]} intensity={3} distance={6} color="#FFD58A" />}
       </group>
     );
   if (id === 'ceilingFan')
@@ -756,8 +757,8 @@ export function CeilingPiece({ id, h, at }: { id: string; h: number; at: V3 }) {
     return (
       <group position={at}>
         <B p={[0, h - 0.05, 0]} s={[1.2, 0.05, 0.12]} c="#EEE" />
-        <Cyl p={[0, h - 0.11, 0]} r1={0.025} h={1.15} c="#FFF" e="#F2F8FF" ei={2} rot={[0, 0, Math.PI / 2]} />
-        <pointLight position={[0, h - 0.4, 0]} intensity={4} distance={7} color="#EEF4FF" />
+        <Cyl p={[0, h - 0.11, 0]} r1={0.025} h={1.15} c="#FFF" e="#F2F8FF" ei={2 * glowK} rot={[0, 0, Math.PI / 2]} />
+        {!off && <pointLight position={[0, h - 0.4, 0]} intensity={4} distance={7} color="#EEF4FF" />}
       </group>
     );
   if (id === 'trackLights')
@@ -767,10 +768,10 @@ export function CeilingPiece({ id, h, at }: { id: string; h: number; at: V3 }) {
         {[-1, -0.35, 0.35, 1].map((x, i) => (
           <group key={x} position={[x, h - 0.15, 0]} rotation={[i % 2 ? 0.5 : -0.5, 0, 0]}>
             <Cyl p={[0, 0, 0]} r1={0.05} r2={0.07} h={0.16} c="#1E1E24" />
-            <Cyl p={[0, -0.085, 0]} r1={0.055} h={0.01} c="#FFF" e="#FFF0D0" ei={2} />
+            <Cyl p={[0, -0.085, 0]} r1={0.055} h={0.01} c="#FFF" e="#FFF0D0" ei={2 * glowK} />
           </group>
         ))}
-        <pointLight position={[0, h - 0.6, 0.4]} intensity={5} distance={8} color="#FFF0D8" />
+        {!off && <pointLight position={[0, h - 0.6, 0.4]} intensity={5} distance={8} color="#FFF0D8" />}
       </group>
     );
   if (id === 'pendants')
@@ -780,10 +781,10 @@ export function CeilingPiece({ id, h, at }: { id: string; h: number; at: V3 }) {
           <group key={x} position={[x, 0, 0]}>
             <B p={[0, h - 0.35, 0]} s={[0.01, 0.7, 0.01]} c="#111" />
             <Cyl p={[0, h - 0.78, 0]} r1={0.06} r2={0.2} h={0.18} c="#1E1E24" />
-            <Ball p={[0, h - 0.88, 0]} r={0.05} c="#FFF" e="#FFE9B0" ei={2} />
+            <Ball p={[0, h - 0.88, 0]} r={0.05} c="#FFF" e="#FFE9B0" ei={2 * glowK} />
           </group>
         ))}
-        <pointLight position={[0, h - 1, 0]} intensity={5} distance={8} color="#FFE2B0" />
+        {!off && <pointLight position={[0, h - 1, 0]} intensity={5} distance={8} color="#FFE2B0" />}
       </group>
     );
   if (id === 'chandelier')
@@ -793,10 +794,10 @@ export function CeilingPiece({ id, h, at }: { id: string; h: number; at: V3 }) {
         {[0.5, 0.35, 0.2].map((r, k) =>
           Array.from({ length: 10 - k * 2 }, (_, i) => {
             const a = (i / (10 - k * 2)) * Math.PI * 2;
-            return <Ball key={`${k}-${i}`} p={[Math.cos(a) * r, h - 0.6 - k * 0.18, Math.sin(a) * r]} r={0.05} c="#EAF6FF" e="#FFFFFF" ei={0.8} m={0.3} rough={0.05} o={0.85} />;
+            return <Ball key={`${k}-${i}`} p={[Math.cos(a) * r, h - 0.6 - k * 0.18, Math.sin(a) * r]} r={0.05} c="#EAF6FF" e="#FFFFFF" ei={0.8 * glowK} m={0.3} rough={0.05} o={0.85} />;
           }),
         )}
-        <pointLight position={[0, h - 1, 0]} intensity={8} distance={12} color="#FFF4E0" />
+        {!off && <pointLight position={[0, h - 1, 0]} intensity={8} distance={12} color="#FFF4E0" />}
       </group>
     );
   return null;

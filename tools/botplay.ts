@@ -6,7 +6,7 @@ import { MAKEUP_LOOKS } from '../src/constants/catalog';
 import { TIERS, naira } from '../src/game/economy';
 import { MARKET, canBuy, makeDesign } from '../src/game/market';
 import { NAMED_COLOURS } from '../src/game/colours';
-import { applyLook, buyDesign, displayedCount, displayCap, listingsNow, moveTo, buyFurniture, stats, newGame, nextMorning, openShop, settle, canHire, candidates, hire, train, restockAll, tick, startStyling, waiting, staffChoice } from '../src/game/engine';
+import { applyLook, buyDesign, displayedCount, displayCap, listingsNow, moveTo, buyFurniture, stats, newGame, nextMorning, openShop, settle, canHire, candidates, hire, train, restockAll, tick, startStyling, waiting, staffChoice, inBlackout, setGen } from '../src/game/engine';
 import { lookCost, scoreLook } from '../src/game/scoring';
 import { SHOP_MINUTES } from '../src/game/economy';
 import { Customer, GameState, StyleChoice } from '../src/game/types';
@@ -86,6 +86,8 @@ for (let d = 0; d < days; d++) {
   const next = s.tier + 1 < TIERS.length ? TIERS[s.tier + 1] : null;
   const opt = listingsNow(s)[1];
   if (next && opt && s.cash > opt.moveIn + opt.rent * 2 + next.slots * 2 * 9000 * 0.5 + 60_000) s = moveTo(s, opt);
+  if (!s.furniture.some((f) => f.id === 'fan') && s.cash > 90_000) s = buyFurniture(s, 'fan');
+  if (!stats(s).gen && s.cash > 180_000) s = buyFurniture(s, 'smallGen');
   if (canHire(s) && s.cash > s.listing.rent * 3) s = hire(s, candidates(s)[0]);
   for (const m of s.staff) if (m.level < 9 && s.cash > s.listing.rent * 4) s = train(s, m.id);
   s = openShop(s);
@@ -93,12 +95,13 @@ for (let d = 0; d < days; d++) {
   let guard = 0;
   while (s.phase === 'shop' && guard++ < 5000) {
     const w = waiting(s).sort((a, b) => Number(b.c.cls === 'rich') - Number(a.c.cls === 'rich') || a.arrived - b.arrived);
+    if (inBlackout(s) && !s.power.gen && stats(s).gen) s = setGen(s, true);
     if (!w.length || s.clock >= SHOP_MINUTES) { s = tick(s, 1); continue; }
     const c = w[0].c;
     s = startStyling(s, c.id);
     const ch = bestLook(s, c);
     const dur = (c.service ? SPEED * 0.5 : SPEED) * (0.75 + Math.random() * 0.5);
-    for (let m = 0; m < dur; m++) s = tick(s, 1);
+    for (let m = 0; m < dur; m++) { if (inBlackout(s) && !s.power.gen && stats(s).gen) s = setGen(s, true); s = tick(s, 1); }
     const score = scoreLook(c, ch, s.stock);
     const cost = lookCost(c, ch, s.stock);
     const price = Math.min(cost.fair, Math.round(c.budget));

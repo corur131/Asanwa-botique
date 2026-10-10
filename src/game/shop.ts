@@ -134,7 +134,7 @@ export const room = (k: RoomKey): RoomStyle => (typeof k === 'number' ? roomOf({
 // ---------------------------------------------------------------------------
 // Furniture
 // ---------------------------------------------------------------------------
-export type Mount = 'floor' | 'wall' | 'ceiling' | 'finish';
+export type Mount = 'floor' | 'wall' | 'ceiling' | 'finish' | 'roof';
 export type FurnitureGroup = 'Display' | 'Mirrors' | 'Hair & makeup' | 'Seating' | 'Comfort & power' | 'Lighting' | 'Decor' | 'Paint & floor';
 export const FURNITURE_GROUPS: FurnitureGroup[] = ['Display', 'Mirrors', 'Hair & makeup', 'Seating', 'Comfort & power', 'Lighting', 'Decor', 'Paint & floor'];
 export interface FurnitureDef {
@@ -153,8 +153,12 @@ export interface FurnitureDef {
   seats?: number;
   /** Cooling, 0..1: customers wait longer and reputation grows faster. Needs light or a generator. */
   cool?: number;
-  /** Keeps the shop running when NEPA takes light. */
-  generator?: boolean;
+  /** Is an air conditioner (needs a big generator or 3+ solar panels in a blackout). */
+  ac?: boolean;
+  /** A generator: small runs lights and fans; big runs everything. You switch it on; it burns fuel. */
+  gen?: 'small' | 'big';
+  /** A solar panel with battery: comes on by itself in a blackout. Stack them for longer. */
+  solar?: boolean;
   wigs?: boolean;
   richBonus?: number;
   /** Customers wait this much longer (0.15 = 15%). */
@@ -225,11 +229,11 @@ export const FURNITURE: FurnitureDef[] = [
   // comfort and power
   { id: 'fan', name: 'Standing fan', price: 15_000, w: 1, d: 1, mount: 'floor', group: 'Comfort & power', cool: 0.15, prestige: 0, note: 'A bit cooler: people wait longer. Off when NEPA takes light.' },
   { id: 'ceilingFan', name: 'Ceiling fan', price: 28_000, w: 1, d: 1, mount: 'ceiling', group: 'Comfort & power', cool: 0.2, prestige: 0, note: 'Cooler, and no floor space. Needs light.' },
-  { id: 'ac', name: 'Split AC', price: 220_000, w: 1, d: 1, mount: 'wall', group: 'Comfort & power', cool: 0.4, prestige: 2, minTier: 1, note: 'Cold shop: people wait much longer, reputation grows faster. Needs light.' },
-  { id: 'standingAc', name: 'Standing AC', price: 380_000, w: 1, d: 1, mount: 'floor', group: 'Comfort & power', cool: 0.55, prestige: 2, minTier: 2, note: 'The coldest shop on the street. Needs light.' },
-  { id: 'smallGen', name: '"I better pass my neighbour" generator', price: 70_000, w: 1, d: 1, mount: 'floor', group: 'Comfort & power', generator: true, prestige: -1, note: 'Keeps the lights on when NEPA strikes. Loud.' },
-  { id: 'generator', name: 'Soundproof generator', price: 260_000, w: 1, d: 1, mount: 'floor', group: 'Comfort & power', generator: true, prestige: 1, minTier: 1, note: 'Power through every blackout, quietly.' },
-  { id: 'inverter', name: 'Inverter and solar', price: 520_000, w: 1, d: 1, mount: 'wall', group: 'Comfort & power', generator: true, prestige: 2, minTier: 2, note: 'Silent power from the sun. Very classy.' },
+  { id: 'ac', name: 'Split AC', price: 220_000, w: 1, d: 1, mount: 'wall', group: 'Comfort & power', cool: 0.4, ac: true, prestige: 2, minTier: 1, note: 'Cold shop: people wait much longer, reputation grows faster. Needs light.' },
+  { id: 'standingAc', name: 'Standing AC', price: 380_000, w: 1, d: 1, mount: 'floor', group: 'Comfort & power', cool: 0.55, ac: true, prestige: 2, minTier: 2, note: 'The coldest shop on the street. Needs light.' },
+  { id: 'smallGen', name: '"I better pass my neighbour" generator', price: 70_000, w: 1, d: 1, mount: 'floor', group: 'Comfort & power', gen: 'small', prestige: -1, note: 'Start it when NEPA takes light. Runs lights and fans, not AC. Fuel: ₦1,200 an hour.' },
+  { id: 'generator', name: 'Soundproof generator', price: 260_000, w: 1, d: 1, mount: 'floor', group: 'Comfort & power', gen: 'big', prestige: 1, minTier: 1, note: 'Runs everything, AC included, quietly. Fuel: ₦2,600 an hour.' },
+  { id: 'inverter', name: 'Solar panel and battery', price: 150_000, w: 1, d: 1, mount: 'roof', group: 'Comfort & power', solar: true, prestige: 1, note: 'Comes on by itself when NEPA takes light, free and silent; customers love it. Each panel adds about 1 hour 40 minutes. 3 or more can run AC. Recharges while there is light.' },
   { id: 'waterDispenser', name: 'Water dispenser', price: 18_000, w: 1, d: 1, mount: 'floor', group: 'Comfort & power', patience: 0.12, prestige: 0, note: 'Cold water for waiting customers: they wait 12% longer.' },
   { id: 'speaker', name: 'Bluetooth speaker', price: 12_000, w: 1, d: 1, mount: 'floor', group: 'Comfort & power', traffic: 0.05, patience: 0.05, prestige: 0, note: 'Afrobeats pulls people in from the street.' },
   { id: 'tv', name: 'Wall TV (fashion channel)', price: 120_000, w: 2, d: 1, mount: 'wall', group: 'Comfort & power', patience: 0.2, prestige: 1, minTier: 1, note: 'Runway shows on loop: people wait 20% longer.' },
@@ -391,7 +395,7 @@ export function autoPlace(items: Placed[], tier: RoomKey): Placed[] {
   const order = [...items].sort((a, b) => furnitureById(b.id).w * furnitureById(b.id).d - furnitureById(a.id).w * furnitureById(a.id).d);
   for (const it of order) {
     const f = furnitureById(it.id);
-    if (f.mount === 'finish') { out.push(it); continue; }
+    if (f.mount === 'finish' || f.mount === 'roof') { out.push({ ...it, placed: true }); continue; }
     if (f.mount === 'ceiling') { const ok = out.filter((o) => o.placed && furnitureById(o.id).mount === 'ceiling').length < ceilingCapacity(tier); out.push({ ...it, placed: ok, x: 0, z: 0 }); continue; }
     if (f.mount === 'wall') {
       const ok = wall + f.w <= cap;
@@ -425,7 +429,12 @@ export interface ShopStats {
   /** How cool the shop is, 0..1 (only while there is power). */
   cool: number;
   repBoost: number;
-  generator: boolean;
+  /** Best generator owned. */
+  gen: 'small' | 'big' | null;
+  solarPanels: number;
+  /** Cooling from fans only, and from AC only. */
+  coolFans: number;
+  coolAc: number;
   wigs: boolean;
   richBonus: number;
   patience: number;
@@ -459,7 +468,10 @@ export function shopStats(items: Placed[], tier: number, stars: number): ShopSta
     seats: sum('seats'),
     cool,
     repBoost: cool * 0.6,
-    generator: placed.some((f) => f.generator),
+    gen: placed.some((f) => f.gen === 'big') ? 'big' : placed.some((f) => f.gen === 'small') ? 'small' : null,
+    solarPanels: placed.filter((f) => f.solar).length,
+    coolFans: Math.min(0.8, placed.filter((f) => !f.ac).reduce((a, f) => a + (f.cool || 0), 0)),
+    coolAc: Math.min(0.8, placed.filter((f) => f.ac).reduce((a, f) => a + (f.cool || 0), 0)),
     wigs: placed.some((f) => f.wigs),
     richBonus: Math.min(3, sum('richBonus')),
     patience: Math.min(0.5, sum('patience')),

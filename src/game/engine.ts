@@ -3,6 +3,7 @@ import { generateRandomCustomer } from '../utils/randomizer';
 import { DIVINE_CAPACITY, HOUR_WEIGHTS, PATIENCE, SHOP_MINUTES, staffMinutes, NEW_SHOP_RAMP_DAYS, NEW_SHOP_START, SERVICE_FEE, SLOW_WEEK_CHANCE, STAFF, STAFF_CAPACITY, START_CASH, SUPPLIES_SHARE, MARKUP, TIERS, naira } from './economy';
 import { canBuy, entryFor, isClothing, makeDesign, pieceCost } from './market';
 import { FabricId } from '../types/character';
+import { POWER as POWER_CFG, addShout, coolRunning, drainRate, nepaOff, outageAt, planOutages, powerStep, source } from './power';
 import { makeCustomer } from './customers';
 import { buildLook, hairGroup, lookCost, scoreLook } from './scoring';
 import { FEMALE_HAIR, MAKEUP_LOOKS } from '../constants/catalog';
@@ -64,7 +65,7 @@ const STARTER: [string, string, string, string, number][] = [
   ['earrings', 'goldStuds', '#C9A163', '#C9A163', 0],
 ];
 
-const freshDay = { clock: 0, arrivals: [], inShop: [], serving: null, left: [], blackout: null };
+const freshDay = { clock: 0, arrivals: [], inShop: [], serving: null, left: [], outages: [] as GameState['outages'], shouts: [] as GameState['shouts'] };
 
 export function newGame(divine: CharacterConfig): GameState {
   const stock = STARTER.map(([kind, id, c, c2, pat]) => {
@@ -73,7 +74,7 @@ export function newGame(divine: CharacterConfig): GameState {
   });
   const spent = stock.reduce((a, d) => a + d.cost * d.pieces, 0);
   let s: GameState = {
-    version: 3,
+    version: 4,
     listing: KIOSK_LISTING,
     furniture: STARTER_FURNITURE.map((f) => ({ ...f, uid: newUid() })),
     day: 1,
@@ -91,6 +92,8 @@ export function newGame(divine: CharacterConfig): GameState {
     slowWeek: false,
     phase: 'morning',
     ...freshDay,
+    power: { gen: false, solar: 0 },
+    shoutSeq: 0,
     ledger: [],
     followers: 120,
     posts: [],
@@ -137,7 +140,7 @@ export function scoreInShop(s: GameState, c: Customer, choice: StyleChoice): Sco
   const base = scoreLook(c, choice, s.stock);
   const b = shopBonus(s, c, choice);
   if (!b.bonus) return base;
-  return { ...base, total: Math.min(100, base.total + b.bonus), bonus: b.bonus, bonusNotes: b.notes } as ScoreBreakdown;
+  return { ...base, total: Math.max(0, Math.min(100, base.total + b.bonus)), bonus: b.bonus, bonusNotes: b.notes } as ScoreBreakdown;
 }
 
 /** Extra score from the shop itself: mirror, stations, fitting room. */
@@ -150,6 +153,9 @@ export function shopBonus(s: GameState, c: Customer, choice: StyleChoice): { bon
   if (!c.male && choice.makeup && st.makeupBonus) { bonus += st.makeupBonus; notes.push(`Makeup station +${st.makeupBonus}`); }
   if (c.cls === 'rich' && st.richBonus) { bonus += st.richBonus; notes.push(`Fitting room +${st.richBonus}`); }
   if (st.scoreBonus) { bonus += st.scoreBonus; notes.push(`Steamer and lighting +${st.scoreBonus}`); }
+  const src = s.phase === 'shop' ? source(s) : 'grid';
+  if (src === 'solar') { bonus += 2; notes.push('Cool and quiet on solar +2'); }
+  if (src === 'none') { bonus -= 4; notes.push('Styled in the dark and heat -4'); }
   return { bonus: Math.min(10, bonus), notes };
 }
 
@@ -167,20 +173,23 @@ export function openShop(s0: GameState): GameState {
   mix[0] = Math.max(0.05, mix[0] - shift);
   mix[2] = Math.max(0, mix[2] + shift);
   const arrivals = Array.from({ length: n }, () => ({ at: arrivalMinute(), c: makeCustomer(s, mix) })).sort((a, b) => a.at - b.at);
-  let blackout: GameState['blackout'] = null;
-  if (s.day > 2 && chance(1 / 8)) {
-    const from = Math.floor(60 + Math.random() * 480);
-    blackout = { from, to: from + 120 + Math.floor(Math.random() * 120) };
+  const outages = planOutages(s.day);
+  let next: GameState = { ...s, slowWeek: slow, arrivals, outages, power: { gen: false, solar: s.power?.solar || 0 } };
+  if (outageAt(next, 0)) {
+    next = addShout(next, 'NEPA', 'No light this morning. NEPA took it before you opened.', 'nepa');
+    if (stats(next).solarPanels && next.power.solar > 0) next = addShout(next, 'Solar', 'Solar is running the shop for now.', 'good');
+    else if (stats(next).gen) next = addShout(next, 'Deborah', 'Start the generator before customers come!', 'warn');
   }
-  return { ...s, slowWeek: slow, arrivals, blackout };
+  return next;
 }
 
 export const divineCapacity = DIVINE_CAPACITY;
 export const staffCapacity = (s: GameState) => s.staff.length * STAFF_CAPACITY;
 
-export const inBlackout = (s: GameState, t = s.clock) => !!s.blackout && t >= s.blackout.from && t < s.blackout.to;
-/** Fans and AC only work when there is light or a generator. */
-export const coolNow = (s: GameState) => (inBlackout(s) && !stats(s).generator ? 0 : stats(s).cool);
+export const inBlackout = (s: GameState, t = s.clock) => nepaOff(s, t);
+/** Fans and AC only work when there is light, solar or a generator. */
+export const coolNow = (s: GameState) => coolRunning(s);
+export { POWER, fuelPerHour, setGen, source } from './power';
 export const waiting = (s: GameState) => s.inShop.filter((v) => !v.by);
 export const visitor = (s: GameState, id: string | null) => (id ? s.inShop.find((v) => v.c.id === id) : undefined);
 export const shopClosing = (s: GameState) => s.phase === 'shop' && s.clock >= SHOP_MINUTES;
@@ -212,15 +221,19 @@ export function tick(s0: GameState, minutes: number): GameState {
   while (s.arrivals.length && s.arrivals[0].at <= end) {
     const [a, ...rest] = s.arrivals;
     s = { ...s, arrivals: rest };
-    if (inBlackout(s, a.at) && !st.generator && chance(0.35)) { lostHeat++; continue; }
+    // passers-by look in at a dark, hot shop and keep walking
+    if (source(s, a.at) === 'none' && chance({ poor: 0.2, middle: 0.35, rich: 0.6 }[a.c.cls])) { lostHeat++; continue; }
     if (waiting(s).length >= waitingRoom(s)) { lostDoor++; continue; }
-    s = { ...s, inShop: [...s.inShop, { c: a.c, arrived: a.at, patience: patienceFor(s, a.c) }] };
+    s = { ...s, inShop: [...s.inShop, { c: a.c, arrived: a.at, patience: patienceFor(s, a.c), waited: 0 }] };
   }
   if (lostDoor || lostHeat) s = { ...s, today: { ...s.today, lost: s.today.lost + lostDoor + lostHeat, doorLost: (s.today.doorLost || 0) + lostDoor, heatLost: (s.today.heatLost || 0) + lostHeat } };
+  s = powerStep(s, s.clock, end);
   s = { ...s, clock: end };
-  // tired of waiting
+  // tired of waiting: heat and darkness use patience up faster
+  const step = end - s0.clock;
+  s = { ...s, inShop: s.inShop.map((v) => (v.by ? v : { ...v, waited: (v.waited ?? Math.max(0, s0.clock - v.arrived)) + step * drainRate(s, v.c.cls) })) };
   for (const v of waiting(s)) {
-    if (end - v.arrived > v.patience * (inBlackout(s) && !st.generator ? 0.6 : 1)) {
+    if ((v.waited || 0) > v.patience) {
       s = depart(s, v.c, v.c.look, false);
       s = { ...s, rep: clamp(s.rep - 0.4, 0, 100), today: { ...s.today, lost: s.today.lost + 1, impatient: (s.today.impatient || 0) + 1, repChange: s.today.repChange - 0.4 } };
     }
@@ -433,14 +446,20 @@ export function closeShop(s0: GameState): GameState {
   if (sentHome) s = { ...s, today: { ...s.today, lost: s.today.lost + sentHome, closedOn: (s.today.closedOn || 0) + sentHome } };
   s = { ...s, arrivals: [], serving: null, clock: Math.max(s.clock, 0) };
   const t = { ...TIERS[s.tier], rent: s.listing.rent };
-  s = money(s, -t.running, 'Light, fuel and running costs');
+  if (s.today.fuel) s = { ...s, ledger: [{ day: s.day, t: -1, label: 'Generator fuel', amount: -Math.round(s.today.fuel) }, ...(s.ledger || [])].slice(0, 150), power: { ...s.power, gen: false } };
+  s = money(s, -t.running, 'NEPA bill and running costs');
   s = { ...s, today: { ...s.today, costs: s.today.costs + t.running } };
   const d = s.today;
   const ev: string[] = [];
   if (d.impatient) ev.push(`${d.impatient} customer${d.impatient > 1 ? 's' : ''} got tired of waiting and left.`);
   if (d.doorLost) ev.push(`${d.doorLost} turned back at the door: no space to wait. More seats would keep them.`);
-  if (d.heatLost) ev.push(`NEPA took light and ${d.heatLost} left in the heat. A generator would keep them.`);
-  if (s.blackout && !d.heatLost) ev.push(stats(s).generator ? 'NEPA took light, but your generator kept the shop going.' : 'NEPA took light for a while today.');
+  if (d.outageMinutes) {
+    const h = Math.floor(d.outageMinutes / 60);
+    const m = Math.round(d.outageMinutes % 60);
+    ev.push(`NEPA took light for ${h ? `${h}h ` : ''}${m}m of opening time.`);
+  }
+  if (d.heatLost) ev.push(`${d.heatLost} walked past a dark, hot shop without coming in.`);
+  if (d.fuel) ev.push(`The generator burnt ${naira(d.fuel)} of fuel.`);
   if (d.closedOn) ev.push(`${d.closedOn} ${d.closedOn > 1 ? 'were' : 'was'} still waiting at closing time and went home.`);
   s = { ...s, today: { ...s.today, events: [...s.today.events, ...ev] } };
 
@@ -539,6 +558,11 @@ export function buyFurniture(s: GameState, id: string): GameState {
   const item: Placed = { uid: newUid(), id, x: 0, z: 0, rot: 0, placed: false };
   let furniture = s.furniture;
   let placedItem: Placed = item;
+  if (f.mount === 'roof') {
+    if (furniture.filter((p) => furnitureById(p.id).mount === 'roof').length >= POWER_CFG.maxPanels) return s;
+    const next = money({ ...s, furniture: [...furniture, { ...item, placed: true }] }, -f.price, f.name);
+    return { ...next, power: { gen: next.power?.gen || false, solar: (next.power?.solar || 0) + POWER_CFG.minutesPerPanel } };
+  }
   if (f.mount === 'finish') {
     // new paint goes over the old paint; new flooring replaces the old floor
     furniture = furniture.filter((p) => { const o = furnitureById(p.id); return o.mount !== 'finish' || (f.paint ? !o.paint : !o.floorTiles); });
@@ -836,7 +860,21 @@ const KEY = 'asanwa-boutique-save-v1';
 function migrate(raw: GameState): GameState | null {
   type Old = Omit<GameState, 'version'> & { version: number; queue?: unknown; queueIndex?: unknown };
   let s = raw as unknown as Old;
-  if (s.version === 3) return s as GameState;
+  if (s.version === 4) return s as GameState;
+  if (s.version === 3) {
+    const o = s as unknown as GameState & { blackout?: unknown };
+    delete o.blackout;
+    const midDay = o.phase === 'shop';
+    return {
+      ...o,
+      version: 4,
+      outages: [],
+      power: { gen: false, solar: 0 },
+      shouts: [],
+      shoutSeq: 0,
+      ...(midDay ? { ...freshDay, phase: 'morning' as const, today: emptyLog(o.day) } : {}),
+    };
+  }
   if (s.version === 1) {
     const listing = s.tier === 0 ? KIOSK_LISTING : { ...cheapestListing(s.tier, week(s.day)), rent: TIERS[s.tier].rent, stars: 2 };
     const base = STARTER_FURNITURE.map((f) => ({ ...f, uid: newUid() }));
@@ -850,8 +888,10 @@ function migrate(raw: GameState): GameState | null {
   const midDay = s.phase === 'shop';
   return {
     ...(rest as unknown as GameState),
-    version: 3,
+    version: 4,
     ...freshDay,
+    power: { gen: false, solar: 0 },
+    shoutSeq: 0,
     phase: midDay ? 'morning' : s.phase,
     today: midDay ? emptyLog(s.day) : s.today,
     ledger: [],

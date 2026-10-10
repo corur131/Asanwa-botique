@@ -68,6 +68,9 @@ export interface Visitor {
   until?: number;
   /** Divine asked staff to take this one. */
   forStaff?: boolean;
+  /** Minutes of patience used up (heat and darkness use it up faster). */
+  waited?: number;
+  complained?: boolean;
 }
 
 /** Someone walking out, for the 3D scene. */
@@ -76,6 +79,13 @@ export interface Departure {
   id: string;
   look: CharacterConfig;
   bag: boolean;
+}
+
+export interface Shout {
+  id: number;
+  who: string;
+  text: string;
+  tone: 'nepa' | 'complain' | 'good' | 'warn';
 }
 
 export interface LedgerLine {
@@ -171,6 +181,8 @@ export interface DayLog {
   doorLost?: number;
   heatLost?: number;
   closedOn?: number;
+  fuel?: number;
+  outageMinutes?: number;
   events: string[];
 }
 
@@ -185,7 +197,7 @@ export interface Message {
 }
 
 export interface GameState {
-  version: 3;
+  version: 4;
   /** The shop she rents now. */
   listing: Listing;
   /** Furniture she owns: placed in the room or in storage. */
@@ -213,7 +225,12 @@ export interface GameState {
   /** Customer id Divine is styling. */
   serving: string | null;
   left: Departure[];
-  blackout: { from: number; to: number } | null;
+  /** NEPA cuts today, in shop minutes (can start before opening and run past closing). */
+  outages: { from: number; to: number }[];
+  power: { gen: boolean; solar: number };
+  /** Things said out loud in the shop: NEPA news and customer complaints. */
+  shouts: Shout[];
+  shoutSeq: number;
   ledger: LedgerLine[];
   followers: number;
   posts: Post[];
