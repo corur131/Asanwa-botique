@@ -1,5 +1,6 @@
 import { CharacterConfig, FabricId, Makeup } from '../types/character';
 import { Occasion } from '../constants/catalog';
+import type { Listing, Placed } from './shop';
 
 export type CustomerClass = 'poor' | 'middle' | 'rich';
 
@@ -107,6 +108,9 @@ export interface ScoreBreakdown {
   complete: number;
   harmony: number;
   notes: string[];
+  /** Points the shop added (mirror, stations). */
+  bonus?: number;
+  bonusNotes?: string[];
 }
 
 export interface DayLog {
@@ -131,7 +135,11 @@ export interface Message {
 }
 
 export interface GameState {
-  version: 1;
+  version: 2;
+  /** The shop she rents now. */
+  listing: Listing;
+  /** Furniture she owns: placed in the room or in storage. */
+  furniture: Placed[];
   day: number;
   cash: number;
   rep: number;

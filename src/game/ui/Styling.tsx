@@ -41,7 +41,8 @@ export const Styling: React.FC<{
   onFinish: (choice: StyleChoice) => void;
   onTurnAway: () => void;
   onSendToStaff: (() => void) | null;
-}> = ({ state, customer: c, served, onFinish, onTurnAway, onSendToStaff }) => {
+  canWig?: boolean;
+}> = ({ state, customer: c, served, onFinish, onTurnAway, onSendToStaff, canWig = true }) => {
   const [choice, setChoice] = useState<StyleChoice>({});
   const [tab, setTab] = useState<Tab>('outfit');
   const [camera, setCamera] = useState<CameraView>('full');
@@ -141,7 +142,7 @@ export const Styling: React.FC<{
           ))}
         </div>
 
-        <div className="flex-1 overflow-y-auto max-h-[60vh] pr-1">
+        <div className="flex-1 overflow-y-auto max-h-[56vh] pr-1">
           {tab === 'outfit' && (
             <>
               <ItemList title={c.male ? 'Native sets & kaftans' : 'Dresses & gowns'} slot="dress" items={kind('dress')} />
@@ -169,12 +170,15 @@ export const Styling: React.FC<{
             <>
               <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">Install a style (attachments sold at markup)</div>
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5 mb-3">
-                {hairList.map((h) => (
-                  <Chip key={h.id} on={choice.hair === h.id} onClick={() => setChoice((ch) => ({ ...ch, hair: ch.hair === h.id ? undefined : h.id }))}>
-                    <span className="block font-semibold">{h.label}</span>
-                    <span className="block text-[10px] text-slate-400">{naira((HAIR_COST[hairGroup(h.id)] || 500) * MARKUP)}</span>
-                  </Chip>
-                ))}
+                {hairList.map((h) => {
+                  const locked = !canWig && hairGroup(h.id) === 'wig';
+                  return (
+                    <Chip key={h.id} on={choice.hair === h.id} onClick={() => !locked && setChoice((ch) => ({ ...ch, hair: ch.hair === h.id ? undefined : h.id }))} title={locked ? 'Buy a hair station to install wigs' : undefined}>
+                      <span className={`block font-semibold ${locked ? 'text-slate-500' : ''}`}>{h.label}</span>
+                      <span className="block text-[10px] text-slate-400">{locked ? 'Needs a hair station' : naira((HAIR_COST[hairGroup(h.id)] || 500) * MARKUP)}</span>
+                    </Chip>
+                  );
+                })}
               </div>
               <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">Colour</div>
               <ColourDots colors={hairColours} value={hairColours.find((h) => h.id === (choice.hairColor || c.look.hairColor))?.color} onPick={(col) => setChoice((ch) => ({ ...ch, hairColor: hairColours.find((h) => h.color === col)?.id }))} />

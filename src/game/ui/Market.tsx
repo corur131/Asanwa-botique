@@ -1,3 +1,4 @@
+import { displayCap } from '../engine';
 import React, { useMemo, useState } from 'react';
 import { CharacterSvg } from '../../components/renderer/renderCharacter';
 import { ANKARA_PRINTS, DEFAULT_WARDROBE, FABRICS, FABRIC_COLORS } from '../../constants/catalog';
@@ -120,7 +121,7 @@ export const Market: React.FC<{ state: GameState; onBuy: (d: ReturnType<typeof m
           <div className="h-full rounded-xl border border-dashed border-white/15 flex items-center justify-center text-sm text-slate-500 p-8 text-center">
             Pick an item to see it on the mannequin and choose its fabric and colour.
             <br />
-            Display: {displayed}/{tier.slots} spaces used. New stock goes on display if there is space, otherwise to storage.
+            Display: {displayed}/{displayCap(state)} spaces used. New stock goes on display if there is space, otherwise to storage.
           </div>
         ) : (
           <div className="rounded-xl border border-white/10 bg-[#15171f] p-4 space-y-3">
@@ -193,7 +194,7 @@ export const Market: React.FC<{ state: GameState; onBuy: (d: ReturnType<typeof m
                 {locked ? 'Needs a Boutique' : state.cash < total ? 'Not enough cash' : 'Buy'}
               </Btn>
             </div>
-            <p className="text-[11px] text-slate-500">You have {naira(state.cash)}. Keep enough for rent: {naira(tier.rent)} every 7 days.</p>
+            <p className="text-[11px] text-slate-500">You have {naira(state.cash)}. Keep enough for rent: {naira(state.listing.rent)} every 7 days.</p>
           </div>
         )}
       </div>

@@ -5,6 +5,8 @@ import { entryFor, makeDesign } from './market';
 import { makeCustomer } from './customers';
 import { lookCost, scoreLook } from './scoring';
 import { colourName } from './colours';
+import { FURNITURE, KIOSK_LISTING, Listing, Placed, STARTER_FURNITURE, autoPlace,
+  findSpot, canPlace, cheapestListing, furnitureById, listingsFor, newUid, prestigeRichShift, prestigeTraffic, shopStats, usesFloor, wallCapacity, wallUsed } from './shop';
 import { Customer, DayLog, GameState, Message, Regular, ScoreBreakdown, Settlement, StaffMember, StyleChoice } from './types';
 
 const pick = <T,>(a: readonly T[]): T => a[Math.floor(Math.random() * a.length)];
@@ -14,7 +16,10 @@ const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v
 const emptyLog = (day: number): DayLog => ({ day, served: 0, walkedOut: 0, lost: 0, income: 0, costs: 0, tips: 0, bestScore: 0, repChange: 0, staffServed: 0, events: [] });
 
 export const daysToRent = (day: number) => (7 - (day % 7)) % 7;
-export const rentDue = (s: GameState) => TIERS[s.tier].rent;
+export const rentDue = (s: GameState) => s.listing.rent;
+export const week = (day: number) => Math.floor((day - 1) / 7);
+export const stats = (s: GameState) => shopStats(s.furniture, s.tier, s.listing.stars);
+export const displayCap = (s: GameState) => stats(s).display;
 
 function msg(s: GameState, from: string, text: string, tone: Message['tone'] = 'info'): GameState {
   return { ...s, messages: [{ day: s.day, from, text, tone }, ...s.messages].slice(0, 60) };
@@ -46,7 +51,9 @@ export function newGame(divine: CharacterConfig): GameState {
   });
   const spent = stock.reduce((a, d) => a + d.cost * d.pieces, 0);
   let s: GameState = {
-    version: 1,
+    version: 2,
+    listing: KIOSK_LISTING,
+    furniture: STARTER_FURNITURE.map((f) => ({ ...f, uid: newUid() })),
     day: 1,
     cash: START_CASH - spent,
     rep: 30,
@@ -69,7 +76,7 @@ export function newGame(divine: CharacterConfig): GameState {
     stats: { served: 0, totalEarned: 0, demotions: 0, bestScore: 0 },
     seed: Math.floor(Math.random() * 1e9),
   };
-  s = msg(s, 'Deborah', `Sis! The kiosk is ready. I helped you stock it with ${naira(spent)} of clothes from Yaba market. You have ${naira(s.cash)} left. Rent is ${naira(TIERS[0].rent)} every 7 days. Let's make money!`, 'good');
+  s = msg(s, 'Deborah', `Sis! The kiosk is ready. I helped you stock it with ${naira(spent)} of clothes from Yaba market. You have ${naira(s.cash)} left. Rent is ${naira(TIERS[0].rent)} every 7 days. The place is small and rough, but we'll fix it up as the money comes. Let's make money!`, 'good');
   return s;
 }
 
@@ -79,7 +86,31 @@ export function newGame(divine: CharacterConfig): GameState {
 export function customersToday(s: GameState, slow: boolean) {
   const t = TIERS[s.tier];
   const ramp = Math.min(1, NEW_SHOP_START + (1 - NEW_SHOP_START) * Math.max(0, s.day - s.movedDay) / NEW_SHOP_RAMP_DAYS);
-  return Math.max(5, Math.round(t.customers * (0.6 + (s.rep / 100) * 0.8) * (0.85 + Math.random() * 0.3) * (slow ? 0.5 : 1) * ramp));
+  const traffic = prestigeTraffic(stats(s).prestige);
+  return Math.max(5, Math.round(t.customers * traffic * (0.6 + (s.rep / 100) * 0.8) * (0.85 + Math.random() * 0.3) * (slow ? 0.5 : 1) * ramp));
+}
+
+/** How many people can wait: the one being served, three standing, plus seats. */
+export const waitingRoom = (s: GameState) => 4 + stats(s).seats;
+
+/** The look's score including what the shop adds. */
+export function scoreInShop(s: GameState, c: Customer, choice: StyleChoice): ScoreBreakdown {
+  const base = scoreLook(c, choice, s.stock);
+  const b = shopBonus(s, c, choice);
+  if (!b.bonus) return base;
+  return { ...base, total: Math.min(100, base.total + b.bonus), bonus: b.bonus, bonusNotes: b.notes } as ScoreBreakdown;
+}
+
+/** Extra score from the shop itself: mirror, stations, fitting room. */
+export function shopBonus(s: GameState, c: Customer, choice: StyleChoice): { bonus: number; notes: string[] } {
+  const st = stats(s);
+  let bonus = st.mirror;
+  const notes: string[] = [];
+  if (st.mirror) notes.push(`Mirror +${st.mirror}`);
+  if (choice.hair && st.hairBonus) { bonus += st.hairBonus; notes.push(`Hair station +${st.hairBonus}`); }
+  if (!c.male && choice.makeup && st.makeupBonus) { bonus += st.makeupBonus; notes.push(`Makeup station +${st.makeupBonus}`); }
+  if (c.cls === 'rich' && st.richBonus) { bonus += st.richBonus; notes.push(`Fitting room +${st.richBonus}`); }
+  return { bonus: Math.min(10, bonus), notes };
 }
 
 export function openShop(s: GameState): GameState {
@@ -89,12 +120,35 @@ export function openShop(s: GameState): GameState {
     slow = s.day > 7 && chance(SLOW_WEEK_CHANCE);
     if (slow) next = msg(next, 'Deborah', pick(['Rain has started o. Customers will be few this week.', 'Fuel scarcity everywhere. People are not going out this week.', 'Exam week for the students. The market is quiet.']), 'warn');
   }
-  const n = customersToday(next, slow);
+  const st = stats(next);
+  let n = customersToday(next, slow);
+  const mix = [...TIERS[next.tier].mix] as [number, number, number];
+  const shift = prestigeRichShift(st.prestige);
+  mix[0] = Math.max(0.05, mix[0] - shift);
+  mix[2] = Math.max(0, mix[2] + shift);
+  let lostAtDoor = 0;
+  let blackout = false;
+  if (s.day > 2 && chance(1 / 8)) {
+    blackout = true;
+    if (!st.generator) {
+      const gone = Math.round(n * 0.35);
+      lostAtDoor += gone;
+      n -= gone;
+    }
+  }
+  const room = waitingRoom(next);
+  if (n > room + 2) {
+    lostAtDoor += n - (room + 2);
+    n = room + 2;
+  }
   const queue: Customer[] = [];
-  for (let i = 0; i < n; i++) queue.push(makeCustomer(next, TIERS[next.tier].mix));
+  for (let i = 0; i < n; i++) queue.push(makeCustomer(next, mix));
+  const events: string[] = [];
+  if (blackout) events.push(st.generator ? 'NEPA took light, but your generator kept the shop open.' : 'NEPA took light. With no generator, some customers left in the heat.');
+  if (lostAtDoor && !(blackout && !st.generator)) events.push(`${lostAtDoor} customer${lostAtDoor > 1 ? 's' : ''} left at the door: no space to wait. More seats would keep them.`);
   // rich clients and regulars come first; Divine sees them herself
   queue.sort((a, b) => (b.cls === 'rich' ? 2 : b.regularId ? 1 : 0) - (a.cls === 'rich' ? 2 : a.regularId ? 1 : 0));
-  return { ...next, slowWeek: slow, phase: 'shop', queue, queueIndex: 0, today: emptyLog(s.day) };
+  return { ...next, slowWeek: slow, phase: 'shop', queue, queueIndex: 0, today: { ...emptyLog(s.day), lost: lostAtDoor, events } };
 }
 
 export const divineCapacity = DIVINE_CAPACITY;
@@ -185,7 +239,7 @@ export function applyLook(s: GameState, c: Customer, choice: StyleChoice, st: Se
   return {
     ...s,
     cash: s.cash + net,
-    rep: clamp(s.rep + st.repDelta, 0, 100),
+    rep: clamp(s.rep + (st.repDelta > 0 ? st.repDelta * (1 + stats(s).repBoost) : st.repDelta), 0, 100),
     stock,
     regulars,
     today,
@@ -221,7 +275,7 @@ export function staffServe(s: GameState, c: Customer): { state: GameState; serve
   choice.hair = c.look.hair;
   const cost = lookCost(c, choice, s.stock);
   const best = s.staff.reduce((a, b) => (b.level > a.level ? b : a));
-  const base = scoreLook(c, choice, s.stock);
+  const base = scoreInShop(s, c, choice);
   const total = Math.round(clamp(base.total * (0.62 + 0.035 * best.level), 0, 100));
   const score = { ...base, total };
   const price = Math.min(cost.fair, c.budget);
@@ -243,7 +297,7 @@ export function closeShop(s0: GameState): GameState {
     if (s.staff.length && staffDone < staffCapacity(s) && c.cls !== 'rich') s = staffServe(s, c).state;
     else s = turnAway(s);
   }
-  const t = TIERS[s.tier];
+  const t = { ...TIERS[s.tier], rent: s.listing.rent };
   s = { ...s, cash: s.cash - t.running, today: { ...s.today, costs: s.today.costs + t.running } };
   if (s.today.lost) s = { ...s, today: { ...s.today, events: [...s.today.events, `${s.today.lost} customer${s.today.lost > 1 ? 's' : ''} left without being served.`] } };
 
@@ -270,7 +324,7 @@ export function nextMorning(s: GameState): GameState {
 }
 
 function payRent(s: GameState): GameState {
-  const rent = TIERS[s.tier].rent;
+  const rent = s.listing.rent;
   if (s.cash >= rent && !s.lateRent) return msg({ ...s, cash: s.cash - rent, today: { ...s.today, costs: s.today.costs + rent, events: [...s.today.events, `Paid ${naira(rent)} rent.`] } }, 'Landlord', `Rent of ${naira(rent)} received. See you next week.`, 'info');
   const due = s.day + s.grace;
   const next = { ...s, cash: s.cash - rent, lateRent: { amount: rent, due }, today: { ...s.today, costs: s.today.costs + rent } };
@@ -283,18 +337,28 @@ function demote(s: GameState): GameState {
   if (s.tier === 0) return msg({ ...s, lateRent: null }, 'Landlord', 'This kiosk is the last stop. I will let the debt run, but pay me soon.', 'danger');
   const tier = s.tier - 1;
   const t = TIERS[tier];
+  const listing = cheapestListing(tier, week(s.day));
+  const furniture = autoPlace(s.furniture.map((f) => ({ ...f, placed: true })), tier);
+  const staff = s.staff.slice(0, t.staff);
+  const left = s.staff.slice(t.staff);
+  let next: GameState = { ...s, tier, listing, furniture, staff, lateRent: null, cash: s.cash + (s.lateRent?.amount || 0) * 0.5, movedDay: s.day, grace: listing.grace, stats: { ...s.stats, demotions: s.stats.demotions + 1 } };
+  next = fitDisplay(next);
+  next = msg(next, 'Landlord', `Time is up. Pack your things. You have been moved down to a ${t.name} on ${listing.street}, ${listing.area}. I've kept the deposit and waived half the debt.`, 'danger');
+  if (left.length) next = msg(next, 'Deborah', `${left.map((x) => x.name).join(' and ')} had to go. There's no space for them in the new shop.`, 'warn');
+  if (furniture.some((f) => !f.placed)) next = msg(next, 'Deborah', `Some furniture didn't fit in the smaller shop, so it's in storage.`, 'warn');
+  return next;
+}
+
+/** Designs beyond the display space go back to storage. */
+export function fitDisplay(s: GameState): GameState {
+  const cap = displayCap(s);
   let shown = 0;
   const stock = s.stock.map((d) => {
     if (!d.displayed) return d;
     shown += 1;
-    return shown > t.slots ? { ...d, displayed: false } : d;
+    return shown > cap ? { ...d, displayed: false } : d;
   });
-  const staff = s.staff.slice(0, t.staff);
-  const left = s.staff.slice(t.staff);
-  let next: GameState = { ...s, tier, stock, staff, lateRent: null, cash: s.cash + (s.lateRent?.amount || 0) * 0.5, movedDay: s.day, grace: pick(GRACE_OPTIONS), stats: { ...s.stats, demotions: s.stats.demotions + 1 } };
-  next = msg(next, 'Landlord', `Time is up. Pack your things. You have been moved down to a ${t.name}. I've kept the deposit and waived half the debt.`, 'danger');
-  if (left.length) next = msg(next, 'Deborah', `${left.map((x) => x.name).join(' and ')} had to go. There's no space for them in the new shop.`, 'warn');
-  return next;
+  return { ...s, stock };
 }
 
 // ---------------------------------------------------------------------------
@@ -302,23 +366,75 @@ function demote(s: GameState): GameState {
 // ---------------------------------------------------------------------------
 export function moveUpCost(s: GameState) {
   if (s.tier + 1 >= TIERS.length) return null;
-  return TIERS[s.tier + 1].moveIn;
+  return Math.min(...listingsNow(s).map((l) => l.moveIn));
 }
 
-export function moveUp(s: GameState, grace: number): GameState {
-  const cost = moveUpCost(s);
-  if (cost === null || s.cash < cost) return s;
-  const tier = s.tier + 1;
+/** The four shops to rent at the next size this week. */
+export function listingsNow(s: GameState): Listing[] {
+  if (s.tier + 1 >= TIERS.length) return [];
+  return listingsFor(s.tier + 1, week(s.day));
+}
+
+export function moveTo(s: GameState, l: Listing): GameState {
+  if (l.tier !== s.tier + 1 || s.cash < l.moveIn) return s;
+  const tier = l.tier;
   const t = TIERS[tier];
-  let next: GameState = { ...s, tier, cash: s.cash - cost, movedDay: s.day, grace };
-  next = msg(next, 'Deborah', `We moved! Welcome to your ${t.name}. ${t.slots} display spaces, rent ${naira(t.rent)} a week. It will be quiet for the first two weeks while people find us.`, 'good');
-  if (t.staff && !s.staff.length) next = msg(next, 'Deborah', `You can hire staff now! Go to the Staff tab. Trainees are cheap and loyal; experts are good from day one but they leave for money.`, 'info');
+  const furniture = autoPlace(s.furniture, tier);
+  let next: GameState = { ...s, tier, listing: l, furniture, cash: s.cash - l.moveIn, movedDay: s.day, grace: l.grace };
+  next = msg(next, 'Deborah', `We moved! Welcome to your ${t.name} on ${l.street}, ${l.area}. Rent is ${naira(l.rent)} a week and the landlord is ${l.landlord}. The shop holds up to ${t.slots} designs, so buy rails and shelves to fill it. It will be quiet for two weeks while people find us.`, 'good');
+  if (t.staff && !s.staff.length) next = msg(next, 'Deborah', `You can hire staff now! Trainees are cheap and loyal; experts are good from day one but they leave for money.`, 'info');
   return next;
 }
 
-export function landlordOffer(): number {
-  return pick(GRACE_OPTIONS);
+// ---------------------------------------------------------------------------
+// Furniture
+// ---------------------------------------------------------------------------
+export function buyFurniture(s: GameState, id: string): GameState {
+  const f = furnitureById(id);
+  if (!f || s.cash < f.price || (f.minTier || 0) > s.tier) return s;
+  const item: Placed = { uid: newUid(), id, x: 0, z: 0, rot: 0, placed: false };
+  let placedItem: Placed = item;
+  if (f.mount === 'ceiling') placedItem = { ...item, placed: true };
+  else if (f.mount === 'wall') {
+    if (wallUsed(s.furniture) + f.w <= wallCapacity(s.tier)) placedItem = { ...item, placed: true, x: wallUsed(s.furniture) };
+  } else placedItem = findSpot(s.furniture, s.tier, item) || item;
+  return { ...s, cash: s.cash - f.price, furniture: [...s.furniture, placedItem] };
 }
+
+export function placeFurniture(s: GameState, uid: string, x: number, z: number, rot: 0 | 1): GameState {
+  const p = s.furniture.find((f) => f.uid === uid);
+  if (!p) return s;
+  const cand: Placed = { ...p, x, z, rot, placed: true };
+  if (!canPlace(s.furniture, s.tier, cand)) return s;
+  return { ...s, furniture: s.furniture.map((f) => (f.uid === uid ? cand : f)) };
+}
+
+/** Put a stored item back in the room wherever it fits. */
+export function installFurniture(s: GameState, uid: string): GameState {
+  const p = s.furniture.find((f) => f.uid === uid);
+  if (!p || p.placed) return s;
+  const f = furnitureById(p.id);
+  if (f.mount === 'wall') {
+    if (wallUsed(s.furniture) + f.w > wallCapacity(s.tier)) return s;
+    return { ...s, furniture: s.furniture.map((x) => (x.uid === uid ? { ...x, placed: true, x: wallUsed(s.furniture) } : x)) };
+  }
+  if (f.mount === 'ceiling') return { ...s, furniture: s.furniture.map((x) => (x.uid === uid ? { ...x, placed: true } : x)) };
+  const spot = autoPlace([...s.furniture.filter((x) => x.placed), { ...p }], s.tier).find((x) => x.uid === uid)!;
+  if (!spot.placed) return s;
+  return { ...s, furniture: s.furniture.map((x) => (x.uid === uid ? spot : x)) };
+}
+
+export function storeFurniture(s: GameState, uid: string): GameState {
+  return fitDisplay({ ...s, furniture: s.furniture.map((f) => (f.uid === uid ? { ...f, placed: false } : f)) });
+}
+
+export function sellFurniture(s: GameState, uid: string): GameState {
+  const p = s.furniture.find((f) => f.uid === uid);
+  if (!p) return s;
+  return fitDisplay({ ...s, cash: s.cash + Math.round(furnitureById(p.id).price * 0.4), furniture: s.furniture.filter((f) => f.uid !== uid) });
+}
+
+export { FURNITURE, usesFloor };
 
 // ---------------------------------------------------------------------------
 // Stock
@@ -328,12 +444,12 @@ export const displayedCount = (s: GameState) => s.stock.filter((d) => d.displaye
 export function buyDesign(s: GameState, d: ReturnType<typeof makeDesign>): GameState {
   const total = d.cost * d.pieces;
   if (s.cash < total) return s;
-  const free = displayedCount(s) < TIERS[s.tier].slots;
+  const free = displayedCount(s) < displayCap(s);
   return { ...s, cash: s.cash - total, stock: [...s.stock, { ...d, displayed: free }] };
 }
 
 export function setDisplayed(s: GameState, uid: string, on: boolean): GameState {
-  if (on && displayedCount(s) >= TIERS[s.tier].slots) return s;
+  if (on && displayedCount(s) >= displayCap(s)) return s;
   return { ...s, stock: s.stock.map((d) => (d.uid === uid ? { ...d, displayed: on } : d)) };
 }
 
@@ -475,6 +591,17 @@ function weeklyStaff(s0: GameState): GameState {
 // Save
 // ---------------------------------------------------------------------------
 const KEY = 'asanwa-boutique-save-v1';
+
+/** Saves from before the 3D shop get the cheapest listing of their size and furniture that matches their display. */
+function migrate(raw: GameState): GameState | null {
+  const s = raw as unknown as GameState & { version: number };
+  if (s.version === 2) return s;
+  if (s.version !== 1) return null;
+  const listing = s.tier === 0 ? KIOSK_LISTING : { ...cheapestListing(s.tier, week(s.day)), rent: TIERS[s.tier].rent, stars: 2 };
+  const base = STARTER_FURNITURE.map((f) => ({ ...f, uid: newUid() }));
+  const rails = Array.from({ length: Math.max(0, Math.ceil((TIERS[s.tier].slots - 12) / 8)) }, () => ({ uid: newUid(), id: 'chromeRail', x: 0, z: 0, rot: 0 as const, placed: true }));
+  return { ...s, version: 2, listing, furniture: autoPlace([...base, ...rails], s.tier) };
+}
 export function save(s: GameState) {
   try {
     localStorage.setItem(KEY, JSON.stringify(s));
@@ -487,7 +614,7 @@ export function load(): GameState | null {
     const raw = localStorage.getItem(KEY);
     if (!raw) return null;
     const s = JSON.parse(raw) as GameState;
-    return s.version === 1 ? s : null;
+    return migrate(s);
   } catch {
     return null;
   }
@@ -510,8 +637,8 @@ export function exportSave(s: GameState) {
 export function parseSave(text: string): GameState | null {
   try {
     const s = JSON.parse(text) as GameState;
-    if (s.version !== 1 || typeof s.day !== 'number' || !Array.isArray(s.stock)) return null;
-    return s;
+    if (typeof s.day !== 'number' || !Array.isArray(s.stock)) return null;
+    return migrate(s);
   } catch {
     return null;
   }

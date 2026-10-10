@@ -6,7 +6,7 @@ import { MAKEUP_LOOKS } from '../src/constants/catalog';
 import { TIERS, naira } from '../src/game/economy';
 import { MARKET, canBuy, makeDesign } from '../src/game/market';
 import { NAMED_COLOURS } from '../src/game/colours';
-import { applyLook, buyDesign, closeShop, displayedCount, landlordOffer, moveUp, newGame, nextMorning, openShop, settle, staffServe, canHire, candidates, hire, train, restockAll } from '../src/game/engine';
+import { applyLook, buyDesign, closeShop, displayedCount, displayCap, listingsNow, moveTo, buyFurniture, stats, newGame, nextMorning, openShop, settle, staffServe, canHire, candidates, hire, train, restockAll } from '../src/game/engine';
 import { lookCost, scoreLook } from '../src/game/scoring';
 import { Customer, GameState, StyleChoice } from '../src/game/types';
 
@@ -17,7 +17,15 @@ function restockBot(s: GameState): GameState {
   const t = TIERS[s.tier];
   s = restockAll(s, 3);
   let guard = 0;
-  while (displayedCount(s) < t.slots && guard++ < 60) {
+  // buy display furniture when the rails are full but the shop has room
+  for (let k = 0; k < 4 && stats(s).display < t.slots; k++) {
+    const id = s.tier >= 1 ? 'chromeRail' : 'rustyRail';
+    if (s.cash < s.listing.rent * 1.5 + 25_000) break;
+    const before = stats(s).display;
+    s = buyFurniture(s, id);
+    if (stats(s).display === before) break;
+  }
+  while (displayedCount(s) < displayCap(s) && guard++ < 60) {
     const need = ['top', 'bottom', 'dress', 'shoes', 'shoes', 'dress', 'headwear', 'necklace', 'earrings', 'bag', 'outer'];
     const kind = need[guard % need.length];
     const opts = MARKET.filter((e) => e.kind === kind && canBuy(e, s.tier) && e.for !== 'm' && e.price < (s.tier >= 2 ? 90_000 : 25_000));
@@ -25,7 +33,7 @@ function restockBot(s: GameState): GameState {
     const e = pick(opts);
     const c = pick(NAMED_COLOURS);
     const d = makeDesign(e, { fabric: e.fabric, color: c.color, color2: pick(NAMED_COLOURS).color, pattern: Math.floor(Math.random() * 10) });
-    if (s.cash - d.cost * d.pieces < t.rent * 1.2) break;
+    if (s.cash - d.cost * d.pieces < s.listing.rent * 1.2) break;
     s = buyDesign(s, d);
   }
   return s;
@@ -61,9 +69,10 @@ const scores: number[] = [];
 for (let d = 0; d < days; d++) {
   { const c0 = s.cash; s = restockBot(s); acct.stockSpend += c0 - s.cash; }
   const next = s.tier + 1 < TIERS.length ? TIERS[s.tier + 1] : null;
-  if (next && s.cash > next.moveIn + next.rent * 2 + next.slots * 2 * 9000 * 0.5) s = moveUp(s, landlordOffer());
-  if (canHire(s) && s.cash > TIERS[s.tier].rent * 3) s = hire(s, candidates(s)[0]);
-  for (const m of s.staff) if (m.level < 9 && s.cash > TIERS[s.tier].rent * 4) s = train(s, m.id);
+  const opt = listingsNow(s)[1];
+  if (next && opt && s.cash > opt.moveIn + opt.rent * 2 + next.slots * 2 * 9000 * 0.5 + 60_000) s = moveTo(s, opt);
+  if (canHire(s) && s.cash > s.listing.rent * 3) s = hire(s, candidates(s)[0]);
+  for (const m of s.staff) if (m.level < 9 && s.cash > s.listing.rent * 4) s = train(s, m.id);
   s = openShop(s);
   let mine = 0;
   while (s.queueIndex < s.queue.length) {

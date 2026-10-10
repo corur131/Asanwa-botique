@@ -87,6 +87,7 @@ export const Reveal: React.FC<{ state: GameState; c: Customer; choice: StyleChoi
           <Bar label="Fits her class" value={score.cls} max={15} />
           <Bar label="Complete look" value={score.complete} max={15} />
           <Bar label="Colours work together" value={score.harmony} max={10} />
+          {!!score.bonus && <div className="text-[11px] text-emerald-300">Your shop added +{score.bonus}: {score.bonusNotes?.join(', ')}</div>}
           {score.notes.length > 0 && (
             <ul className="pt-1 text-xs text-slate-300 space-y-0.5">
               {score.notes.slice(0, 5).map((n, i) => (

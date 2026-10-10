@@ -68,4 +68,4 @@ export const STAFF = {
 
 export const GRACE_OPTIONS = [0, 2, 7, 7, 14];
 
-export const naira = (n: number) => `₦${Math.round(n).toLocaleString('en-NG')}`;
+export const naira = (n: number) => `${n < 0 ? '-' : ''}₦${Math.abs(Math.round(n)).toLocaleString('en-NG')}`;
