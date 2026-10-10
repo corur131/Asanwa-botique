@@ -17,7 +17,7 @@ import {
   CharacterState,
 } from '../types/character';
 import { SKIN_TONES } from '../constants/skinTones';
-import { HAIR_PALETTES } from './renderer/paths/hairPaths';
+import { HAIR_PALETTES } from './renderer/hair';
 import { Sparkles, Eye, Scissors, Heart, Gem, Check, Info } from 'lucide-react';
 
 interface ControlsPanelProps {

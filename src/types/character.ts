@@ -11,6 +11,10 @@ export interface SkinPalette {
   shadow: string;
   contour: string;
   highlight: string;
+  /** Darkest crease tone (lid crease, nostrils, lip corners). */
+  deep: string;
+  /** Soft sheen laid on forehead, nose bridge and cheekbones. */
+  glow: string;
   blushDefault: string;
   lipDefault: string;
 }
