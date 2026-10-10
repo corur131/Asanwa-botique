@@ -12,6 +12,7 @@ import { Styling } from './ui/Styling';
 import { PriceModal, Reveal } from './ui/Checkout';
 import { FurniturePanel, RailPanel, Stars, StaffActions } from './ui/Panels';
 import { AppId, Phone } from './ui/Phone';
+import { armSound, pop, useSound } from './sound';
 
 const ShopScene = lazy(() => import('./scene/ShopScene'));
 
@@ -42,6 +43,8 @@ export default function GameApp({ onLab }: { onLab: () => void }) {
   const [confirmClose, setConfirmClose] = useState(false);
   const [toast, setToast] = useState<{ from: string; text: string } | null>(null);
   const seenMsg = useRef<number>(s?.msgSeq || 0);
+  const sound = useSound();
+  useEffect(() => armSound(), []);
   const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -75,6 +78,7 @@ export default function GameApp({ onLab }: { onLab: () => void }) {
       seenMsg.current = s.msgSeq;
       if (m && !(phone && phoneApp === 'chats' && chat === m.from)) {
         setToast({ from: m.from, text: m.text });
+        pop();
         const id = window.setTimeout(() => setToast(null), 4500);
         return () => window.clearTimeout(id);
       }
@@ -147,6 +151,7 @@ export default function GameApp({ onLab }: { onLab: () => void }) {
           {s.lateRent ? `RENT LATE · clear by day ${s.lateRent.due}` : `Rent ${naira(s.listing.rent)} ${E.daysToRent(s.day) === 0 ? 'tonight' : `in ${E.daysToRent(s.day)}d`}`}
         </div>
         <div className="ml-auto flex gap-2">
+          <Btn size="sm" onClick={sound.toggleMusic} title={sound.music ? 'Music on' : 'Music off'}>{sound.music ? '♫ On' : '♫ Off'}</Btn>
           <Btn size="sm" onClick={() => E.exportSave(s)}>Backup</Btn>
           <Btn size="sm" onClick={() => setMenu(true)}>Menu</Btn>
         </div>
@@ -272,7 +277,7 @@ export default function GameApp({ onLab }: { onLab: () => void }) {
 
         {/* toast */}
         {toast && (
-          <button onClick={() => { setToast(null); openPhone('chats', toast.from); }} className="absolute z-40 top-3 left-1/2 -translate-x-1/2 w-[min(92vw,380px)] rounded-2xl bg-[#1f2c33]/97 border border-white/10 shadow-2xl p-3 text-left flex gap-3 animate-[fadeIn_.2s_ease-out]">
+          <button onClick={() => { setToast(null); setStyling(false); openPhone('chats', toast.from); }} className="fixed z-[60] top-3 left-1/2 -translate-x-1/2 w-[min(92vw,380px)] rounded-2xl bg-[#1f2c33]/97 border border-white/10 shadow-2xl p-3 text-left flex gap-3 animate-[fadeIn_.2s_ease-out]">
             <span className="w-9 h-9 rounded-xl bg-[#25D366] flex items-center justify-center text-white text-lg shrink-0">✆</span>
             <span className="min-w-0">
               <span className="block text-[11px] text-slate-400">WhatsApp · {toast.from}</span>
@@ -430,6 +435,10 @@ export default function GameApp({ onLab }: { onLab: () => void }) {
             <Btn className="w-full" onClick={() => E.exportSave(s)}>Download a backup of this save</Btn>
             <Btn className="w-full" onClick={() => fileRef.current?.click()}>Restore from a backup file</Btn>
             <input ref={fileRef} type="file" accept="application/json,.json" className="hidden" onChange={(e) => e.target.files?.[0] && restore(e.target.files[0])} />
+            <div className="grid grid-cols-2 gap-2">
+              <Btn onClick={sound.toggleMusic}>Music: {sound.music ? 'on' : 'off'}</Btn>
+              <Btn onClick={sound.toggleSfx}>Message pop: {sound.sfx ? 'on' : 'off'}</Btn>
+            </div>
             <Btn className="w-full" onClick={onLab}>Character Lab</Btn>
             <Btn className="w-full" tone="danger" onClick={() => setConfirmNew(true)}>Start a new game</Btn>
           </div>

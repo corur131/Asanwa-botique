@@ -69,7 +69,7 @@ const freshDay = { clock: 0, arrivals: [], inShop: [], serving: null, left: [], 
 export function newGame(divine: CharacterConfig): GameState {
   const stock = STARTER.map(([kind, id, c, c2, pat]) => {
     const e = entryFor(kind as never, id)!;
-    return { ...makeDesign(e, { fabric: e.fabric, color: c, color2: c2, pattern: pat }), displayed: true };
+    return { ...makeDesign(e, { fabric: e.fabric, color: c, color2: c2, pattern: pat, pieces: 2 }), displayed: true };
   });
   const spent = stock.reduce((a, d) => a + d.cost * d.pieces, 0);
   let s: GameState = {
@@ -477,7 +477,7 @@ function demote(s: GameState): GameState {
   const tier = s.tier - 1;
   const t = TIERS[tier];
   const listing = cheapestListing(tier, week(s.day));
-  const furniture = autoPlace(s.furniture.map((f) => ({ ...f, placed: true })), tier);
+  const furniture = autoPlace(s.furniture.map((f) => ({ ...f, placed: true })), listing);
   const staff = s.staff.slice(0, t.staff);
   const left = s.staff.slice(t.staff);
   let next: GameState = money({ ...s, tier, listing, furniture, staff, lateRent: null, movedDay: s.day, grace: listing.grace, stats: { ...s.stats, demotions: s.stats.demotions + 1 } }, (s.lateRent?.amount || 0) * 0.5, 'Half the rent debt waived');
@@ -518,7 +518,7 @@ export function moveTo(s: GameState, l: Listing): GameState {
   if (l.tier !== s.tier + 1 || s.cash < l.moveIn) return s;
   const tier = l.tier;
   const t = TIERS[tier];
-  const furniture = autoPlace(s.furniture, tier);
+  const furniture = autoPlace(s.furniture, l);
   let next: GameState = money({ ...s, tier, listing: l, furniture, movedDay: s.day, grace: l.grace }, -l.moveIn, `Move-in: ${l.street}`);
   next = msg(next, 'Deborah', `We moved! Welcome to your ${t.name} on ${l.street}, ${l.area}. Rent is ${naira(l.rent)} a week and the landlord is ${l.landlord}. The shop holds up to ${t.slots} designs, so buy rails and shelves to fill it. It will be quiet for two weeks while people find us.`, 'good');
   if (t.staff && !s.staff.length) next = msg(next, 'Deborah', `You can hire staff now! Trainees are cheap and loyal; experts are good from day one but they leave for money.`, 'info');
@@ -535,8 +535,8 @@ export function buyFurniture(s: GameState, id: string): GameState {
   let placedItem: Placed = item;
   if (f.mount === 'ceiling') placedItem = { ...item, placed: true };
   else if (f.mount === 'wall') {
-    if (wallUsed(s.furniture) + f.w <= wallCapacity(s.tier)) placedItem = { ...item, placed: true, x: wallUsed(s.furniture) };
-  } else placedItem = findSpot(s.furniture, s.tier, item) || item;
+    if (wallUsed(s.furniture) + f.w <= wallCapacity(s.listing)) placedItem = { ...item, placed: true, x: wallUsed(s.furniture) };
+  } else placedItem = findSpot(s.furniture, s.listing, item) || item;
   return money({ ...s, furniture: [...s.furniture, placedItem] }, -f.price, f.name);
 }
 
@@ -544,7 +544,7 @@ export function placeFurniture(s: GameState, uid: string, x: number, z: number, 
   const p = s.furniture.find((f) => f.uid === uid);
   if (!p) return s;
   const cand: Placed = { ...p, x, z, rot, placed: true };
-  if (!canPlace(s.furniture, s.tier, cand)) return s;
+  if (!canPlace(s.furniture, s.listing, cand)) return s;
   return { ...s, furniture: s.furniture.map((f) => (f.uid === uid ? cand : f)) };
 }
 
@@ -554,11 +554,11 @@ export function installFurniture(s: GameState, uid: string): GameState {
   if (!p || p.placed) return s;
   const f = furnitureById(p.id);
   if (f.mount === 'wall') {
-    if (wallUsed(s.furniture) + f.w > wallCapacity(s.tier)) return s;
+    if (wallUsed(s.furniture) + f.w > wallCapacity(s.listing)) return s;
     return { ...s, furniture: s.furniture.map((x) => (x.uid === uid ? { ...x, placed: true, x: wallUsed(s.furniture) } : x)) };
   }
   if (f.mount === 'ceiling') return { ...s, furniture: s.furniture.map((x) => (x.uid === uid ? { ...x, placed: true } : x)) };
-  const spot = autoPlace([...s.furniture.filter((x) => x.placed), { ...p }], s.tier).find((x) => x.uid === uid)!;
+  const spot = autoPlace([...s.furniture.filter((x) => x.placed), { ...p }], s.listing).find((x) => x.uid === uid)!;
   if (!spot.placed) return s;
   return { ...s, furniture: s.furniture.map((x) => (x.uid === uid ? spot : x)) };
 }
@@ -815,7 +815,7 @@ function migrate(raw: GameState): GameState | null {
     const listing = s.tier === 0 ? KIOSK_LISTING : { ...cheapestListing(s.tier, week(s.day)), rent: TIERS[s.tier].rent, stars: 2 };
     const base = STARTER_FURNITURE.map((f) => ({ ...f, uid: newUid() }));
     const rails = Array.from({ length: Math.max(0, Math.ceil((TIERS[s.tier].slots - 12) / 8)) }, () => ({ uid: newUid(), id: 'chromeRail', x: 0, z: 0, rot: 0 as const, placed: true }));
-    s = { ...s, version: 2, listing, furniture: autoPlace([...base, ...rails], s.tier) } as Old;
+    s = { ...s, version: 2, listing, furniture: autoPlace([...base, ...rails], listing) } as Old;
   }
   if (s.version !== 2) return null;
   const messages = s.messages.map((m, i) => ({ ...m, id: s.messages.length - i }));

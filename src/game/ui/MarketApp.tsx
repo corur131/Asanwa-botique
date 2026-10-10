@@ -67,7 +67,7 @@ export const MarketApp: React.FC<{ s: GameState; cart: CartLine[]; setCart: (f: 
   const open = (e: MarketEntry) => {
     setSel(e);
     setFabric(e.fabric || 'plain');
-    setPicks(takesColour(e.kind) ? [] : [{ color: '#C9A163', n: 2 }]);
+    setPicks(takesColour(e.kind) ? [] : [{ color: '#C9A163', n: 1 }]);
     setView('item');
   };
 
@@ -134,7 +134,7 @@ export const MarketApp: React.FC<{ s: GameState; cart: CartLine[]; setCart: (f: 
     const locked = !canBuy(sel, s.tier);
     const toggle = (color: string) => {
       setPreview(color);
-      setPicks((ps) => (ps.some((p) => p.color === color) ? ps.filter((p) => p.color !== color) : [...ps, { color, n: 2 }]));
+      setPicks((ps) => (ps.some((p) => p.color === color) ? ps.filter((p) => p.color !== color) : [...ps, { color, n: 1 }]));
     };
     const add = () => {
       setCart((c) => {
@@ -149,15 +149,15 @@ export const MarketApp: React.FC<{ s: GameState; cart: CartLine[]; setCart: (f: 
         return next;
       });
       setFlash(`Added ${n} to cart`);
-      setPicks(takesColour(sel.kind) ? [] : [{ color: '#C9A163', n: 2 }]);
+      setPicks(takesColour(sel.kind) ? [] : [{ color: '#C9A163', n: 1 }]);
       setTimeout(() => setFlash(''), 1800);
     };
     return (
       <div className="flex-1 min-h-0 flex flex-col">
         {header(sel.label, () => setView('list'))}
         <div className="flex-1 overflow-y-auto">
-          <div className="h-60 bg-gradient-to-b from-[#2a2320] to-[#141210] flex justify-center overflow-hidden">
-            <div className="w-48"><CharacterSvg config={mannequin(sel, fabric, picks.length ? preview : takesColour(sel.kind) ? preview : '#C9A163', color2, pattern)} idPrefix="mkapp" camera={clothing || sel.kind === 'shoes' ? 'full' : 'bust'} /></div>
+          <div className="h-72 bg-gradient-to-b from-[#2a2320] to-[#141210] flex justify-center overflow-hidden py-1">
+            <CharacterSvg config={mannequin(sel, fabric, picks.length ? preview : takesColour(sel.kind) ? preview : '#C9A163', color2, pattern)} idPrefix="mkapp" camera={clothing || sel.kind === 'shoes' ? 'full' : 'bust'} className="h-full w-auto" />
           </div>
           <div className="p-3 space-y-3">
             <div className="flex items-baseline justify-between">

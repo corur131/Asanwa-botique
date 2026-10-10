@@ -87,14 +87,49 @@ export interface RoomStyle {
   trim: string;
   kind: 'container' | 'plaster' | 'boutique' | 'marble' | 'flagship';
   height: number;
+  /** 1..4: how well kept the place is (the listing's stars). Never as fine as the next size up. */
+  finish: number;
 }
 export const ROOMS: RoomStyle[] = [
-  { w: 5, d: 3, wall: '#5E7A86', wallLow: '#3E525C', floor: '#8C8C86', floor2: '#7C7C76', trim: '#9A5A2E', kind: 'container', height: 2.4 },
-  { w: 7, d: 5, wall: '#E2D2AE', wallLow: '#B9A57D', floor: '#C9C2B4', floor2: '#B8B0A0', trim: '#7A5A3A', kind: 'plaster', height: 2.8 },
-  { w: 9, d: 6, wall: '#F2C8CC', wallLow: '#D9A3AA', floor: '#B98A5E', floor2: '#A97A50', trim: '#F4E4C8', kind: 'boutique', height: 3 },
-  { w: 11, d: 8, wall: '#F4F0EA', wallLow: '#E2D8CA', floor: '#ECE6DC', floor2: '#DCD3C6', trim: '#C9A163', kind: 'marble', height: 3.2 },
-  { w: 13, d: 9, wall: '#1E1B22', wallLow: '#141217', floor: '#F2EDE6', floor2: '#1E1B22', trim: '#D4AF37', kind: 'flagship', height: 3.6 },
+  { w: 5, d: 3, wall: '#5E7A86', wallLow: '#3E525C', floor: '#8C8C86', floor2: '#7C7C76', trim: '#9A5A2E', kind: 'container', height: 2.4, finish: 2 },
+  { w: 7, d: 5, wall: '#E2D2AE', wallLow: '#B9A57D', floor: '#C9C2B4', floor2: '#B8B0A0', trim: '#7A5A3A', kind: 'plaster', height: 2.8, finish: 2 },
+  { w: 9, d: 6, wall: '#F2C8CC', wallLow: '#D9A3AA', floor: '#B98A5E', floor2: '#A97A50', trim: '#F4E4C8', kind: 'boutique', height: 3, finish: 2 },
+  { w: 11, d: 8, wall: '#F4F0EA', wallLow: '#E2D8CA', floor: '#ECE6DC', floor2: '#DCD3C6', trim: '#C9A163', kind: 'marble', height: 3.2, finish: 2 },
+  { w: 13, d: 9, wall: '#1E1B22', wallLow: '#141217', floor: '#F2EDE6', floor2: '#1E1B22', trim: '#D4AF37', kind: 'flagship', height: 3.6, finish: 2 },
 ];
+
+/** Floor size by shop size and stars: better listings are bigger. */
+const SIZES: [number, number][][] = [
+  [[5, 3]],
+  [[8, 5], [9, 5], [9, 6], [10, 6]],
+  [[10, 6], [11, 7], [12, 7], [12, 8]],
+  [[12, 8], [13, 8], [14, 9], [14, 10]],
+  [[14, 9], [15, 10], [16, 10], [17, 11]],
+];
+
+function shade(hex: string, toward: string, k: number) {
+  const a = parseInt(hex.slice(1), 16);
+  const b = parseInt(toward.slice(1), 16);
+  const ch = (v: number, s: number) => (v >> s) & 255;
+  const mix = (s: number) => Math.round(ch(a, s) * (1 - k) + ch(b, s) * k);
+  return `#${((mix(16) << 16) | (mix(8) << 8) | mix(0)).toString(16).padStart(6, '0')}`;
+}
+
+/** The room a listing comes with: size and how well kept it is. */
+export function roomOf(l: Pick<Listing, 'tier' | 'stars'>): RoomStyle {
+  const base = ROOMS[l.tier];
+  const sizes = SIZES[l.tier];
+  const [w, d] = sizes[Math.min(sizes.length, Math.max(1, l.stars)) - 1];
+  const finish = l.tier === 0 ? 1 : l.stars;
+  // tired places look dull and grubby; the best ones are fresh and bright
+  const dull = [0, 0.32, 0.16, 0, 0][finish];
+  const bright = finish === 4 ? 0.12 : 0;
+  const tone = (c: string) => (bright ? shade(c, '#FFFFFF', base.kind === 'flagship' ? 0.02 : bright) : shade(c, '#6E6A62', dull));
+  return { ...base, w, d, finish, wall: tone(base.wall), wallLow: tone(base.wallLow), floor: tone(base.floor), floor2: tone(base.floor2), height: base.height + (finish - 2) * 0.1 };
+}
+
+export type RoomKey = number | Pick<Listing, 'tier' | 'stars'>;
+export const room = (k: RoomKey): RoomStyle => (typeof k === 'number' ? roomOf({ tier: k, stars: k === 0 ? 1 : 2 }) : roomOf(k));
 
 // ---------------------------------------------------------------------------
 // Furniture
@@ -185,11 +220,11 @@ export const footprint = (p: Pick<Placed, 'id' | 'rot'>) => {
 export const usesFloor = (id: string) => furnitureById(id).mount === 'floor' && id !== 'rug';
 
 /** Wall items go along the back wall, then the left wall (the two tall walls). */
-export const wallCapacity = (tier: number) => ROOMS[tier].w + ROOMS[tier].d - 1;
+export const wallCapacity = (k: RoomKey) => room(k).w + room(k).d - 1;
 
 /** Where each wall item hangs: side 'back' (along x at z=0) or 'left' (along z at x=0). */
-export function wallLayout(items: Placed[], tier: number): Record<string, { side: 'back' | 'left'; at: number }> {
-  const r = ROOMS[tier];
+export function wallLayout(items: Placed[], tier: RoomKey): Record<string, { side: 'back' | 'left'; at: number }> {
+  const r = room(tier);
   const out: Record<string, { side: 'back' | 'left'; at: number }> = {};
   let back = 0;
   let left = 0;
@@ -204,8 +239,8 @@ export function wallLayout(items: Placed[], tier: number): Record<string, { side
 export const wallUsed = (items: Placed[]) => items.filter((p) => p.placed && furnitureById(p.id).mount === 'wall').reduce((a, p) => a + furnitureById(p.id).w, 0);
 
 /** The front row is the walkway from the door; nothing can stand there. */
-export function cellsBlocked(items: Placed[], tier: number, except?: string): boolean[][] {
-  const r = ROOMS[tier];
+export function cellsBlocked(items: Placed[], tier: RoomKey, except?: string): boolean[][] {
+  const r = room(tier);
   const g = Array.from({ length: r.d }, () => Array(r.w).fill(false) as boolean[]);
   for (const p of items) {
     if (!p.placed || p.uid === except || !usesFloor(p.id)) continue;
@@ -215,8 +250,8 @@ export function cellsBlocked(items: Placed[], tier: number, except?: string): bo
   return g;
 }
 
-export function canPlace(items: Placed[], tier: number, p: Placed): boolean {
-  const r = ROOMS[tier];
+export function canPlace(items: Placed[], tier: RoomKey, p: Placed): boolean {
+  const r = room(tier);
   const f = furnitureById(p.id);
   if (f.mount !== 'floor') return true;
   const { w, d } = footprint(p);
@@ -228,8 +263,8 @@ export function canPlace(items: Placed[], tier: number, p: Placed): boolean {
 }
 
 /** First free floor spot for one new item, leaving everything else where it is. */
-export function findSpot(items: Placed[], tier: number, it: Placed): Placed | null {
-  const r = ROOMS[tier];
+export function findSpot(items: Placed[], tier: RoomKey, it: Placed): Placed | null {
+  const r = room(tier);
   for (let z = 0; z < r.d - 1; z++)
     for (let x = 0; x < r.w; x++)
       for (const rot of [0, 1] as const) {
@@ -240,8 +275,8 @@ export function findSpot(items: Placed[], tier: number, it: Placed): Placed | nu
 }
 
 /** Puts every item somewhere it fits (after a move); what doesn't fit goes to storage. */
-export function autoPlace(items: Placed[], tier: number): Placed[] {
-  const r = ROOMS[tier];
+export function autoPlace(items: Placed[], tier: RoomKey): Placed[] {
+  const r = room(tier);
   const out: Placed[] = [];
   let wall = 0;
   const cap = wallCapacity(tier);
@@ -287,6 +322,9 @@ export interface ShopStats {
   prestige: number;
 }
 
+/** Most designs a shop can show: bigger, better listings hold more. */
+export const displayLimit = (tier: number, stars: number) => Math.round(TIERS[tier].slots * (1 + (Math.max(1, stars) - 1) * 0.12));
+
 export function shopStats(items: Placed[], tier: number, stars: number): ShopStats {
   const placed = items.filter((p) => p.placed).map((p) => furnitureById(p.id));
   const sum = (k: keyof FurnitureDef) => placed.reduce((a, f) => a + ((f[k] as number) || 0), 0);
@@ -298,7 +336,7 @@ export function shopStats(items: Placed[], tier: number, stars: number): ShopSta
   if (placed.some((f) => (f.mirror || 0) > 0) && placed.some((f) => f.id === 'crackedMirror')) fp += 1;
   const furniturePrestige = Math.min(fp, 4 + tier * 4);
   return {
-    display: Math.min(TIERS[tier].slots, sum('slots')),
+    display: Math.min(displayLimit(tier, stars), sum('slots')),
     mirror: max('mirror'),
     hairBonus: max('hairBonus'),
     makeupBonus: max('makeupBonus'),

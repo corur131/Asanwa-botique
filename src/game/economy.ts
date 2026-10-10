@@ -18,11 +18,11 @@ export interface ShopTier {
 }
 
 export const TIERS: ShopTier[] = [
-  { name: 'Kiosk', slots: 12, rent: 30_000, moveIn: 0, customers: 9, mix: [0.7, 0.27, 0.03], staff: 0, running: 1_500, luxury: false, blurb: 'A container kiosk on Herbert Macaulay Way, Yaba.' },
-  { name: 'Small shop', slots: 25, rent: 120_000, moveIn: 100_000, customers: 12, mix: [0.55, 0.38, 0.07], staff: 0, running: 3_000, luxury: false, blurb: 'A proper shop in a Yaba plaza, with a fitting room.' },
-  { name: 'Boutique', slots: 45, rent: 330_000, moveIn: 500_000, customers: 16, mix: [0.42, 0.46, 0.12], staff: 2, running: 6_000, luxury: true, blurb: 'A bright boutique in Surulere with a big mirror wall.' },
-  { name: 'Big boutique', slots: 70, rent: 600_000, moveIn: 3_000_000, customers: 21, mix: [0.32, 0.5, 0.18], staff: 4, running: 12_000, luxury: true, blurb: 'Two floors on Admiralty Way, Lekki.' },
-  { name: 'Flagship', slots: 100, rent: 850_000, moveIn: 8_500_000, customers: 27, mix: [0.25, 0.5, 0.25], staff: 6, running: 25_000, luxury: true, blurb: 'The flagship store on Victoria Island. Celebrities come here.' },
+  { name: 'Kiosk', slots: 20, rent: 30_000, moveIn: 0, customers: 9, mix: [0.7, 0.27, 0.03], staff: 0, running: 1_500, luxury: false, blurb: 'A container kiosk on Herbert Macaulay Way, Yaba.' },
+  { name: 'Small shop', slots: 30, rent: 120_000, moveIn: 100_000, customers: 12, mix: [0.55, 0.38, 0.07], staff: 0, running: 3_000, luxury: false, blurb: 'A proper shop in a Yaba plaza, with a fitting room.' },
+  { name: 'Boutique', slots: 50, rent: 330_000, moveIn: 500_000, customers: 16, mix: [0.42, 0.46, 0.12], staff: 2, running: 6_000, luxury: true, blurb: 'A bright boutique in Surulere with a big mirror wall.' },
+  { name: 'Big boutique', slots: 75, rent: 600_000, moveIn: 3_000_000, customers: 21, mix: [0.32, 0.5, 0.18], staff: 4, running: 12_000, luxury: true, blurb: 'Two floors on Admiralty Way, Lekki.' },
+  { name: 'Flagship', slots: 105, rent: 850_000, moveIn: 8_500_000, customers: 27, mix: [0.25, 0.5, 0.25], staff: 6, running: 25_000, luxury: true, blurb: 'The flagship store on Victoria Island. Celebrities come here.' },
 ];
 
 /** The shop is open 8am–8pm: 720 game minutes, one per real second. */
@@ -36,7 +36,7 @@ export const staffMinutes = (level: number) => Math.max(30, 90 - 6 * level);
 
 export const START_CASH = 200_000;
 export const MARKUP = 1.35;
-export const PIECES_PER_DESIGN = 2;
+export const PIECES_PER_DESIGN = 1;
 export const DIVINE_CAPACITY = 8;
 export const STAFF_CAPACITY = 5;
 export const NEW_SHOP_RAMP_DAYS = 14;

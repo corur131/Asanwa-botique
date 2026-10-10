@@ -1,7 +1,11 @@
-import React, { useState } from 'react';
+import React, { Suspense, lazy, useState } from 'react';
 import { MARKUP, STAFF, TIERS, naira } from '../economy';
 import { Candidate, RaiseAnswer, candidates, canHire, daysToRent, displayCap, displayedCount, listingsNow, marketWage, restockAllCost, stats, waitingRoom } from '../engine';
-import { FURNITURE, FurnitureDef, Listing, furnitureById, wallCapacity, wallUsed } from '../shop';
+import { FURNITURE, FurnitureDef, Listing, displayLimit, furnitureById, roomOf, wallCapacity, wallUsed } from '../shop';
+
+const FurniturePreview = lazy(() => import('../scene/Previews').then((m) => ({ default: m.FurniturePreview })));
+const RoomPreview = lazy(() => import('../scene/Previews').then((m) => ({ default: m.RoomPreview })));
+const Loading = () => <div className="w-full h-full flex items-center justify-center text-xs text-slate-500">Loading picture…</div>;
 import { GameState } from '../types';
 import { Bar, Btn, Card, Modal, Pill, Swatch } from './kit';
 
@@ -65,7 +69,7 @@ export const RailPanel: React.FC<{ s: GameState; display: (uid: string, on: bool
       <div className="flex items-center justify-between gap-2">
         <div className="text-sm text-slate-300">
           <b className="text-white">{used}/{cap}</b> on display
-          {cap < TIERS[s.tier].slots && <span className="text-slate-500"> · buy rails or shelves for up to {TIERS[s.tier].slots}</span>}
+          {cap < displayLimit(s.tier, s.listing.stars) && <span className="text-slate-500"> · buy rails or shelves for up to {displayLimit(s.tier, s.listing.stars)}</span>}
         </div>
         <div className="flex gap-1.5">
           <Btn size="sm" tone={tab === 'display' ? 'gold' : 'ghost'} onClick={() => setTab('display')}>Display ({shown.length})</Btn>
@@ -95,7 +99,7 @@ export const RailPanel: React.FC<{ s: GameState; display: (uid: string, on: bool
                 </div>
               </div>
               <div className="flex gap-1">
-                <Btn size="sm" disabled={s.cash < d.cost * 2} onClick={() => restock(d.uid, 2)}>+2 · {naira(d.cost * 2)}</Btn>
+                <Btn size="sm" disabled={s.cash < d.cost} onClick={() => restock(d.uid, 1)}>+1 · {naira(d.cost)}</Btn>
                 {d.displayed ? <Btn size="sm" onClick={() => display(d.uid, false)}>Store</Btn> : <Btn size="sm" tone="gold" disabled={used >= cap} onClick={() => display(d.uid, true)}>Display</Btn>}
                 <Btn size="sm" onClick={() => clear(d.uid)} title="Sell back at half price">Sell off</Btn>
               </div>
@@ -124,7 +128,7 @@ export const ShopStatsCard: React.FC<{ s: GameState }> = ({ s }) => {
     <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-xs">
       {[
         ['Prestige', `${st.prestige}`, `${s.listing.stars * 2} from location, ${st.furniturePrestige >= 0 ? '+' : ''}${st.furniturePrestige} inside`],
-        ['Display', `${st.display}/${TIERS[s.tier].slots}`, 'designs'],
+        ['Display', `${st.display}/${displayLimit(s.tier, s.listing.stars)}`, 'designs: rails, shelves, tables'],
         ['Waiting room', `${waitingRoom(s)}`, 'people'],
         ['Mirror', st.mirror ? `+${st.mirror}` : '0', 'to every score'],
         ['Hair / makeup', `+${st.hairBonus} / +${st.makeupBonus}`, st.wigs ? 'wigs: yes' : 'wigs: need a hair station'],
@@ -144,7 +148,17 @@ export const FurniturePanel: React.FC<{ s: GameState; a: FurnitureActions; selec
   const [tab, setTab] = useState<'mine' | 'store'>('mine');
   const groups = Array.from(new Set(FURNITURE.map((f) => f.group)));
   const [group, setGroup] = useState<FurnitureDef['group']>('Display');
-  const wallLeft = wallCapacity(s.tier) - wallUsed(s.furniture);
+  const [look, setLook] = useState<string | null>(null);
+  const [bought, setBought] = useState<{ n: number; name: string } | null>(null);
+  const wallLeft = wallCapacity(s.listing) - wallUsed(s.furniture);
+  const st = stats(s);
+  const limit = displayLimit(s.tier, s.listing.stars);
+  const last = bought && s.furniture.length > bought.n ? s.furniture[s.furniture.length - 1] : null;
+  const buy = (f: FurnitureDef) => {
+    setBought({ n: s.furniture.length, name: f.name });
+    a.buy(f.id);
+  };
+  const lookAt = look ? furnitureById(look) : null;
   return (
     <div className="space-y-3">
       <ShopStatsCard s={s} />
@@ -179,18 +193,51 @@ export const FurniturePanel: React.FC<{ s: GameState; a: FurnitureActions; selec
               <Btn key={g} size="sm" tone={group === g ? 'gold' : 'ghost'} onClick={() => setGroup(g)}>{g}</Btn>
             ))}
           </div>
-          <p className="text-[11px] text-slate-500">Wall space left: {wallLeft} m.</p>
+          {last && (
+            <div className={`rounded-lg p-2 text-xs ${last.placed ? 'bg-emerald-500/10 border border-emerald-500/30 text-emerald-200' : 'bg-amber-500/10 border border-amber-500/30 text-amber-200'}`}>
+              {last.placed ? `${bought!.name} is in your shop.` : `${bought!.name} is in storage: no free spot. Store or move something, then tap "Put in shop" in the other tab.`}
+            </div>
+          )}
+          {lookAt && (
+            <div className="rounded-xl border border-amber-500/40 bg-[#15171f] overflow-hidden">
+              <div className="h-48">
+                <Suspense fallback={<Loading />}>
+                  <FurniturePreview id={lookAt.id} />
+                </Suspense>
+              </div>
+              <div className="p-3 space-y-1">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="text-sm font-semibold text-white">{lookAt.name} <span className="text-[11px] text-slate-400">· {lookAt.w}×{lookAt.d} {lookAt.mount === 'wall' ? 'on the wall' : lookAt.mount === 'ceiling' ? 'ceiling' : 'floor'}</span></div>
+                  <button className="text-xs text-slate-400" onClick={() => setLook(null)}>Close</button>
+                </div>
+                <div className="text-[11px] text-slate-400">{lookAt.note} {lookAt.prestige ? `Prestige ${lookAt.prestige > 0 ? '+' : ''}${lookAt.prestige}.` : ''}</div>
+                {!!lookAt.slots && (
+                  <div className={`text-[11px] ${st.display + lookAt.slots > limit ? 'text-amber-300' : 'text-emerald-300'}`}>
+                    {st.display + lookAt.slots > limit
+                      ? st.display >= limit
+                        ? `This shop already shows its limit of ${limit} designs, so this adds no display space here. A bigger shop holds more.`
+                        : `Adds ${limit - st.display} display spaces here (this shop's limit is ${limit}).`
+                      : `Adds ${lookAt.slots} display spaces: ${st.display} → ${st.display + lookAt.slots}.`}
+                  </div>
+                )}
+                <Btn className="w-full mt-1" tone="gold" disabled={(lookAt.minTier || 0) > s.tier || s.cash < lookAt.price} onClick={() => buy(lookAt)}>
+                  {(lookAt.minTier || 0) > s.tier ? `Needs a ${TIERS[lookAt.minTier || 0].name}` : `Buy · ${naira(lookAt.price)}`}
+                </Btn>
+              </div>
+            </div>
+          )}
+          <p className="text-[11px] text-slate-500">Tap a piece to see it. Wall space left: {wallLeft} m.</p>
           {FURNITURE.filter((f) => f.group === group && !f.starter).map((f) => {
             const locked = (f.minTier || 0) > s.tier;
             return (
-              <div key={f.id} className={`flex items-center gap-2 p-2 rounded-lg border border-white/10 bg-white/5 ${locked ? 'opacity-50' : ''}`}>
+              <div key={f.id} onClick={() => setLook(f.id)} className={`cursor-pointer flex items-center gap-2 p-2 rounded-lg border ${look === f.id ? 'border-amber-500 bg-amber-500/10' : 'border-white/10 bg-white/5 hover:border-white/25'} ${locked ? 'opacity-50' : ''}`}>
                 <div className="min-w-0 flex-1">
                   <div className="text-sm font-semibold text-white">
                     {f.name} <span className="text-[11px] text-slate-400">· {f.w}×{f.d} {f.mount === 'wall' ? 'on the wall' : f.mount === 'ceiling' ? 'ceiling' : 'floor'}</span>
                   </div>
                   <div className="text-[11px] text-slate-400">{f.note} {f.prestige ? `Prestige +${f.prestige}.` : ''}</div>
                 </div>
-                <Btn size="sm" tone="gold" disabled={locked || s.cash < f.price} onClick={() => a.buy(f.id)}>
+                <Btn size="sm" tone="ghost" onClick={() => setLook(f.id)}>
                   {locked ? `Needs ${TIERS[f.minTier || 0].name}` : naira(f.price)}
                 </Btn>
               </div>
@@ -216,7 +263,7 @@ export const MovePanel: React.FC<{ s: GameState; onMove: (l: Listing) => void }>
         Now: <b className="text-white">{TIERS[s.tier].name}</b>, {s.listing.street}, {s.listing.area} <Stars n={s.listing.stars} /> · rent {naira(s.listing.rent)}
       </div>
       <div className="rounded-lg border border-white/10 bg-white/5 p-3 text-xs text-slate-300">
-        <b className="text-white">{next.name}</b>: holds up to {next.slots} designs{next.staff ? `, ${next.staff} staff` : ''}{next.luxury ? ', luxury suppliers' : ''}. Your furniture comes with you; buy more rails to fill the bigger room. Listings change every week.
+        <b className="text-white">{next.name}</b>: bigger, better listings are roomier and hold more{next.staff ? `, ${next.staff} staff` : ''}{next.luxury ? ', luxury suppliers' : ''}. Your furniture comes with you; buy more rails to fill the bigger room. Listings change every week.
       </div>
       {list.map((l) => {
         const after = s.cash - l.moveIn;
@@ -226,11 +273,9 @@ export const MovePanel: React.FC<{ s: GameState; onMove: (l: Listing) => void }>
             <div className="flex items-start justify-between gap-2">
               <div>
                 <div className="text-sm font-semibold text-white">{l.street}</div>
-                <div className="text-[11px] text-slate-400">{l.area} · <Stars n={l.stars} /></div>
+                <div className="text-[11px] text-slate-400">{l.area} · <Stars n={l.stars} /> · {roomOf(l).w}×{roomOf(l).d} m · up to {displayLimit(l.tier, l.stars)} designs</div>
               </div>
-              <Btn size="sm" tone="gold" disabled={s.cash < l.moveIn} onClick={() => setPick(l)}>
-                {s.cash < l.moveIn ? `Need ${naira(l.moveIn)}` : 'View'}
-              </Btn>
+              <Btn size="sm" tone="gold" onClick={() => setPick(l)}>View</Btn>
             </div>
             <div className="grid grid-cols-3 gap-2 mt-2 text-[11px]">
               <div><div className="text-slate-500">Rent/week</div><div className="text-white font-semibold">{naira(l.rent)}</div></div>
@@ -243,9 +288,15 @@ export const MovePanel: React.FC<{ s: GameState; onMove: (l: Listing) => void }>
       })}
       {pick && (
         <Modal onClose={() => setPick(null)}>
+          <div className="h-56 -mx-1 mb-3 rounded-xl overflow-hidden">
+            <Suspense fallback={<Loading />}>
+              <RoomPreview tier={pick.tier} stars={pick.stars} />
+            </Suspense>
+          </div>
           <h2 className="font-serif text-2xl font-bold text-white">{pick.street}</h2>
           <p className="text-sm text-slate-400 mb-3">{pick.area} · {next.name} · <Stars n={pick.stars} /></p>
           <ul className="text-sm space-y-1 mb-3">
+            <li>Floor: <b>{roomOf(pick).w}×{roomOf(pick).d} m</b>, holds up to <b>{displayLimit(pick.tier, pick.stars)}</b> designs{pick.stars === 1 ? ', tired and in need of paint' : pick.stars === 4 ? ', freshly done with a feature wall' : ''}</li>
             <li>Move-in: <b>{naira(pick.moveIn)}</b> (you have {naira(s.cash)})</li>
             <li>Rent: <b>{naira(pick.rent)}</b> every 7 days</li>
             <li>Landlord: <b>{pick.landlord}</b>, {graceText(pick.grace)}</li>
@@ -254,7 +305,7 @@ export const MovePanel: React.FC<{ s: GameState; onMove: (l: Listing) => void }>
           {s.cash - pick.moveIn < pick.rent * 2 && <p className="text-sm text-rose-300 mb-3">Careful: the first two weeks in a new shop are quiet, and you'd have less than two weeks of rent saved.</p>}
           <div className="flex gap-2 justify-end">
             <Btn onClick={() => setPick(null)}>Not yet</Btn>
-            <Btn tone="gold" onClick={() => { onMove(pick); setPick(null); }}>Sign and move</Btn>
+            <Btn tone="gold" disabled={s.cash < pick.moveIn} onClick={() => { onMove(pick); setPick(null); }}>{s.cash < pick.moveIn ? `Need ${naira(pick.moveIn)}` : 'Sign and move'}</Btn>
           </div>
         </Modal>
       )}

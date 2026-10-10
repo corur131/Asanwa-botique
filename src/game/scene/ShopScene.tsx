@@ -2,7 +2,7 @@ import React, { useMemo, useRef, useState } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { OrbitControls } from '@react-three/drei';
 import { GameState } from '../types';
-import { ROOMS, cellsBlocked, footprint, furnitureById, wallLayout, Placed, canPlace } from '../shop';
+import { RoomStyle, room, cellsBlocked, footprint, furnitureById, wallLayout, Placed, canPlace } from '../shop';
 import { CeilingPiece, FloorPiece, WallPiece, B } from './Furniture3D';
 import { Cell, FigureLook, Walker, lookToFigure } from './People';
 
@@ -21,8 +21,8 @@ export interface SceneProps {
 
 /** Cells where people stand: the styling spot, Divine's spot, waiting spots, staff spots. */
 export function spots(s: GameState) {
-  const r = ROOMS[s.tier];
-  const blocked = cellsBlocked(s.furniture, s.tier);
+  const r = room(s.listing);
+  const blocked = cellsBlocked(s.furniture, s.listing);
   const free = (x: number, z: number) => x >= 0 && x < r.w && z >= 0 && z < r.d && !blocked[z][x];
   const door: Cell = [Math.floor(r.w / 2), r.d - 1];
   const outside: Cell = [door[0], r.d + 2];
@@ -32,7 +32,7 @@ export function spots(s: GameState) {
   const floorMirror = placed.filter((p) => ['standMirror', 'goldMirror'].includes(p.id)).sort((a, b) => (furnitureById(b.id).mirror || 0) - (furnitureById(a.id).mirror || 0))[0];
   if (floorMirror && free(floorMirror.x, floorMirror.z + 1)) style = [floorMirror.x, floorMirror.z + 1];
   if (!style) {
-    const wl = wallLayout(s.furniture, s.tier);
+    const wl = wallLayout(s.furniture, s.listing);
     const wm = placed.find((p) => ['mirrorWall', 'crackedMirror'].includes(p.id) && wl[p.uid]);
     if (wm) {
       const at = wl[wm.uid];
@@ -65,8 +65,7 @@ export function spots(s: GameState) {
   return { door, outside, style, divine, wait, staff, staffClient, street };
 }
 
-function Room({ s }: { s: GameState }) {
-  const r = ROOMS[s.tier];
+export function Room({ r, tier }: { r: RoomStyle; tier: number }) {
   const H = r.height;
   const tiles = useMemo(() => {
     const out: React.ReactNode[] = [];
@@ -87,7 +86,7 @@ function Room({ s }: { s: GameState }) {
       {/* street around the shop */}
       <mesh position={[r.w / 2, -0.07, r.d / 2]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
         <circleGeometry args={[Math.max(r.w, r.d) * 1.1 + 4, 48]} />
-        <meshStandardMaterial color={s.tier >= 3 ? '#5E7048' : '#6E6A58'} roughness={1} />
+        <meshStandardMaterial color={tier >= 3 ? '#5E7048' : '#6E6A58'} roughness={1} />
       </mesh>
       <mesh position={[r.w / 2, -0.06, r.d + 1.6]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
         <planeGeometry args={[r.w + 6, 2.2]} />
@@ -126,6 +125,29 @@ function Room({ s }: { s: GameState }) {
         </>
       )}
       {r.kind === 'flagship' && <B p={[r.w / 2, 1.6, 0.02]} s={[r.w - 0.4, 0.03, 0.01]} c={r.trim} m={0.9} e={r.trim} ei={0.3} />}
+      {/* how well kept the place is */}
+      {r.finish === 1 && r.kind !== 'container' && (
+        <>
+          <B p={[r.w * 0.3, 0.6, 0.03]} s={[0.8, 0.5, 0.01]} c="#5A4A36" o={0.35} />
+          <B p={[r.w * 0.72, 1.7, 0.03]} s={[0.6, 0.9, 0.01]} c="#5A4A36" o={0.3} />
+          <B p={[0.03, 1.1, r.d * 0.6]} s={[0.01, 0.7, 0.9]} c="#5A4A36" o={0.3} />
+          <B p={[r.w * 0.55, 0.004, r.d * 0.45]} s={[1.6, 0.006, 0.08]} c="#3A3530" o={0.5} />
+        </>
+      )}
+      {r.finish >= 3 && (
+        <>
+          <B p={[r.w / 2, 0.95, 0.02]} s={[r.w, 0.05, 0.03]} c={r.trim} m={r.kind === 'marble' || r.kind === 'flagship' ? 0.8 : 0.1} />
+          <B p={[0.02, 0.95, r.d / 2]} s={[0.03, 0.05, r.d]} c={r.trim} m={r.kind === 'marble' || r.kind === 'flagship' ? 0.8 : 0.1} />
+        </>
+      )}
+      {r.finish === 4 && (
+        <>
+          {/* feature wall and a warm light strip along the top */}
+          <B p={[r.w / 2, H * 0.55, 0.025]} s={[Math.min(4, r.w * 0.4), H * 0.7, 0.02]} c={r.kind === 'flagship' ? '#2A2430' : r.trim} o={r.kind === 'flagship' ? 1 : 0.35} m={0.2} />
+          <B p={[r.w / 2, H - 0.14, 0.04]} s={[r.w - 0.2, 0.03, 0.03]} c="#FFE7B0" e="#FFD27A" ei={1.2} />
+          <B p={[0.04, H - 0.14, r.d / 2]} s={[0.03, 0.03, r.d - 0.2]} c="#FFE7B0" e="#FFD27A" ei={1.2} />
+        </>
+      )}
       {/* door mat */}
       <B p={[door + 0.5, 0.008, r.d - 0.35]} s={[0.8, 0.012, 0.45]} c="#8A6A44" />
       <B p={[door + 0.5, 0.01, r.d + 0.06]} s={[1, 0.02, 0.14]} c="#9A968C" />
@@ -134,8 +156,8 @@ function Room({ s }: { s: GameState }) {
 }
 
 function Furniture({ s, selected, placing, onSelect }: Pick<SceneProps, 's' | 'selected' | 'placing' | 'onSelect'>) {
-  const r = ROOMS[s.tier];
-  const wl = wallLayout(s.furniture, s.tier);
+  const r = room(s.listing);
+  const wl = wallLayout(s.furniture, s.listing);
   // colours of displayed stock, shared out to display furniture
   const shown = s.stock.filter((d) => d.displayed && d.pieces > 0);
   let cursor = 0;
@@ -186,7 +208,7 @@ function PlacingGhost({ s, placing, cell }: { s: GameState; placing: NonNullable
   const p = s.furniture.find((x) => x.uid === placing.uid);
   if (!p) return null;
   const cand: Placed = { ...p, x: cell[0], z: cell[1], rot: placing.rot, placed: true };
-  const ok = canPlace(s.furniture, s.tier, cand);
+  const ok = canPlace(s.furniture, s.listing, cand);
   const { w, d } = footprint(cand);
   return (
     <group position={[cell[0] + w / 2, 0, cell[1] + d / 2]}>
@@ -200,10 +222,10 @@ function PlacingGhost({ s, placing, cell }: { s: GameState; placing: NonNullable
 
 export default function ShopScene(p: SceneProps) {
   const { s } = p;
-  const r = ROOMS[s.tier];
+  const r = room(s.listing);
   const [cell, setCell] = useState<Cell | null>(null);
-  const blocked = useMemo(() => cellsBlocked(s.furniture, s.tier), [s.furniture, s.tier]);
-  const sp = useMemo(() => spots(s), [s.furniture, s.tier]); // eslint-disable-line react-hooks/exhaustive-deps
+  const blocked = useMemo(() => cellsBlocked(s.furniture, s.listing), [s.furniture, s.listing]);
+  const sp = useMemo(() => spots(s), [s.furniture, s.listing]); // eslint-disable-line react-hooks/exhaustive-deps
   const cx = r.w / 2;
   const cz = r.d / 2;
   const dist = Math.max(r.w, r.d) * 1.25 + 3;
@@ -277,7 +299,7 @@ export default function ShopScene(p: SceneProps) {
       <hemisphereLight args={['#FFF4E0', '#3A3A50', p.night ? 0.3 : p.dark ? 0.25 : 0.55]} />
       <directionalLight position={[cx + 6, 12, cz + 8]} intensity={p.night ? 0.4 : 1.2} castShadow shadow-mapSize={[1024, 1024]} shadow-camera-left={-12} shadow-camera-right={12} shadow-camera-top={12} shadow-camera-bottom={-12} />
       <OrbitControls target={[cx, 0.6, cz]} enablePan={false} minPolarAngle={0.45} maxPolarAngle={1.2} minDistance={dist * 0.45} maxDistance={dist * 1.8} />
-      <Room s={s} />
+      <Room r={r} tier={s.tier} />
       <Furniture s={s} selected={p.selected} placing={p.placing} onSelect={p.onSelect} />
       {people}
       {p.placing && <PlacingGhost s={s} placing={p.placing} cell={cell} />}
@@ -300,6 +322,21 @@ export default function ShopScene(p: SceneProps) {
         <planeGeometry args={[r.w, r.d]} />
         <meshBasicMaterial visible={false} />
       </mesh>
+    </Canvas>
+  );
+}
+
+/** A slowly turning look at an empty room, for the shop listings. */
+export function RoomPreview({ tier, stars }: { tier: number; stars: number }) {
+  const r = room({ tier, stars });
+  const dist = Math.max(r.w, r.d) * 0.78 + 1.6;
+  return (
+    <Canvas dpr={[1, 1.5]} camera={{ fov: 32, position: [r.w / 2 + dist * 0.75, dist * 0.95, r.d / 2 + dist * 1.05], near: 0.1, far: 200 }} style={{ background: 'linear-gradient(#24305a,#3a4a7a)' }}>
+      <ambientLight intensity={0.6} />
+      <hemisphereLight args={['#FFF4E0', '#3A3A50', 0.55]} />
+      <directionalLight position={[r.w / 2 + 6, 12, r.d / 2 + 8]} intensity={1.2} />
+      <OrbitControls target={[r.w / 2, 0.6, r.d / 2]} enablePan={false} autoRotate autoRotateSpeed={0.6} minPolarAngle={0.45} maxPolarAngle={1.2} minDistance={dist * 0.45} maxDistance={dist * 1.8} />
+      <Room r={r} tier={tier} />
     </Canvas>
   );
 }
