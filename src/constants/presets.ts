@@ -1,133 +1,113 @@
 import { CharacterConfig } from '../types/character';
 
+/** Divine: the player. Curvy body, divine.svg's face, skin and lips. */
 export const DIVINE_CONFIG: CharacterConfig = {
   body: 'femaleRegular',
-  skinTone: 'tone6', // Honey Amber
+  skinTone: 'tone6',
   faceShape: 'oval',
-  eyes: {
-    shape: 'almond',
-    irisColor: 'darkBrown',
-  },
+  eyes: { shape: 'almond', irisColor: 'darkBrown' },
   brows: 'featheredArch',
   nose: 'narrowDefined',
-  lips: {
-    shape: 'fullPout',
-    color: '#ba5869', // Rich warm berry plum
-  },
+  lips: { shape: 'fullPout', color: '#C46E62' },
   makeup: {
     blush: true,
+    blushColor: '#E7867A',
     liner: true,
+    linerStyle: 'wing',
     lashes: 'full',
-    lipColor: '#ba5869',
+    lipColor: '#C46E62',
+    lipFinish: 'gloss',
+    eyeshadow: 'none',
+    highlighter: false,
+    contour: false,
+    browStyle: 'natural',
   },
-  maleOnly: {
-    facialHair: 'none',
-  },
+  maleOnly: { facialHair: 'none' },
   hair: 'longBraids',
   hairColor: 'black',
   earrings: 'goldStuds',
   necklace: true,
   state: 'styled',
-  outfitColor: {
-    top: '#f6f1e8', // Cream halter / fitted top
-    bottom: '#ded4c5', // Matching neutral skirt
-    shoes: '#c9a163', // Golden-caramel heels
-  },
+  outfit: { cut: 'camiPencil', fabric: 'plain', color: '#DED4C5', color2: '#F6F1E8' },
+  accessories: { headwear: 'none', beads: false, bag: 'none', shoes: 'heels', shoesColor: '#C9A163', glasses: 'none', watch: false },
 };
 
 export const PLUS_FEMALE_CONFIG: CharacterConfig = {
   body: 'femalePlus',
-  skinTone: 'tone2', // Rich Warm Ebony
+  skinTone: 'tone2',
   faceShape: 'heart',
-  eyes: {
-    shape: 'doe',
-    irisColor: 'warmAmber',
-  },
+  eyes: { shape: 'doe', irisColor: 'warmAmber' },
   brows: 'featheredArch',
   nose: 'broadAfrican',
-  lips: {
-    shape: 'widePillowy',
-    color: '#9e3447', // Deep rose plum
-  },
+  lips: { shape: 'widePillowy', color: '#A8405A' },
   makeup: {
     blush: true,
+    blushColor: '#B8553A',
     liner: true,
-    lashes: 'full',
-    lipColor: '#9e3447',
+    linerStyle: 'bold',
+    lashes: 'dramatic',
+    lipColor: '#A8405A',
+    lipFinish: 'satin',
+    eyeshadow: '#D4A23A',
+    highlighter: true,
+    contour: true,
+    browStyle: 'defined',
   },
-  maleOnly: {
-    facialHair: 'none',
-  },
+  maleOnly: { facialHair: 'none' },
   hair: 'afroPuff',
   hairColor: 'black',
-  earrings: 'goldHoops',
-  necklace: true,
+  earrings: 'goldDrops',
+  necklace: false,
   state: 'styled',
-  outfitColor: {
-    top: '#b85d38', // Terracotta ochre top
-    bottom: '#29433b', // Deep emerald skirt
-    shoes: '#1f1614',
-  },
+  outfit: { cut: 'iroBuba', fabric: 'ankara', color: '#E86A2E', color2: '#2F5D3A', pattern: 6 },
+  accessories: { headwear: 'gele', headwearColor: '#E3B23C', beads: true, bag: 'clutch', bagColor: '#E3B23C', shoes: 'sandals', shoesColor: '#C9A163', glasses: 'none', watch: false },
 };
 
 export const MALE_CONFIG: CharacterConfig = {
   body: 'male',
-  skinTone: 'tone3', // Mahogany Bronze
+  skinTone: 'tone3',
   faceShape: 'square',
-  eyes: {
-    shape: 'almond',
-    irisColor: 'espressoBlack',
-  },
+  eyes: { shape: 'almond', irisColor: 'espressoBlack' },
   brows: 'straightDefined',
   nose: 'broadAfrican',
-  lips: {
-    shape: 'subtleSoft',
-    color: '#823e4b',
-  },
-  makeup: {
-    blush: false,
-    liner: false,
-    lashes: 'natural',
-    lipColor: '#823e4b',
-  },
-  maleOnly: {
-    facialHair: 'stubble',
-  },
+  lips: { shape: 'subtleSoft', color: '#823e4b' },
+  makeup: { blush: false, liner: false, lashes: 'natural', lipColor: '#823e4b' },
+  maleOnly: { facialHair: 'shortBoxed' },
   hair: 'waves',
   hairColor: 'black',
   earrings: 'none',
   necklace: false,
   state: 'styled',
-  outfitColor: {
-    top: '#233246', // Indigo tailored shirt
-    bottom: '#181b22', // Charcoal tailored trousers
-    shoes: '#42281d', // Rich leather shoes
-  },
+  outfit: { cut: 'senator', fabric: 'plain', color: '#2F5D3A', color2: '#2F5D3A' },
+  accessories: { headwear: 'none', beads: false, bag: 'none', shoes: 'loafers', shoesColor: '#42281D', glasses: 'none', watch: true },
 };
 
 /**
- * Derives Deborah's config from Divine's face config live.
- * Requirements: Deborah reads Divine's exact face config live
- * (skin, face, eyes, brows, nose, lips) but has her own hair (bone straight),
- * makeup, and outfit.
+ * Deborah: Divine's twin. She reads Divine's exact face config live
+ * (skin, face, eyes, brows, nose, lips, body) but has her own hair, makeup and outfit.
  */
-export function getDeborahConfig(divineConfig: CharacterConfig): CharacterConfig {
+export function getDeborahConfig(divine: CharacterConfig): CharacterConfig {
+  const plain = divine.state === 'plain';
   return {
-    ...divineConfig,
+    ...divine,
     hair: 'boneStraight',
     hairColor: 'burgundy',
     makeup: {
-      blush: divineConfig.state === 'plain' ? false : true,
-      liner: divineConfig.state === 'plain' ? false : true,
-      lashes: divineConfig.state === 'plain' ? 'natural' : 'full',
-      lipColor: divineConfig.state === 'plain' ? divineConfig.lips.color : '#8f2334', // Signature deep wine
+      blush: !plain,
+      blushColor: '#D9667A',
+      liner: !plain,
+      linerStyle: 'bold',
+      lashes: plain ? 'natural' : 'dramatic',
+      lipColor: '#7A1C2E',
+      lipFinish: 'matte',
+      eyeshadow: '#6E2F5A',
+      highlighter: true,
+      contour: true,
+      browStyle: 'defined',
     },
-    earrings: divineConfig.state === 'plain' ? 'none' : 'goldHoops',
-    necklace: divineConfig.state === 'plain' ? false : true,
-    outfitColor: {
-      top: divineConfig.state === 'plain' ? '#787a80' : '#1d4838', // Deep forest green or dull faded
-      bottom: divineConfig.state === 'plain' ? '#5a5b61' : '#12261e',
-      shoes: divineConfig.state === 'plain' ? '#44464c' : '#cca357',
-    },
+    earrings: plain ? 'none' : 'goldHoops',
+    necklace: !plain,
+    outfit: { cut: 'corsetFlare', fabric: 'satin', color: '#1D4838', color2: '#1D4838' },
+    accessories: { headwear: 'none', beads: false, bag: 'clutch', bagColor: '#C9A163', shoes: 'heels', shoesColor: '#CCA357', glasses: 'none', watch: false },
   };
 }

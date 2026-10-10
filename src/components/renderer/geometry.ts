@@ -74,51 +74,75 @@ export interface BodySpec {
   knee: Pt;
   elbow: Pt;
   handScale: number;
+  /** Degrees the arms are swung out (A-pose); hands and shoes follow it. */
+  armAngle?: number;
   footScale: number;
   female: boolean;
 }
 
 export const BODY_SPECS: Record<BodyType, BodySpec> = {
+  femaleSlim: {
+    neck: [286, 25],
+    shoulder: [304, 86],
+    pit: [360, 76],
+    bust: [420, 86],
+    under: [450, 76],
+    waist: [520, 64],
+    hhip: [580, 84],
+    hip: [640, 94],
+    crotch: 720,
+    armInner: [[232, 330], [230, 380], [226, 450], [220, 520], [216, 560], [212, 640], [208, 722]],
+    armOuter: [[188, 722], [184, 650], [183, 590], [186, 530], [188, 470], [188, 400], [192, 342], [199, 318], [210, 308], [227, 304]],
+    wrist: [198, 724],
+    legOuter: [[206, 600], [204, 660], [208, 740], [216, 840], [226, 940], [229, 1010], [227, 1060], [230, 1140], [242, 1240], [258, 1340], [263, 1370]],
+    legInner: [[300, 698], [293, 740], [289, 820], [285, 920], [283, 1000], [281, 1040], [283, 1120], [283, 1200], [283, 1300], [284, 1370]],
+    ankle: [273, 1370],
+    knee: [255, 1010],
+    elbow: [204, 525],
+    handScale: 1.16,
+    footScale: 1.22,
+    female: true,
+  },
   femaleRegular: {
     neck: [286, 26],
-    shoulder: [304, 90],
-    pit: [360, 80],
-    bust: [420, 94],
-    under: [452, 82],
-    waist: [520, 70],
-    hhip: [580, 92],
-    hip: [640, 104],
-    crotch: 722,
-    armInner: [[230, 330], [228, 380], [224, 450], [218, 520], [214, 560], [210, 640], [206, 722]],
-    armOuter: [[184, 722], [180, 650], [178, 590], [182, 530], [184, 470], [184, 400], [188, 342], [196, 318], [208, 308], [226, 304]],
-    wrist: [195, 724],
-    legOuter: [[196, 600], [194, 660], [198, 740], [208, 840], [220, 940], [224, 1010], [222, 1060], [226, 1140], [240, 1240], [256, 1340], [262, 1370]],
-    legInner: [[300, 700], [292, 740], [288, 820], [284, 920], [282, 1000], [280, 1040], [282, 1120], [282, 1200], [282, 1300], [284, 1370]],
+    shoulder: [304, 86],
+    pit: [360, 78],
+    bust: [424, 104],
+    under: [458, 82],
+    waist: [522, 64],
+    hhip: [578, 104],
+    hip: [634, 126],
+    crotch: 724,
+    armInner: [[230, 330], [226, 380], [220, 450], [212, 520], [206, 560], [198, 640], [190, 722]],
+    armOuter: [[166, 722], [163, 650], [164, 590], [170, 530], [176, 470], [182, 400], [190, 342], [198, 318], [210, 308], [227, 304]],
+    wrist: [178, 724],
+    legOuter: [[174, 600], [174, 640], [176, 700], [186, 800], [206, 900], [218, 1000], [220, 1040], [224, 1120], [238, 1230], [256, 1340], [262, 1370]],
+    legInner: [[300, 702], [292, 744], [288, 820], [284, 920], [282, 1000], [280, 1040], [282, 1120], [282, 1200], [282, 1300], [284, 1370]],
     ankle: [273, 1370],
-    knee: [252, 1010],
-    elbow: [200, 525],
+    knee: [249, 1010],
+    elbow: [192, 525],
     handScale: 1.2,
     footScale: 1.25,
     female: true,
   },
   femalePlus: {
     neck: [288, 30],
-    shoulder: [306, 98],
+    shoulder: [306, 94],
     pit: [368, 92],
-    bust: [432, 120],
-    under: [472, 108],
-    waist: [530, 104],
-    hhip: [590, 124],
-    hip: [650, 140],
-    crotch: 730,
-    armInner: [[212, 340], [210, 400], [206, 470], [198, 530], [194, 580], [190, 650], [182, 722]],
-    armOuter: [[156, 722], [150, 650], [146, 580], [148, 520], [152, 460], [152, 400], [156, 346], [166, 320], [180, 310], [204, 306]],
-    wrist: [169, 724],
-    legOuter: [[160, 620], [158, 680], [162, 760], [176, 860], [196, 960], [206, 1012], [204, 1060], [208, 1140], [226, 1240], [246, 1340], [254, 1370]],
-    legInner: [[300, 712], [292, 760], [288, 840], [286, 930], [282, 1004], [280, 1044], [282, 1120], [282, 1200], [282, 1300], [284, 1370]],
+    bust: [436, 126],
+    under: [478, 110],
+    waist: [534, 94],
+    hhip: [584, 134],
+    hip: [640, 158],
+    crotch: 734,
+    armInner: [[212, 340], [208, 400], [202, 470], [192, 530], [186, 580], [178, 650], [168, 722]],
+    armOuter: [[142, 722], [136, 650], [132, 580], [136, 520], [142, 460], [148, 400], [156, 346], [166, 320], [180, 310], [204, 306]],
+    wrist: [155, 724],
+    legOuter: [[142, 620], [142, 660], [148, 740], [168, 860], [190, 960], [203, 1012], [201, 1060], [205, 1140], [224, 1240], [246, 1340], [254, 1370]],
+    legInner: [[300, 716], [292, 760], [288, 840], [286, 930], [282, 1004], [280, 1044], [282, 1120], [282, 1200], [282, 1300], [284, 1370]],
     ankle: [269, 1370],
-    knee: [244, 1012],
-    elbow: [174, 525],
+    knee: [242, 1012],
+    elbow: [164, 525],
     handScale: 1.28,
     footScale: 1.3,
     female: true,
@@ -146,6 +170,28 @@ export const BODY_SPECS: Record<BodyType, BodySpec> = {
     female: false,
   },
 };
+
+/**
+ * A-pose: swing each arm out from the shoulder joint so the waist and hips are never
+ * hidden behind the arms (the standard dress-up pose). Positive degrees move the hand
+ * away from the body.
+ */
+function aPose(s: BodySpec, deg: number): BodySpec {
+  const top = s.armOuter[s.armOuter.length - 1];
+  const px = top[0] - 12;
+  const py = top[1] + 16;
+  const a = (deg * Math.PI) / 180;
+  const r = ([x, y]: Pt): Pt => {
+    const dx = x - px;
+    const dy = y - py;
+    return [px + dx * Math.cos(a) - dy * Math.sin(a), py + dx * Math.sin(a) + dy * Math.cos(a)];
+  };
+  return { ...s, armInner: s.armInner.map(r), armOuter: s.armOuter.map(r), wrist: r(s.wrist), elbow: r(s.elbow), armAngle: deg };
+}
+
+for (const k of Object.keys(BODY_SPECS) as BodyType[]) {
+  BODY_SPECS[k] = aPose(BODY_SPECS[k], k === 'male' ? 6 : 9);
+}
 
 /** Torso outline (neck base to crotch), smooth all round. */
 export function torsoPath(s: BodySpec): string {

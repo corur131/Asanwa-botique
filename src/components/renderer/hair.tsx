@@ -1,6 +1,7 @@
 import React from 'react';
 import { CharacterConfig, HairColorId, SkinPalette } from '../../types/character';
 import { darken, hexToRgb, lighten, mix } from './color';
+import { NEW_STYLES } from './hair2';
 import {
   BACK_LONG,
   BACK_STRANDS,
@@ -27,6 +28,8 @@ export interface HairPalette {
   mid: string;
   strandHighlight: string;
   specular: string;
+  /** Colour at the ends for ombré hair. */
+  ends?: string;
 }
 
 export const HAIR_PALETTES: Record<HairColorId, HairPalette> = {
@@ -34,11 +37,27 @@ export const HAIR_PALETTES: Record<HairColorId, HairPalette> = {
   darkBrown: { base: '#2E1A10', mid: '#45281A', darkShadow: '#1C0F08', strandHighlight: '#6E4630', specular: '#A8785A' },
   burgundy: { base: '#3A0E18', mid: '#5A1626', darkShadow: '#22070D', strandHighlight: '#8A2A40', specular: '#C0566C' },
   honeyBlonde: { base: '#8A5A26', mid: '#A87436', darkShadow: '#5A3814', strandHighlight: '#D09A52', specular: '#F0C888' },
+  ginger: { base: '#7A3414', mid: '#9C4A20', darkShadow: '#4E1E0A', strandHighlight: '#C46A34', specular: '#E89A5C' },
+  platinum: { base: '#B9A27A', mid: '#D2BE96', darkShadow: '#7E6A48', strandHighlight: '#EBDDBE', specular: '#FFF6E2' },
+  ombre: { base: '#2E1A10', mid: '#3A2214', darkShadow: '#1C0F08', strandHighlight: '#B8803E', specular: '#E8BC7A', ends: '#B98340' },
 };
 
-type Id = (n: string) => string;
+/** Dull, ashy version of a palette for the plain (unstyled) state. */
+export function dullPalette(p: HairPalette): HairPalette {
+  const ash = '#6B5D54';
+  return {
+    base: mix(p.base, ash, 0.22),
+    mid: mix(p.mid, ash, 0.25),
+    darkShadow: mix(p.darkShadow, ash, 0.15),
+    strandHighlight: mix(p.strandHighlight, ash, 0.4),
+    specular: mix(p.specular, ash, 0.55),
+    ends: p.ends ? mix(p.ends, ash, 0.35) : undefined,
+  };
+}
 
-interface HairProps {
+export type Id = (n: string) => string;
+
+export interface HairProps {
   id: Id;
   config: CharacterConfig;
   pal: HairPalette;
@@ -58,12 +77,12 @@ const lum = (hex: string) => {
 const REF_DARK = lum('#1A0E09');
 const REF_LIGHT = lum('#8A5E44');
 /** Re-colour a strand colour from divine.svg's black-hair palette into any hair palette. */
-function recolor(refHex: string, pal: HairPalette): string {
+export function recolor(refHex: string, pal: HairPalette): string {
   const k = Math.max(0, Math.min(1, (lum(refHex) - REF_DARK) / (REF_LIGHT - REF_DARK)));
   return k < 0.5 ? mix(pal.base, pal.strandHighlight, k * 2) : mix(pal.strandHighlight, pal.specular, (k - 0.5) * 2);
 }
 
-function seeded(n: number) {
+export function seeded(n: number) {
   let x = (n * 9301 + 49297) % 233280;
   return () => {
     x = (x * 9301 + 49297) % 233280;
@@ -78,18 +97,24 @@ const Gradient: React.FC<{ id: Id; pal: HairPalette }> = ({ id, pal }) => (
     <linearGradient id={id('hairG')} x1="0" y1="0" x2="1" y2="1">
       <stop offset="0" stopColor={pal.mid} />
       <stop offset="0.5" stopColor={pal.base} />
-      <stop offset="1" stopColor={pal.darkShadow} />
+      <stop offset="1" stopColor={pal.ends || pal.darkShadow} />
     </linearGradient>
     <linearGradient id={id('hairV')} x1="0" y1="0" x2="0" y2="1">
       <stop offset="0" stopColor={pal.mid} />
-      <stop offset="0.6" stopColor={pal.base} />
-      <stop offset="1" stopColor={pal.darkShadow} />
+      <stop offset={pal.ends ? '0.35' : '0.6'} stopColor={pal.base} />
+      <stop offset="1" stopColor={pal.ends || pal.darkShadow} />
+    </linearGradient>
+    {/* long hair gradient in head space: roots at the crown, ends near the waist */}
+    <linearGradient id={id('hairLong')} gradientUnits="userSpaceOnUse" x1="0" y1="180" x2="0" y2="1060">
+      <stop offset="0" stopColor={pal.mid} />
+      <stop offset="0.3" stopColor={pal.base} />
+      <stop offset="1" stopColor={pal.ends || pal.darkShadow} />
     </linearGradient>
   </>
 );
 
 /** Small coil marks scattered inside an ellipse: afro, TWA and puff texture. */
-function coils(seed: number, cx: number, cy: number, rx: number, ry: number, n: number, color: string, size = 3) {
+export function coils(seed: number, cx: number, cy: number, rx: number, ry: number, n: number, color: string, size = 3) {
   const rnd = seeded(seed);
   const out: React.ReactElement[] = [];
   for (let i = 0; i < n; i++) {
@@ -113,7 +138,7 @@ function coils(seed: number, cx: number, cy: number, rx: number, ry: number, n: 
 }
 
 /** Frizzy flyaways around the top of the head for the plain (unstyled) state. */
-function flyaways(seed: number, color: string, rx = 132, ry = 140, cy = 312) {
+export function flyaways(seed: number, color: string, rx = 132, ry = 140, cy = 312) {
   const rnd = seeded(seed);
   const out: React.ReactElement[] = [];
   for (let i = 0; i < 46; i++) {
@@ -138,7 +163,7 @@ function flyaways(seed: number, color: string, rx = 132, ry = 140, cy = 312) {
 }
 
 /** Grain overlay: speckled texture for short and coily hair. */
-const Grain: React.FC<{ clip: string; color: string; opacity?: number }> = ({ clip, color, opacity = 0.5 }) => (
+export const Grain: React.FC<{ clip: string; color: string; opacity?: number }> = ({ clip, color, opacity = 0.5 }) => (
   <g clipPath={`url(#${clip})`}>
     <rect x="150" y="80" width="300" height="320" fill={color} filter="url(#global-grain)" opacity={opacity} />
   </g>
@@ -147,29 +172,32 @@ const Grain: React.FC<{ clip: string; color: string; opacity?: number }> = ({ cl
 // ---------------------------------------------------------------------------
 // Shapes for the styles that are not in divine.svg
 // ---------------------------------------------------------------------------
-const BS_BACK =
+export const BS_BACK =
   'M 300 166 C 192 166 150 258 152 360 L 156 860 C 210 878 390 878 444 860 L 448 360 C 450 258 408 166 300 166 Z';
-const BS_CURTAIN =
+export const BS_CURTAIN =
   'M 300 182 C 248 184 212 222 200 290 C 192 340 188 420 186 520 C 184 620 180 740 176 868 C 194 878 216 878 234 868 C 232 740 232 620 234 520 C 236 420 238 350 248 300 C 260 248 280 216 300 202 Z';
-const BS_EDGE = 'M 300 186 C 251 188 215 224 203 291 C 195 340 191 420 189 520 C 187 620 183 740 179 868';
+export const BS_EDGE = 'M 300 186 C 251 188 215 224 203 291 C 195 340 191 420 189 520 C 187 620 183 740 179 868';
 
-const CORN_CAP =
+export const CORN_CAP =
   'M 192 352 C 182 254 218 170 300 164 C 382 170 418 254 408 352 C 404 318 398 290 386 268 C 368 238 336 226 300 226 C 264 226 232 238 214 268 C 202 290 196 318 192 352 Z';
-const SLICK_CAP =
+export const SLICK_CAP =
   'M 194 340 C 186 250 220 172 300 166 C 380 172 414 250 406 340 C 402 300 394 270 376 250 C 354 230 328 222 300 222 C 272 222 246 230 224 250 C 206 270 198 300 194 340 Z';
-const TWA_CAP =
+export const TWA_CAP =
   'M 184 346 C 170 242 212 150 300 144 C 388 150 430 242 416 346 C 410 304 402 274 384 252 C 360 230 330 222 300 222 C 270 222 240 230 216 252 C 198 274 190 304 184 346 Z';
-const MALE_CAP =
+export const MALE_CAP =
   'M 188 342 C 180 252 216 168 300 162 C 384 168 420 252 412 342 L 406 338 C 404 302 398 280 388 266 L 374 262 C 362 244 332 238 300 238 C 268 238 238 244 226 262 L 212 266 C 202 280 196 302 194 338 Z';
-const MALE_HAIRLINE =
+export const MALE_HAIRLINE =
   'M 194 338 C 196 302 202 280 212 266 L 226 262 C 238 244 268 238 300 238 C 332 238 362 244 374 262 L 388 266 C 398 280 404 302 406 338';
 
 // ---------------------------------------------------------------------------
 // BACK LAYER (behind the body)
 // ---------------------------------------------------------------------------
-export const HairBack: React.FC<HairProps> = ({ id, config, pal, plain, widen }) => {
+export const HairBack: React.FC<HairProps> = (props) => {
+  const { id, config, pal, plain, widen } = props;
   const shine = plain ? 0.35 : 1;
   const style = config.hair;
+  const extra = NEW_STYLES[style];
+  if (extra) return extra.back ? <g transform={widen}>{extra.back(props)}</g> : null;
   let body: React.ReactNode = null;
 
   if (style === 'longBraids') {
@@ -258,9 +286,12 @@ export const HairBack: React.FC<HairProps> = ({ id, config, pal, plain, widen })
 // ---------------------------------------------------------------------------
 // SIDE LAYER (in front of the face and shoulders, behind the ears)
 // ---------------------------------------------------------------------------
-export const HairSide: React.FC<HairProps> = ({ id, config, pal, plain, widen }) => {
+export const HairSide: React.FC<HairProps> = (props) => {
+  const { id, config, pal, plain, widen } = props;
   const shine = plain ? 0.35 : 1;
   const style = config.hair;
+  const extra = NEW_STYLES[style];
+  if (extra) return extra.side ? <g transform={widen}>{extra.side(props)}</g> : null;
 
   if (style === 'longBraids') {
     const rib = (d: string, strands: typeof RIB_L_STRANDS, clip: string, shadows: [number, number, number][], curl: string) => (
@@ -323,9 +354,12 @@ export const HairSide: React.FC<HairProps> = ({ id, config, pal, plain, widen })
 // ---------------------------------------------------------------------------
 // FRONT LAYER (on top of everything on the head)
 // ---------------------------------------------------------------------------
-export const HairFront: React.FC<HairProps> = ({ id, config, pal, skin, plain, widen }) => {
+export const HairFront: React.FC<HairProps> = (props) => {
+  const { id, config, pal, skin, plain, widen } = props;
   const shine = plain ? 0.35 : 1;
   const style = config.hair;
+  const extra = NEW_STYLES[style];
+  if (extra) return extra.front ? <g transform={widen}>{extra.front(props)}</g> : null;
   let body: React.ReactNode = null;
 
   if (style === 'longBraids') {
@@ -524,7 +558,7 @@ export const HairFront: React.FC<HairProps> = ({ id, config, pal, skin, plain, w
   return <g transform={widen}>{body}</g>;
 };
 
-const Loc: React.FC<{ d: string; pal: HairPalette; shine: number }> = ({ d, pal, shine }) => (
+export const Loc: React.FC<{ d: string; pal: HairPalette; shine: number }> = ({ d, pal, shine }) => (
   <g>
     <path d={d} fill="none" stroke={pal.darkShadow} strokeWidth="11" strokeLinecap="round" />
     <path d={d} fill="none" stroke={pal.base} strokeWidth="8.5" strokeLinecap="round" />
