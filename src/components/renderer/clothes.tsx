@@ -14,9 +14,9 @@ import { BodySpec, Pt, edgeXAt, mirrorPt, runs, torsoHalfAt } from './geometry';
 
 type Id = (n: string) => string;
 const f = (n: number) => n.toFixed(1);
-const MIRROR = 'translate(600 0) scale(-1 1)';
+export const MIRROR = 'translate(600 0) scale(-1 1)';
 
-function seeded(n: number) {
+export function seeded(n: number) {
   let x = (n * 9301 + 49297) % 233280;
   return () => {
     x = (x * 9301 + 49297) % 233280;
@@ -137,6 +137,34 @@ export function fabricDefs(id: Id, key: string, fabric: FabricId, color: string,
         </PatternTile>
       );
       break;
+    case 'george':
+      // embroidered George wrapper: big flowers outlined in gold with sequin dots
+      defs = (
+        <PatternTile id={pid} w={52} h={52}>
+          {[0, 60, 120, 180, 240, 300].map((a) => (
+            <ellipse key={a} cx={26 + Math.cos((a * Math.PI) / 180) * 9} cy={26 + Math.sin((a * Math.PI) / 180) * 9} rx="7" ry="4.4" transform={`rotate(${a} ${26 + Math.cos((a * Math.PI) / 180) * 9} ${26 + Math.sin((a * Math.PI) / 180) * 9})`} fill={c2} stroke="#E2B654" strokeWidth="1" />
+          ))}
+          <circle cx="26" cy="26" r="4" fill="#E2B654" />
+          {[[0, 0], [52, 0], [0, 52], [52, 52]].map(([x, y], i) => (
+            <circle key={i} cx={x} cy={y} r="5" fill="none" stroke="#E2B654" strokeWidth="1.2" />
+          ))}
+          {[[13, 4], [39, 48], [4, 39], [48, 13]].map(([x, y], i) => (
+            <circle key={`s${i}`} cx={x} cy={y} r="1.4" fill="#FFF4C8" />
+          ))}
+        </PatternTile>
+      );
+      break;
+    case 'adire':
+      // indigo tie-dye: soft resist rings and stitched lines
+      defs = (
+        <PatternTile id={pid} w={46} h={46}>
+          <circle cx="23" cy="23" r="16" fill="none" stroke={c2} strokeWidth="3" opacity="0.55" />
+          <circle cx="23" cy="23" r="9" fill="none" stroke={c2} strokeWidth="2" opacity="0.7" strokeDasharray="3 2" />
+          <circle cx="23" cy="23" r="3" fill={c2} opacity="0.8" />
+          <path d="M 0 0 L 46 46 M 46 0 L 0 46" stroke={c2} strokeWidth="1" opacity="0.25" strokeDasharray="2 3" />
+        </PatternTile>
+      );
+      break;
     default:
       hasPattern = false;
   }
@@ -167,7 +195,7 @@ export const ClothDefs: React.FC<{ id: Id }> = ({ id }) => (
 );
 
 /** One garment piece: base colour, print, shading, folds, satin sheen, and plain-state wear. */
-const Piece: React.FC<{
+export const Piece: React.FC<{
   id: Id;
   name: string;
   d: string;
@@ -206,7 +234,9 @@ const Piece: React.FC<{
             <path d={fd} transform="translate(3 0)" fill="none" stroke="#FFF" strokeWidth="2" opacity="0.14" filter="url(#global-blur-xs)" />
           </g>
         ))}
-        {(paint.kind === 'satin' || paint.kind === 'sequin') && !plain && <path d={d} fill={`url(#${id('sheen')})`} />}
+        {(paint.kind === 'satin' || paint.kind === 'sequin' || paint.kind === 'leather' || paint.kind === 'chiffon') && !plain && <path d={d} fill={`url(#${id('sheen')})`} />}
+        {paint.kind === 'velvet' && <path d={d} fill={`url(#${id('shadeH')})`} opacity="0.8" />}
+        {paint.kind === 'leather' && !plain && <path d={d} fill={`url(#${id('sheen')})`} opacity="0.8" />}
         {wrinkles}
         {stains}
       </g>
@@ -218,12 +248,13 @@ const Piece: React.FC<{
 // ---------------------------------------------------------------------------
 // Geometry helpers
 // ---------------------------------------------------------------------------
-const legsHalf = (s: BodySpec, y: number) => 300 - edgeXAt(s.legOuter, y);
+export const legsHalf = (s: BodySpec, y: number) => 300 - edgeXAt(s.legOuter, y);
 /** Half width of the body silhouette at y: torso to the hips, then the legs. */
-const bodyHalf = (s: BodySpec, y: number) => (y <= s.hip[0] ? torsoHalfAt(s, y) : Math.max(legsHalf(s, y), 30));
+export const bodyHalf = (s: BodySpec, y: number) =>
+  y <= s.hip[0] ? Math.max(torsoHalfAt(s, y), y >= s.legOuter[0][1] ? legsHalf(s, y) : 0) : Math.max(legsHalf(s, y), 30);
 
 /** Left edge sampled from y0 to y1, pushed out by ease(y, t). */
-function leftEdge(s: BodySpec, y0: number, y1: number, ease: (y: number, t: number) => number, step = 24): Pt[] {
+export function leftEdge(s: BodySpec, y0: number, y1: number, ease: (y: number, t: number) => number, step = 24): Pt[] {
   const n = Math.max(2, Math.round((y1 - y0) / step));
   return Array.from({ length: n + 1 }, (_, i) => {
     const t = i / n;
@@ -233,43 +264,43 @@ function leftEdge(s: BodySpec, y0: number, y1: number, ease: (y: number, t: numb
 }
 
 /** A symmetric piece from a left edge (top to bottom) and an optional top edge (right to left). */
-function symmetric(left: Pt[], top?: Pt[]): string {
+export function symmetric(left: Pt[], top?: Pt[]): string {
   const right = [...left].reverse().map(mirrorPt);
   return top ? runs(left, right, top) : runs(left, right);
 }
 
-const sweetheart = (s: BodySpec, ease = 3): Pt[] => {
+export const sweetheart = (s: BodySpec, ease = 3): Pt[] => {
   const [py, ph] = s.pit;
   const [by, bh] = s.bust;
   return [[300 + ph - ease, py + 10], [300 + bh * 0.5, by - 34], [300, by - 14], [300 - bh * 0.5, by - 34], [300 - ph + ease, py + 10]];
 };
-const crew = (s: BodySpec, depth: number, widen = 6): Pt[] => {
+export const crew = (s: BodySpec, depth: number, widen = 6): Pt[] => {
   const [ny, nh] = s.neck;
   return [[300 + nh + widen, ny + 2], [300 + nh * 0.5, ny + depth * 0.8], [300, ny + depth], [300 - nh * 0.5, ny + depth * 0.8], [300 - nh - widen, ny + 2]];
 };
 /** Shoulder line from the neck to the shoulder tip, for garments that cover the shoulders. */
-const shoulderLeft = (s: BodySpec, ease = 0): Pt[] => {
+export const shoulderLeft = (s: BodySpec, ease = 0): Pt[] => {
   const [ny, nh] = s.neck;
   const [sy, sh] = s.shoulder;
   return [[300 - nh - 6, ny + 2], [300 - sh * 0.56, ny + 5], [300 - sh + 2 - ease, sy + 1]];
 };
 
 /** Sleeve over the left arm from the shoulder to endY, with optional bell flare. */
-function sleevePath(s: BodySpec, endY: number, flare = 0, ease = 4): string {
+export function sleevePath(s: BodySpec, endY: number, flare = 0, ease = 4): string {
   const top = s.armOuter[s.armOuter.length - 1];
   const sy = top[1];
   const t = (y: number) => Math.max(0, Math.min(1, (y - sy) / (endY - sy)));
   const inner: Pt[] = [[top[0] + 5, top[1] - 2], ...s.armInner.filter(([, y]) => y < endY).map(([x, y]) => [x + ease + flare * 0.35 * t(y), y] as Pt), [edgeXAt(s.armInner, endY) + ease + flare * 0.35, endY]];
   const outerAll = s.armOuter;
   const outer: Pt[] = [
-    [edgeXAt(outerAll.slice(0, 5), endY) - ease - flare, endY],
+    [edgeXAt(outerAll.filter(([, y]) => y >= top[1] + 40), endY) - ease - flare, endY],
     ...outerAll.filter(([, y]) => y < endY).map(([x, y], i, arr) => [x - ease - flare * t(y), i >= arr.length - 3 ? y - 2 : y] as Pt),
   ];
   return runs(inner, outer);
 }
 
 /** Trouser legs from topY to hemY. */
-function trousers(s: BodySpec, topY: number, hemY: number, o: { ease?: number; easeIn?: number; flare?: number } = {}): string {
+export function trousers(s: BodySpec, topY: number, hemY: number, o: { ease?: number; easeIn?: number; flare?: number } = {}): string {
   const ease = o.ease ?? 8;
   const easeIn = o.easeIn ?? 4;
   const flare = o.flare ?? 0;
@@ -288,7 +319,7 @@ function trousers(s: BodySpec, topY: number, hemY: number, o: { ease?: number; e
 // ---------------------------------------------------------------------------
 // Cuts
 // ---------------------------------------------------------------------------
-interface CutCtx {
+export interface CutCtx {
   id: Id;
   s: BodySpec;
   main: FabricPaint;
@@ -296,14 +327,14 @@ interface CutCtx {
   denim: FabricPaint;
   plain: boolean;
 }
-interface CutLayers {
+export interface CutLayers {
   under: (c: CutCtx) => React.ReactNode;
   over?: (c: CutCtx) => React.ReactNode;
 }
 
-const box = (s: BodySpec, y0: number, y1: number, pad = 0): [number, number, number, number] => [300 - s.hip[1] - pad, 300 + s.hip[1] + pad, y0, y1];
+export const box = (s: BodySpec, y0: number, y1: number, pad = 0): [number, number, number, number] => [300 - s.hip[1] - pad, 300 + s.hip[1] + pad, y0, y1];
 
-function straps(c: CutCtx, color: string, width = 3.4) {
+export function straps(c: CutCtx, color: string, width = 3.4) {
   const { s } = c;
   const [by, bh] = s.bust;
   const d = `M ${300 - bh * 0.5} ${by - 32} C ${300 - bh * 0.5} ${s.pit[0] - 20} ${300 - s.shoulder[1] * 0.5} ${s.neck[0] + 20} ${300 - s.shoulder[1] * 0.42} ${s.neck[0] + 4}`;
@@ -321,7 +352,7 @@ function straps(c: CutCtx, color: string, width = 3.4) {
   );
 }
 
-function camiPiece(c: CutCtx, paint: FabricPaint, hemY: number, name: string) {
+export function camiPiece(c: CutCtx, paint: FabricPaint, hemY: number, name: string) {
   const { s } = c;
   const [py] = s.pit;
   const left = leftEdge(s, py + 10, hemY, () => 3);
@@ -342,7 +373,7 @@ function camiPiece(c: CutCtx, paint: FabricPaint, hemY: number, name: string) {
   );
 }
 
-function pencilPiece(c: CutCtx, paint: FabricPaint, topY: number, hemY: number, name: string, flare = 0) {
+export function pencilPiece(c: CutCtx, paint: FabricPaint, topY: number, hemY: number, name: string, flare = 0) {
   const { s } = c;
   const left = leftEdge(s, topY, hemY, (y, t) => 4 + flare * t * t);
   const d = symmetric(left);
@@ -360,7 +391,7 @@ function pencilPiece(c: CutCtx, paint: FabricPaint, topY: number, hemY: number, 
   );
 }
 
-const CUTS: Record<string, CutLayers> = {
+export const CUTS: Record<string, CutLayers> = {
   camiPencil: {
     under: (c) => (
       <>
@@ -647,7 +678,7 @@ const CUTS: Record<string, CutLayers> = {
   },
 };
 
-function trouserPiece(c: CutCtx, paint: FabricPaint, name: string) {
+export function trouserPiece(c: CutCtx, paint: FabricPaint, name: string) {
   const { s } = c;
   const top = s.waist[0] + 18;
   const hem = s.ankle[1] - 10;
@@ -670,7 +701,7 @@ function trouserPiece(c: CutCtx, paint: FabricPaint, name: string) {
   );
 }
 
-function shirtPiece(c: CutCtx, paint: FabricPaint, tucked: boolean) {
+export function shirtPiece(c: CutCtx, paint: FabricPaint, tucked: boolean) {
   const { s } = c;
   const [ny, nh] = s.neck;
   const hem = tucked ? s.waist[0] + 34 : s.waist[0] + 50;
@@ -705,7 +736,7 @@ function shirtPiece(c: CutCtx, paint: FabricPaint, tucked: boolean) {
   );
 }
 
-function tunicPiece(c: CutCtx, paint: FabricPaint, hem: number, name: string) {
+export function tunicPiece(c: CutCtx, paint: FabricPaint, hem: number, name: string) {
   const { s } = c;
   const [ny, nh] = s.neck;
   const left: Pt[] = [...shoulderLeft(s), [300 - s.pit[1] - 8, s.pit[0]], [300 - s.bust[1] - 8, s.bust[0]], [300 - s.waist[1] - 14, s.waist[0]], [300 - s.hip[1] - 14, s.hip[0]], [300 - s.hip[1] - 18, hem]];
@@ -724,7 +755,7 @@ function tunicPiece(c: CutCtx, paint: FabricPaint, hem: number, name: string) {
   );
 }
 
-function sleeves(c: CutCtx, paint: FabricPaint, endY: number, cuff: boolean, flare = 0) {
+export function sleeves(c: CutCtx, paint: FabricPaint, endY: number, cuff: boolean, flare = 0) {
   const d = sleevePath(c.s, endY, flare, 4);
   const one = (name: string) => (
     <>
@@ -748,7 +779,7 @@ function sleeves(c: CutCtx, paint: FabricPaint, endY: number, cuff: boolean, fla
   );
 }
 
-const JeansDetails: React.FC<{ s: BodySpec; top: number; paint: FabricPaint }> = ({ s, top, paint }) => {
+export const JeansDetails: React.FC<{ s: BodySpec; top: number; paint: FabricPaint }> = ({ s, top, paint }) => {
   const stitch = '#C9963E';
   const hw = torsoHalfAt(s, top) + 4;
   return (

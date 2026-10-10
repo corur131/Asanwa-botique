@@ -1,15 +1,16 @@
 import React from 'react';
-import { Accessories, CameraView, CharacterConfig, OutfitSpec } from '../../types/character';
+import { Accessories, CameraView, CharacterConfig, OutfitSpec, Wardrobe } from '../../types/character';
 import { SKIN_TONES } from '../../constants/skinTones';
-import { DEFAULT_ACCESSORIES, DEFAULT_OUTFIT, fitsBody } from '../../constants/catalog';
+import { BAGS, DEFAULT_ACCESSORIES, DEFAULT_OUTFIT, DEFAULT_WARDROBE, GLASSES, HEADWEAR, NECKLACES, SHOES, WRIST, fitsBody, wardrobeFromOutfit } from '../../constants/catalog';
 import { mix } from './color';
 import { BODY_SPECS, HEAD_TRANSFORM } from './geometry';
-import { Ears, Face, HeadDefs, HeadLook, IRIS, Neck, naturalLip } from './head';
+import { CONTACT_IRIS, Ears, Face, HeadDefs, HeadLook, IRIS, Neck, naturalLip } from './head';
 import { HAIR_PALETTES, HairBack, HairDefs, HairFront, HairSide, dullPalette } from './hair';
 import { HairMess } from './hair2';
 import { Arms, BodyDefs, Feet, Hands, Legs, Torso } from './body';
-import { ClothDefs, OutfitLayer } from './clothes';
-import { Beads, Glasses, HandAccessories, Headwear, Shoes } from './accessories';
+import { ClothDefs } from './clothes';
+import { WardrobeLayer } from './garments';
+import { Glasses, HandAccessories, Headwear, Necklace, Shoes } from './accessories';
 
 export interface RenderCharacterProps {
   config: CharacterConfig;
@@ -29,7 +30,24 @@ const VIEWBOX_TALL: Record<CameraView, string> = {
   portrait: '170 -20 260 300',
   bust: '100 -20 400 486',
 };
-const TALL = new Set(['afroPuff', 'highBun', 'highTopFade', 'afro', 'deepCurly']);
+const TALL = new Set(['afroPuff', 'highBun', 'highTopFade', 'afro', 'deepCurly', 'afroWig', 'goddessLocs']);
+const COVERS_EARS = new Set(['boneStraight', 'bodyWave', 'bluntBob', 'sidePartFrontal', 'kinkyStraight', 'waterWave', 'butterflyLayers']);
+/** Headwear that covers the hair completely. */
+const HIDES_HAIR = new Set(['gele', 'geleWrap', 'headwrap']);
+
+function fitWardrobe(w: Wardrobe, body: CharacterConfig['body']): Wardrobe {
+  const out: Wardrobe = {};
+  (Object.keys(w) as (keyof Wardrobe)[]).forEach((k) => {
+    const g = w[k];
+    if (g && fitsBody(g.style, body)) out[k] = g;
+  });
+  if (!out.dress && !out.top && !out.bottom) return { ...DEFAULT_WARDROBE[body], outer: out.outer };
+  if (!out.dress) {
+    if (!out.top) out.top = DEFAULT_WARDROBE[body].top;
+    if (!out.bottom) out.bottom = DEFAULT_WARDROBE[body].bottom;
+  }
+  return out;
+}
 
 /**
  * Full-body character at divine.svg quality.
@@ -54,7 +72,8 @@ export const CharacterSvg: React.FC<RenderCharacterProps> = ({ config, idPrefix,
   // Men never wear makeup or (from a female config) jewellery. Plain customers wear none.
   const styled = !isPlain && !isMale;
   const mk = config.makeup;
-  const iris = IRIS[config.eyes.irisColor] || IRIS.darkBrown;
+  const lens = styled && mk.contacts && mk.contacts !== 'none' ? CONTACT_IRIS[mk.contacts] : null;
+  const iris = lens || IRIS[config.eyes.irisColor] || IRIS.darkBrown;
   const look: HeadLook = {
     skin,
     isMale,
@@ -75,42 +94,65 @@ export const CharacterSvg: React.FC<RenderCharacterProps> = ({ config, idPrefix,
     browColor: config.hairColor === 'honeyBlonde' || config.hairColor === 'platinum' || config.hairColor === 'ginger' ? mix(basePal.mid, '#2A170E', 0.55) : mix(basePal.darkShadow, '#2A170E', 0.5),
     facialHair: isMale ? config.maleOnly.facialHair : 'none',
     beardColor: mix(basePal.base, '#120905', 0.3),
+    foundation: styled && !!mk.foundation,
+    skinFinish: mk.skinFinish,
+    concealer: styled && !!mk.concealer,
+    powder: styled && !!mk.powder,
+    bronzer: styled && !!mk.bronzer,
+    blushPlacement: mk.blushPlacement,
+    highlightColor: mk.highlightColor,
+    freckles: !!mk.freckles && !isMale,
+    beautyMark: !!mk.beautyMark && !isMale,
+    shadowStyle: mk.shadowStyle,
+    linerColor: mk.linerColor,
+    bottomLashes: styled && !!mk.bottomLashes,
+    lipLiner: styled && mk.lipLiner && mk.lipLiner !== 'none' ? mk.lipLiner : null,
   };
   const earrings = styled ? config.earrings : 'none';
-  const necklace = styled && config.necklace;
 
-  // Outfit: a cut that does not fit this body falls back to the body's default.
+  // Wardrobe: pieces that do not fit this body fall back to the body's defaults.
   const fallback = DEFAULT_OUTFIT[config.body] || DEFAULT_OUTFIT.femaleRegular;
   let outfit: OutfitSpec = config.outfit || {
     ...fallback,
     ...(config.outfitColor ? { color: config.outfitColor.bottom, color2: config.outfitColor.top } : {}),
   };
   if (!fitsBody(outfit.cut, config.body)) outfit = { ...fallback, color: outfit.color, color2: outfit.color2, fabric: outfit.fabric, pattern: outfit.pattern };
+  const wardrobe = fitWardrobe(config.wardrobe || wardrobeFromOutfit(outfit), config.body);
+
   const accDefault = DEFAULT_ACCESSORIES[isMale ? 'male' : 'female'];
   const acc: Accessories = {
     ...accDefault,
     ...(config.outfitColor ? { shoesColor: config.outfitColor.shoes } : {}),
     ...(config.accessories || {}),
   };
-  if (isMale && (acc.shoes === 'heels' || acc.shoes === 'sandals' || acc.shoes === 'flats')) acc.shoes = 'loafers';
-  if (isMale && (acc.headwear === 'gele' || acc.headwear === 'headwrap')) acc.headwear = 'none';
-  if (!isMale && acc.headwear === 'fila') acc.headwear = 'none';
+  // legacy switches
+  if (!acc.wrist || acc.wrist === 'none') acc.wrist = acc.watch ? 'watch' : 'none';
+  if (!acc.necklace || acc.necklace === 'none') acc.necklace = acc.beads ? 'coral' : config.necklace && !isMale ? 'pendant' : 'none';
+  const fits = (list: { id: string; for: string }[], v: string, dflt: string) => {
+    const it = list.find((i) => i.id === v);
+    return it && (it.for === 'both' || it.for === (isMale ? 'm' : 'f')) ? v : dflt;
+  };
+  acc.shoes = fits(SHOES, acc.shoes, accDefault.shoes);
+  acc.bag = fits(BAGS, acc.bag, 'none');
+  acc.headwear = fits(HEADWEAR, acc.headwear, 'none');
+  acc.glasses = fits(GLASSES, acc.glasses, 'none');
+  acc.necklace = fits(NECKLACES, acc.necklace, 'none');
+  acc.wrist = fits(WRIST, acc.wrist, 'none');
   if (isPlain) {
     acc.bag = 'none';
     acc.glasses = 'none';
-    acc.watch = false;
-    acc.beads = false;
+    acc.wrist = 'none';
+    acc.necklace = 'none';
     acc.headwear = 'none';
   }
-  if (isMale) acc.bag = acc.bag === 'tote' ? 'tote' : 'none';
 
   // Hair is tucked away under a gele or head wrap.
-  const hairHidden = acc.headwear === 'gele' || acc.headwear === 'headwrap';
+  const hairHidden = HIDES_HAIR.has(acc.headwear);
   const widen = isPlus ? 'translate(300 0) scale(1.06 1) translate(-300 0)' : undefined;
   const hairProps = { id, config, pal, skin, plain: isPlain, widen };
-  const hideLeftEar = !hairHidden && (config.hair === 'longBraids' || config.hair === 'boneStraight' || config.hair === 'bodyWave');
-  const hideRightEar = !hairHidden && (config.hair === 'boneStraight' || config.hair === 'bodyWave');
-  const tall = TALL.has(config.hair) || acc.headwear === 'gele';
+  const hideLeftEar = !hairHidden && (config.hair === 'longBraids' || COVERS_EARS.has(config.hair));
+  const hideRightEar = !hairHidden && COVERS_EARS.has(config.hair);
+  const tall = TALL.has(config.hair) || acc.headwear === 'gele' || acc.headwear === 'fascinator';
 
   return (
     <svg xmlns="http://www.w3.org/2000/svg" viewBox={(tall ? VIEWBOX_TALL : VIEWBOX)[camera]} className={className} preserveAspectRatio="xMidYMid meet">
@@ -145,22 +187,18 @@ export const CharacterSvg: React.FC<RenderCharacterProps> = ({ config, idPrefix,
         <Neck id={id} look={look} />
       </g>
 
-      <OutfitLayer id={id} spec={spec} outfit={outfit} plain={isPlain} layer="under" />
+      <WardrobeLayer id={id} spec={spec} wardrobe={wardrobe} plain={isPlain} layer="under" />
       <Arms id={id} skin={skin} spec={spec} />
-      <OutfitLayer id={id} spec={spec} outfit={outfit} plain={isPlain} layer="over" />
-      <Hands id={id} skin={skin} spec={spec} nails={styled ? mk.lipColor : undefined} />
-      <HandAccessories spec={spec} acc={acc} />
+      <WardrobeLayer id={id} spec={spec} wardrobe={wardrobe} plain={isPlain} layer="over" />
+      <Hands id={id} skin={skin} spec={spec} nails={styled && mk.nailColor && mk.nailColor !== 'none' ? mk.nailColor : undefined} nailFinish={mk.nailFinish} plain={isPlain} />
+      <HandAccessories id={id} spec={spec} acc={acc} />
 
       <g transform={HEAD_TRANSFORM}>
-        {necklace && (
+        {acc.necklace !== 'none' && (
           <g transform={isPlus ? 'translate(300 0) scale(1.08 1) translate(-300 0)' : undefined}>
-            <path d="M 268 524 C 276 578 290 602 300 606 C 310 602 324 578 332 524" fill="none" stroke={`url(#${id('gold')})`} strokeWidth="2" />
-            <path d="M 268 524 C 276 578 290 602 300 606 C 310 602 324 578 332 524" fill="none" stroke="#FFF4C8" strokeWidth="0.7" strokeDasharray="2 3" opacity="0.9" />
-            <circle cx="300" cy="612" r="5" fill={`url(#${id('gold')})`} />
-            <circle cx="298.5" cy="610.5" r="1.6" fill="#FFF8DC" />
+            <Necklace id={id} kind={acc.necklace || 'none'} male={isMale} />
           </g>
         )}
-        {acc.beads && <Beads id={id} />}
         <Face id={id} look={look} config={config} />
         {!hairHidden && <HairSide {...hairProps} />}
         {!(hideLeftEar && hideRightEar) && (

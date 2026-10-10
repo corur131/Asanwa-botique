@@ -1,5 +1,5 @@
 import React from 'react';
-import { BrowStyle, CharacterConfig, FacialHairPreset, LashStyle, LinerStyle, SkinPalette } from '../../types/character';
+import { BlushPlacement, BrowStyle, CharacterConfig, ContactLens, FacialHairPreset, LashStyle, LinerStyle, ShadowStyle, SkinPalette } from '../../types/character';
 import { darken, lighten, mix } from './color';
 
 /**
@@ -10,7 +10,7 @@ import { darken, lighten, mix } from './color';
  * so every variation keeps the reference's detail and shading.
  */
 
-export type LipLook = 'gloss' | 'satin' | 'matte' | 'natural';
+export type LipLook = 'gloss' | 'satin' | 'matte' | 'chrome' | 'natural';
 
 export interface HeadLook {
   skin: SkinPalette;
@@ -33,7 +33,31 @@ export interface HeadLook {
   browColor: string;
   facialHair: FacialHairPreset;
   beardColor: string;
+  // the rest of the makeup kit (all off for men and plain customers)
+  foundation?: boolean;
+  skinFinish?: 'dewy' | 'matte';
+  concealer?: boolean;
+  powder?: boolean;
+  bronzer?: boolean;
+  blushPlacement?: BlushPlacement;
+  highlightColor?: string;
+  freckles?: boolean;
+  beautyMark?: boolean;
+  shadowStyle?: ShadowStyle;
+  linerColor?: string;
+  bottomLashes?: boolean;
+  lipLiner?: string | null;
 }
+
+/** Coloured contact lenses: replace the iris colours. */
+export const CONTACT_IRIS: Record<Exclude<ContactLens, 'none'>, { inner: string; outer: string }> = {
+  lightBrown: { inner: '#6A3A16', outer: '#B07A3E' },
+  honey: { inner: '#8A5A16', outer: '#E0A84A' },
+  hazel: { inner: '#5A3A16', outer: '#8E9A48' },
+  green: { inner: '#2A5A34', outer: '#6AAE6A' },
+  grey: { inner: '#4A5058', outer: '#A8B4BE' },
+  blue: { inner: '#1E3A6A', outer: '#5A94D8' },
+};
 
 export const IRIS: Record<string, { inner: string; outer: string }> = {
   darkBrown: { inner: '#3E1F0F', outer: '#7A4A22' },
@@ -125,6 +149,7 @@ export const HeadDefs: React.FC<{ id: (n: string) => string; look: HeadLook; con
   const s = look.skin;
   const L = look.lipColor;
   const flat = look.lipLook === 'natural' || look.lipLook === 'matte';
+  const chrome = look.lipLook === 'chrome';
   return (
     <>
       <radialGradient id={id('skin')} cx="0.5" cy="0.4" r="0.7">
@@ -149,12 +174,19 @@ export const HeadDefs: React.FC<{ id: (n: string) => string; look: HeadLook; con
       </radialGradient>
       <linearGradient id={id('lipT')} x1="0" y1="0" x2="0" y2="1">
         <stop offset="0" stopColor={darken(L, flat ? 0.1 : 0.16)} />
+        {chrome && <stop offset="0.55" stopColor={lighten(L, 0.45)} />}
         <stop offset="1" stopColor={L} />
       </linearGradient>
       <linearGradient id={id('lipB')} x1="0" y1="0" x2="0" y2="1">
-        <stop offset="0" stopColor={lighten(L, flat ? 0.05 : 0.1)} />
+        <stop offset="0" stopColor={lighten(L, flat ? 0.05 : chrome ? 0.5 : 0.1)} />
+        {chrome && <stop offset="0.45" stopColor={darken(L, 0.1)} />}
+        {chrome && <stop offset="0.7" stopColor={lighten(L, 0.35)} />}
         <stop offset="1" stopColor={darken(L, flat ? 0.08 : 0.14)} />
       </linearGradient>
+      <radialGradient id={id('blushC')} cx="0.5" cy="0.5" r="0.5">
+        <stop offset="0" stopColor={look.blushColor} stopOpacity="0.4" />
+        <stop offset="1" stopColor={look.blushColor} stopOpacity="0" />
+      </radialGradient>
       <linearGradient id={id('gold')} x1="0" y1="0" x2="1" y2="1">
         <stop offset="0" stopColor="#FFF0B8" />
         <stop offset="0.45" stopColor="#E2B654" />
@@ -245,6 +277,36 @@ export const Ears: React.FC<{ id: (n: string) => string; look: HeadLook; earring
             <ellipse cx={x - 2} cy="420" rx="1.4" ry="3" fill="#FFF8DC" opacity="0.9" />
           </g>
         ))}
+      {earrings === 'huggies' &&
+        both((x, side) => <ellipse key={x} cx={x + side} cy="388" rx="5" ry="6" fill="none" stroke={`url(#${id('gold')})`} strokeWidth="3" />)}
+      {earrings === 'bigHoops' &&
+        both((x, side) => (
+          <g key={x}>
+            <ellipse cx={x + side * 4} cy="424" rx="22" ry="36" fill="none" stroke={`url(#${id('gold')})`} strokeWidth="3.4" />
+            <path d={`M ${x - 14 * side} 404 C ${x - 10 * side} 394 ${x} 389 ${x + 8 * side} 391`} fill="none" stroke="#FFF4C8" strokeWidth="1.1" opacity="0.9" />
+          </g>
+        ))}
+      {earrings === 'chandelier' &&
+        both((x) => (
+          <g key={x}>
+            <circle cx={x} cy="388" r="3" fill={`url(#${id('gold')})`} />
+            <path d={`M ${x} 391 L ${x} 400 M ${x - 12} 404 Q ${x} 396 ${x + 12} 404 Q ${x} 418 ${x - 12} 404 Z`} fill="none" stroke={`url(#${id('gold')})`} strokeWidth="1.6" />
+            {[-12, -6, 0, 6, 12].map((dx) => (
+              <g key={dx}>
+                <path d={`M ${x + dx} ${405 + Math.abs(dx) * -0.2} L ${x + dx} ${418 + (12 - Math.abs(dx))}`} stroke={`url(#${id('gold')})`} strokeWidth="1" />
+                <circle cx={x + dx} cy={420 + (12 - Math.abs(dx))} r="2.4" fill={dx === 0 ? '#C2262E' : '#F4ECD8'} stroke="#A9781E" strokeWidth="0.5" />
+              </g>
+            ))}
+          </g>
+        ))}
+      {earrings === 'coralDrops' &&
+        both((x) => (
+          <g key={x}>
+            {[388, 396, 404, 412].map((y, i) => (
+              <circle key={y} cx={x} cy={y + i * 2} r={3 + i * 0.6} fill={i % 2 ? `url(#${id('gold')})` : '#C2452D'} />
+            ))}
+          </g>
+        ))}
       {earrings === 'pearls' &&
         both((x) => (
           <g key={x}>
@@ -288,6 +350,17 @@ const LASHES_DRAMATIC_L = [
   'M 225 328 Q 217.5 320 209 319',
   'M 221 331 Q 213 325.5 205 326',
 ];
+const LASHES_WISPY_L = [
+  'M 256 320.5 Q 255 315 251.5 312',
+  'M 251.5 319.6 Q 250.4 315.6 247.4 314',
+  'M 247 319.4 Q 245 311.5 239.6 308.6',
+  'M 242.4 319.8 Q 240 315.6 236.4 314.4',
+  'M 238 321 Q 234.4 313 228.4 310.6',
+  'M 233.6 322.8 Q 230 318.4 225.6 317.6',
+  'M 229.4 325 Q 224.4 317.4 217.4 316',
+  'M 225.4 327.8 Q 221 324 216 323.6',
+  'M 222 330.4 Q 215.6 325.8 208.6 325.6',
+];
 const LOWER_LASHES_L = ['M 236 341.5 l -1.6 3.2', 'M 243 343.6 l -1 3.4', 'M 250 344.6 l -0.4 3.4', 'M 257 344.4 l 0.2 3.2'];
 const BROW_HAIRS_L = [
   'M 226.0 306.0 l 4 -3', 'M 231.5 304.1 l 4 -3', 'M 237.0 302.5 l 4 -3', 'M 242.5 301.1 l 4 -3', 'M 248.0 300.3 l 4 -3',
@@ -309,6 +382,67 @@ const METALLIC = new Set(['#D4A23A', '#9A5A2A', '#1F7A5A', '#2846A8', '#C46A78']
 /** Mirror a left-side path across x = 300 using a group transform. */
 const MIRROR = 'translate(600 0) scale(-1 1)';
 
+function eyeshadowLayer(shadow: string, style: ShadowStyle, s: SkinPalette): React.ReactNode {
+  const metallic = METALLIC.has(shadow);
+  switch (style) {
+    case 'smoky':
+      return (
+        <>
+          <path d={LID_AREA} transform={around(252, 322, 'scale(1.1 1.1)')} fill={shadow} opacity="0.75" filter="url(#global-blur-sm)" />
+          <path d={LID_AREA} fill={shadow} opacity="0.35" />
+          <path d="M 224 336 C 238 346 262 348 278 341" fill="none" stroke={shadow} strokeWidth="2.4" opacity="0.4" filter="url(#global-blur-xs)" />
+        </>
+      );
+    case 'cutCrease':
+      return (
+        <>
+          <path d="M 282 328 C 270 306 240 302 210 320 C 230 306 258 304 278 316 Z" fill={shadow} opacity="0.85" filter="url(#global-blur-xs)" />
+          <path d={LID_AREA} transform={around(250, 324, 'scale(1.1 1.12)')} fill={shadow} opacity="0.45" filter="url(#global-blur-sm)" />
+          <path d="M 279 336 C 270 322 248 318 226 328 C 246 324 268 324 279 336 Z" fill={lighten(shadow, 0.6)} opacity="0.95" />
+          <path d="M 279 336 C 270 322 248 318 226 328 C 246 324 268 324 279 336 Z" fill="#FFF8EC" opacity="0.35" />
+        </>
+      );
+    case 'halo':
+      return (
+        <>
+          <path d={LID_AREA} transform={around(250, 324, 'scale(1.1 1.15)')} fill={shadow} opacity="0.7" filter="url(#global-blur-sm)" />
+          <ellipse cx="252" cy="324" rx="12" ry="6" fill={lighten(shadow, 0.6)} opacity="0.85" filter="url(#global-blur-xs)" />
+          <ellipse cx="251" cy="323" rx="5" ry="2.4" fill="#FFFFFF" opacity="0.6" filter="url(#global-blur-xs)" />
+        </>
+      );
+    case 'glitter': {
+      const rnd = seeded(41);
+      return (
+        <>
+          <path d={LID_AREA} fill={shadow} opacity="0.6" filter="url(#global-blur-sm)" />
+          {Array.from({ length: 26 }, (_, i) => {
+            const x = 226 + rnd() * 52;
+            const y = 316 + rnd() * 14 - (x - 250) * 0.1;
+            return <circle key={i} cx={x} cy={y} r={0.5 + rnd() * 0.9} fill={i % 3 ? lighten(shadow, 0.7) : '#FFFFFF'} opacity={0.6 + rnd() * 0.4} />;
+          })}
+        </>
+      );
+    }
+    default:
+      return (
+        <>
+          <path d={LID_AREA} fill={shadow} opacity="0.6" filter="url(#global-blur-sm)" />
+          {metallic && <ellipse cx="250" cy="318" rx="12" ry="5" fill={lighten(shadow, 0.5)} opacity="0.55" filter="url(#global-blur-xs)" />}
+        </>
+      );
+  }
+}
+
+function freckles(s: SkinPalette) {
+  const rnd = seeded(77);
+  return Array.from({ length: 46 }, (_, i) => {
+    const side = i % 2 ? 1 : -1;
+    const x = 300 + side * (14 + rnd() * 62);
+    const y = 360 + rnd() * 34 - Math.abs(x - 300) * 0.12;
+    return <circle key={i} cx={x} cy={y} r={0.8 + rnd() * 0.9} fill={darken(s.contour, 0.3)} opacity={0.35 + rnd() * 0.3} />;
+  });
+}
+
 // ---------------------------------------------------------------------------
 // Face
 // ---------------------------------------------------------------------------
@@ -320,15 +454,20 @@ export const Face: React.FC<{ id: (n: string) => string; look: HeadLook; config:
   const waterline = mix(s.base, s.highlight, 0.3);
   const socket = mix(s.contour, s.deep, 0.3);
   const plain = look.isPlain;
+  const glowK = look.skinFinish === 'matte' || look.powder ? 0.5 : look.foundation ? 1.15 : 1;
+  const bronze = mix(s.contour, '#B8642A', 0.35);
+  const hl = look.highlightColor ? mix(look.highlightColor, lighten(s.glow, 0.2), 0.5) : lighten(s.glow, 0.25);
 
+  const LID_PLAIN = 'M 278 338 C 268 323 244 318 223 331 C 244 320 268 322 278 337 Z';
   const lidShapeL =
-    look.liner === 'wing'
+    look.liner === 'wing' || look.liner === 'doubleWing'
       ? 'M 278 338 C 268 323 244 318 223 331 L 209 320 L 227 327 C 245 314 268 320 278 337 Z'
-      : look.liner === 'bold'
-        ? 'M 279 339 C 268 321 243 315 222 330 L 200 313 L 224 324 C 244 311 269 317 279 337 Z'
-        : look.liner === 'thin'
-          ? 'M 278 338 C 268 323 244 318 223 331 C 244 319 268 321 278 337 Z'
-          : 'M 278 338 C 268 323 244 318 223 331 C 244 320 268 322 278 337 Z';
+      : look.liner === 'cat'
+        ? 'M 280 340 C 268 320 243 314 222 330 L 198 311 L 224 323 C 244 309 270 316 280 337 Z'
+        : look.liner === 'thin' || look.liner === 'tightline'
+          ? 'M 278 338 C 268 323 244 318 223 331 C 244 318 268 320 278 336 Z'
+          : LID_PLAIN;
+  const linerC = look.linerColor || '#160A06';
 
   const lashesL = look.isMale
     ? LASHES_L.slice(1, 5)
@@ -336,8 +475,10 @@ export const Face: React.FC<{ id: (n: string) => string; look: HeadLook; config:
       ? LASHES_DRAMATIC_L
       : look.lashes === 'full'
         ? LASHES_FULL_L
-        : LASHES_L;
-  const lashW = look.isMale ? 0.8 : look.lashes === 'dramatic' ? 1.45 : look.lashes === 'full' ? 1.25 : 1.0;
+        : look.lashes === 'wispy'
+          ? LASHES_WISPY_L
+          : LASHES_L;
+  const lashW = look.isMale ? 0.8 : look.lashes === 'dramatic' ? 1.45 : look.lashes === 'full' ? 1.25 : look.lashes === 'mascara' ? 1.3 : look.lashes === 'wispy' ? 1.0 : 0.9;
 
   const eye = (side: 'L' | 'R') => {
     const L = side === 'L';
@@ -345,13 +486,7 @@ export const Face: React.FC<{ id: (n: string) => string; look: HeadLook; config:
     return (
       <g transform={eyeTransform(config.eyes.shape, side, look.isMale) || undefined}>
         <ellipse cx={L ? 251 : 349} cy="324" rx="27" ry="9" fill={socket} opacity="0.35" filter="url(#global-blur-xs)" />
-        {shadow && (
-          <g transform={L ? undefined : MIRROR}>
-            <path d={LID_AREA} fill={shadow} opacity={shadow === '#2E2420' ? 0.7 : 0.6} filter="url(#global-blur-sm)" />
-            {shadow === '#2E2420' && <path d="M 222 334 C 236 352 262 354 280 342" fill="none" stroke={shadow} strokeWidth="5" opacity="0.45" filter="url(#global-blur-sm)" />}
-            {METALLIC.has(shadow) && <ellipse cx="250" cy="318" rx="12" ry="5" fill={lighten(shadow, 0.5)} opacity="0.55" filter="url(#global-blur-xs)" />}
-          </g>
-        )}
+        {shadow && <g transform={L ? undefined : MIRROR}>{eyeshadowLayer(shadow, look.shadowStyle || (shadow === '#2E2420' ? 'smoky' : 'wash'), s)}</g>}
         <path d={L ? 'M 278 338 C 268 323 244 318 223 331 C 238 344 262 347 278 338 Z' : 'M 322 338 C 332 323 356 318 377 331 C 362 344 338 347 322 338 Z'} fill="#F6EDE6" />
         <g clipPath={`url(#${id(L ? 'eyeL' : 'eyeR')})`}>
           <path d={L ? 'M 278 338 C 268 323 244 318 223 331 L 278 318 L 223 311 Z' : 'M 322 338 C 332 323 356 318 377 331 L 322 318 L 377 311 Z'} fill="#000" />
@@ -365,14 +500,22 @@ export const Face: React.FC<{ id: (n: string) => string; look: HeadLook; config:
           <path d="M 226 333 C 239 343 262 346 278 338" fill="none" stroke={s.deep} strokeWidth="1.1" opacity="0.7" />
           <path d="M 231 340 C 243 347 264 350 276 343" fill="none" stroke={waterline} strokeWidth="2" opacity="0.6" filter="url(#global-blur-xs)" />
           <path d="M 275 328 C 264 316 243 311 221 325" fill="none" stroke={lidCrease} strokeWidth="1.3" opacity="0.55" />
-          <path d={lidShapeL} fill="#160A06" opacity={look.isMale ? 0.85 : 1} />
-          {look.liner === 'bold' && <path d="M 228 337 C 242 346 262 347 276 341" fill="none" stroke="#160A06" strokeWidth="1.6" opacity="0.8" />}
+          <path d={LID_PLAIN} fill="#160A06" opacity={look.isMale ? 0.85 : 1} />
+          {look.liner !== 'none' && look.liner !== 'lowerOnly' && look.liner !== 'floatingCrease' && <path d={lidShapeL} fill={linerC} />}
+          {look.liner === 'tightline' && <path d="M 231 340 C 243 347 264 350 276 343" fill="none" stroke={linerC} strokeWidth="1.6" opacity="0.85" />}
+          {look.liner === 'cat' && <path d="M 228 337 C 242 346 262 347 276 341" fill="none" stroke={linerC} strokeWidth="1.6" opacity="0.8" />}
+          {look.liner === 'doubleWing' && <path d="M 226 323 C 214 318 206 314 200 310" fill="none" stroke={linerC} strokeWidth="1.8" strokeLinecap="round" />}
+          {look.liner === 'floatingCrease' && <path d="M 278 324 C 266 309 242 305 220 319 L 206 310" fill="none" stroke={linerC} strokeWidth="1.6" strokeLinecap="round" />}
+          {(look.liner === 'lowerOnly' || look.liner === 'smudged') && <path d="M 228 337 C 242 346 262 348 276 342" fill="none" stroke={linerC} strokeWidth={look.liner === 'smudged' ? 2.2 : 1.6} opacity={look.liner === 'smudged' ? 0.45 : 0.9} filter={look.liner === 'smudged' ? 'url(#global-blur-xs)' : undefined} />}
+          {look.liner === 'smudged' && <path d="M 278 333 C 266 319 242 315 222 328" fill="none" stroke={linerC} strokeWidth="4" opacity="0.45" filter="url(#global-blur-xs)" />}
           {lashesL.map((d, i) => (
             <path key={i} d={d} fill="none" stroke="#120806" strokeWidth={lashW - i * 0.04} strokeLinecap="round" />
           ))}
           {!look.isMale && look.lashes !== 'natural' &&
-            LOWER_LASHES_L.map((d, i) => <path key={i} d={d} fill="none" stroke="#120806" strokeWidth="0.7" strokeLinecap="round" opacity="0.7" />)}
-          {look.highlighter && <circle cx="276" cy="337" r="2.2" fill="#FFF6E4" opacity="0.7" filter="url(#global-blur-xs)" />}
+            LOWER_LASHES_L.map((d, i) => <path key={i} d={d} fill="none" stroke="#120806" strokeWidth={look.bottomLashes ? 1.1 : 0.7} strokeLinecap="round" opacity={look.bottomLashes ? 0.95 : 0.7} transform={look.bottomLashes ? 'translate(0 0.6)' : undefined} />)}
+          {look.bottomLashes &&
+            LOWER_LASHES_L.map((d, i) => <path key={`b${i}`} d={d} transform="translate(-3.4 -0.8)" fill="none" stroke="#120806" strokeWidth="1" strokeLinecap="round" opacity="0.85" />)}
+          {look.highlighter && <circle cx="276" cy="337" r="2.2" fill={look.highlightColor || '#FFF6E4'} opacity="0.75" filter="url(#global-blur-xs)" />}
         </g>
       </g>
     );
@@ -401,8 +544,8 @@ export const Face: React.FC<{ id: (n: string) => string; look: HeadLook; config:
             </>
           ) : (
             <>
-              <path d={BROW_SHAPE} fill={style === 'defined' ? darken(look.browColor, 0.25) : look.browColor} opacity={plain ? 0.8 : look.isMale ? 0.92 : 1} />
-              {style === 'defined' && <path d={BROW_SHAPE} fill="none" stroke={darken(look.browColor, 0.4)} strokeWidth="0.8" />}
+              <path d={BROW_SHAPE} transform={style === 'bold' ? around(252, 302, 'scale(1.04 1.3)') : undefined} fill={style === 'defined' || style === 'bold' ? darken(look.browColor, style === 'bold' ? 0.4 : 0.25) : look.browColor} opacity={plain ? 0.8 : look.isMale ? 0.92 : 1} />
+              {(style === 'defined' || style === 'bold') && <path d={BROW_SHAPE} transform={style === 'bold' ? around(252, 302, 'scale(1.04 1.3)') : undefined} fill="none" stroke={darken(look.browColor, 0.5)} strokeWidth="0.8" />}
               {browHairs.map((d, i) => (
                 <path key={i} d={d} stroke={lighten(look.browColor, 0.12)} strokeWidth={look.isMale ? 1.1 : 0.8} opacity="0.6" />
               ))}
@@ -421,6 +564,12 @@ export const Face: React.FC<{ id: (n: string) => string; look: HeadLook; config:
         <ellipse cx="310" cy="449" rx="5" ry="2" fill="#FFF1EA" opacity="0.55" filter="url(#global-blur-xs)" />
         <path d="M 290 430 C 294 428 297 429 299 431" fill="none" stroke={lighten(look.lipColor, 0.45)} strokeWidth="1.4" opacity="0.7" />
       </>
+    ) : look.lipLook === 'chrome' ? (
+      <>
+        <ellipse cx="292" cy="447" rx="12" ry="3" fill="#FFFFFF" opacity="0.85" filter="url(#global-blur-xs)" />
+        <ellipse cx="312" cy="448" rx="6" ry="2" fill="#FFFFFF" opacity="0.7" />
+        <path d="M 284 432 C 290 428 296 429 299 432 M 302 432 C 306 429 312 429 316 432" fill="none" stroke="#FFFFFF" strokeWidth="1.4" opacity="0.8" />
+      </>
     ) : look.lipLook === 'satin' ? (
       <ellipse cx="295" cy="448" rx="9" ry="3" fill="#FFF1EA" opacity="0.35" filter="url(#global-blur-xs)" />
     ) : look.lipLook === 'natural' ? (
@@ -428,6 +577,7 @@ export const Face: React.FC<{ id: (n: string) => string; look: HeadLook; config:
     ) : null;
 
   const lipLine = look.lipLook === 'natural' ? mix(darken(look.lipColor, 0.3), s.contour, 0.4) : darken(look.lipColor, 0.42);
+  const LIP_OUTLINE = 'M 265 436 C 278 430 289 422 300 427.5 C 311 422 322 430 335 436 C 326 452 314 460.5 300 460.5 C 286 460.5 274 452 265 436 Z';
 
   return (
     <g>
@@ -450,14 +600,51 @@ export const Face: React.FC<{ id: (n: string) => string; look: HeadLook; config:
             <path d="M 386 250 C 370 226 340 214 320 212" fill="none" stroke={s.deep} strokeWidth="12" opacity="0.2" filter="url(#global-blur-md)" />
           </>
         )}
-        <ellipse cx="300" cy="262" rx="46" ry="26" fill={s.glow} opacity="0.5" filter="url(#global-blur-lg)" />
-        <ellipse cx="248" cy="376" rx="26" ry="14" fill={s.glow} opacity="0.45" filter="url(#global-blur-lg)" />
-        <ellipse cx="352" cy="376" rx="26" ry="14" fill={s.glow} opacity="0.45" filter="url(#global-blur-lg)" />
-        <ellipse cx="300" cy="472" rx="18" ry="8" fill={s.glow} opacity="0.4" filter="url(#global-blur-md)" />
-        {look.blush && (
+        {look.foundation && <path d={outline} transform={faceT} fill={s.base} opacity="0.22" filter="url(#global-blur-md)" />}
+        <ellipse cx="300" cy="262" rx="46" ry="26" fill={s.glow} opacity={0.5 * glowK} filter="url(#global-blur-lg)" />
+        <ellipse cx="248" cy="376" rx="26" ry="14" fill={s.glow} opacity={0.45 * glowK} filter="url(#global-blur-lg)" />
+        <ellipse cx="352" cy="376" rx="26" ry="14" fill={s.glow} opacity={0.45 * glowK} filter="url(#global-blur-lg)" />
+        <ellipse cx="300" cy="472" rx="18" ry="8" fill={s.glow} opacity={0.4 * glowK} filter="url(#global-blur-md)" />
+        {look.foundation && look.skinFinish === 'dewy' && (
+          <>
+            <ellipse cx="240" cy="360" rx="22" ry="10" fill="#FFF8F0" opacity="0.22" filter="url(#global-blur-md)" />
+            <ellipse cx="360" cy="360" rx="22" ry="10" fill="#FFF8F0" opacity="0.22" filter="url(#global-blur-md)" />
+            <ellipse cx="300" cy="250" rx="28" ry="12" fill="#FFF8F0" opacity="0.16" filter="url(#global-blur-md)" />
+          </>
+        )}
+        {look.concealer && (
+          <>
+            <path d="M 226 350 C 240 380 262 384 280 352 C 266 364 242 364 226 350 Z" fill={lighten(s.base, 0.2)} opacity="0.55" filter="url(#global-blur-sm)" />
+            <path d="M 374 350 C 360 380 338 384 320 352 C 334 364 358 364 374 350 Z" fill={lighten(s.base, 0.2)} opacity="0.55" filter="url(#global-blur-sm)" />
+            <ellipse cx="300" cy="300" rx="10" ry="16" fill={lighten(s.base, 0.15)} opacity="0.4" filter="url(#global-blur-sm)" />
+          </>
+        )}
+        {look.bronzer && (
+          <>
+            <ellipse cx="216" cy="290" rx="20" ry="36" fill={bronze} opacity="0.32" filter="url(#global-blur-lg)" />
+            <ellipse cx="384" cy="290" rx="20" ry="36" fill={bronze} opacity="0.32" filter="url(#global-blur-lg)" />
+            <ellipse cx="214" cy="398" rx="20" ry="14" fill={bronze} opacity="0.18" filter="url(#global-blur-lg)" />
+            <ellipse cx="386" cy="398" rx="20" ry="14" fill={bronze} opacity="0.18" filter="url(#global-blur-lg)" />
+          </>
+        )}
+        {look.blush && (look.blushPlacement || 'apples') === 'apples' && (
           <>
             <ellipse cx="243" cy="392" rx="34" ry="20" fill={`url(#${id('blush')})`} />
             <ellipse cx="357" cy="392" rx="34" ry="20" fill={`url(#${id('blush')})`} />
+          </>
+        )}
+        {look.blush && look.blushPlacement === 'cSculpt' && (
+          <>
+            <ellipse cx="228" cy="380" rx="34" ry="13" transform="rotate(-22 228 380)" fill={`url(#${id('blushC')})`} />
+            <ellipse cx="372" cy="380" rx="34" ry="13" transform="rotate(22 372 380)" fill={`url(#${id('blushC')})`} />
+            <ellipse cx="214" cy="322" rx="12" ry="22" fill={`url(#${id('blushC')})`} opacity="0.7" />
+            <ellipse cx="386" cy="322" rx="12" ry="22" fill={`url(#${id('blushC')})`} opacity="0.7" />
+          </>
+        )}
+        {look.blush && look.blushPlacement === 'draped' && (
+          <>
+            <ellipse cx="208" cy="344" rx="42" ry="13" transform="rotate(-72 208 344)" fill={`url(#${id('blushC')})`} opacity="0.85" />
+            <ellipse cx="392" cy="344" rx="42" ry="13" transform="rotate(72 392 344)" fill={`url(#${id('blushC')})`} opacity="0.85" />
           </>
         )}
         <ellipse cx="252" cy="326" rx="32" ry="14" fill={s.contour} opacity="0.28" filter="url(#global-blur-md)" />
@@ -466,11 +653,15 @@ export const Face: React.FC<{ id: (n: string) => string; look: HeadLook; config:
         <path d="M 312 340 C 314 370 318 392 320 404" fill="none" stroke={s.contour} strokeWidth={look.contour ? 6 : 4} opacity={look.contour ? 0.4 : 0.25} filter="url(#global-blur-xs)" />
         {look.highlighter && (
           <>
-            <ellipse cx="244" cy="364" rx="26" ry="9" fill={lighten(s.glow, 0.25)} opacity="0.4" filter="url(#global-blur-md)" />
-            <ellipse cx="356" cy="364" rx="26" ry="9" fill={lighten(s.glow, 0.25)} opacity="0.4" filter="url(#global-blur-md)" />
-            <path d="M 300 344 L 300 392" stroke={lighten(s.glow, 0.25)} strokeWidth="4" opacity="0.5" filter="url(#global-blur-xs)" />
+            <ellipse cx="244" cy="364" rx="26" ry="9" fill={hl} opacity="0.42" filter="url(#global-blur-md)" />
+            <ellipse cx="356" cy="364" rx="26" ry="9" fill={hl} opacity="0.42" filter="url(#global-blur-md)" />
+            <ellipse cx="236" cy="360" rx="10" ry="4" fill={hl} opacity="0.5" filter="url(#global-blur-xs)" />
+            <ellipse cx="364" cy="360" rx="10" ry="4" fill={hl} opacity="0.5" filter="url(#global-blur-xs)" />
+            <path d="M 300 344 L 300 392" stroke={hl} strokeWidth="4" opacity="0.5" filter="url(#global-blur-xs)" />
           </>
         )}
+        {look.freckles && freckles(s)}
+        {look.beautyMark && <ellipse cx="333" cy="420" rx="2.4" ry="2.2" fill={darken(s.deep, 0.35)} opacity="0.9" />}
         {plain && (
           <>
             {/* tired under-eyes and an oily T-zone: both fixed by makeup */}
@@ -507,8 +698,9 @@ export const Face: React.FC<{ id: (n: string) => string; look: HeadLook; config:
         <path d="M 263 431 C 277 442 292 443 300 443 C 308 443 323 442 337 431" fill="none" stroke={lipLine} strokeWidth={look.lipLook === 'natural' ? 1.2 : 1.6} strokeLinecap="round" opacity={look.lipLook === 'natural' ? 0.75 : 1} />
         <ellipse cx="264" cy="437" rx="4" ry="3" fill={s.contour} opacity="0.45" filter="url(#global-blur-xs)" />
         <ellipse cx="336" cy="437" rx="4" ry="3" fill={s.contour} opacity="0.45" filter="url(#global-blur-xs)" />
+        {look.lipLiner && <path d={LIP_OUTLINE} fill="none" stroke={look.lipLiner} strokeWidth="2.2" opacity="0.85" strokeLinejoin="round" />}
         {lipGloss}
-        {look.highlighter && <ellipse cx="300" cy="426" rx="5" ry="1.8" fill="#FFF3DA" opacity="0.6" filter="url(#global-blur-xs)" />}
+        {look.highlighter && <ellipse cx="300" cy="426" rx="5" ry="1.8" fill={look.highlightColor || '#FFF3DA'} opacity="0.6" filter="url(#global-blur-xs)" />}
         {plain && (
           <>
             {/* dry, unbalmed lips */}

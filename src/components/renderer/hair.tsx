@@ -2,6 +2,7 @@ import React from 'react';
 import { CharacterConfig, HairColorId, SkinPalette } from '../../types/character';
 import { darken, hexToRgb, lighten, mix } from './color';
 import { NEW_STYLES } from './hair2';
+import { WIG_STYLES } from './hair3';
 import {
   BACK_LONG,
   BACK_STRANDS,
@@ -196,7 +197,7 @@ export const HairBack: React.FC<HairProps> = (props) => {
   const { id, config, pal, plain, widen } = props;
   const shine = plain ? 0.35 : 1;
   const style = config.hair;
-  const extra = NEW_STYLES[style];
+  const extra = NEW_STYLES[style] || WIG_STYLES[style];
   if (extra) return extra.back ? <g transform={widen}>{extra.back(props)}</g> : null;
   let body: React.ReactNode = null;
 
@@ -290,7 +291,7 @@ export const HairSide: React.FC<HairProps> = (props) => {
   const { id, config, pal, plain, widen } = props;
   const shine = plain ? 0.35 : 1;
   const style = config.hair;
-  const extra = NEW_STYLES[style];
+  const extra = NEW_STYLES[style] || WIG_STYLES[style];
   if (extra) return extra.side ? <g transform={widen}>{extra.side(props)}</g> : null;
 
   if (style === 'longBraids') {
@@ -358,7 +359,7 @@ export const HairFront: React.FC<HairProps> = (props) => {
   const { id, config, pal, skin, plain, widen } = props;
   const shine = plain ? 0.35 : 1;
   const style = config.hair;
-  const extra = NEW_STYLES[style];
+  const extra = NEW_STYLES[style] || WIG_STYLES[style];
   if (extra) return extra.front ? <g transform={widen}>{extra.front(props)}</g> : null;
   let body: React.ReactNode = null;
 

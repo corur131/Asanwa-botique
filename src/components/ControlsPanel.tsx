@@ -9,37 +9,53 @@ import {
   LipShapePreset,
   Makeup,
   NosePreset,
-  OutfitSpec,
+  Garment,
   SkinToneId,
+  Wardrobe,
 } from '../types/character';
 import { SKIN_TONES } from '../constants/skinTones';
 import {
   ANKARA_PRINTS,
   BAGS,
   BEARDS,
+  BLUSH_PLACEMENTS,
   BLUSH_SHADES,
   BODIES,
   BROW_STYLES,
+  CONTACTS,
   DEFAULT_ACCESSORIES,
   DEFAULT_OUTFIT,
+  DEFAULT_WARDROBE,
   EARRINGS,
   EYESHADOWS,
   FABRICS,
   FABRIC_COLORS,
-  FEMALE_CUTS,
   FEMALE_HAIR,
   GLASSES,
   HAIR_COLORS,
   HEADWEAR,
+  HIGHLIGHTS,
   LASHES,
   LINERS,
+  LINER_COLORS,
   LIP_FINISHES,
+  LIP_LINERS,
   LIP_SHADES,
-  MALE_CUTS,
+  MAKEUP_LOOKS,
   MALE_HAIR,
+  NAIL_COLORS,
+  NAIL_FINISHES,
+  NECKLACES,
   Option,
+  SHADOW_STYLES,
   SHOES,
+  Slot,
+  WRIST,
+  WardrobeItem,
   fitsBody,
+  forBody,
+  itemsFor,
+  wardrobeFromOutfit,
 } from '../constants/catalog';
 import { HAIR_PALETTES } from './renderer/hair';
 import { Sparkles, Eye, Scissors, Heart, Shirt, Gem, Check, Info } from 'lucide-react';
@@ -56,7 +72,7 @@ const TABS: { id: TabType; label: string; icon: React.ReactNode }[] = [
   { id: 'face', label: 'Face', icon: <Eye className="w-3.5 h-3.5" /> },
   { id: 'hair', label: 'Hair & Beard', icon: <Scissors className="w-3.5 h-3.5" /> },
   { id: 'makeup', label: 'Makeup', icon: <Heart className="w-3.5 h-3.5" /> },
-  { id: 'outfit', label: 'Outfit', icon: <Shirt className="w-3.5 h-3.5" /> },
+  { id: 'outfit', label: 'Wardrobe', icon: <Shirt className="w-3.5 h-3.5" /> },
   { id: 'accessories', label: 'Accessories', icon: <Gem className="w-3.5 h-3.5" /> },
 ];
 
@@ -117,6 +133,45 @@ const Toggle: React.FC<{ label: string; on: boolean; onToggle: () => void }> = (
   </button>
 );
 
+function SubTabs<T extends string>({ options, value, onPick, small }: { options: { id: T; label: string }[]; value: T; onPick: (v: T) => void; small?: boolean }) {
+  return (
+    <div className="flex flex-wrap gap-1.5">
+      {options.map((o) => (
+        <button
+          key={o.id}
+          onClick={() => onPick(o.id)}
+          className={`${small ? 'px-2 py-1 text-[10px]' : 'px-3 py-1.5 text-xs'} rounded-full border font-medium transition-all ${value === o.id ? 'border-amber-500 bg-amber-500 text-black' : 'border-white/15 bg-white/5 text-slate-300 hover:border-white/30'}`}
+        >
+          {o.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+type MkTab = 'looks' | 'face' | 'eyes' | 'lips' | 'nails';
+const MAKEUP_GROUPS: { id: MkTab; label: string }[] = [
+  { id: 'looks', label: 'Looks' },
+  { id: 'face', label: 'Face' },
+  { id: 'eyes', label: 'Eyes' },
+  { id: 'lips', label: 'Lips' },
+  { id: 'nails', label: 'Nails' },
+];
+const SLOT_TABS: { id: Slot; label: string }[] = [
+  { id: 'top', label: 'Tops' },
+  { id: 'bottom', label: 'Bottoms' },
+  { id: 'dress', label: 'Dresses & Gowns' },
+  { id: 'outer', label: 'Outerwear' },
+];
+type AccTab = 'shoes' | 'bags' | 'head' | 'jewellery' | 'eyewear';
+const ACC_TABS: { id: AccTab; label: string }[] = [
+  { id: 'shoes', label: 'Shoes' },
+  { id: 'bags', label: 'Bags' },
+  { id: 'head', label: 'Headwear' },
+  { id: 'jewellery', label: 'Jewellery' },
+  { id: 'eyewear', label: 'Eyewear' },
+];
+
 const colorSwatches = FABRIC_COLORS.map((c, i) => ({ name: `Colour ${i + 1}`, color: c }));
 
 // ---------------------------------------------------------------------------
@@ -126,21 +181,47 @@ export const ControlsPanel: React.FC<ControlsPanelProps> = ({ config, onChange }
 
   const isMale = config.body === 'male';
   const isPlain = config.state === 'plain';
-  const outfit: OutfitSpec = config.outfit || DEFAULT_OUTFIT[config.body];
+  const [mkTab, setMkTab] = useState<MkTab>('looks');
+  const [slot, setSlot] = useState<Slot>('top');
+  const [origin, setOrigin] = useState<'all' | 'native' | 'english'>('all');
+  const [accTab, setAccTab] = useState<AccTab>('shoes');
   const acc: Accessories = { ...DEFAULT_ACCESSORIES[isMale ? 'male' : 'female'], ...(config.accessories || {}) };
+  if ((!acc.wrist || acc.wrist === 'none') && acc.watch) acc.wrist = 'watch';
+  if ((!acc.necklace || acc.necklace === 'none') && acc.beads) acc.necklace = 'coral';
   const mk = config.makeup;
+  const wardrobe: Wardrobe = config.wardrobe || wardrobeFromOutfit(config.outfit || DEFAULT_OUTFIT[config.body]);
+  const current: Garment | undefined = wardrobe[slot];
 
   const setMakeup = (p: Partial<Makeup>) => update({ makeup: { ...mk, ...p } });
-  const setOutfit = (p: Partial<OutfitSpec>) => update({ outfit: { ...outfit, ...p } });
   const setAcc = (p: Partial<Accessories>) => update({ accessories: { ...acc, ...p } });
+  const setWardrobe = (w: Wardrobe) => update({ wardrobe: w, outfit: undefined });
+  const setGarment = (p: Partial<Garment>) => current && setWardrobe({ ...wardrobe, [slot]: { ...current, ...p } });
+
+  /** A dress replaces the top and bottom; a top or bottom replaces the dress. */
+  const pickItem = (it: WardrobeItem) => {
+    const g: Garment = { style: it.id, fabric: it.fabric, color: current?.color || FABRIC_COLORS[5], color2: current?.color2 || FABRIC_COLORS[0], pattern: current?.pattern ?? 0 };
+    const dflt = DEFAULT_WARDROBE[config.body];
+    if (it.slot === 'dress') setWardrobe({ dress: g, outer: wardrobe.outer });
+    else if (it.slot === 'outer') setWardrobe({ ...wardrobe, outer: g });
+    else setWardrobe({ top: wardrobe.top || dflt.top, bottom: wardrobe.bottom || dflt.bottom, outer: wardrobe.outer, [it.slot]: g });
+  };
+  const items = itemsFor(isMale, slot).filter((it) => origin === 'all' || it.native === (origin === 'native'));
+  const groups = Object.entries(
+    items.reduce<Record<string, WardrobeItem[]>>((acc2, it) => {
+      (acc2[it.group] = acc2[it.group] || []).push(it);
+      return acc2;
+    }, {}),
+  );
 
   const switchBody = (body: CharacterConfig['body']) => {
     const male = body === 'male';
+    const keep = (male === isMale);
     update({
       body,
       hair: fitsBody(config.hair, body) ? config.hair : male ? 'waves' : 'longBraids',
-      outfit: fitsBody(outfit.cut, body) ? outfit : { ...DEFAULT_OUTFIT[body] },
-      accessories: { ...DEFAULT_ACCESSORIES[male ? 'male' : 'female'], ...(config.accessories && fitsBody(outfit.cut, body) ? config.accessories : {}) },
+      wardrobe: keep ? wardrobe : { ...DEFAULT_WARDROBE[body] },
+      outfit: undefined,
+      accessories: keep ? acc : { ...DEFAULT_ACCESSORIES[male ? 'male' : 'female'] },
     });
   };
 
@@ -296,95 +377,178 @@ export const ControlsPanel: React.FC<ControlsPanelProps> = ({ config, onChange }
           ) : (
             <>
               {isPlain && <p className="text-xs text-amber-300">Makeup only shows in the styled state.</p>}
-              <Section title="Eyeshadow">
-                <Swatches colors={EYESHADOWS} value={mk.eyeshadow || 'none'} onPick={(eyeshadow) => setMakeup({ eyeshadow })} />
-              </Section>
-              <Section title="Eyeliner">
-                <Chips options={LINERS} value={mk.liner ? mk.linerStyle || 'wing' : 'none'} onPick={(v) => setMakeup(v === 'none' ? { liner: false } : { liner: true, linerStyle: v })} cols={4} />
-              </Section>
-              <Section title="Lashes">
-                <Chips options={LASHES} value={mk.lashes} onPick={(lashes) => setMakeup({ lashes })} />
-              </Section>
-              <Section title="Brows">
-                <Chips options={BROW_STYLES} value={mk.browStyle || 'natural'} onPick={(browStyle) => setMakeup({ browStyle })} />
-              </Section>
-              <Section title="Lip colour">
-                <Swatches colors={LIP_SHADES} value={mk.lipColor} onPick={(lipColor) => setMakeup({ lipColor })} />
-              </Section>
-              <Section title="Lip finish">
-                <Chips options={LIP_FINISHES} value={mk.lipFinish || 'gloss'} onPick={(lipFinish) => setMakeup({ lipFinish })} />
-              </Section>
-              <Section title="Blush">
-                <div className="space-y-2">
-                  <Toggle label="Blush on" on={mk.blush} onToggle={() => setMakeup({ blush: !mk.blush })} />
-                  {mk.blush && <Swatches colors={BLUSH_SHADES} value={mk.blushColor} onPick={(blushColor) => setMakeup({ blushColor })} />}
-                </div>
-              </Section>
-              <Section title="Glow">
-                <div className="grid grid-cols-2 gap-2">
-                  <Toggle label="Highlighter" on={!!mk.highlighter} onToggle={() => setMakeup({ highlighter: !mk.highlighter })} />
-                  <Toggle label="Contour" on={!!mk.contour} onToggle={() => setMakeup({ contour: !mk.contour })} />
-                </div>
-              </Section>
+              <SubTabs options={MAKEUP_GROUPS} value={mkTab} onPick={setMkTab} />
+              {mkTab === 'looks' && (
+                <Section title="One-tap looks" note="Applies a full face. Tweak anything after.">
+                  <div className="grid grid-cols-2 gap-2">
+                    {MAKEUP_LOOKS.map((l) => (
+                      <button key={l.id} onClick={() => update({ makeup: { ...l.makeup } })} className="p-2 rounded-lg border border-white/10 bg-white/5 text-left hover:border-amber-500">
+                        <div className="text-xs font-semibold">{l.label}</div>
+                        <div className="text-[10px] text-slate-400">{l.note}</div>
+                      </button>
+                    ))}
+                  </div>
+                </Section>
+              )}
+              {mkTab === 'face' && (
+                <>
+                  <Section title="Base">
+                    <div className="grid grid-cols-2 gap-2">
+                      <Toggle label="Foundation" on={!!mk.foundation} onToggle={() => setMakeup({ foundation: !mk.foundation })} />
+                      <Toggle label="Concealer" on={!!mk.concealer} onToggle={() => setMakeup({ concealer: !mk.concealer })} />
+                      <Toggle label="Setting powder" on={!!mk.powder} onToggle={() => setMakeup({ powder: !mk.powder })} />
+                      <Toggle label="Bronzer" on={!!mk.bronzer} onToggle={() => setMakeup({ bronzer: !mk.bronzer })} />
+                      <Toggle label="Contour" on={!!mk.contour} onToggle={() => setMakeup({ contour: !mk.contour })} />
+                      <Toggle label="Highlighter" on={!!mk.highlighter} onToggle={() => setMakeup({ highlighter: !mk.highlighter })} />
+                    </div>
+                  </Section>
+                  {mk.foundation && (
+                    <Section title="Skin finish">
+                      <Chips options={[{ id: 'dewy', label: 'Dewy' }, { id: 'matte', label: 'Matte' }]} value={mk.skinFinish || 'dewy'} onPick={(skinFinish) => setMakeup({ skinFinish })} cols={2} />
+                    </Section>
+                  )}
+                  {mk.highlighter && (
+                    <Section title="Highlighter shade">
+                      <Swatches colors={HIGHLIGHTS} value={mk.highlightColor} onPick={(highlightColor) => setMakeup({ highlightColor })} />
+                    </Section>
+                  )}
+                  <Section title="Blush">
+                    <div className="space-y-2">
+                      <Toggle label="Blush on" on={mk.blush} onToggle={() => setMakeup({ blush: !mk.blush })} />
+                      {mk.blush && (
+                        <>
+                          <Swatches colors={BLUSH_SHADES} value={mk.blushColor} onPick={(blushColor) => setMakeup({ blushColor })} />
+                          <Chips options={BLUSH_PLACEMENTS} value={mk.blushPlacement || 'apples'} onPick={(blushPlacement) => setMakeup({ blushPlacement })} />
+                        </>
+                      )}
+                    </div>
+                  </Section>
+                  <Section title="Details">
+                    <div className="grid grid-cols-2 gap-2">
+                      <Toggle label="Faux freckles" on={!!mk.freckles} onToggle={() => setMakeup({ freckles: !mk.freckles })} />
+                      <Toggle label="Beauty mark" on={!!mk.beautyMark} onToggle={() => setMakeup({ beautyMark: !mk.beautyMark })} />
+                    </div>
+                  </Section>
+                </>
+              )}
+              {mkTab === 'eyes' && (
+                <>
+                  <Section title="Eyeshadow">
+                    <Swatches colors={EYESHADOWS} value={mk.eyeshadow || 'none'} onPick={(eyeshadow) => setMakeup({ eyeshadow })} />
+                    {mk.eyeshadow && mk.eyeshadow !== 'none' && (
+                      <div className="mt-2">
+                        <Chips options={SHADOW_STYLES} value={mk.shadowStyle || 'wash'} onPick={(shadowStyle) => setMakeup({ shadowStyle })} />
+                      </div>
+                    )}
+                  </Section>
+                  <Section title="Eyeliner">
+                    <Chips options={LINERS} value={mk.liner ? mk.linerStyle || 'wing' : 'none'} onPick={(v) => setMakeup(v === 'none' ? { liner: false } : { liner: true, linerStyle: v })} />
+                    {mk.liner && (
+                      <div className="mt-2">
+                        <Swatches colors={LINER_COLORS} value={mk.linerColor || '#120806'} onPick={(linerColor) => setMakeup({ linerColor })} />
+                      </div>
+                    )}
+                  </Section>
+                  <Section title="Lashes">
+                    <Chips options={LASHES} value={mk.lashes} onPick={(lashes) => setMakeup({ lashes })} />
+                    <div className="mt-2">
+                      <Toggle label="Bottom lashes" on={!!mk.bottomLashes} onToggle={() => setMakeup({ bottomLashes: !mk.bottomLashes })} />
+                    </div>
+                  </Section>
+                  <Section title="Brows">
+                    <Chips options={BROW_STYLES} value={mk.browStyle || 'natural'} onPick={(browStyle) => setMakeup({ browStyle })} cols={4} />
+                  </Section>
+                  <Section title="Coloured contacts">
+                    <Chips options={CONTACTS} value={mk.contacts || 'none'} onPick={(contacts) => setMakeup({ contacts })} cols={4} />
+                  </Section>
+                </>
+              )}
+              {mkTab === 'lips' && (
+                <>
+                  <Section title={`Lip colour (${LIP_SHADES.length})`}>
+                    <Swatches colors={LIP_SHADES} value={mk.lipColor} onPick={(lipColor) => setMakeup({ lipColor })} />
+                  </Section>
+                  <Section title="Finish">
+                    <Chips options={LIP_FINISHES} value={mk.lipFinish || 'gloss'} onPick={(lipFinish) => setMakeup({ lipFinish })} cols={4} />
+                  </Section>
+                  <Section title="Lip liner">
+                    <Swatches colors={LIP_LINERS} value={mk.lipLiner || 'none'} onPick={(lipLiner) => setMakeup({ lipLiner })} />
+                  </Section>
+                </>
+              )}
+              {mkTab === 'nails' && (
+                <>
+                  <Section title="Polish">
+                    <Swatches colors={NAIL_COLORS} value={mk.nailColor || 'none'} onPick={(nailColor) => setMakeup({ nailColor })} />
+                  </Section>
+                  <Section title="Finish">
+                    <Chips options={NAIL_FINISHES} value={mk.nailFinish || 'gloss'} onPick={(nailFinish) => setMakeup({ nailFinish })} />
+                  </Section>
+                </>
+              )}
             </>
           ))}
 
         {activeTab === 'outfit' && (
           <>
-            <Section title="Cut">
-              {isMale ? (
-                <Chips options={MALE_CUTS} value={outfit.cut as never} onPick={(cut) => setOutfit({ cut })} cols={2} />
-              ) : (
-                <Chips options={FEMALE_CUTS} value={outfit.cut as never} onPick={(cut) => setOutfit({ cut })} cols={2} />
-              )}
-            </Section>
-            <Section title="Fabric">
-              <Chips options={FABRICS} value={outfit.fabric} onPick={(fabric) => setOutfit({ fabric })} cols={4} />
-            </Section>
-            {outfit.fabric === 'ankara' && (
-              <Section title="Ankara print">
-                <Chips options={ANKARA_PRINTS.map((label, i) => ({ id: String(i), label }))} value={String(outfit.pattern ?? 0)} onPick={(v) => setOutfit({ pattern: Number(v) })} cols={4} />
-              </Section>
+            <SubTabs options={SLOT_TABS} value={slot} onPick={setSlot} />
+            <SubTabs options={[{ id: 'all', label: 'All' }, { id: 'native', label: 'Native' }, { id: 'english', label: 'English' }]} value={origin} onPick={setOrigin} small />
+            {slot === 'outer' && (
+              <button onClick={() => setWardrobe({ ...wardrobe, outer: undefined })} className={`w-full p-2 rounded-lg border text-xs ${!wardrobe.outer ? 'border-amber-500 bg-amber-500/15' : 'border-white/10 bg-white/5'}`}>
+                No jacket
+              </button>
             )}
-            <Section title="Main colour">
-              <Swatches colors={colorSwatches} value={outfit.color} onPick={(color) => setOutfit({ color })} />
-            </Section>
-            <Section title="Second colour" note="Print colour, or the second piece (top, trousers, jeans).">
-              <Swatches colors={colorSwatches} value={outfit.color2} onPick={(color2) => setOutfit({ color2 })} />
-            </Section>
+            {groups.map(([group, items]) => (
+              <Section key={group} title={group}>
+                <div className="grid grid-cols-2 gap-2">
+                  {items.map((it) => (
+                    <button
+                      key={it.id}
+                      onClick={() => pickItem(it)}
+                      className={`p-2 rounded-lg border text-left transition-all ${current?.style === it.id ? 'border-amber-500 bg-amber-500/15 text-white' : 'border-white/10 bg-white/5 text-slate-300 hover:border-white/25'}`}
+                    >
+                      <div className="text-xs font-semibold leading-tight">{it.label}</div>
+                      <div className="text-[10px] text-slate-400 mt-0.5">₦{it.price.toLocaleString()} · {it.native ? 'Native' : 'English'}</div>
+                    </button>
+                  ))}
+                </div>
+              </Section>
+            ))}
+            {current && (
+              <>
+                <Section title="Fabric">
+                  <Chips options={FABRICS} value={current.fabric} onPick={(fabric) => setGarment({ fabric })} cols={4} />
+                </Section>
+                {current.fabric === 'ankara' && (
+                  <Section title="Ankara print">
+                    <Chips options={ANKARA_PRINTS.map((label, i) => ({ id: String(i), label }))} value={String(current.pattern ?? 0)} onPick={(v) => setGarment({ pattern: Number(v) })} cols={4} />
+                  </Section>
+                )}
+                <Section title="Main colour">
+                  <Swatches colors={colorSwatches} value={current.color} onPick={(color) => setGarment({ color })} />
+                </Section>
+                <Section title="Second colour" note="Print, lace, embroidery or trim colour.">
+                  <Swatches colors={colorSwatches} value={current.color2} onPick={(color2) => setGarment({ color2 })} />
+                </Section>
+              </>
+            )}
           </>
         )}
 
         {activeTab === 'accessories' && (
           <>
-            <Section title="Headwear">
-              <Chips options={HEADWEAR.filter((h) => h.id === 'none' || (isMale ? h.id === 'fila' : h.id !== 'fila'))} value={acc.headwear} onPick={(headwear) => setAcc({ headwear })} />
-              {acc.headwear !== 'none' && (
+            <SubTabs options={ACC_TABS} value={accTab} onPick={setAccTab} />
+            {accTab === 'shoes' && (
+              <Section title="Shoes">
+                <Chips options={forBody(SHOES, isMale)} value={acc.shoes} onPick={(shoes) => setAcc({ shoes })} />
                 <div className="mt-2">
-                  <Swatches colors={colorSwatches} value={acc.headwearColor} onPick={(headwearColor) => setAcc({ headwearColor })} />
+                  <Swatches colors={colorSwatches} value={acc.shoesColor} onPick={(shoesColor) => setAcc({ shoesColor })} />
                 </div>
-              )}
-            </Section>
-            {!isMale && (
-              <Section title="Earrings">
-                <Chips options={EARRINGS} value={config.earrings} onPick={(earrings) => update({ earrings })} />
               </Section>
             )}
-            <Section title="Neck">
-              <div className="grid grid-cols-2 gap-2">
-                {!isMale && <Toggle label="Gold chain" on={config.necklace} onToggle={() => update({ necklace: !config.necklace })} />}
-                <Toggle label="Coral beads" on={acc.beads} onToggle={() => setAcc({ beads: !acc.beads })} />
-              </div>
-            </Section>
-            <Section title="Shoes">
-              <Chips options={SHOES.filter((s) => !isMale || s.id === 'loafers' || s.id === 'sneakers')} value={acc.shoes} onPick={(shoes) => setAcc({ shoes })} />
-              <div className="mt-2">
-                <Swatches colors={colorSwatches} value={acc.shoesColor} onPick={(shoesColor) => setAcc({ shoesColor })} />
-              </div>
-            </Section>
-            {!isMale && (
+            {accTab === 'bags' && (
               <Section title="Bag">
-                <Chips options={BAGS} value={acc.bag} onPick={(bag) => setAcc({ bag })} />
+                <Chips options={forBody(BAGS, isMale)} value={acc.bag} onPick={(bag) => setAcc({ bag })} />
                 {acc.bag !== 'none' && (
                   <div className="mt-2">
                     <Swatches colors={colorSwatches} value={acc.bagColor} onPick={(bagColor) => setAcc({ bagColor })} />
@@ -392,10 +556,36 @@ export const ControlsPanel: React.FC<ControlsPanelProps> = ({ config, onChange }
                 )}
               </Section>
             )}
-            <Section title="Glasses">
-              <Chips options={GLASSES} value={acc.glasses} onPick={(glasses) => setAcc({ glasses })} />
-            </Section>
-            <Toggle label="Wristwatch" on={acc.watch} onToggle={() => setAcc({ watch: !acc.watch })} />
+            {accTab === 'head' && (
+              <Section title="Headwear">
+                <Chips options={forBody(HEADWEAR, isMale)} value={acc.headwear} onPick={(headwear) => setAcc({ headwear })} />
+                {acc.headwear !== 'none' && (
+                  <div className="mt-2">
+                    <Swatches colors={colorSwatches} value={acc.headwearColor} onPick={(headwearColor) => setAcc({ headwearColor })} />
+                  </div>
+                )}
+              </Section>
+            )}
+            {accTab === 'jewellery' && (
+              <>
+                {!isMale && (
+                  <Section title="Earrings">
+                    <Chips options={EARRINGS} value={config.earrings} onPick={(earrings) => update({ earrings })} />
+                  </Section>
+                )}
+                <Section title="Necklace">
+                  <Chips options={forBody(NECKLACES, isMale)} value={acc.necklace || 'none'} onPick={(necklace) => setAcc({ necklace, beads: false })} />
+                </Section>
+                <Section title="Wrist">
+                  <Chips options={forBody(WRIST, isMale)} value={acc.wrist || 'none'} onPick={(wrist) => setAcc({ wrist, watch: false })} />
+                </Section>
+              </>
+            )}
+            {accTab === 'eyewear' && (
+              <Section title="Eyewear">
+                <Chips options={forBody(GLASSES, isMale)} value={acc.glasses} onPick={(glasses) => setAcc({ glasses })} />
+              </Section>
+            )}
           </>
         )}
       </div>

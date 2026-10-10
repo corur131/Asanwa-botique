@@ -193,9 +193,17 @@ export const Arms: React.FC<{ id: Id; skin: SkinPalette; spec: BodySpec }> = ({ 
 };
 
 /** A relaxed hanging hand seen from the side: thumb forward, fingers together and softly curled. */
-export const Hands: React.FC<{ id: Id; skin: SkinPalette; spec: BodySpec; nails?: string }> = ({ id, skin, spec, nails }) => {
+export const Hands: React.FC<{ id: Id; skin: SkinPalette; spec: BodySpec; nails?: string; nailFinish?: string; plain?: boolean }> = ({ id, skin, spec, nails, nailFinish = 'gloss', plain }) => {
   const s = spec.handScale;
-  const nailColor = nails || lighten(skin.base, 0.3);
+  const nailColor = nails || (plain ? mix(skin.base, '#9A8A7A', 0.3) : lighten(skin.base, 0.3));
+  const polished = !!nails;
+  const nail = (cx: number, cy: number, rx: number, ry: number) => (
+    <g key={`${cx}`}>
+      <ellipse cx={cx} cy={cy} rx={rx * (polished ? 1.1 : 1)} ry={ry * (polished ? 1.25 : 1)} fill={nailColor} opacity={polished ? 1 : 0.85} />
+      {polished && nailFinish !== 'matte' && <ellipse cx={cx - rx * 0.35} cy={cy - ry * 0.3} rx={rx * 0.35} ry={ry * 0.6} fill="#FFF" opacity={nailFinish === 'chrome' ? 0.75 : 0.45} />}
+      {polished && nailFinish === 'chrome' && <ellipse cx={cx + rx * 0.3} cy={cy + ry * 0.3} rx={rx * 0.3} ry={ry * 0.5} fill="#FFF" opacity="0.35" />}
+    </g>
+  );
   const hand = (
     <g transform={`translate(${spec.wrist[0]} ${spec.wrist[1] - 4}) rotate(${4 + (spec.armAngle || 0)}) scale(${s})`}>
       {/* back of hand + fingers */}
@@ -209,13 +217,13 @@ export const Hands: React.FC<{ id: Id; skin: SkinPalette; spec: BodySpec; nails?
         <ellipse key={x} cx={x + 2} cy="48" rx="2.8" ry="2" fill={skin.glow} opacity="0.45" filter="url(#global-blur-xs)" />
       ))}
       {/* nails */}
-      <ellipse cx="-6.5" cy="90" rx="2.3" ry="3.4" fill={nailColor} opacity="0.85" />
-      <ellipse cx="0.8" cy="95.5" rx="2.4" ry="3.5" fill={nailColor} opacity="0.85" />
-      <ellipse cx="7.4" cy="86" rx="2.2" ry="3.2" fill={nailColor} opacity="0.85" />
+      {nail(-6.5, 90, 2.3, 3.4)}
+      {nail(0.8, 95.5, 2.4, 3.5)}
+      {nail(7.4, 86, 2.2, 3.2)}
       {/* thumb, toward the body, in front */}
       <path d="M 10 22 C 18 32 21 48 18 62 C 16 70 10 70 9 63 C 8 52 7 42 3 34 Z" fill={mix(skin.base, skin.highlight, 0.25)} />
       <path d="M 10 22 C 18 32 21 48 18 62" fill="none" stroke={skin.shadow} strokeWidth="1.2" opacity="0.6" />
-      <ellipse cx="14.5" cy="61" rx="2.1" ry="3" fill={nailColor} opacity="0.85" />
+      {nail(14.5, 61, 2.1, 3)}
       {/* wrist crease */}
       <path d="M -10 6 Q 0 9 10 6" fill="none" stroke={skin.contour} strokeWidth="1" opacity="0.35" />
     </g>

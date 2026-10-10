@@ -29,8 +29,8 @@ import {
  * shoulders) and front (over the face).
  */
 
-type Layer = (p: HairProps) => React.ReactNode;
-interface StyleLayers {
+export type Layer = (p: HairProps) => React.ReactNode;
+export interface StyleLayers {
   back?: Layer;
   side?: Layer;
   front?: Layer;
@@ -38,11 +38,11 @@ interface StyleLayers {
 
 const MIRROR = 'translate(600 0) scale(-1 1)';
 const f = (n: number) => n.toFixed(1);
-const toD = (pts: Pt[]) => `M ${f(pts[0][0])} ${f(pts[0][1])}${curveThrough(pts)}`;
-const shineOf = (p: HairProps) => (p.plain ? 0.35 : 1);
+export const toD = (pts: Pt[]) => `M ${f(pts[0][0])} ${f(pts[0][1])}${curveThrough(pts)}`;
+export const shineOf = (p: HairProps) => (p.plain ? 0.35 : 1);
 
 /** Points for a strand hanging from (x0, y0), swaying side to side. */
-function hang(x0: number, y0: number, len: number, sway: number, phase: number, drift = 0, n = 12): Pt[] {
+export function hang(x0: number, y0: number, len: number, sway: number, phase: number, drift = 0, n = 12): Pt[] {
   return Array.from({ length: n + 1 }, (_, i) => {
     const t = i / n;
     return [x0 + Math.sin(t * Math.PI * 1.3 + phase) * sway * t + drift * t, y0 + len * t] as Pt;
@@ -50,7 +50,7 @@ function hang(x0: number, y0: number, len: number, sway: number, phase: number, 
 }
 
 /** Points along a quadratic curve. */
-function quad(a: Pt, c: Pt, b: Pt, n = 12): Pt[] {
+export function quad(a: Pt, c: Pt, b: Pt, n = 12): Pt[] {
   return Array.from({ length: n + 1 }, (_, i) => {
     const t = i / n;
     return [(1 - t) * (1 - t) * a[0] + 2 * (1 - t) * t * c[0] + t * t * b[0], (1 - t) * (1 - t) * a[1] + 2 * (1 - t) * t * c[1] + t * t * b[1]] as Pt;
@@ -58,7 +58,7 @@ function quad(a: Pt, c: Pt, b: Pt, n = 12): Pt[] {
 }
 
 /** Walk a polyline and call back every `step` units with position and unit tangent. */
-function along(pts: Pt[], step: number, cb: (x: number, y: number, ux: number, uy: number, i: number) => void) {
+export function along(pts: Pt[], step: number, cb: (x: number, y: number, ux: number, uy: number, i: number) => void) {
   let carry = 0;
   let k = 0;
   for (let i = 0; i < pts.length - 1; i++) {
@@ -77,7 +77,7 @@ function along(pts: Pt[], step: number, cb: (x: number, y: number, ux: number, u
 }
 
 /** One braid: outline, body, plait chevrons; optional gold cuffs or beads. */
-const Braid: React.FC<{ p: HairProps; pts: Pt[]; w: number; cuffs?: number[]; beads?: boolean }> = ({ p, pts, w, cuffs, beads }) => {
+export const Braid: React.FC<{ p: HairProps; pts: Pt[]; w: number; cuffs?: number[]; beads?: boolean }> = ({ p, pts, w, cuffs, beads }) => {
   const d = toD(pts);
   const chev: React.ReactElement[] = [];
   along(pts, w * 0.95, (x, y, ux, uy, i) => {
@@ -109,7 +109,7 @@ const Braid: React.FC<{ p: HairProps; pts: Pt[]; w: number; cuffs?: number[]; be
 };
 
 /** One loc: ribbed rope with a highlight. */
-const LocRope: React.FC<{ p: HairProps; pts: Pt[]; w: number; cuff?: boolean }> = ({ p, pts, w, cuff }) => {
+export const LocRope: React.FC<{ p: HairProps; pts: Pt[]; w: number; cuff?: boolean }> = ({ p, pts, w, cuff }) => {
   const d = toD(pts);
   const ribs: React.ReactElement[] = [];
   along(pts, w * 0.7, (x, y, ux, uy, i) => {
@@ -130,7 +130,7 @@ const LocRope: React.FC<{ p: HairProps; pts: Pt[]; w: number; cuff?: boolean }> 
 };
 
 /** Braided or twisted rows running back from the hairline over the scalp. */
-function scalpRows(p: HairProps, n: number, w: number, opts: { spread?: number; crownY?: number; part?: number; rope?: boolean; cap?: string } = {}) {
+export function scalpRows(p: HairProps, n: number, w: number, opts: { spread?: number; crownY?: number; part?: number; rope?: boolean; cap?: string } = {}) {
   const spread = opts.spread ?? 0.76;
   const crownY = opts.crownY ?? 168;
   const out: React.ReactElement[] = [];
@@ -157,7 +157,7 @@ function scalpRows(p: HairProps, n: number, w: number, opts: { spread?: number; 
  * Scalp for box braids and locs: braids fan out from the parting and run down over the head,
  * clipped at the hairline so no braid ends sit on the forehead. Fine scalp lines mark the box parts.
  */
-function braidCap(p: HairProps, w: number, opts: { part?: number; rope?: boolean; cap?: string; n?: number } = {}) {
+export function braidCap(p: HairProps, w: number, opts: { part?: number; rope?: boolean; cap?: string; n?: number } = {}) {
   const part = opts.part ?? 300;
   const cap = opts.cap || CORN_CAP;
   const n = opts.n ?? 17;
@@ -185,15 +185,15 @@ function braidCap(p: HairProps, w: number, opts: { part?: number; rope?: boolean
   );
 }
 
-const scalpFill = (p: HairProps) => mix(p.skin.contour, p.pal.darkShadow, 0.35);
+export const scalpFill = (p: HairProps) => mix(p.skin.contour, p.pal.darkShadow, 0.35);
 
 /** Partly-visible scalp under braids, locs and knots. */
-const ScalpCap: React.FC<{ p: HairProps; d?: string }> = ({ p, d = CORN_CAP }) => <path d={d} fill={scalpFill(p)} />;
+export const ScalpCap: React.FC<{ p: HairProps; d?: string }> = ({ p, d = CORN_CAP }) => <path d={d} fill={scalpFill(p)} />;
 
 // ---------------------------------------------------------------------------
 // Women's styles
 // ---------------------------------------------------------------------------
-function backBraids(p: HairProps, n: number, len: number, w: number, seed: number, rope = false, beads = false) {
+export function backBraids(p: HairProps, n: number, len: number, w: number, seed: number, rope = false, beads = false) {
   const rnd = seeded(seed);
   const out: React.ReactElement[] = [];
   for (let i = 0; i < n; i++) {
@@ -207,7 +207,7 @@ function backBraids(p: HairProps, n: number, len: number, w: number, seed: numbe
   return out;
 }
 
-function frontBraids(p: HairProps, n: number, len: number, w: number, seed: number, rope = false, cuffs = false, beads = false) {
+export function frontBraids(p: HairProps, n: number, len: number, w: number, seed: number, rope = false, cuffs = false, beads = false) {
   const rnd = seeded(seed);
   const side = (mirror: boolean) => (
     <g transform={mirror ? MIRROR : undefined}>
@@ -367,7 +367,7 @@ const bodyWave: StyleLayers = {
 };
 
 /** A cloud of curls: many overlapping circles, clipped coils inside. */
-function curlCloud(p: HairProps, clipName: string, blobs: [number, number, number][], seed: number) {
+export function curlCloud(p: HairProps, clipName: string, blobs: [number, number, number][], seed: number) {
   const clip = p.id(clipName);
   const minX = Math.min(...blobs.map(([x, , r]) => x - r));
   const maxX = Math.max(...blobs.map(([x, , r]) => x + r));
@@ -432,7 +432,7 @@ const pixie: StyleLayers = {
   ),
 };
 
-function slickFront(p: HairProps) {
+export function slickFront(p: HairProps) {
   const lines: React.ReactElement[] = [];
   for (let i = 0; i < 22; i++) {
     const a = Math.PI * (1.08 + (0.84 * i) / 21);
@@ -619,6 +619,9 @@ const HALO: Partial<Record<HairStyle, [number, number, number]>> = {
   highTopFade: [118, 196, 330],
   shortDreads: [124, 140, 318],
   bald: [0, 0, 0],
+  afroWig: [190, 190, 290],
+  curlyBob: [150, 150, 300],
+  fingerWaves: [116, 150, 318],
 };
 
 /**

@@ -20,7 +20,11 @@ export const DIVINE_CONFIG: CharacterConfig = {
     eyeshadow: 'none',
     highlighter: false,
     contour: false,
-    browStyle: 'natural',
+    browStyle: 'laminated',
+    foundation: true,
+    skinFinish: 'dewy',
+    concealer: true,
+    nailColor: '#C99A84',
   },
   maleOnly: { facialHair: 'none' },
   hair: 'longBraids',
@@ -28,8 +32,11 @@ export const DIVINE_CONFIG: CharacterConfig = {
   earrings: 'goldStuds',
   necklace: true,
   state: 'styled',
-  outfit: { cut: 'camiPencil', fabric: 'plain', color: '#DED4C5', color2: '#F6F1E8' },
-  accessories: { headwear: 'none', beads: false, bag: 'none', shoes: 'heels', shoesColor: '#C9A163', glasses: 'none', watch: false },
+  wardrobe: {
+    top: { style: 'camisole', fabric: 'plain', color: '#F6F1E8', color2: '#F6F1E8' },
+    bottom: { style: 'pencilSkirt', fabric: 'plain', color: '#DED4C5', color2: '#DED4C5' },
+  },
+  accessories: { headwear: 'none', beads: false, bag: 'none', shoes: 'heels', shoesColor: '#C9A163', glasses: 'none', watch: false, necklace: 'pendant', wrist: 'none' },
 };
 
 export const PLUS_FEMALE_CONFIG: CharacterConfig = {
@@ -44,7 +51,7 @@ export const PLUS_FEMALE_CONFIG: CharacterConfig = {
     blush: true,
     blushColor: '#B8553A',
     liner: true,
-    linerStyle: 'bold',
+    linerStyle: 'cat',
     lashes: 'dramatic',
     lipColor: '#A8405A',
     lipFinish: 'satin',
@@ -52,6 +59,17 @@ export const PLUS_FEMALE_CONFIG: CharacterConfig = {
     highlighter: true,
     contour: true,
     browStyle: 'defined',
+    foundation: true,
+    skinFinish: 'matte',
+    powder: true,
+    bronzer: true,
+    blushPlacement: 'cSculpt',
+    highlightColor: '#F2C66A',
+    shadowStyle: 'cutCrease',
+    bottomLashes: true,
+    lipLiner: '#4A0E1C',
+    nailColor: '#C2262E',
+    nailFinish: 'chrome',
   },
   maleOnly: { facialHair: 'none' },
   hair: 'afroPuff',
@@ -59,8 +77,11 @@ export const PLUS_FEMALE_CONFIG: CharacterConfig = {
   earrings: 'goldDrops',
   necklace: false,
   state: 'styled',
-  outfit: { cut: 'iroBuba', fabric: 'ankara', color: '#E86A2E', color2: '#2F5D3A', pattern: 6 },
-  accessories: { headwear: 'gele', headwearColor: '#E3B23C', beads: true, bag: 'clutch', bagColor: '#E3B23C', shoes: 'sandals', shoesColor: '#C9A163', glasses: 'none', watch: false },
+  wardrobe: {
+    top: { style: 'buba', fabric: 'ankara', color: '#E86A2E', color2: '#2F5D3A', pattern: 6 },
+    bottom: { style: 'iro', fabric: 'ankara', color: '#E86A2E', color2: '#2F5D3A', pattern: 6 },
+  },
+  accessories: { headwear: 'gele', headwearColor: '#E3B23C', beads: true, bag: 'beadedBag', bagColor: '#E3B23C', shoes: 'sandals', shoesColor: '#C9A163', glasses: 'none', watch: false, necklace: 'coral', wrist: 'bangles' },
 };
 
 export const MALE_CONFIG: CharacterConfig = {
@@ -78,8 +99,8 @@ export const MALE_CONFIG: CharacterConfig = {
   earrings: 'none',
   necklace: false,
   state: 'styled',
-  outfit: { cut: 'senator', fabric: 'plain', color: '#2F5D3A', color2: '#2F5D3A' },
-  accessories: { headwear: 'none', beads: false, bag: 'none', shoes: 'loafers', shoesColor: '#42281D', glasses: 'none', watch: true },
+  wardrobe: { dress: { style: 'senator', fabric: 'plain', color: '#2F5D3A', color2: '#2F5D3A' } },
+  accessories: { headwear: 'none', beads: false, bag: 'none', shoes: 'loafers', shoesColor: '#42281D', glasses: 'none', watch: true, necklace: 'none', wrist: 'watch' },
 };
 
 /**
@@ -96,7 +117,7 @@ export function getDeborahConfig(divine: CharacterConfig): CharacterConfig {
       blush: !plain,
       blushColor: '#D9667A',
       liner: !plain,
-      linerStyle: 'bold',
+      linerStyle: 'cat',
       lashes: plain ? 'natural' : 'dramatic',
       lipColor: '#7A1C2E',
       lipFinish: 'matte',
@@ -104,10 +125,23 @@ export function getDeborahConfig(divine: CharacterConfig): CharacterConfig {
       highlighter: true,
       contour: true,
       browStyle: 'defined',
+      foundation: true,
+      skinFinish: 'matte',
+      powder: true,
+      bronzer: true,
+      blushPlacement: 'draped',
+      shadowStyle: 'smoky',
+      lipLiner: '#2A120C',
+      contacts: 'hazel',
+      nailColor: '#6A1626',
     },
     earrings: plain ? 'none' : 'goldHoops',
     necklace: !plain,
-    outfit: { cut: 'corsetFlare', fabric: 'satin', color: '#1D4838', color2: '#1D4838' },
-    accessories: { headwear: 'none', beads: false, bag: 'clutch', bagColor: '#C9A163', shoes: 'heels', shoesColor: '#CCA357', glasses: 'none', watch: false },
+    outfit: undefined,
+    wardrobe: {
+      top: { style: 'corsetTop', fabric: 'satin', color: '#1D4838', color2: '#1D4838' },
+      bottom: { style: 'aLineSkirt', fabric: 'satin', color: '#1D4838', color2: '#1D4838' },
+    },
+    accessories: { headwear: 'none', beads: false, bag: 'miniBag', bagColor: '#C9A163', shoes: 'heels', shoesColor: '#CCA357', glasses: 'none', watch: false, necklace: 'layered', wrist: 'cuff' },
   };
 }
