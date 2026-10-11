@@ -355,8 +355,8 @@ export function tick(s0: GameState, minutes: number): GameState {
       s = staffFinish(s, mine.c, m);
     }
     if (!s.inShop.some((v) => v.by === m.id)) {
-      // Divine's picks first: staff take people she sent, or anyone small who has waited 10 minutes
-      const next = waiting(s).filter((v) => v.c.cls !== 'rich' && (m.profession === 'makeup' ? v.c.service === 'makeup' || v.c.service === 'both' : v.c.service !== 'makeup')).sort((a, b) => Number(!!b.forStaff) - Number(!!a.forStaff) || a.arrived - b.arrived).find((v) => v.forStaff || end - v.arrived >= 10);
+      // Staff take eligible customers as soon as they arrive; profession determines who they can serve.
+      const next = waiting(s).filter((v) => v.c.cls !== 'rich' && (m.profession === 'makeup' ? v.c.service === 'makeup' || v.c.service === 'both' : v.c.service !== 'makeup')).sort((a, b) => Number(!!b.forStaff) - Number(!!a.forStaff) || a.arrived - b.arrived).find((v) => v.forStaff || end - v.arrived >= 0);
       if (next && end < SHOP_MINUTES) s = { ...s, inShop: s.inShop.map((v) => (v.c.id === next.c.id ? { ...v, by: m.id, until: end + staffMinutes(m.level) } : v)) };
     }
   }
