@@ -355,6 +355,27 @@ const W = (id: string, label: string, slot: Slot, group: string, native: boolean
 });
 
 export const WARDROBE: WardrobeItem[] = [
+  // Additional Lagos streetwear, occasion and native outfit options.
+  W('cargoSkirt', 'Cargo Maxi Skirt', 'bottom', 'Skirts', false, ['casual', 'brunch', 'birthday'], 'middle', 3500, 'denim'),
+  W('pleatedTrousers', 'Pleated Wide-Leg Trousers', 'bottom', 'Trousers', false, ['office', 'brunch', 'dateNight'], 'middle', 4200, 'plain'),
+  W('ankaraCorset', 'Ankara Corset Top', 'top', 'Native Tops', true, ['owambe', 'wedding', 'party'], 'middle', 6500, 'ankara'),
+  W('adireShirt', 'Adire Oversized Shirt', 'top', 'Native Tops', true, ['casual', 'brunch', 'office'], 'middle', 4800, 'adire'),
+  W('lacePeplum', 'Lace Peplum Blouse', 'top', 'Native Tops', true, ['owambe', 'wedding', 'church'], 'middle', 7500, 'lace'),
+  W('silkCami', 'Silk Cami Top', 'top', 'Tops', false, ['dateNight', 'brunch', 'party'], 'middle', 3800, 'satin'),
+  W('denimVest', 'Denim Vest', 'outer', 'Outerwear', false, ['casual', 'party', 'birthday'], 'poor', 3200, 'denim'),
+  W('crochetKimono', 'Crochet Kimono', 'outer', 'Outerwear', false, ['brunch', 'casual', 'dateNight'], 'middle', 5200, 'plain'),
+  W('ankaraBlazerDress', 'Ankara Blazer Dress', 'dress', 'Native Gowns', true, ['office', 'owambe', 'brunch'], 'middle', 8500, 'ankara'),
+  W('adireWrapDress', 'Adire Wrap Dress', 'dress', 'Native Gowns', true, ['church', 'brunch', 'casual'], 'middle', 6200, 'adire'),
+  W('satinCowlDress', 'Satin Cowl-Neck Dress', 'dress', 'Dresses', false, ['dateNight', 'party', 'birthday'], 'middle', 7200, 'satin'),
+  W('tieredAnkara', 'Tiered Ankara Gown', 'dress', 'Native Gowns', true, ['owambe', 'wedding', 'church'], 'middle', 9000, 'ankara'),
+  W('linenCoOrdTop', 'Linen Co-ord Shirt', 'top', 'Tops', false, ['office', 'brunch', 'casual'], 'middle', 4000, 'plain'),
+  W('linenCoOrdTrouser', 'Linen Co-ord Trousers', 'bottom', 'Trousers', false, ['office', 'brunch', 'casual'], 'middle', 4500, 'plain'),
+  W('sequinTop', 'Sequin Party Top', 'top', 'Tops', false, ['party', 'birthday', 'redCarpet'], 'rich', 12500, 'sequin'),
+  W('velvetMini', 'Velvet Mini Dress', 'dress', 'Evening Gowns', false, ['party', 'birthday', 'dateNight'], 'middle', 9500, 'velvet'),
+  W('asoOkeCape', 'Aso-Oke Cape Blouse', 'top', 'Native Tops', true, ['owambe', 'wedding'], 'rich', 18500, 'asoOke'),
+  W('georgeBlouse', 'George Embellished Blouse', 'top', 'Native Tops', true, ['owambe', 'wedding'], 'rich', 24000, 'george'),
+  W('tulleMidi', 'Tulle Midi Skirt', 'bottom', 'Skirts', false, ['birthday', 'brunch', 'party'], 'middle', 5800, 'chiffon'),
+  W('sculptedJumpsuit', 'Sculpted Evening Jumpsuit', 'dress', 'Jumpsuits', false, ['redCarpet', 'party', 'dateNight'], 'rich', 18500, 'satin'),
   // ---- women's tops ----
   W('camisole', 'Camisole', 'top', 'Tops', false, ['dateNight', 'office', 'brunch'], 'middle', 2000, 'satin'),
   W('cropTop', 'Crop Top', 'top', 'Tops', false, ['casual', 'birthday', 'party'], 'poor', 1500, 'plain'),
