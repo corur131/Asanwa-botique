@@ -620,7 +620,7 @@ export default function GameApp({ onLab, initial, storageKey, cloud, notice }: {
                 const result = E.settle(c, score, price, cost.consumables, {
                   hasPOS: s.furniture.some((p) => p.placed && p.id === 'posTerminal'),
                   hasAlterations: s.furniture.some((p) => p.placed && p.id === 'alterationsCorner'),
-                  fitted: c.wants.some((w) => w.kind === 'fitted'),
+                  fitted: c.wants.some((w) => w.kind === 'fitted') && Object.values(step.choice).some((uid) => typeof uid === 'string' && s.stock.some((d) => d.uid === uid && ['bodyconMini', 'mermaidGown', 'tubeMidi', 'corsetGown', 'offShoulderGown', 'slitGown', 'pencilSkirt', 'skinnyJeans', 'corsetTop', 'tubeTop', 'jumpsuit', 'slipDress', 'laceGown', 'capeGown'].includes(d.itemId))),
                 });
                 setStep({ kind: 'reveal', c, choice: step.choice, stockBefore: s.stock, score, st: result });
                 done(c.id);
