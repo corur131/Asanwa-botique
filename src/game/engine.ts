@@ -118,6 +118,7 @@ export function newGame(divine: CharacterConfig): GameState {
     stats: { served: 0, totalEarned: 0, demotions: 0, bestScore: 0 },
     seed: Math.floor(Math.random() * 1e9),
   };
+  s = { ...s, weather: weatherForDay(s.day, s.seed) };
   s = money(s, -spent, 'Starter stock from Yaba market');
   s = msg(s, 'Deborah', `Sis! The kiosk is ready. I helped you stock it with ${naira(spent)} of clothes from Yaba market. You have ${naira(s.cash)} left. Rent is ${naira(TIERS[0].rent)} every 7 days. The place is small and rough, but we'll fix it up as the money comes.`, 'good');
   s = msg(s, 'Deborah', `The shop opens 8am to 8pm. Customers come in all day, busiest at lunch and after work. If you're slow, they get tired of waiting and leave, so move fast! Some only want hair or makeup, no clothes.`, 'info');
@@ -623,7 +624,7 @@ export function closeShop(s0: GameState): GameState {
 }
 
 export function nextMorning(s: GameState): GameState {
-  return planDrop({ ...s, day: s.day + 1, phase: 'morning', ...freshDay, busy: null, energy: ENERGY.max, today: emptyLog(s.day + 1) });
+  return planDrop({ ...s, day: s.day + 1, weather: weatherForDay(s.day + 1, s.seed), phase: 'morning', ...freshDay, busy: null, energy: ENERGY.max, today: emptyLog(s.day + 1) });
 }
 
 /** A reply picked in WhatsApp. */
