@@ -264,7 +264,8 @@ function shopIncidentStep(s0: GameState, minutes: number): GameState {
   let s = s0;
   const has = (id: string) => s.furniture.some((p) => p.placed && p.id === id);
   const crowded = s.inShop.length >= 3 && (!!s.serving || !!s.busy);
-  if (crowded && !has('cctv') && chance(1 - Math.pow(1 - 0.00016, minutes))) {
+  const theftRisk = s.staff.length ? 0.00008 : 0.00016;
+  if (crowded && !has('cctv') && chance(1 - Math.pow(1 - theftRisk, minutes))) {
     const available = s.stock.filter((d) => d.pieces > 0);
     if (available.length) {
       const stolen = available[Math.floor(Math.random() * available.length)];
