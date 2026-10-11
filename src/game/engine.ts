@@ -308,7 +308,8 @@ function shopIncidentStep(s0: GameState, minutes: number): GameState {
  * staff, and at 8pm the doors shut.
  */
 export function tick(s0: GameState, minutes: number): GameState {
-  if (s0.phase !== 'shop') return s0;
+  // Errands keep progressing while the boutique is closed too; the shop clock itself remains paused.
+  if (s0.phase !== 'shop') return securityStep(s0, minutes);
   let s = s0;
   const end = Math.min(SHOP_MINUTES, s.clock + minutes);
   const st = stats(s);
