@@ -302,6 +302,9 @@ export default function GameApp({ onLab, initial, storageKey, cloud, notice }: {
             </div>
           </div>
         </div>
+        {s.weather && <div className="text-xs text-sky-200" title="Lagos weather affects walk-ins, comfort and energy">
+          {s.weather === 'sunny' ? '☀️ Sunny · hot' : s.weather === 'rainy' ? '🌧️ Rainy · fewer walk-ins' : s.weather === 'harmattan' ? '🌫️ Harmattan · dusty' : '☁️ Cloudy · mild'}
+        </div>}
         <div className={`text-lg font-bold ${s.cash < 0 ? 'text-rose-300' : 'text-emerald-300'}`}>{naira(s.cash)}</div>
         <div className="w-32">
           <Bar label="Reputation" value={s.rep} max={100} tone={s.rep > 60 ? 'bg-emerald-400' : s.rep > 30 ? 'bg-amber-400' : 'bg-rose-400'} />
@@ -614,7 +617,11 @@ export default function GameApp({ onLab, initial, storageKey, cloud, notice }: {
                 const c = step.c;
                 const score = E.scoreInShop(s, c, step.choice);
                 const cost = lookCost(c, step.choice, s.stock);
-                const result = E.settle(c, score, price, cost.consumables);
+                const result = E.settle(c, score, price, cost.consumables, {
+                  hasPOS: s.furniture.some((p) => p.placed && p.id === 'posTerminal'),
+                  hasAlterations: s.furniture.some((p) => p.placed && p.id === 'alterationsCorner'),
+                  fitted: c.wants.some((w) => w.kind === 'fitted'),
+                });
                 setStep({ kind: 'reveal', c, choice: step.choice, stockBefore: s.stock, score, st: result });
                 done(c.id);
                 up((g) => E.applyLook(g, c, step.choice, result, score));
