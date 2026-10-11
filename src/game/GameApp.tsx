@@ -16,7 +16,7 @@ import { AppId, Phone } from './ui/Phone';
 import { furnitureById, turn, Rot } from './shop';
 import type { CloudSession } from '../cloud/AuthGate';
 import { AdminPanel } from '../cloud/AdminPanel';
-import { armSound, pop, setGenSound, useSound } from './sound';
+import { armSound, playNepaReturn, pop, setGenSound, useSound } from './sound';
 import { ActionMenu, Catalogue, EnergyBar, SoundSettings, ViewPicker } from './ui/Build';
 import type { View } from './scene/ShopScene';
 import type { Pose } from './types';
@@ -154,6 +154,7 @@ export default function GameApp({ onLab, initial, storageKey, cloud, notice }: {
     const fresh = (s.shouts || []).filter((x) => x.id > seenShout.current);
     if (!fresh.length) return;
     seenShout.current = s.shoutSeq;
+    if (fresh.some((x) => x.who === 'NEPA' && x.text.includes('Light is back'))) playNepaReturn();
     if (fresh.some((x) => x.tone !== 'good')) pop();
     setBubbles((b) => [...b, ...fresh].slice(-4));
     fresh.forEach((x) => window.setTimeout(() => setBubbles((b) => b.filter((y) => y.id !== x.id)), x.tone === 'nepa' ? 6000 : 4500));
