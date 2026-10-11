@@ -1,0 +1,53 @@
+rules_version = '2';
+
+// Who can read and write what. Paste this into Firebase console → Firestore → Rules → Publish
+// (or run `npx firebase deploy --only firestore:rules`).
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() { return request.auth != null; }
+    function isOwner(uid) { return signedIn() && request.auth.uid == uid; }
+    // Admins are listed by hand in the console: a document admins/<your player ID>.
+    // Nobody can make themselves an admin from the game.
+    function isAdmin() { return signedIn() && exists(/databases/$(database)/documents/admins/$(request.auth.uid)); }
+
+    match /admins/{uid} {
+      allow read: if isOwner(uid);
+      allow write: if false;
+    }
+
+    // One save per account. Only the owner writes it; the owner or an admin can read it.
+    match /saves/{uid} {
+      allow read: if isOwner(uid) || isAdmin();
+      allow create, update: if isOwner(uid)
+        && request.resource.data.keys().hasOnly(['data', 'meta', 'updatedAt'])
+        && request.resource.data.data is string
+        && request.resource.data.data.size() < 900000
+        && request.resource.data.meta is map;
+      allow delete: if false;
+
+      // Money sent by an admin. Only admins create them; the player's game can only mark them applied.
+      match /grants/{gid} {
+        allow read: if isOwner(uid) || isAdmin();
+        allow create: if isAdmin()
+          && request.resource.data.keys().hasOnly(['kind', 'amount', 'reason', 'by', 'applied', 'at'])
+          && request.resource.data.kind in ['add', 'set']
+          && request.resource.data.amount is number
+          && request.resource.data.amount > -100000000000 && request.resource.data.amount < 100000000000
+          && request.resource.data.applied == false
+          && request.resource.data.reason is string && request.resource.data.reason.size() <= 80;
+        allow update: if isOwner(uid)
+          && resource.data.applied == false
+          && request.resource.data.applied == true
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['applied', 'appliedAt']);
+        allow delete: if false;
+      }
+    }
+
+    // A record of every admin money change. Admins can add to it, nobody can edit or remove it.
+    match /adminLog/{id} {
+      allow read, create: if isAdmin();
+      allow update, delete: if false;
+    }
+  }
+}

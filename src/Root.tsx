@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import App from './App';
-import GameApp from './game/GameApp';
+import AuthGate from './cloud/AuthGate';
 import { SharedDefs } from './components/SharedDefs';
 
 /** The game is the main screen; the Character Lab (the old builder) is one click away. */
@@ -22,7 +22,7 @@ export default function Root() {
   return (
     <>
       <SharedDefs />
-      <GameApp onLab={() => go('lab')} />
+      <AuthGate onLab={() => go('lab')} />
     </>
   );
 }

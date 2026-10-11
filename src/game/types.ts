@@ -355,6 +355,10 @@ export interface GameState {
   celebDay?: number;
   /** Times Divine has looked around Tolani's shop (Deborah notices). */
   spying: number;
+  /** When this copy was saved (ms), to tell which copy is newest. */
+  savedAt?: number;
+  /** Admin money grants already applied. */
+  appliedGrants?: string[];
   today: DayLog;
   history: DayLog[];
   messages: Message[];

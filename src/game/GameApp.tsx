@@ -13,6 +13,8 @@ import { PriceModal, Reveal } from './ui/Checkout';
 import { FurniturePanel, RailPanel, Stars, StaffActions } from './ui/Panels';
 import { AppId, Phone } from './ui/Phone';
 import { furnitureById } from './shop';
+import type { CloudSession } from '../cloud/AuthGate';
+import { AdminPanel } from '../cloud/AdminPanel';
 import { armSound, pop, useSound } from './sound';
 
 const ShopScene = lazy(() => import('./scene/ShopScene'));
@@ -25,8 +27,10 @@ type Panel = null | 'rail' | 'furniture';
 
 const CLS_DOT = { poor: 'bg-slate-400', middle: 'bg-sky-400', rich: 'bg-amber-400' } as const;
 
-export default function GameApp({ onLab }: { onLab: () => void }) {
-  const [s, setS] = useState<GameState | null>(() => E.load());
+export default function GameApp({ onLab, initial, storageKey, cloud, notice }: { onLab: () => void; initial?: GameState | null; storageKey?: string; cloud?: CloudSession; notice?: string }) {
+  const [s, setS] = useState<GameState | null>(() => (initial !== undefined ? initial : E.load(storageKey)));
+  const [syncState, setSyncState] = useState<'saved' | 'saving' | 'offline'>('saved');
+  const [admin, setAdmin] = useState(false);
   const [panel, setPanel] = useState<Panel>(null);
   const [styling, setStyling] = useState(false);
   const [step, setStep] = useState<Step>({ kind: 'style' });
@@ -63,9 +67,38 @@ export default function GameApp({ onLab }: { onLab: () => void }) {
   }, [placing, selected]);
   const fileRef = useRef<HTMLInputElement>(null);
 
+  // every change is saved on this device; signed-in players are also saved to their account
   useEffect(() => {
-    if (s) E.save(s);
-  }, [s]);
+    if (!s) return;
+    const stamped = E.save(s, storageKey);
+    cloud?.sync.push(stamped);
+  }, [s]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (!cloud) return;
+    cloud.sync.onStatus = setSyncState;
+    return () => {
+      cloud.sync.onStatus = undefined;
+    };
+  }, [cloud]);
+  // money sent by an admin: applied once, then marked as done on the server
+  const grantQueue = useRef<{ id: string; kind: 'add' | 'set'; amount: number; reason: string }[]>([]);
+  useEffect(() => {
+    if (!cloud) return;
+    return cloud.store.onGrants(cloud.user.uid, (list) => {
+      grantQueue.current = list;
+      setS((g) => {
+        if (!g) return g;
+        let next = g;
+        for (const x of list) next = E.adminGrant(next, x);
+        return next;
+      });
+    });
+  }, [cloud]);
+  useEffect(() => {
+    if (!cloud || !s) return;
+    for (const x of grantQueue.current) if ((s.appliedGrants || []).includes(x.id)) cloud.store.markApplied(cloud.user.uid, x.id).catch(() => undefined);
+    grantQueue.current = grantQueue.current.filter((x) => !(s.appliedGrants || []).includes(x.id));
+  }, [s?.appliedGrants?.length]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // the clock only runs while the tab is visible
   useEffect(() => {
@@ -538,9 +571,24 @@ export default function GameApp({ onLab }: { onLab: () => void }) {
         </Modal>
       )}
 
+      {admin && cloud && <AdminPanel store={cloud.store} me={cloud.user} onClose={() => setAdmin(false)} />}
+      {notice && <div className="fixed bottom-2 left-1/2 -translate-x-1/2 z-[70] rounded-lg bg-amber-900/90 text-amber-100 text-xs px-3 py-1.5 pointer-events-none">{notice}</div>}
+
       {menu && (
         <Modal onClose={() => setMenu(false)}>
           <h2 className="font-serif text-xl font-bold text-white mb-3">Menu</h2>
+          {cloud && (
+            <div className="rounded-lg border border-white/10 bg-white/5 p-2.5 mb-3 text-sm">
+              <div className="text-white font-semibold">{cloud.user.name}</div>
+              <div className="text-[11px] text-slate-400">{cloud.user.email}</div>
+              <div className={`text-[11px] mt-1 ${syncState === 'offline' ? 'text-amber-300' : 'text-emerald-300'}`}>{syncState === 'saved' ? '✓ Saved to your account' : syncState === 'saving' ? 'Saving to your account…' : 'Offline: saved on this device, will sync when back online'}</div>
+              <div className="flex gap-2 mt-2">
+                {cloud.isAdmin && <Btn size="sm" tone="gold" onClick={() => { setMenu(false); setAdmin(true); }}>Admin</Btn>}
+                <Btn size="sm" onClick={() => { setMenu(false); cloud.signOut(); }}>Sign out</Btn>
+              </div>
+              <div className="text-[10px] text-slate-600 mt-1.5 select-all">Player ID: {cloud.user.uid}</div>
+            </div>
+          )}
           <div className="space-y-2">
             <Btn className="w-full" onClick={() => E.exportSave(s)}>Download a backup of this save</Btn>
             <Btn className="w-full" onClick={() => fileRef.current?.click()}>Restore from a backup file</Btn>
@@ -558,7 +606,7 @@ export default function GameApp({ onLab }: { onLab: () => void }) {
               <p className="text-rose-200 mb-2">This deletes the current game on this device. Download a backup first if you want to keep it.</p>
               <div className="flex gap-2">
                 <Btn size="sm" onClick={() => setConfirmNew(false)}>Cancel</Btn>
-                <Btn size="sm" tone="danger" onClick={() => { E.clearSave(); setS(null); setMenu(false); setConfirmNew(false); setCart([]); }}>Delete and start over</Btn>
+                <Btn size="sm" tone="danger" onClick={() => { E.clearSave(storageKey); setS(null); setMenu(false); setConfirmNew(false); setCart([]); }}>Delete and start over</Btn>
               </div>
             </div>
           )}

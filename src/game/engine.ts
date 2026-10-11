@@ -949,16 +949,23 @@ function migrate(raw: GameState): GameState | null {
     read: Object.fromEntries(messages.map((m) => [m.from, messages.length])),
   };
 }
-export function save(s: GameState) {
+/** The save on this device from before accounts existed. */
+export const LEGACY_KEY = KEY;
+/** Each signed-in account keeps its own copy on the device too. */
+export const keyFor = (uid?: string | null) => (uid ? `${KEY}:${uid}` : KEY);
+
+export function save(s: GameState, key = KEY): GameState {
+  const stamped = { ...s, savedAt: Date.now() };
   try {
-    localStorage.setItem(KEY, JSON.stringify(s));
+    localStorage.setItem(key, JSON.stringify(stamped));
   } catch {
-    /* storage can be full or blocked; the backup button still works */
+    /* storage can be full or blocked; the backup button and the cloud still work */
   }
+  return stamped;
 }
-export function load(): GameState | null {
+export function load(key = KEY): GameState | null {
   try {
-    const raw = localStorage.getItem(KEY);
+    const raw = localStorage.getItem(key);
     if (!raw) return null;
     const s = JSON.parse(raw) as GameState;
     return migrate(s);
@@ -966,12 +973,27 @@ export function load(): GameState | null {
     return null;
   }
 }
-export function clearSave() {
+export function clearSave(key = KEY) {
   try {
-    localStorage.removeItem(KEY);
+    localStorage.removeItem(key);
   } catch {
     /* ignore */
   }
+}
+/** A save brought in from elsewhere (the cloud, a backup): checked and upgraded. */
+export function fromData(raw: unknown): GameState | null {
+  const s = raw as GameState;
+  if (!s || typeof s.day !== 'number' || !Array.isArray(s.stock)) return null;
+  return migrate(s);
+}
+
+/** Money sent by an admin. Applied once, shown in the bank and as a message. */
+export function adminGrant(s: GameState, g: { id: string; kind: 'add' | 'set'; amount: number; reason: string }): GameState {
+  if ((s.appliedGrants || []).includes(g.id)) return s;
+  const delta = Math.round(g.kind === 'set' ? g.amount - s.cash : g.amount);
+  let next: GameState = { ...s, appliedGrants: [...(s.appliedGrants || []), g.id].slice(-100) };
+  if (delta) next = money(next, delta, g.reason ? `Admin: ${g.reason}` : delta > 0 ? 'Admin top-up' : 'Admin deduction');
+  return msg(next, 'Asanwa HQ', delta >= 0 ? `${naira(delta)} has been added to your account.${g.reason ? ` Note: ${g.reason}` : ''}` : `${naira(-delta)} has been taken from your account.${g.reason ? ` Note: ${g.reason}` : ''}`, delta >= 0 ? 'good' : 'warn');
 }
 export function exportSave(s: GameState) {
   const blob = new Blob([JSON.stringify(s)], { type: 'application/json' });
