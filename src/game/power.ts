@@ -45,9 +45,27 @@ export function scarcity(s: Pick<GameState, 'seed' | 'day'>): boolean {
   return x - Math.floor(x) < 0.18;
 }
 
-export const tankSize = (s: GameState) => { const g = liveStats(s).gen; return g ? POWER.tank[g] : 0; };
-/** Litres in the tank (old saves start full). */
-export const fuelOf = (s: GameState) => Math.min(tankSize(s), s.power?.fuel ?? tankSize(s));
+/** UID of the generator used by the shop's existing on/off switch: the largest installed generator. */
+export const activeGeneratorUid = (s: GameState) => s.furniture
+  .filter((p) => p.placed && !!furnitureById(p.id).gen)
+  .sort((a, b) => Number(furnitureById(b.id).gen === 'big') - Number(furnitureById(a.id).gen === 'big'))[0]?.uid;
+
+/** Tank size can be queried for one generator, or for the active generator. */
+export const tankSize = (s: GameState, uid?: string) => {
+  const piece = uid ? s.furniture.find((p) => p.uid === uid && p.placed) : undefined;
+  const g = piece ? furnitureById(piece.id).gen : liveStats(s).gen;
+  return g ? POWER.tank[g] : 0;
+};
+/** Litres in a particular tank. Old saves use power.fuel for their active generator. */
+export const fuelOf = (s: GameState, uid?: string) => {
+  const target = uid || activeGeneratorUid(s);
+  const cap = tankSize(s, target);
+  if (!cap) return 0;
+  const stored = target ? s.power?.generatorFuel?.[target] : undefined;
+  if (stored !== undefined) return Math.min(cap, Math.max(0, stored));
+  if (!uid || target === activeGeneratorUid(s)) return Math.min(cap, Math.max(0, s.power?.fuel ?? cap));
+  return 0;
+};
 
 /** Electricity the shop pulls right now, in kW, if it is on NEPA. */
 export function loadKw(s: GameState): number {
@@ -154,7 +172,8 @@ export function powerStep(s0: GameState, from: number, to: number): GameState {
   const minutes = to - from;
   const wasOff = !!outageAt(s, from);
   const isOff = !!outageAt(s, to);
-  const power = { gen: !!s.power?.gen, solar: s.power?.solar || 0, fuel: fuelOf(s), fanBattery: s.power?.fanBattery || 0 };
+  const activeUid = activeGeneratorUid(s);
+  const power = { gen: !!s.power?.gen, solar: s.power?.solar || 0, fuel: fuelOf(s), generatorFuel: { ...(s.power?.generatorFuel || {}) }, fanBattery: s.power?.fanBattery || 0 };
   const cap = st.solarPanels * POWER.minutesPerPanel;
 
   if (!wasOff && isOff) {
@@ -172,6 +191,7 @@ export function powerStep(s0: GameState, from: number, to: number): GameState {
     s = { ...s, today: { ...s.today, outageMinutes: (s.today.outageMinutes || 0) + minutes } };
     if (power.gen && st.gen) {
       power.fuel = Math.max(0, power.fuel - (POWER.burn[st.gen] * minutes) / 60);
+      if (activeUid) power.generatorFuel[activeUid] = power.fuel;
       if (power.fuel <= 0) {
         power.gen = false;
         s = addShout(s, 'Generator', 'Gen don off! Fuel finish 😩', 'warn');
@@ -217,16 +237,17 @@ export function setGen(s: GameState, on: boolean): GameState {
   const st = liveStats(s);
   if (on && (!st.gen || !nepaOff(s))) return s;
   if (on && fuelOf(s) <= 0) return addShout(s, 'Generator', 'No fuel in the tank. Refuel the gen first.', 'warn');
-  let next: GameState = { ...s, power: { ...s.power, gen: on, fuel: fuelOf(s) } };
+  let next: GameState = { ...s, power: { ...s.power, gen: on, fuel: fuelOf(s), generatorFuel: { ...(s.power?.generatorFuel || {}), ...(activeGeneratorUid(s) ? { [activeGeneratorUid(s)!]: fuelOf(s) } : {}) } } };
   if (on) next = addShout(next, 'Generator', st.gen === 'small' ? 'Brrrrrm! The generator is on: lights and fans running.' : 'The generator is on: everything is running.', 'good');
   return next;
 }
 
-/** Pour petrol into the generator. 'full' fills the tank. Pays this week's price. */
-export function refuel(s: GameState, litres: number | 'full'): GameState {
-  const cap = tankSize(s);
-  if (!cap) return s;
-  const have = fuelOf(s);
+/** Pour purchased petrol into one generator (or the active one). */
+export function refuel(s: GameState, litres: number | 'full', uid?: string): GameState {
+  const target = uid || activeGeneratorUid(s);
+  const cap = tankSize(s, target);
+  if (!cap || !target) return s;
+  const have = fuelOf(s, target);
   const price = fuelPrice(s);
   let l = Math.min(cap - have, litres === 'full' ? cap : litres);
   l = Math.min(l, Math.floor(Math.max(0, s.cash) / price));
@@ -234,12 +255,30 @@ export function refuel(s: GameState, litres: number | 'full'): GameState {
   if (l <= 0) return s;
   const cost = Math.round(l * price);
   const line = { day: s.day, t: s.phase === 'shop' ? Math.floor(s.clock) : -1, label: `Fuel: ${l} L at ${naira(price)}`, amount: -cost };
+  const total = have + l;
+  const primary = target === activeGeneratorUid(s);
   const next: GameState = {
     ...s,
     cash: s.cash - cost,
     ledger: [line, ...(s.ledger || [])].slice(0, 150),
-    power: { ...s.power, fuel: have + l },
+    power: { ...s.power, fuel: primary ? total : s.power.fuel, generatorFuel: { ...(s.power?.generatorFuel || {}), [target]: total } },
     today: { ...s.today, fuel: (s.today.fuel || 0) + cost, litres: (s.today.litres || 0) + l, costs: s.today.costs + cost },
   };
-  return addShout(next, 'Generator', `Poured ${l} litres. Tank: ${Math.round(have + l)} of ${cap} L.`, 'good');
+  return addShout(next, 'Generator', `Poured ${l} litres into the selected generator. Tank: ${Math.round(total * 10) / 10} of ${cap} L.`, 'good');
+}
+
+/** Pour fuel from an already-paid physical gallon without charging twice. */
+export function pourFuel(s: GameState, litres: number, uid: string): { s: GameState; used: number; remaining: number } {
+  const cap = tankSize(s, uid);
+  if (!cap) return { s, used: 0, remaining: Math.max(0, litres) };
+  const have = fuelOf(s, uid);
+  const used = Math.floor(Math.min(Math.max(0, cap - have), Math.max(0, litres)) * 10) / 10;
+  if (used <= 0) return { s, used: 0, remaining: Math.max(0, litres) };
+  const total = have + used;
+  const primary = uid === activeGeneratorUid(s);
+  const next: GameState = {
+    ...s,
+    power: { ...s.power, fuel: primary ? total : s.power.fuel, generatorFuel: { ...(s.power?.generatorFuel || {}), [uid]: total } },
+  };
+  return { s: addShout(next, 'Generator', `Poured ${used} L into the generator. Tank: ${Math.round(total * 10) / 10} of ${cap} L.`, 'good'), used, remaining: Math.max(0, Math.round((litres - used) * 10) / 10) };
 }
