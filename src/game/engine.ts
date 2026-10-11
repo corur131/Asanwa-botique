@@ -398,8 +398,7 @@ export function tick(s0: GameState, minutes: number): GameState {
       // Dispatch the oldest eligible customer as soon as an employee is free; explicit requests go first.
       const next = waiting(s)
         .filter((v) => staffCanServeCustomer(m, v.c) && staffChoice(s, v.c) !== null)
-        .sort((a, b) => Number(!!b.forStaff) - Number(!!a.forStaff) || a.arrived - b.arrived)
-        .find((v) => v.forStaff || end - v.arrived >= 0);
+        .sort((a, b) => Number(!!b.forStaff) - Number(!!a.forStaff) || a.arrived - b.arrived)[0];
       if (next && end < SHOP_MINUTES) s = { ...s, inShop: s.inShop.map((v) => (v.c.id === next.c.id ? { ...v, by: m.id, until: end + staffMinutes(m.level) } : v)) };
     }
   }
