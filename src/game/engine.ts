@@ -456,7 +456,7 @@ export function settle(c: Customer, score: ScoreBreakdown, price: number, suppli
       line = `For this? ${naira(paid)}, take it or leave it.`;
     }
   }
-  if (s < 50) {
+  if (s < 50 && !c.celebrity) {
     if (chance(0.4)) return { price, paid: 0, tip: 0, cost: 0, outcome: 'refused', line: pick(REACTIONS.cry) + ' Take it back, I\'m not paying.', reaction: 'cry', repDelta: -1.5 * (c.influencer ? 3 : 1), becameRegular: false };
     paid *= 0.7;
     outcome = 'bargained';
