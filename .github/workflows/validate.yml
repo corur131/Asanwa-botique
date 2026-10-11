@@ -1,4 +1,5 @@
 name: Validate game
+# No lockfile is committed, so setup-node cache is intentionally disabled.
 
 on:
   push:
