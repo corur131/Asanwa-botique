@@ -50,6 +50,8 @@ export default function GameApp({ onLab, initial, storageKey, cloud, notice }: {
   const [trying, setTrying] = useState<{ id: string; x: number; z: number; rot: Rot } | null>(null);
   const [view, setView] = useState<View>('angle');
   const [menuFor, setMenuFor] = useState<string | null>(null);
+  /** Last floor tile chosen by the player; the scene keeps Divine there until another destination is chosen. */
+  const [manualTarget, setManualTarget] = useState<[number, number] | null>(null);
   const [localAct, setLocalAct] = useState<{ uid: string; pose: Pose } | null>(null);
   const [phone, setPhone] = useState(false);
   const [phoneApp, setPhoneApp] = useState<AppId>('home');
@@ -179,7 +181,7 @@ export default function GameApp({ onLab, initial, storageKey, cloud, notice }: {
     }
   }, [s?.phase]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  if (!s) return <NewGame onStart={(cfg) => { const g = E.newGame(cfg); seenMsg.current = g.msgSeq; setS(g); }} onLab={onLab} />;
+  if (!s) return <NewGame onStart={(cfg) => { const g = E.newGame(cfg); seenMsg.current = g.msgSeq; setManualTarget(null); setS(g); }} onLab={onLab} />;
 
   const up = (f: (g: GameState) => GameState) => setS((g) => (g ? f(g) : g));
   const t = TIERS[s.tier];
@@ -341,6 +343,8 @@ export default function GameApp({ onLab, initial, storageKey, cloud, notice }: {
             build={build}
             view={view}
             act={build ? null : act}
+            manualTarget={manualTarget}
+            onMoveTo={(x, z) => { setManualTarget([x, z]); setMenuFor(null); }}
             reflections={sound.reflections}
             onHover={(x, z) => (trying ? setTrying({ ...trying, x, z }) : placing && setPlacing({ ...placing, x, z }))}
             onSelect={(uid) => { if (!placing && !trying) setSelected(uid); }}
