@@ -477,10 +477,12 @@ const RivalPage: React.FC<{ s: GameState; r: Rival; back: () => void; onVisit: (
 
 const Top20: React.FC<{ s: GameState; open: (id: string) => void }> = ({ s, open }) => {
   const rows = ladder(s);
-  const last = (s.ranking || []).slice(-1)[0];
+  const recentDays = (s.dailyRanking || []).slice(-2);
+  // Compare against the prior in-game day so overtaking is visible before Sunday's official list.
+  const last = recentDays.length > 1 ? recentDays[0] : (s.ranking || []).slice(-1)[0];
   return (
     <AppFrame title="Top 20 Boutiques" sub={`Lagos · live now · next list on day ${s.day + ((7 - (s.day % 7)) % 7 || 7)}`} tone="bg-gradient-to-r from-amber-600 to-yellow-700">
-      <div className="px-3 py-2 text-[11px] text-slate-400">Ranked on this week's takings, reputation, followers and shop size.</div>
+      <div className="px-3 py-2 text-[11px] text-slate-400">Recent takings, reputation, followers and shop size decide the race. ▲/▼ shows movement since the previous in-game day; the official list is published weekly.</div>
       <div className="divide-y divide-white/5">
         {rows.map((r, i) => {
           const before = last ? last.order.indexOf(r.id) + 1 : 0;
