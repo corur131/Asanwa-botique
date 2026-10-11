@@ -3,7 +3,7 @@ import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { OrbitControls } from '@react-three/drei';
 import * as THREE from 'three';
 import { GameState, Pose } from '../types';
-import { RoomStyle, finishes, room, cellsBlocked, footprint, furnitureById, wallLayout, Placed, canPlace, yardCapacity } from '../shop';
+import { RoomStyle, finishes, room, cellsBlocked, footprint, furnitureById, wallLayout, Placed, canPlace, yardCapacity, Rot, rotAngle } from '../shop';
 import { solarCap, source } from '../power';
 import { stats } from '../engine';
 import { CeilingPiece, FloorPiece, WallPiece, B, MirrorLive } from './Furniture3D';
@@ -12,7 +12,7 @@ import { Cell, FigureLook, Walker, lookToFigure } from './People';
 export interface SceneProps {
   s: GameState;
   /** A floor piece in Divine's hands in build mode: where it would go. */
-  placing: { uid: string; rot: 0 | 1; x: number; z: number } | null;
+  placing: { uid: string; rot: Rot; x: number; z: number } | null;
   /** Build mode: grid on, taps select pieces to move. */
   build?: boolean;
   view?: View;
@@ -229,7 +229,7 @@ export function actionSpot(s: GameState, uid: string): { cell: Cell; face: numbe
     const seatCells: Cell[] = [];
     for (let x = p.x; x < p.x + w; x++) for (let z = p.z; z < p.z + d; z++) seatCells.push([x, z]);
     const seat = seatCells.find(touching);
-    if (seat) return { cell: seat, face: p.rot ? -Math.PI / 2 : 0, onIt: true };
+    if (seat) return { cell: seat, face: rotAngle(p.rot), onIt: true };
   }
   const ring: Cell[] = [];
   for (let x = p.x; x < p.x + w; x++) ring.push([x, p.z + d]);
@@ -385,7 +385,7 @@ function Furniture({ s, selected, placing, onTap, dark, reflections }: Pick<Scen
         }
         const { w, d } = footprint(p);
         return (
-          <group key={p.uid} position={[p.x + w / 2, 0, p.z + d / 2]} rotation={[0, p.rot ? -Math.PI / 2 : 0, 0]} onClick={click} {...hover}>
+          <group key={p.uid} position={[p.x + w / 2, 0, p.z + d / 2]} rotation={[0, rotAngle(p.rot), 0]} onClick={click} {...hover}>
             <MirrorLive.Provider value={live.has(p.uid)}>
               <FloorPiece id={p.id} colors={colors} />
             </MirrorLive.Provider>
@@ -412,7 +412,7 @@ function PlacingGhost({ s, placing }: { s: GameState; placing: NonNullable<Scene
   const { w, d } = footprint(cand);
   return (
     <group position={[placing.x + w / 2, 0, placing.z + d / 2]}>
-      <group rotation={[0, placing.rot ? -Math.PI / 2 : 0, 0]}>
+      <group rotation={[0, rotAngle(placing.rot), 0]}>
         <FloorPiece id={p.id} colors={[]} />
       </group>
       <B p={[0, 0.03, 0]} s={[w - 0.04, 0.04, d - 0.04]} c={ok ? '#22C55E' : '#EF4444'} o={0.45} e={ok ? '#22C55E' : '#EF4444'} ei={0.5} />

@@ -13,7 +13,7 @@ import { Styling } from './ui/Styling';
 import { PriceModal, Reveal } from './ui/Checkout';
 import { FurniturePanel, RailPanel, Stars, StaffActions } from './ui/Panels';
 import { AppId, Phone } from './ui/Phone';
-import { furnitureById } from './shop';
+import { furnitureById, turn, Rot } from './shop';
 import type { CloudSession } from '../cloud/AuthGate';
 import { AdminPanel } from '../cloud/AdminPanel';
 import { armSound, pop, setGenSound, useSound } from './sound';
@@ -44,7 +44,7 @@ export default function GameApp({ onLab, initial, storageKey, cloud, notice }: {
   const [confirmNew, setConfirmNew] = useState(false);
   const [selected, setSelected] = useState<string | null>(null);
   /** A floor piece in Divine's hands (build mode); `fresh` when just bought or taken out of storage. */
-  const [placing, setPlacing] = useState<{ uid: string; rot: 0 | 1; x: number; z: number; fresh?: boolean } | null>(null);
+  const [placing, setPlacing] = useState<{ uid: string; rot: Rot; x: number; z: number; fresh?: boolean } | null>(null);
   const [build, setBuild] = useState(false);
   const [view, setView] = useState<View>('angle');
   const [menuFor, setMenuFor] = useState<string | null>(null);
@@ -70,7 +70,7 @@ export default function GameApp({ onLab, initial, storageKey, cloud, notice }: {
     const on = (e: KeyboardEvent) => {
       if (e.key !== 'r' && e.key !== 'R') return;
       if ((e.target as HTMLElement)?.tagName === 'INPUT') return;
-      if (placing) setPlacing({ ...placing, rot: placing.rot ? 0 : 1 });
+      if (placing) setPlacing({ ...placing, rot: turn(placing.rot) });
       else if (selected && build) setS((g) => (g && g.phase !== 'shop' ? E.rotateFurniture(g, selected) : g));
     };
     window.addEventListener('keydown', on);
@@ -377,7 +377,7 @@ export default function GameApp({ onLab, initial, storageKey, cloud, notice }: {
               return (
                 <div className="absolute top-14 left-1/2 -translate-x-1/2 z-20 rounded-xl border border-amber-500/50 bg-[#12141c]/95 p-2 flex flex-wrap items-center justify-center gap-2 text-sm max-w-[94vw]">
                   <span className={`px-1 text-xs font-semibold ${ghostOk ? 'text-emerald-300' : 'text-rose-300'}`}>{f?.name}: {ghostOk ? 'fits here' : "can't go here"} · tap the floor to move it</span>
-                  <Btn size="sm" onClick={() => setPlacing({ ...placing, rot: placing.rot ? 0 : 1 })}>↻ Rotate</Btn>
+                  <Btn size="sm" onClick={() => setPlacing({ ...placing, rot: turn(placing.rot) })}>↻ Rotate</Btn>
                   <Btn size="sm" tone="green" disabled={!ghostOk} onClick={() => { up((g) => E.placeFurniture(g, placing.uid, placing.x, placing.z, placing.rot)); setPlacing(null); setSelected(null); }}>Place</Btn>
                   {placing.fresh ? (
                     <Btn size="sm" onClick={() => { up((g) => E.storeFurniture(g, placing.uid)); setPlacing(null); setSelected(null); }}>Put in storage</Btn>

@@ -8,7 +8,7 @@
  * Each rival's kit matches what they sell, richer shops are fuller, and the
  * whole shop is rearranged every few weeks.
  */
-import { FURNITURE, Listing, Placed, canPlace, ceilingCapacity, furnitureById, newUid, room } from './shop';
+import { FURNITURE, Rot, Listing, Placed, canPlace, ceilingCapacity, furnitureById, newUid, room } from './shop';
 import { Rival, Speciality } from './types';
 
 type Kit = {
@@ -65,7 +65,7 @@ export function zonedLayout(r: Rival, listing: Listing, day: number): Placed[] {
   const door = Math.floor(W / 2);
   const fill = Math.min(1, 0.55 + tier * 0.12); // richer shops are fuller
   const items: Placed[] = [];
-  const put = (id: string, x: number, z: number, rot: 0 | 1 = 0): boolean => {
+  const put = (id: string, x: number, z: number, rot: Rot = 0): boolean => {
     if (!ok(id)) return false;
     const p: Placed = { uid: newUid(), id, x, z, rot, placed: true };
     if (furnitureById(id).mount !== 'floor') { items.push(p); return true; }

@@ -284,13 +284,19 @@ export interface Placed {
   id: string;
   x: number;
   z: number;
-  rot: 0 | 1; // 1 = turned 90 degrees
+  /** Quarter turns: 0 = facing the shop front, 1 = 90°, 2 = 180°, 3 = 270°. */
+  rot: Rot;
   placed: boolean;
 }
 
+export type Rot = 0 | 1 | 2 | 3;
+/** The next quarter turn. */
+export const turn = (r: number): Rot => (((r || 0) + 1) % 4) as Rot;
+/** Y rotation in radians for a quarter turn. */
+export const rotAngle = (r: number) => -((r || 0) % 4) * (Math.PI / 2);
 export const footprint = (p: Pick<Placed, 'id' | 'rot'>) => {
   const f = furnitureById(p.id);
-  return p.rot ? { w: f.d, d: f.w } : { w: f.w, d: f.d };
+  return (p.rot || 0) % 2 ? { w: f.d, d: f.w } : { w: f.w, d: f.d };
 };
 
 /** Wall and ceiling items take a wall position, not floor cells. */

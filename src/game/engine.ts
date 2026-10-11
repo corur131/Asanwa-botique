@@ -12,7 +12,7 @@ import { buildLook, hairGroup, lookCost, scoreLook } from './scoring';
 import { FEMALE_HAIR, MAKEUP_LOOKS } from '../constants/catalog';
 import { colourName } from './colours';
 import { FURNITURE, KIOSK_LISTING, Listing, Placed, STARTER_FURNITURE, autoPlace,
-  findSpot, canPlace, ceilingCapacity, ceilingUsed, yardCapacity, yardUsed, cheapestListing, furnitureById, listingsFor, newUid, prestigeRichShift, prestigeTraffic, shopStats, usesFloor, wallCapacity, wallUsed } from './shop';
+  findSpot, canPlace, turn, Rot, ceilingCapacity, ceilingUsed, yardCapacity, yardUsed, cheapestListing, furnitureById, listingsFor, newUid, prestigeRichShift, prestigeTraffic, shopStats, usesFloor, wallCapacity, wallUsed } from './shop';
 import { Customer, DayLog, Departure, Design, ReplyChoice, GameState, LedgerLine, Message, Regular, ScoreBreakdown, Settlement, StaffMember, StyleChoice } from './types';
 
 const pick = <T,>(a: readonly T[]): T => a[Math.floor(Math.random() * a.length)];
@@ -639,7 +639,7 @@ export function buyFurniture(s: GameState, id: string): GameState {
 export function rotateFurniture(s: GameState, uid: string): GameState {
   const p = s.furniture.find((f) => f.uid === uid);
   if (!p || !p.placed || furnitureById(p.id).mount !== 'floor') return s;
-  const rot = (p.rot ? 0 : 1) as 0 | 1;
+  const rot = turn(p.rot);
   for (const [dx, dz] of [[0, 0], [-1, 0], [0, -1], [-1, -1], [1, 0], [0, 1]]) {
     const cand: Placed = { ...p, rot, x: p.x + dx, z: p.z + dz };
     if (canPlace(s.furniture, s.listing, cand)) return { ...s, furniture: s.furniture.map((f) => (f.uid === uid ? cand : f)) };
@@ -647,7 +647,7 @@ export function rotateFurniture(s: GameState, uid: string): GameState {
   return s;
 }
 
-export function placeFurniture(s: GameState, uid: string, x: number, z: number, rot: 0 | 1): GameState {
+export function placeFurniture(s: GameState, uid: string, x: number, z: number, rot: Rot): GameState {
   const p = s.furniture.find((f) => f.uid === uid);
   if (!p) return s;
   const cand: Placed = { ...p, x, z, rot, placed: true };
