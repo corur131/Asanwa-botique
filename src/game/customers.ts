@@ -75,6 +75,7 @@ function wantLine(w: Want, male: boolean): string {
     case 'hair': if (w.group === 'male') return 'Make the cut sharp.'; return { wig: 'Install a fine wig for me.', braids: 'Do braids for me.', natural: 'I want my natural hair, styled.', updo: 'Pack my hair up.', twists: 'I want twists.', locs: 'I want locs.' }[w.group] || 'Do something with my hair.';
     case 'glam': return pick(['Full glam, I want to slay.', 'Beat my face well well.']);
     case 'naturalFace': return pick(['Light makeup only.', "Soft makeup, I don't like heavy face."]);
+    case 'nails': return pick(['Please match my nails with the outfit.', 'Can you do my nails too?', 'I need a nail colour that goes with this look.']);
   }
 }
 
@@ -93,6 +94,7 @@ function wantsFor(occasion: Occasion, male: boolean, cls: CustomerClass, wigs: b
     if (['party', 'dateNight', 'birthday', 'redCarpet'].includes(occasion)) pool.push({ kind: 'fitted' }, { kind: 'glam' });
     if (['owambe', 'wedding'].includes(occasion)) pool.push({ kind: 'noHeels' }, { kind: 'glam' });
     if (['church', 'office', 'casual', 'brunch'].includes(occasion)) pool.push({ kind: 'naturalFace' });
+    if (['party', 'dateNight', 'birthday', 'redCarpet', 'owambe', 'wedding'].includes(occasion)) pool.push({ kind: 'nails' });
     pool.push({ kind: 'hair', group: pick(wigs ? ['wig', 'braids', 'natural', 'updo'] : ['braids', 'natural', 'updo', 'twists']) });
   }
   if (['office', 'dateNight', 'casual'].includes(occasion)) pool.push({ kind: 'jacket' });
@@ -187,6 +189,8 @@ export function makeCustomer(state: GameState, mix: [number, number, number]): C
     male,
     influencer: cls === 'rich' && chance(0.25),
     regularId: regular?.id,
+    paymentMethod: chance(0.28) ? 'transfer' as const : 'cash' as const,
+    fitIssue: !service && !male && chance(0.18),
   };
   return { ...base, request: buildRequest(base, regular) };
 }
