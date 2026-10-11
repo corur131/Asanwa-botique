@@ -47,7 +47,7 @@ export default function GameApp({ onLab, initial, storageKey, cloud, notice }: {
   const [placing, setPlacing] = useState<{ uid: string; rot: Rot; x: number; z: number; fresh?: boolean } | null>(null);
   const [build, setBuild] = useState(false);
   /** A catalogue piece you're trying before you buy it. */
-  const [trying, setTrying] = useState<{ id: string; x: number; z: number; rot: Rot } | null>(null);
+  const [trying, setTrying] = useState<{ id: string; x: number; z: number; rot: Rot; yardSide?: 'left' | 'right' } | null>(null);
   const [view, setView] = useState<View>('angle');
   const [menuFor, setMenuFor] = useState<string | null>(null);
   /** Last floor tile chosen by the player; the scene keeps Divine there until another destination is chosen. */
@@ -237,13 +237,13 @@ export default function GameApp({ onLab, initial, storageKey, cloud, notice }: {
     setPlacing(null);
     setSelected(null);
     const pv = E.withPreview(s, id);
-    setTrying({ id, x: pv.x, z: pv.z, rot: pv.rot });
+    setTrying({ id, x: pv.x, z: pv.z, rot: pv.rot, yardSide: 'right' });
   };
   const tryView = trying ? E.withPreview(s, trying.id, furnitureById(trying.id).mount === 'floor' ? trying : undefined) : null;
   const confirmBuy = () => {
     if (!trying || !tryView?.ok) return;
     const floor = furnitureById(trying.id).mount === 'floor';
-    up((g) => E.buyPreviewed(g, trying.id, floor ? trying : undefined));
+    up((g) => E.buyPreviewed(g, trying.id, floor ? trying : furnitureById(trying.id).mount === 'yard' ? { x: trying.yardSide === 'left' ? -1 : 1, z: trying.z, rot: trying.rot } : undefined));
     setTrying(null);
   };
   const install = (uid: string) => {
@@ -411,9 +411,10 @@ export default function GameApp({ onLab, initial, storageKey, cloud, notice }: {
                 <div className="absolute top-14 left-1/2 -translate-x-1/2 z-20 rounded-xl border border-amber-500/50 bg-[#12141c]/95 p-2 flex flex-wrap items-center justify-center gap-2 text-sm max-w-[94vw]">
                   <span className="px-1 leading-tight">
                     <span className="block text-white font-semibold text-xs">{f.name} · {naira(f.price)}</span>
-                    <span className={`block text-[11px] ${tryView.ok ? 'text-emerald-300' : 'text-rose-300'}`}>{tryView.ok ? (floor ? 'Fits here · tap the floor to move it' : f.mount === 'finish' ? 'This is how it will look' : 'This is where it will go') : tryView.why}</span>
+                    <span className={`block text-[11px] ${tryView.ok ? 'text-emerald-300' : 'text-rose-300'}`}>{tryView.ok ? (floor ? 'Fits here · tap the floor to move it' : f.mount === 'finish' ? 'This is how it will look' : f.mount === 'yard' ? `Outdoor placement · ${trying.yardSide === 'left' ? 'left side' : 'right side'}` : 'This is where it will go') : tryView.why}</span>
                   </span>
                   {floor && <Btn size="sm" onClick={() => setTrying({ ...trying, rot: turn(trying.rot) })}>↻ Rotate</Btn>}
+                  {f.mount === 'yard' && <><Btn size="sm" tone={trying.yardSide === 'left' ? 'gold' : 'ghost'} onClick={() => setTrying({ ...trying, yardSide: 'left' })}>← Left side</Btn><Btn size="sm" tone={trying.yardSide !== 'left' ? 'gold' : 'ghost'} onClick={() => setTrying({ ...trying, yardSide: 'right' })}>Right side →</Btn></>}
                   <Btn size="sm" tone="green" disabled={!tryView.ok} onClick={confirmBuy}>Buy</Btn>
                   <Btn size="sm" onClick={() => setTrying(null)}>Cancel</Btn>
                 </div>
