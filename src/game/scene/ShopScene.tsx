@@ -490,11 +490,11 @@ function Yard({ s, selected, onTap }: { s: GameState; selected: string | null; o
           </mesh>
         </group>
       ))}
-      {s.security?.guard && (() => {
+      {s.security?.guard && s.security?.trip?.carrier !== 'guard' && (() => {
         const index = items.findIndex((p) => p.id === 'securityPost');
         if (index < 0) return null;
         return <group key={s.security.guard.id} position={[X + 0.42, 0, 0.5 + index + 0.55]} rotation={[0, -0.25, 0]}>
-          <Figure look={lookToFigure(s.security.guard.look)} walking={!!s.security.trip && s.security.trip.carrier === 'guard'} pose={s.security.trip?.carrier === 'guard' ? 'work' : 'stand'} />
+          <Figure look={lookToFigure(s.security.guard.look)} walking={false} pose="stand" />
         </group>;
       })()}
     </group>
