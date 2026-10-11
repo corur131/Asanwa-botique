@@ -54,7 +54,9 @@ export function energyStep(s: GameState, minutes: number): GameState {
   if (s.phase !== 'shop' || minutes <= 0) return s;
   if (s.busy?.pose === 'sit') return s;
   const cool = coolRunning(s);
-  const k = cool >= 0.4 ? 0.55 : cool > 0 ? 0.75 : 1.35;
+  let k = cool >= 0.4 ? 0.55 : cool > 0 ? 0.75 : 1.35;
+  if (s.weather === 'sunny' && cool <= 0) k *= 1.22;
+  if (s.weather === 'harmattan') k *= 0.92;
   return setEnergy(s, energyOf(s) - ENERGY.perMinute * k * minutes);
 }
 
