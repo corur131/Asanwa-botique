@@ -731,7 +731,7 @@ export function listingsNow(s: GameState): Listing[] {
 export function moveTo(s0: GameState, l0: Listing): GameState {
   const fight = contestFor(s0, l0);
   const l = fight ? { ...l0, moveIn: l0.moveIn + fight.extra } : l0;
-  if (l.tier !== s0.tier + 1 || s0.cash < l.moveIn) return s0;
+  if ((l.tier !== s0.tier + 1 && !(l.signature && l.tier === s0.tier && !s0.listing.signature)) || s0.cash < l.moveIn) return s0;
   const s = fight ? wonListing(s0, l0) : s0;
   const tier = l.tier;
   const t = TIERS[tier];
