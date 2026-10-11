@@ -55,7 +55,8 @@ export function energyStep(s: GameState, minutes: number): GameState {
   if (s.busy?.pose === 'sit') return s;
   const cool = coolRunning(s);
   const k = cool >= 0.4 ? 0.55 : cool > 0 ? 0.75 : 1.35;
-  return setEnergy(s, energyOf(s) - ENERGY.perMinute * k * minutes);
+  const weatherHeat = s.weather === 'sunny' && cool < 0.4 ? 1.35 : s.weather === 'harmattan' ? 0.82 : s.weather === 'rainy' || s.weather === 'cloudy' ? 0.92 : 1;
+  return setEnergy(s, energyOf(s) - ENERGY.perMinute * k * weatherHeat * minutes);
 }
 
 /** Score changes from how Divine is doing today. */
