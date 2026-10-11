@@ -55,7 +55,7 @@ export function listingsFor(tier: number, week: number): Listing[] {
   const t = TIERS[tier];
   const r = rng(week * 97 + tier * 13 + 5);
   const areas = AREAS[tier];
-  return [1, 2, 3, 4].map((stars, i) => {
+  return [1, 2, 3, 4].map<Listing>((stars, i) => {
     const [street, area] = areas[i % areas.length];
     const wobble = 0.92 + r() * 0.16;
     const round = (n: number) => Math.round(n / 5_000) * 5_000;
@@ -338,6 +338,8 @@ export interface Placed {
   /** Quarter turns: 0 = facing the shop front, 1 = 90°, 2 = 180°, 3 = 270°. */
   rot: Rot;
   placed: boolean;
+  /** Outdoor items can be assigned to either side of the building. Older saves default to right. */
+  yardSide?: 'left' | 'right';
 }
 
 export type Rot = 0 | 1 | 2 | 3;
