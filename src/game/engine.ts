@@ -265,14 +265,20 @@ function shopIncidentStep(s0: GameState, minutes: number): GameState {
   let s = s0;
   const has = (id: string) => s.furniture.some((p) => p.placed && p.id === id);
   const crowded = s.inShop.length >= 3 && (!!s.serving || !!s.busy);
-  const theftRisk = has('cctv') ? 0.000015 : has('shopAlarm') ? 0.00006 : s.staff.length ? 0.00008 : 0.00016;
+  const guardOnDuty = !!s.security?.guard && has('securityPost');
+  const theftRisk = guardOnDuty ? (has('cctv') ? 0.000006 : 0.000035) : has('cctv') ? 0.000015 : has('shopAlarm') ? 0.00006 : s.staff.length ? 0.00008 : 0.00016;
   if (crowded && chance(1 - Math.pow(1 - theftRisk, minutes))) {
     const available = s.stock.filter((d) => d.pieces > 0);
     if (available.length) {
       const stolen = available[Math.floor(Math.random() * available.length)];
-      s = { ...s, stock: s.stock.map((d) => d.uid === stolen.uid ? { ...d, pieces: Math.max(0, d.pieces - 1) } : d) };
-      s = addShout(s, 'Deborah', `Sis, one ${stolen.label} don miss from the rail 😩`, 'warn');
-      s = { ...s, today: { ...s.today, events: [...s.today.events, `Shoplifting: one ${stolen.label} went missing.`] } };
+      if (guardOnDuty && chance(0.82)) {
+        s = addShout(s, s.security!.guard!.name, `Stop there! I caught someone taking ${stolen.label}. I've recovered it and returned it to the rail.`, 'good');
+        s = { ...s, today: { ...s.today, events: [...s.today.events, `Security caught a shoplifter and recovered ${stolen.label}; no stock was lost.`] } };
+      } else {
+        s = { ...s, stock: s.stock.map((d) => d.uid === stolen.uid ? { ...d, pieces: Math.max(0, d.pieces - 1) } : d) };
+        s = addShout(s, 'Deborah', `Sis, one ${stolen.label} don miss from the rail 😩`, 'warn');
+        s = { ...s, today: { ...s.today, events: [...s.today.events, `Shoplifting: one ${stolen.label} went missing.`] } };
+      }
     }
   }
   if (s.power?.gen && source(s) === 'gen') {
