@@ -756,7 +756,7 @@ export function hireSecurityGuard(s: GameState): GameState {
   if (s.security?.guard) return s;
   const signing = 35_000;
   if (s.cash < signing) return addShout(s, 'Security', `You need ${naira(signing)} to hire a guard.`, 'warn');
-  const guard = { id: `guard-${s.day}-${Math.random().toString(36).slice(2, 7)}`, name: ['Tunde', 'Chuka', 'Bashir', 'Emeka', 'Seyi'][Math.floor(Math.random() * 5)], wage: 18_000, look: generateRandomCustomer('styled').look };
+  const guard = { id: `guard-${s.day}-${Math.random().toString(36).slice(2, 7)}`, name: ['Tunde', 'Chuka', 'Bashir', 'Emeka', 'Seyi'][Math.floor(Math.random() * 5)], wage: 18_000, look: generateRandomCustomer('styled') };
   let next = money({ ...s, security: { ...(s.security || {}), guard, postUid: post.uid, gallons: s.security?.gallons || [] } }, -signing, 'Security guard signing fee');
   next = msg(next, 'Security', `${guard.name} has been hired. Weekly pay is ${naira(guard.wage)}. I will stay at the post and protect the shop.`, 'good');
   return next;
@@ -775,7 +775,7 @@ export function startFuelTrip(s: GameState, litres: number, refillUid?: string):
   const total = guardOnDuty ? 58 : 92;
   let next = money({ ...s, security: { ...(s.security || {}), postUid: post?.uid || s.security?.postUid, gallons: s.security?.gallons || [], trip: { remaining: total, total, litres, cost, refillUid, carrier: guardOnDuty ? 'guard' : 'divine' } } }, -cost, `Fuel purchase: ${litres} L`);
   next = { ...next, today: { ...next.today, fuel: (next.today.fuel || 0) + cost, litres: (next.today.litres || 0) + litres, costs: next.today.costs + cost } };
-  return addShout(next, guardOnDuty ? s.security!.guard!.name : 'Divine', guardOnDuty ? `I'm going to buy ${litres} litres of fuel. I'll announce when I'm back.` : `I'm heading out to buy ${litres} litres of fuel. I'll be back after the trip.`, 'info');
+  return addShout(next, guardOnDuty ? s.security!.guard!.name : 'Divine', guardOnDuty ? `I'm going to buy ${litres} litres of fuel. I'll announce when I'm back.` : `I'm heading out to buy ${litres} litres of fuel. I'll be back after the trip.`, 'good');
 }
 
 /** Advance an errand using the in-game clock, including after-hours trips once time resumes. */
