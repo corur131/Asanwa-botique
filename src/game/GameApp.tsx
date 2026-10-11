@@ -198,6 +198,9 @@ export default function GameApp({ onLab, initial, storageKey, cloud, notice }: {
   const selectedPiece = selected ? (() => { const p = s.furniture.find((x) => x.uid === selected && x.placed); return p ? furnitureById(p.id) : null; })() : null;
   const busy = E.busyNow(s);
   const act = busy ? { uid: busy.uid, pose: busy.pose } : localAct || sitting;
+  const securityPostForMenu = menuFor ? s.furniture.find((p) => p.uid === menuFor && p.id === 'securityPost') : undefined;
+  const fuelGallonForMenu = menuFor?.startsWith('fuel-gallon:') ? menuFor.slice('fuel-gallon:'.length) : undefined;
+  const securityMenuOpen = menuFor === '__security__' || !!securityPostForMenu;
   const say = (who: string, text: string) => {
     const b: Shout = { id: -Date.now(), who, text, tone: 'warn' };
     setBubbles((x) => [...x, b].slice(-4));
@@ -331,6 +334,7 @@ export default function GameApp({ onLab, initial, storageKey, cloud, notice }: {
         <div className="ml-auto flex gap-2">
           <Btn size="sm" onClick={sound.toggleMusic} title={sound.music ? 'Music on' : 'Music off'}>{sound.music ? '♫ On' : '♫ Off'}</Btn>
           {genKind && <Btn size="sm" onClick={() => sound.set({ gen: !sound.gen })} title="Generator sound">{sound.gen ? '⛽🔊' : '⛽🔇'}</Btn>}
+          <Btn size="sm" onClick={() => setMenuFor('__security__')} title="Fuel trips and security">🛡 Security</Btn>
           <Btn size="sm" onClick={() => E.exportSave(s)}>Backup</Btn>
           <Btn size="sm" onClick={() => setMenu(true)}>Menu</Btn>
         </div>
@@ -448,7 +452,9 @@ export default function GameApp({ onLab, initial, storageKey, cloud, notice }: {
         )}
 
         {/* what Divine can do with the piece you tapped */}
-        {menuFor && !build && !styling && <ActionMenu s={s} uid={menuFor} onPick={(id) => doAction(menuFor, id)} onClose={() => setMenuFor(null)} />}
+        {securityMenuOpen && !build && !styling && <SecurityMenu s={s} onClose={() => setMenuFor(null)} onHire={() => up(E.hireSecurityGuard)} onBuy={(litres, generatorUid) => up((g) => E.startFuelTrip(g, litres, generatorUid))} />}
+        {fuelGallonForMenu && !build && !styling && <SecurityMenu s={s} gallonId={fuelGallonForMenu} onClose={() => setMenuFor(null)} onHire={() => up(E.hireSecurityGuard)} onBuy={(litres, generatorUid) => up((g) => E.startFuelTrip(g, litres, generatorUid))} onPour={(gallonId, generatorUid) => up((g) => E.pourSecurityGallon(g, gallonId, generatorUid))} />}
+        {menuFor && menuFor !== '__security__' && !securityPostForMenu && !fuelGallonForMenu && !build && !styling && <ActionMenu s={s} uid={menuFor} onPick={(id) => doAction(menuFor, id)} onClose={() => setMenuFor(null)} />}
         {busy && !styling && (
           <div className="absolute z-10 left-1/2 -translate-x-1/2 bottom-32 sm:bottom-36 rounded-full bg-[#12141c]/92 border border-white/15 px-3 py-1 text-xs text-amber-200 pointer-events-none">
             Divine is busy · {E.actionLabel(s, busy)} · till {E.clockText(busy.until)}
@@ -814,6 +820,85 @@ const VisitCard: React.FC<{ s: GameState; up: (f: (g: GameState) => GameState) =
         {E.VISIT_CHOICES.map((c) => (
           <button key={c.id} onClick={() => up((g) => E.answerVisit(g, c.id))} className={`rounded-lg px-3 py-1.5 text-sm text-left ${c.id === 'clap' ? 'bg-rose-700/80 text-white' : c.id === 'welcome' ? 'bg-emerald-700/70 text-white' : 'bg-white/10 text-slate-100'}`}>{c.label}</button>
         ))}
+      </div>
+    </div>
+  );
+};
+
+/** Security management: hire the guard, order a gallon, or refill a selected generator. */
+const SecurityMenu: React.FC<{
+  s: GameState;
+  gallonId?: string;
+  onClose: () => void;
+  onHire: () => void;
+  onBuy: (litres: number, generatorUid?: string) => void;
+  onPour?: (gallonId: string, generatorUid: string) => void;
+}> = ({ s, gallonId, onClose, onHire, onBuy, onPour }) => {
+  const [litres, setLitres] = useState(10);
+  const [generatorUid, setGeneratorUid] = useState('');
+  const generators = s.furniture.filter((p) => p.placed && !!furnitureById(p.id).gen);
+  const selectedGenerator = generatorUid || generators[0]?.uid || '';
+  const gallon = (s.security?.gallons || []).find((g) => g.id === gallonId);
+  const post = s.furniture.some((p) => p.placed && p.id === 'securityPost');
+  const guard = s.security?.guard;
+  const trip = s.security?.trip;
+  const price = Math.round(litres * E.fuelPrice(s));
+  const busyText = trip ? `${trip.carrier === 'guard' ? guard?.name || 'Security guard' : 'Divine'} is ${trip.remaining > trip.total / 2 ? 'out buying fuel' : 'on the way back'} · about ${Math.ceil(trip.remaining)} in-game minutes remaining.` : '';
+  return (
+    <div className="fixed inset-0 z-[62] bg-black/65 flex items-end sm:items-center justify-center p-3">
+      <div className="w-full max-w-lg rounded-2xl border border-white/15 bg-[#12141c] shadow-2xl p-4 text-white max-h-[90dvh] overflow-y-auto">
+        <div className="flex items-start justify-between gap-3 mb-3">
+          <div>
+            <h2 className="font-serif text-xl font-bold">{gallon ? 'Fuel gallon' : 'Security & fuel'}</h2>
+            <p className="text-xs text-slate-400 mt-1">{gallon ? `${gallon.litres} L ready to pour` : 'Security is hired separately from salon staff.'}</p>
+          </div>
+          <Btn size="sm" onClick={onClose}>Close</Btn>
+        </div>
+        {gallon ? (
+          <div className="space-y-3">
+            <p className="text-sm text-slate-200">Choose which generator should receive this gallon. The fuel has already been paid for.</p>
+            {generators.length ? (
+              <>
+                <label className="block text-xs text-slate-300">Generator
+                  <select value={selectedGenerator} onChange={(e) => setGeneratorUid(e.target.value)} className="mt-1 block w-full rounded-lg border border-white/15 bg-[#181b24] p-2 text-sm text-white">
+                    {generators.map((g) => <option key={g.uid} value={g.uid}>{furnitureById(g.id).name} · {Math.round(E.fuelOf(s, g.uid) * 10) / 10}/{E.tankSize(s, g.uid)} L</option>)}
+                  </select>
+                </label>
+                <Btn block tone="gold" onClick={() => selectedGenerator && onPour?.(gallon.id, selectedGenerator)}>{guard ? `Ask ${guard.name} to fill it` : 'Fill the generator'}</Btn>
+              </>
+            ) : <p className="text-sm text-amber-200">Buy and place a generator before pouring this fuel.</p>}
+          </div>
+        ) : (
+          <div className="space-y-3">
+            <div className="rounded-xl border border-white/10 bg-white/5 p-3">
+              <div className="font-semibold">{guard ? `${guard.name} · security guard` : 'No security guard hired'}</div>
+              <p className="text-xs text-slate-400 mt-1">{guard ? (post ? 'On duty at the outside security post when not running an errand.' : 'The post is missing, so Divine will handle errands until it is placed again.') : post ? 'You own a security post. Hire a guard to protect the shop and run errands.' : 'Divine will go out herself for fuel. To hire a guard, buy and place the small security post from the Furniture Store first.'}</p>
+              {post && !guard && <Btn block tone="gold" onClick={onHire} className="mt-2">Hire security guard · ₦35,000</Btn>}
+              {guard && <p className="text-xs text-emerald-200 mt-2">Weekly wage: {naira(guard.wage)}</p>}
+            </div>
+            {trip && <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-sm text-amber-100">{busyText} Ordered: {trip.litres} L.</div>}
+            <div>
+              <label className="block text-xs text-slate-300">Fuel quantity
+                <select value={litres} onChange={(e) => setLitres(Number(e.target.value))} className="mt-1 block w-full rounded-lg border border-white/15 bg-[#181b24] p-2 text-sm text-white">
+                  {[5, 10, 20].map((v) => <option key={v} value={v}>{v} litres · {naira(v * E.fuelPrice(s))}</option>)}
+                </select>
+              </label>
+            </div>
+            <div className="grid sm:grid-cols-2 gap-2">
+              <Btn block disabled={!!trip || s.cash < price} onClick={() => onBuy(litres)}>{guard && post ? 'Guard buys a gallon' : 'Divine goes to buy fuel'} · {naira(price)}</Btn>
+              <Btn block tone="gold" disabled={!!trip || !generators.length || s.cash < price} onClick={() => onBuy(litres, selectedGenerator)}>{guard && post ? 'Guard buys & refills' : 'Buy & refill generator'} · {naira(price)}</Btn>
+            </div>
+            {generators.length > 0 && (
+              <label className="block text-xs text-slate-300">Generator to refill
+                <select value={selectedGenerator} onChange={(e) => setGeneratorUid(e.target.value)} className="mt-1 block w-full rounded-lg border border-white/15 bg-[#181b24] p-2 text-sm text-white">
+                  {generators.map((g) => <option key={g.uid} value={g.uid}>{furnitureById(g.id).name} · {Math.round(E.fuelOf(s, g.uid) * 10) / 10}/{E.tankSize(s, g.uid)} L</option>)}
+                </select>
+              </label>
+            )}
+            {(s.security?.gallons || []).length > 0 && <p className="text-xs text-slate-400">There are {s.security!.gallons!.length} physical gallon(s) outside. Click a gallon in the yard to pour it.</p>}
+            <p className="text-[11px] text-slate-500">The fuel is paid for when the trip starts. A trip takes in-game time; when the carrier returns, the gallon appears outside or the selected generator is refilled. This can be started before opening or after closing.</p>
+          </div>
+        )}
       </div>
     </div>
   );
