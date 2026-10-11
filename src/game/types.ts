@@ -36,7 +36,8 @@ export type Want =
   | { kind: 'jacket' }
   | { kind: 'hair'; group: string }
   | { kind: 'glam' }
-  | { kind: 'naturalFace' };
+  | { kind: 'naturalFace' }
+  | { kind: 'nails' };
 
 export interface Customer {
   id: string;
