@@ -73,7 +73,7 @@ export function spots(s: GameState) {
       case 'ottoman': return [{ x: -0.18, z: 0, top: 0.47 }, { x: 0.18, z: 0, top: 0.47 }];
       case 'sofa': return [{ x: -0.63, z: 0.02, top: 0.55 }, { x: -0.21, z: 0.02, top: 0.55 }, { x: 0.21, z: 0.02, top: 0.55 }, { x: 0.63, z: 0.02, top: 0.55 }];
       case 'velvetSofa': return [{ x: -1.0, z: 0.02, top: 0.55 }, { x: -0.6, z: 0.02, top: 0.55 }, { x: -0.2, z: 0.02, top: 0.55 }, { x: 0.2, z: 0.02, top: 0.55 }, { x: 0.6, z: 0.02, top: 0.55 }, { x: 1.0, z: 0.02, top: 0.55 }];
-      case 'doubleSofa': return [{ x: -0.72, z: 0.02, top: 0.55 }, { x: -0.36, z: 0.02, top: 0.55 }, { x: 0, z: 0.02, top: 0.55 }, { x: 0.36, z: 0.02, top: 0.55 }, { x: 0.72, z: 0.02, top: 0.55 }];
+      case 'doubleSofa': return [{ x: -0.65, z: 0.02, top: 0.55 }, { x: -0.325, z: 0.02, top: 0.55 }, { x: 0, z: 0.02, top: 0.55 }, { x: 0.325, z: 0.02, top: 0.55 }, { x: 0.65, z: 0.02, top: 0.55 }];
       case 'luxeOttoman': return [{ x: -0.17, z: 0, top: 0.51 }, { x: 0.17, z: 0, top: 0.51 }];
       case 'shoeBench': return [{ x: -0.52, z: 0, top: 0.48 }, { x: 0.52, z: 0, top: 0.48 }];
       default: {
