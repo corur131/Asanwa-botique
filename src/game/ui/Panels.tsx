@@ -269,6 +269,7 @@ export const MovePanel: React.FC<{ s: GameState; onMove: (l: Listing) => void }>
       </div>
       <div className="rounded-lg border border-white/10 bg-white/5 p-3 text-xs text-slate-300">
         <b className="text-white">{next.name}</b>: bigger, better listings are roomier and hold more{next.staff ? `, ${next.staff} staff` : ''}{next.luxury ? ', luxury suppliers' : ''}. Your furniture comes with you; buy more rails to fill the bigger room. Listings change every week.
+        <p className="mt-2 text-amber-200">Signature properties are substantially larger and more luxurious. They draw wealthy clients, bring rare celebrity visits with million-naira purchases and tips, and can make your shop trend while rivals get jealous. Weekly rent and move-in costs are much higher.</p>
       </div>
       {list.map((l0) => {
         const fight = contestFor(s, l0);
