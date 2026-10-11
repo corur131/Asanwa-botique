@@ -1,17 +1,12 @@
 /**
- * Paste your Firebase web app config here (Firebase console → Project settings →
- * Your apps → Web app → "SDK setup and configuration" → Config).
- * These values are safe to be public: the security rules in firestore.rules
- * decide who can read and write what.
- *
- * While apiKey is empty the game runs exactly as before: one save on this device,
- * no sign-in.
+ * Firebase configuration for Asanwa Boutique
  */
 export const firebaseConfig = {
-  apiKey: '',
-  authDomain: '',
-  projectId: '',
-  storageBucket: '',
-  messagingSenderId: '',
-  appId: '',
+  apiKey: 'AIzaSyBS-fhkjoc2DbZsstPSU5qLK1Xxjf50OBE',
+  authDomain: 'asanwa-boutique-game.firebaseapp.com',
+  projectId: 'asanwa-boutique-game',
+  storageBucket: 'asanwa-boutique-game.firebasestorage.app',
+  messagingSenderId: '927672795502',
+  appId: '1:927672795502:web:a9cda1c89598b30580c17f',
+  measurementId: 'G-QSSGKFQY4K',
 };
