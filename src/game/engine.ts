@@ -169,6 +169,10 @@ export function shopBonus(s: GameState, c: Customer, choice: StyleChoice): { bon
   if (!c.male && choice.makeup && st.makeupBonus) { bonus += st.makeupBonus; notes.push(`Makeup station +${st.makeupBonus}`); }
   if (c.cls === 'rich' && st.richBonus) { bonus += st.richBonus; notes.push(`Fitting room +${st.richBonus}`); }
   if (st.scoreBonus) { bonus += st.scoreBonus; notes.push(`Steamer and lighting +${st.scoreBonus}`); }
+  const placedIds = s.furniture.filter((f) => f.placed).map((f) => f.id);
+  if (c.wants.some((w) => w.kind === 'gele') && placedIds.includes('geleStation')) { bonus += 2; notes.push('Gele station +2'); }
+  if (c.wants.some((w) => w.kind === 'nails') && placedIds.some((id) => id === 'nailStation' || id === 'nailPolishRack')) { bonus += 2; notes.push('Nail bar +2'); }
+  if (c.fitIssue && placedIds.includes('alterationsCorner')) { bonus += 2; notes.push('Alterations corner fixed the fit +2'); }
   if (Object.values(choice).some((uid) => typeof uid === 'string' && s.stock.some((d) => d.uid === uid && (d.trend || 0) >= s.day))) { bonus += 4; notes.push('Trending fabric +4'); }
   const src = s.phase === 'shop' ? source(s) : 'grid';
   if (src === 'solar') { bonus += 2; notes.push('Cool and quiet on solar +2'); }
@@ -185,7 +189,10 @@ export function openShop(s0: GameState): GameState {
     if (scarcity(s) && tankSize(s)) s = msg(s, 'Deborah', `Fuel scarcity o! Petrol is ${naira(fuelPrice(s))} a litre this week, and the queues are long. Use the gen small small.`, 'warn');
   }
   const st = stats(s);
-  const n = customersToday(s, slow);
+  const canopy = s.furniture.some((f) => f.placed && f.id === 'umbrellaCanopy');
+  const weatherFactor = weather === 'rainy' ? (canopy ? 0.86 : 0.72) : weather === 'cloudy' ? 0.94 : weather === 'harmattan' ? 0.96 : 1;
+  const n = Math.max(1, Math.round(customersToday(s, slow) * weatherFactor));
+  const weather = (() => { const d = ((s.day - 1) % 365) + 1; const seasonal = d >= 90 && d <= 300 ? 'rainy' : d >= 335 || d <= 55 ? 'harmattan' : 'sunny'; return Math.random() < 0.24 ? 'cloudy' as const : seasonal as 'rainy' | 'harmattan' | 'sunny'; })();
   const mix = [...TIERS[s.tier].mix] as [number, number, number];
   const shift = prestigeRichShift(st.prestige);
   mix[0] = Math.max(0.05, mix[0] - shift);
@@ -199,7 +206,11 @@ export function openShop(s0: GameState): GameState {
   }
   arrivals.sort((a, b) => a.at - b.at);
   const outages = planOutages(s.day);
-  let next: GameState = { ...s, slowWeek: slow, arrivals, outages, busy: null, power: { ...s.power, gen: false, solar: s.power?.solar || 0 } };
+  let next: GameState = { ...s, slowWeek: slow, weather, arrivals, outages, busy: null, power: { ...s.power, gen: false, solar: s.power?.solar || 0, fanBattery: Math.max(0, s.power?.fanBattery ?? 100), lanternBattery: Math.max(0, s.power?.lanternBattery ?? 100) } };
+  if (weather === 'rainy') next = msg(next, 'Deborah', canopy ? 'Rain dey fall, but the canopy will help people waiting outside.' : 'Rain has started. Fewer people may come in today, but the ones who do should be more patient.', 'info');
+  else if (weather === 'sunny') next = msg(next, 'Deborah', 'Hot sunny day today. Keep the shop cool and give Divine small breaks.', 'info');
+  else if (weather === 'harmattan') next = msg(next, 'Deborah', 'Harmattan morning. The air is cooler, but the dust is plenty. Keep the shop tidy.', 'info');
+
   if (outageAt(next, 0)) {
     next = addShout(next, 'NEPA', 'No light this morning. NEPA took it before you opened.', 'nepa');
     if (stats(next).solarPanels && next.power.solar > 0) next = addShout(next, 'Solar', 'Solar is running the shop for now.', 'good');
@@ -223,7 +234,10 @@ export const shopClosing = (s: GameState) => s.phase === 'shop' && s.clock >= SH
 
 function patienceFor(s: GameState, c: Customer) {
   const st = stats(s);
-  let p = PATIENCE[c.cls] * (1 + Math.min(0.4, 0.1 * st.seats)) * (1 + coolNow(s) * 0.6) * (1 + st.patience);
+  const canopy = s.furniture.some((f) => f.placed && f.id === 'umbrellaCanopy');
+  const weatherPatience = s.weather === 'rainy' ? 1.25 : s.weather === 'harmattan' ? 1.08 : s.weather === 'sunny' && coolNow(s) <= 0 ? 0.9 : 1;
+  let p = PATIENCE[c.cls] * weatherPatience * (1 + Math.min(0.4, 0.1 * st.seats)) * (1 + coolNow(s) * 0.6) * (1 + st.patience);
+  if (canopy && s.weather === 'rainy') p *= 1.08;
   if (c.regularId) p += 20;
   return Math.round(p);
 }
