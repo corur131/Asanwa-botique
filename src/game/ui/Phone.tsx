@@ -152,6 +152,23 @@ const stamp = (m: Message) => (m.t !== undefined ? `Day ${m.day} · ${E.clockTex
 const Chats: React.FC<PhoneProps> = ({ s, up, chat, setChat, staff }) => {
   const list = E.chats(s);
   const endRef = useRef<HTMLDivElement>(null);
+  // after Divine replies, their answers arrive one by one with "typing…"
+  const [typing, setTyping] = useState<{ from: number; start: number } | null>(null);
+  const [, tickTyping] = useState(0);
+  // scroll down whenever a new bubble (or "typing…") appears, not on every clock tick
+  const visCount = useRef(0);
+  const seenCount = useRef(-1);
+  useEffect(() => {
+    if (visCount.current !== seenCount.current) {
+      seenCount.current = visCount.current;
+      window.setTimeout(() => endRef.current?.scrollIntoView({ block: 'end' }), 30);
+    }
+  });
+  useEffect(() => {
+    if (!typing) return;
+    const id = window.setInterval(() => tickTyping((n) => n + 1), 250);
+    return () => window.clearInterval(id);
+  }, [typing]);
   useEffect(() => {
     if (chat) up((g) => E.markRead(g, chat));
     endRef.current?.scrollIntoView();
@@ -180,12 +197,24 @@ const Chats: React.FC<PhoneProps> = ({ s, up, chat, setChat, staff }) => {
       </AppFrame>
     );
   }
-  const msgs = s.messages.filter((m) => E.thread(m) === chat).sort((a, b) => a.id - b.id);
+  const all = s.messages.filter((m) => E.thread(m) === chat).sort((a, b) => a.id - b.id);
+  const incoming = typing ? all.filter((m) => m.id > typing.from && m.from !== 'You') : [];
+  const shownN = typing ? Math.floor((Date.now() - typing.start) / 1300) : 0;
+  const hidden = new Set(incoming.slice(shownN).map((m) => m.id));
+  if (typing && !hidden.size) window.setTimeout(() => setTyping(null), 0);
+  const msgs = all.filter((m) => !hidden.has(m.id));
+  const typer = incoming.find((m) => hidden.has(m.id))?.from;
   const member = s.staff.find((m) => m.name === chat);
   const ask = member?.raiseAsk;
   const isGroup = chat === GROUP;
   const rival = s.rivals?.find((r) => r.owner === chat);
-  const pending = [...msgs].reverse().find((m) => m.choices && !m.answered && m.from !== 'You');
+  const pending = hidden.size ? undefined : [...msgs].reverse().find((m) => m.choices && !m.answered && m.from !== 'You');
+  visCount.current = msgs.length * 4 + (typer ? 1 : 0) + (pending ? 2 : 0);
+  const reply = (id: string) => {
+    if (!pending) return;
+    setTyping({ from: s.msgSeq, start: Date.now() });
+    up((g) => E.answerMessage(g, pending.id, id));
+  };
   const authorTone = (name: string) => ['text-pink-300', 'text-sky-300', 'text-amber-300', 'text-emerald-300', 'text-violet-300', 'text-orange-300'][name.length % 6];
   return (
     <div className="flex-1 min-h-0 flex flex-col">
@@ -194,7 +223,7 @@ const Chats: React.FC<PhoneProps> = ({ s, up, chat, setChat, staff }) => {
         <span className={`w-9 h-9 rounded-full ${avatarTone(chat)} flex items-center justify-center font-bold`}>{chat[0]}</span>
         <div className="leading-tight">
           <div className="font-medium">{chat}</div>
-          <div className="text-[11px] text-slate-400 truncate max-w-[230px]">{isGroup ? `${(s.rivals || []).filter((r) => r.main).map((r) => r.owner.split(' ')[0]).join(', ')}, You` : rival ? rival.shop : chat === 'Landlord' ? s.listing.landlord : member ? `Level ${member.level} stylist` : chat === 'Deborah' ? 'Twin sis · manages the books' : 'online'}</div>
+          <div className="text-[11px] text-slate-400 truncate max-w-[230px]">{isGroup ? `${(s.rivals || []).filter((r) => r.main).map((r) => (/^(Iya|Mrs|Mummy|Mama)\b/.test(r.owner) ? r.owner : r.owner.split(' ')[0])).join(', ')}, You` : rival ? rival.shop : chat === 'Landlord' ? s.listing.landlord : member ? `Level ${member.level} stylist` : chat === 'Deborah' ? 'Twin sis · manages the books' : 'online'}</div>
         </div>
       </div>
       <div className="flex-1 overflow-y-auto px-3 py-3 space-y-1.5 bg-[#0B141A]" style={{ backgroundImage: 'radial-gradient(rgba(255,255,255,0.025) 1px, transparent 1px)', backgroundSize: '14px 14px' }}>
@@ -213,18 +242,40 @@ const Chats: React.FC<PhoneProps> = ({ s, up, chat, setChat, staff }) => {
             </React.Fragment>
           );
         })}
+        {typer && (
+          <div className="flex">
+            <div className="rounded-lg rounded-tl-none bg-[#202C33] px-3 py-2 text-[12px] text-slate-400 italic">
+              {isGroup ? `${typer.split(' ')[0]} is typing` : 'typing'}
+              <span className="inline-flex gap-0.5 ml-1 align-middle">{[0, 1, 2].map((i) => <span key={i} className="w-1 h-1 rounded-full bg-slate-400 animate-bounce" style={{ animationDelay: `${i * 0.15}s` }} />)}</span>
+            </div>
+          </div>
+        )}
         <div ref={endRef} />
       </div>
       {pending ? (
         <div className="bg-[#202C33] p-2 shrink-0">
-          <div className="text-[10px] text-slate-400 mb-1 px-1">Reply to {pending.from.split(' ')[0]}:</div>
-          <div className="flex flex-wrap gap-1.5">
-            {pending.choices!.map((c) => (
-              <button key={c.id} className={`flex-1 rounded-full text-xs py-2 px-3 ${c.id === 'clap' ? 'bg-rose-700 text-white' : c.id === 'classy' || c.id === 'accept' ? 'bg-[#005C4B] text-white' : 'bg-[#2A3942] text-slate-200'}`} onClick={() => up((g) => E.answerMessage(g, pending.id, c.id))}>
-                {c.label}
-              </button>
-            ))}
+          <div className="flex items-center justify-between text-[10px] text-slate-400 mb-1 px-1">
+            <span>Reply to {pending.from.split(' ')[0]}:</span>
+            {pending.convo && <button className="text-slate-400 hover:text-white underline" onClick={() => reply('read')}>Leave on read 👀</button>}
           </div>
+          {pending.convo ? (
+            <div className="grid gap-1.5 max-h-[42vh] overflow-y-auto">
+              {pending.choices!.map((c) => (
+                <button key={c.id} className={`rounded-xl text-left text-[13px] py-2 px-3 leading-snug ${/Clap|Receipts|Call/.test(c.tag || '') ? 'bg-[#3a1d22] text-rose-50 hover:bg-[#4a2229]' : /Classy|peace|well/.test(c.tag || '') ? 'bg-[#0d3b33] text-emerald-50 hover:bg-[#11493f]' : 'bg-[#2A3942] text-slate-100 hover:bg-[#32444e]'}`} onClick={() => reply(c.id)}>
+                  {c.tag && <span className="block text-[10px] font-semibold opacity-70 mb-0.5">{c.tag}</span>}
+                  {c.label}
+                </button>
+              ))}
+            </div>
+          ) : (
+            <div className="flex flex-wrap gap-1.5">
+              {pending.choices!.map((c) => (
+                <button key={c.id} className={`flex-1 rounded-full text-xs py-2 px-3 ${c.id === 'clap' ? 'bg-rose-700 text-white' : c.id === 'classy' || c.id === 'accept' ? 'bg-[#005C4B] text-white' : 'bg-[#2A3942] text-slate-200'}`} onClick={() => reply(c.id)}>
+                  {c.label}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       ) : member && ask ? (
         <div className="bg-[#202C33] p-2 flex flex-wrap gap-1.5 shrink-0">

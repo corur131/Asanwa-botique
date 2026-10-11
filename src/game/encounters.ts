@@ -9,6 +9,7 @@ import { generateRandomCustomer } from '../utils/randomizer';
 import { MARKET, canBuy, isClothing, makeDesign, pieceCost } from './market';
 import { NAMED_COLOURS } from './colours';
 import { FURNITURE, Listing, Placed, autoPlace, newUid, shopStats } from './shop';
+import { startConvo } from './convos';
 import { GROUP, REPLIES, ladder, mainRivals, playerRank, rivalById } from './rivals';
 import { Customer, Design, Drop, GameState, Message, ReplyChoice, Rival, ShowEvent } from './types';
 
@@ -135,7 +136,7 @@ export function judge(s0: GameState, c: Customer, score: number): GameState {
     s = { ...s, cash: s.cash + k.prize, rep: clamp(s.rep + 3, 0, 100), followers: (s.followers || 0) + (e?.followers || 100), ledger: [{ day: s.day, t: Math.floor(s.clock), label: `${k.title} prize`, amount: k.prize }, ...(s.ledger || [])].slice(0, 150) };
     s = gist(s, `Divine beats ${r?.owner || 'her rival'} at the ${k.title}!`, `The judges scored Asanwa Boutique ${score} to ${k.rivalScore}. ${r?.owner.split(' ')[0]} left without taking pictures 👀`, 'you', true);
     if (r) {
-      s = say(s, r.owner, pick(['The judges were paid. Everybody knows 🙄', 'Congrats I guess. Next time.', 'Hmm. Enjoy it while it lasts 😏']), { chat: GROUP, choices: REPLIES, ctx: { kind: 'shade', rivalId: r.id } });
+      s = startConvo(s, { with: r.owner, rivalId: r.id, chat: GROUP, topic: 'lostShow', opener: pick(['The judges were paid. Everybody knows 🙄', 'Congrats I guess. Next time.', 'Hmm. Enjoy it while it lasts 😏', 'My model\'s shoes were wrong size, that\'s the only reason 😤', 'Beginner\'s luck. Let\'s see next month.']) });
       s = feel(s, r.id, -12);
     }
     s = say(s, 'Deborah', `SISSSS YOU WON!!! ₦${k.prize.toLocaleString('en-NG')}! 🎉🎉 I'm screaming!`, { tone: 'good' });
@@ -143,7 +144,7 @@ export function judge(s0: GameState, c: Customer, score: number): GameState {
     s = { ...s, rep: clamp(s.rep - 1, 0, 100) };
     s = gist(s, `${r?.shop || 'Rival'} wins the ${k.title}`, `${r?.owner} scored ${k.rivalScore}; Divine scored ${score}. Close one!`, r?.id);
     if (r) {
-      s = say(s, r.owner, pick([`Thank you judges 🙏🏾 Better luck next time Divine 😘`, `Na so. Experience matters 😌`, `I told una 😂😂`]), { chat: GROUP, choices: REPLIES, ctx: { kind: 'brag', rivalId: r.id } });
+      s = startConvo(s, { with: r.owner, rivalId: r.id, chat: GROUP, topic: 'wonShow', opener: pick([`Thank you judges 🙏🏾 Better luck next time Divine 😘`, `Na so. Experience matters 😌`, `I told una 😂😂`, `Trophy number ${2 + Math.floor(Math.random() * 6)} 🏆 Divine, you tried sha`, `Some people need more practice before entering competitions 😌`]) });
       s = feel(s, r.id, 4);
     }
   }
@@ -248,7 +249,7 @@ function endVisit(s0: GameState, steal: boolean): GameState {
     const t = s.inShop.find((x) => x.c.id === v.target && !x.by);
     if (t && r) {
       s = { ...s, inShop: s.inShop.filter((x) => x.c.id !== v.target), left: [...s.left, { key: `${t.c.id}-stolen`, id: t.c.id, look: t.c.look, bag: false }].slice(-10), today: { ...s.today, lost: s.today.lost + 1 } };
-      s = say(s, r.owner, `Thanks for the customer o 😂 ${t.c.name} said my shop is nicer.`, { chat: GROUP, choices: REPLIES, ctx: { kind: 'shade', rivalId: r.id } });
+      s = startConvo(s, { with: r.owner, rivalId: r.id, chat: GROUP, topic: 'stole', opener: pick([`Thanks for the customer o 😂 ${t.c.name} said my shop is nicer.`, `${t.c.name} just paid me in full. Divine, abeg send more 😂`, `Your customer was waiting so long, I had to rescue her 🚑😂`]) });
     }
   }
   return { ...s, visit: null };
@@ -319,7 +320,7 @@ export function wonListing(s0: GameState, l: Listing): GameState {
   const c = contestFor(s0, l);
   if (!c) return s0;
   let s = feel(s0, c.rival.id, -20);
-  s = say(s, c.rival.owner, pick([`Who took ${l.street}??? I had already paid deposit 😤`, `Some people will outbid you for a shop they can't even fill 🙄`, `${l.street} landlord is a thief. Took the highest offer.`]), { chat: GROUP, choices: REPLIES, ctx: { kind: 'shade', rivalId: c.rival.id } });
+  s = startConvo(s, { with: c.rival.owner, rivalId: c.rival.id, chat: GROUP, topic: 'snatch', opener: pick([`Who took ${l.street}??? I had already paid deposit 😤`, `Some people will outbid you for a shop they can't even fill 🙄`, `${l.street} landlord is a thief. Took the highest offer.`]) });
   return gist(s, `Divine snatches ${l.street} from ${c.rival.owner}!`, `The landlord took Divine's higher offer. ${c.rival.owner.split(' ')[0]} is NOT happy.`, 'you', true);
 }
 

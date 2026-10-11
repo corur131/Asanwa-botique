@@ -303,8 +303,10 @@ export interface WeekMeter {
 }
 
 export interface ReplyChoice {
-  id: 'classy' | 'clap' | 'ignore' | 'accept' | 'decline';
+  id: string;
   label: string;
+  /** Short label for the spirit of the reply (e.g. "🔥 Clap back"). */
+  tag?: string;
 }
 
 export interface Message {
@@ -314,6 +316,8 @@ export interface Message {
   /** Replies Divine can pick, and what she picked. */
   choices?: ReplyChoice[];
   answered?: string;
+  /** The back-and-forth conversation this message belongs to. */
+  convo?: string;
   /** What the message is about, for the reply's effect. */
   ctx?: { kind: 'shade' | 'brag' | 'bait' | 'invite'; rivalId?: string; eventId?: string };
   /** Game minute (shop clock) it arrived, if during the day. */
@@ -365,6 +369,10 @@ export interface GameState {
   meter?: WeekMeter;
   /** TV channel index, for fun. */
   channel?: number;
+  /** WhatsApp conversations that go back and forth. */
+  convos?: import('./convos').Convo[];
+  /** Lines said lately, so chats don't repeat themselves. */
+  said?: string[];
   /** Things said out loud in the shop: NEPA news and customer complaints. */
   shouts: Shout[];
   shoutSeq: number;

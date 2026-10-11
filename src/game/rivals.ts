@@ -8,6 +8,7 @@ import { CharacterConfig } from '../types/character';
 import { generateRandomCustomer } from '../utils/randomizer';
 import { TIERS } from './economy';
 import { GameState, Gist, Message, ReplyChoice, Rival, RivalPost } from './types';
+import { Topic, startConvo } from './convos';
 
 const pick = <T,>(a: readonly T[]): T => a[Math.floor(Math.random() * a.length)];
 const chance = (p: number) => Math.random() < p;
@@ -131,6 +132,8 @@ function say(s: GameState, from: string, text: string, opts: Partial<Message> = 
   return { ...s, msgSeq: id, messages: [m, ...s.messages].slice(0, 160) };
 }
 const inGroup = (s: GameState, r: Rival, text: string, opts: Partial<Message> = {}) => say(s, r.owner, text, { chat: GROUP, ...opts });
+/** A rival starts a back-and-forth with Divine (in the group, or in a DM). */
+const talk = (s: GameState, r: Rival, text: string, topic: Topic, dm = false) => startConvo(s, { with: r.owner, rivalId: r.id, chat: dm ? undefined : GROUP, topic, opener: text });
 
 function gist(s: GameState, title: string, body: string, about?: string, hot = false): GameState {
   const g: Gist = { id: `g${s.day}-${Math.random().toString(36).slice(2, 7)}`, day: s.day, title, body, about, hot };
@@ -159,7 +162,7 @@ const LINES = {
     sweet: ["Divine your shop is so cute! Small, but cute 🥰", "I love that you're trying, sis ❤️"],
     pro: ['Some new shops are pricing very aggressively.'],
   },
-  jealous: ['Hmm. Congratulations I guess.', 'Who is sponsoring her? Just asking 👀', 'Big shop, small talent 😂', 'Let us see how long she will last there.', 'Rent there is not small o. Wish her luck 🙃', 'We move. Abeg.'],
+  jealous: ['Who is her sugar daddy? Just asking questions 🤔', 'Some people move shop every month like say na rent-free 🙄', 'Na God dey bless people wey no sabi work sha 😒', 'Hmm. Congratulations I guess.', 'Who is sponsoring her? Just asking 👀', 'Big shop, small talent 😂', 'Let us see how long she will last there.', 'Rent there is not small o. Wish her luck 🙃', 'We move. Abeg.'],
   welcomeUp: (name: string) => [`Congrats ${name}! 🎉`, `Ehen, ${name} don enter big league o`, `Congrats babe ❤️`],
   mock: (name: string) => [`${name} don pack go smaller shop o 😂`, `Landlord no dey play o. Sorry ${name} 🙃`, `Abeg who saw ${name}'s new shop? Small like matchbox 💀`],
 };
@@ -266,7 +269,7 @@ export function simulateRivals(s0: GameState): GameState {
     if (n.kind === 'up') {
       s = gist(s, `${r.shop} moves to a ${TIERS[r.tier].name}!`, `${r.owner} has upgraded. Sources say the rent is not small.`, r.id);
       if (r.main) {
-        s = inGroup(s, r, pick([`Guess who just signed for a ${TIERS[r.tier].name}? 😌🔑`, `New shop, new level. ${TIERS[r.tier].name} babyyyy 🎉`, `God did! We have moved to a ${TIERS[r.tier].name} 🙏🏾`]), { ctx: { kind: 'brag', rivalId: r.id } });
+        s = talk(s, r, pick([`Guess who just signed for a ${TIERS[r.tier].name}? 😌🔑`, `New shop, new level. ${TIERS[r.tier].name} babyyyy 🎉`, `God did! We have moved to a ${TIERS[r.tier].name} 🙏🏾`]), 'brag');
         for (const o of mainRivals(s).filter((x) => x.id !== r.id && chance(0.5))) s = inGroup(s, o, chance(0.5) ? pick(LINES.jealous) : pick(LINES.welcomeUp(r.owner.split(' ')[0])));
       }
     } else if (n.kind === 'down') {
@@ -282,14 +285,14 @@ export function simulateRivals(s0: GameState): GameState {
 
   // everyday chatter, brags and shade at Divine
   for (const r of mainRivals(s)) {
-    if (chance(0.18)) s = inGroup(s, r, pick(LINES.brag[r.personality]), { ctx: { kind: 'brag', rivalId: r.id } });
+    if (chance(0.18)) s = chance(0.6) ? talk(s, r, pick(LINES.brag[r.personality]), 'brag') : inGroup(s, r, pick(LINES.brag[r.personality]), { ctx: { kind: 'brag', rivalId: r.id } });
     if (chance(0.3)) s = rivalPost(s, r, pick(LINES.brag[r.personality]));
     // shade: more when Divine is doing well, and from those who dislike her
     const threat = s.today.bestScore >= 85 || lastRank(s, 'you') > youRank ? 0.12 : 0.04;
     if (chance(threat * (0.4 + r.aggression) * (r.feeling < 0 ? 1.5 : 1))) {
       const line = pick(LINES.shade[r.personality]);
-      if (chance(0.5)) s = inGroup(s, r, line, { choices: REPLIES, ctx: { kind: 'shade', rivalId: r.id } });
-      else s = say(s, r.owner, line, { choices: REPLIES, ctx: { kind: 'bait', rivalId: r.id } });
+      if (chance(0.5)) s = talk(s, r, line, 'shade');
+      else s = talk(s, r, line, 'bait', true);
       if (chance(0.3)) s = rivalPost(s, r, `Some people in ${s.listing.area} should stick to selling pure water 😂 #notsubbing`, true);
     }
   }
@@ -312,7 +315,7 @@ export function publishLadder(s0: GameState): GameState {
   s = say(s, 'GistLagos', `🏆 This week's Top 20 Boutiques is out! #1 ${rows[0].name}. Asanwa Boutique: #${now}.`, { chat: GROUP });
   if (prev && now < prev) {
     const passed = rows.slice(now, prev).map((r) => rivalById(s, r.id)).filter((r): r is Rival => !!r && r.main);
-    for (const r of passed.slice(0, 2)) s = inGroup(s, r, pick(LINES.jealous), { choices: REPLIES, ctx: { kind: 'shade', rivalId: r.id } });
+    for (const r of passed.slice(0, 2)) s = talk(s, r, pick(LINES.jealous), 'jealous');
     s = say(s, 'Deborah', `Sis!! You're #${now} on the Top 20 now! Tolani was asking me who your landlord is 👀`, { tone: 'good' });
   }
   return s;
@@ -324,10 +327,10 @@ export function reactToMove(s0: GameState, up: boolean): GameState {
   if (!s.rivals?.length) return s;
   if (up) {
     s = gist(s, `Asanwa Boutique moves to ${s.listing.area}!`, `Divine has signed for a ${TIERS[s.tier].name} on ${s.listing.street}. Her rivals are watching.`, 'you');
-    for (const r of mainRivals(s).filter(() => chance(0.6))) s = inGroup(s, r, r.feeling > 30 ? pick(LINES.welcomeUp('Divine')) : pick(LINES.jealous), r.feeling < 10 ? { choices: REPLIES, ctx: { kind: 'shade', rivalId: r.id } } : {});
+    for (const r of mainRivals(s).filter(() => chance(0.6))) s = r.feeling < 10 ? talk(s, r, pick(LINES.jealous), 'jealous') : inGroup(s, r, pick(LINES.welcomeUp('Divine')));
   } else {
     s = gist(s, `Landlord throws Asanwa Boutique out!`, `Divine has moved to a ${TIERS[s.tier].name}. Rivals are laughing in the group chat.`, 'you', true);
-    for (const r of mainRivals(s).filter((x) => x.feeling < 20 && chance(0.6))) s = inGroup(s, r, pick(LINES.mock('Divine')), { choices: REPLIES, ctx: { kind: 'shade', rivalId: r.id } });
+    for (const r of mainRivals(s).filter((x) => x.feeling < 20 && chance(0.6))) s = talk(s, r, pick(LINES.mock('Divine')), 'mock');
   }
   return s;
 }

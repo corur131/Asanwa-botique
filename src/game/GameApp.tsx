@@ -136,7 +136,7 @@ export default function GameApp({ onLab, initial, storageKey, cloud, notice }: {
     if (s.msgSeq > seenMsg.current) {
       const m = s.messages.find((x) => x.id === s.msgSeq);
       seenMsg.current = s.msgSeq;
-      if (m && !(phone && phoneApp === 'chats' && chat === m.from)) {
+      if (m && !(phone && phoneApp === 'chats' && chat === E.thread(m))) {
         setToast({ from: m.from, text: m.text });
         pop();
         const id = window.setTimeout(() => setToast(null), 4500);

@@ -6,6 +6,7 @@ import { FabricId } from '../types/character';
 import { answerRival, competition, initRivals, poacher, reactToMove, simulateRivals } from './rivals';
 import { answerInvite, contestFor, contestModel, dropStep, judge, planDrop, planEvents, planTips, visitStep, wonListing } from './encounters';
 import { POWER as POWER_CFG, addShout, coolRunning, drainRate, fuelPrice, liveStats, nepaOff, outageAt, planOutages, powerStep, scarcity, source, tankSize } from './power';
+import { answerConvo, startGist } from './convos';
 import { ENERGY, busyNow, divineBonus, energyOf, energyStep, exhausted, payBills, spendEnergy } from './life';
 import { makeCustomer } from './customers';
 import { buildLook, hairGroup, lookCost, scoreLook } from './scoring';
@@ -517,6 +518,8 @@ export function closeShop(s0: GameState): GameState {
   const history = [...s.history, s.today].slice(-120);
   s = { ...s, history };
   s = simulateRivals(s);
+  // now and then Deborah has gist
+  if (s.day > 2 && Math.random() < 0.25 && !(s.convos || []).some((c) => c.with === 'Deborah' && !c.done)) s = startGist(s);
   s = planEvents(s);
   s = planTips(s);
   return { ...s, phase: 'evening', visit: null };
@@ -531,6 +534,7 @@ export function answerMessage(s: GameState, msgId: number, choice: ReplyChoice['
   const m = s.messages.find((x) => x.id === msgId);
   if (!m) return s;
   if (m.ctx?.kind === 'invite') return answerInvite(s, m, choice);
+  if (m.convo) return answerConvo(s, msgId, choice);
   return answerRival(s, msgId, choice);
 }
 
