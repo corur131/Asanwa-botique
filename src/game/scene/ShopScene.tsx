@@ -68,7 +68,7 @@ export function spots(s: GameState) {
   // waiting: next to seats first, then along the front
   const seats = placed.filter((p) => (furnitureById(p.id).seats || 0) > 0);
   const waitPool: Cell[] = [];
-  const seatWaitPool: { cell: Cell; position: [number, number, number]; face: number }[] = [];
+  const seatWaitPool: { uid: string; cell: Cell; position: [number, number, number]; face: number }[] = [];
   const seatLayout = (id: string, count: number): { x: number; z: number; top: number }[] => {
     switch (id) {
       case 'plasticChair': return [{ x: 0, z: 0.02, top: 0.44 }];
@@ -112,7 +112,7 @@ export function spots(s: GameState) {
       // Put that pivot at the cushion top, rather than lifting the whole person.
       const y = Math.max(0, offset.top - 0.46);
       waitPool.push(c);
-      seatWaitPool.push({ cell: c, position: [x, y, z], face: angle });
+      seatWaitPool.push({ uid: st.uid, cell: c, position: [x, y, z], face: angle });
       taken.add(`${c[0]},${c[1]}`);
     });
   }
@@ -418,34 +418,46 @@ function Yard({ s, selected, onTap }: { s: GameState; selected: string | null; o
               </group>
             ) : p.id === 'umbrellaCanopy' ? (
               <group>
-                {/* A real street parasol: weighted foot, pole, broad fabric canopy and scalloped edge. */}
-                <mesh position={[0, 0.06, 0]} castShadow><cylinderGeometry args={[0.25, 0.25, 0.12, 20]} /><meshStandardMaterial color="#51483F" /></mesh>
-                <mesh position={[0, 1.0, 0]} castShadow><cylinderGeometry args={[0.035, 0.035, 1.85, 12]} /><meshStandardMaterial color="#C9CED6" metalness={0.65} /></mesh>
-                {/* A curved, fabric umbrella dome rather than a flat box or square slab. */}
-                <mesh position={[0, 1.98, 0]} scale={[1, 0.36, 1]} castShadow>
-                  <sphereGeometry args={[0.92, 32, 12, 0, Math.PI * 2, 0, Math.PI / 2]} />
+                {/* Distinctive parasol silhouette: tapered fabric, raised crown, rounded scalloped rim. */}
+                <mesh position={[0, 0.07, 0]} castShadow>
+                  <cylinderGeometry args={[0.27, 0.3, 0.14, 24]} />
+                  <meshStandardMaterial color="#51483F" roughness={0.75} />
+                </mesh>
+                <mesh position={[0, 1.03, 0]} castShadow>
+                  <cylinderGeometry args={[0.032, 0.042, 1.82, 12]} />
+                  <meshStandardMaterial color="#C9CED6" metalness={0.65} roughness={0.35} />
+                </mesh>
+                {/* The cone gives a clear sloping canopy rather than a flat square slab. */}
+                <mesh position={[0, 2.03, 0]} castShadow>
+                  <coneGeometry args={[0.98, 0.52, 24, 1, false]} />
                   <meshStandardMaterial color="#C2262E" roughness={0.82} side={THREE.DoubleSide} />
                 </mesh>
-                {/* Alternating rounded scallops give the edge a soft parasol silhouette. */}
-                {Array.from({ length: 12 }, (_, i) => {
-                  const a = (i * Math.PI * 2) / 12;
+                {/* Alternating soft scallops break up the edge like a real market umbrella. */}
+                {Array.from({ length: 16 }, (_, i) => {
+                  const a = (i * Math.PI * 2) / 16;
                   return (
-                    <mesh key={i} position={[Math.cos(a) * 0.82, 1.955, Math.sin(a) * 0.82]} scale={[0.19, 0.065, 0.13]} castShadow>
-                      <sphereGeometry args={[1, 10, 8]} />
+                    <mesh key={i} position={[Math.cos(a) * 0.91, 1.79, Math.sin(a) * 0.91]} scale={[0.14, 0.075, 0.14]} castShadow>
+                      <sphereGeometry args={[1, 12, 8]} />
                       <meshStandardMaterial color={i % 2 ? "#B91F2A" : "#D83A42"} roughness={0.82} />
                     </mesh>
                   );
                 })}
-                <mesh position={[0, 1.97, 0]}>
-                  <torusGeometry args={[0.84, 0.018, 6, 32]} />
+                <mesh position={[0, 1.79, 0]}>
+                  <torusGeometry args={[0.91, 0.022, 8, 48]} />
                   <meshStandardMaterial color="#F4EFE6" roughness={0.75} />
                 </mesh>
-                {/* Fine radial ribs visible beneath the fabric. */}
+                {/* Radial ribs run down the underside of the fabric from crown to rim. */}
                 {Array.from({ length: 12 }, (_, i) => {
                   const a = (i * Math.PI * 2) / 12;
-                  return <B key={`rib-${i}`} p={[Math.cos(a) * 0.43, 2.08, Math.sin(a) * 0.43]} s={[0.014, 0.014, 0.82]} c="#E8B84A" rot={[0, -a, 0]} />;
+                  return <mesh key={`rib-${i}`} position={[Math.cos(a) * 0.46, 1.94, Math.sin(a) * 0.46]} rotation={[0, -a, Math.PI / 4]}>
+                    <cylinderGeometry args={[0.009, 0.009, 0.96, 5]} />
+                    <meshStandardMaterial color="#E8B84A" metalness={0.45} />
+                  </mesh>;
                 })}
-                <mesh position={[0, 2.31, 0]} castShadow><sphereGeometry args={[0.055, 10, 8]} /><meshStandardMaterial color="#D4AF37" metalness={0.8} /></mesh>
+                <mesh position={[0, 2.31, 0]} castShadow>
+                  <sphereGeometry args={[0.06, 12, 8]} />
+                  <meshStandardMaterial color="#D4AF37" metalness={0.8} />
+                </mesh>
               </group>
             ) : (
               <group>
@@ -648,10 +660,11 @@ export default function ShopScene(p: SceneProps) {
       : null;
   const trip = s.security?.trip;
   const errandTarget: Cell | null = trip?.carrier === 'divine' ? (trip.remaining > trip.total / 2 ? sp.outside : sp.door) : null;
-  const divineAt: Cell = p.build ? [Math.min(r.w, sp.door[0] + 2), r.d + 1] : errandTarget || (act ? act.cell : manual || sp.divine);
+  const divineSeat = !p.build && p.act?.pose === 'sit' ? sp.seatWait.find((seat) => seat.uid === p.act!.uid) : undefined;
+  const divineAt: Cell = p.build ? [Math.min(r.w, sp.door[0] + 2), r.d + 1] : errandTarget || (divineSeat?.cell || (act ? act.cell : manual || sp.divine));
   const tired = s.energy !== undefined && s.energy < 30;
   const carryingFuel = !!trip && trip.carrier === 'divine' && trip.remaining <= trip.total / 2;
-  people.push(<Walker key="divine" look={divineLook} spawn={sp.divine} target={divineAt} blocked={blocked} w={r.w} d={r.d} speed={tired ? 0.85 : 1.4} carryBag={carryingFuel} pose={!errandTarget && act && !p.build ? (act.stand ? 'stand' : p.act!.pose) : undefined} face={!errandTarget && act && !p.build ? act.face : undefined} />);
+  people.push(<Walker key="divine" look={divineLook} spawn={sp.divine} target={divineAt} blocked={blocked} w={r.w} d={r.d} speed={tired ? 0.85 : 1.4} carryBag={carryingFuel} pose={!errandTarget && act && !p.build ? (act.stand ? 'stand' : p.act!.pose) : undefined} face={!errandTarget && act && !p.build ? act.face : undefined} seatPosition={divineSeat?.position} seatFace={divineSeat?.face ?? act?.face} />);
   const serviceStation = (profession: 'stylist' | 'makeup' | undefined) => {
     const ids = profession === 'makeup'
       ? ['makeupChair', 'salonChair', 'makeupStation', 'vanity', 'hairStation']
