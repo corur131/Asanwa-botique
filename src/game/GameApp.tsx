@@ -279,7 +279,7 @@ export default function GameApp({ onLab, initial, storageKey, cloud, notice }: {
   };
 
   return (
-    <div className="h-screen flex flex-col overflow-hidden">
+    <div className="h-[100dvh] flex flex-col overflow-hidden">
       {/* HUD */}
       <header className="z-30 flex flex-wrap items-center gap-x-5 gap-y-2 px-4 py-2 border-b border-white/10 bg-[#101219]/95 backdrop-blur shrink-0">
         <div className="flex items-center gap-2">
@@ -671,10 +671,18 @@ export default function GameApp({ onLab, initial, storageKey, cloud, notice }: {
           <DivineEditor
             cfg={lookEdit}
             setCfg={setLookEdit}
-            header={<h2 className="font-serif text-2xl font-bold text-white">Divine's look</h2>}
+            header={
+              <div className="flex items-center justify-between gap-2">
+                <h2 className="font-serif text-2xl font-bold text-white">Divine's look</h2>
+                <div className="flex gap-2">
+                  <Btn size="sm" onClick={() => setLookEdit(null)}>← Back</Btn>
+                  <Btn size="sm" tone="gold" onClick={() => { const c = lookEdit; up((g) => ({ ...g, divine: { ...c, state: 'styled' } })); setLookEdit(null); }}>Save & return</Btn>
+                </div>
+              </div>
+            }
             footer={
               <div className="flex gap-2">
-                <Btn tone="gold" onClick={() => { const c = lookEdit; up((g) => ({ ...g, divine: { ...c, state: 'styled' } })); setLookEdit(null); }}>Save</Btn>
+                <Btn tone="gold" onClick={() => { const c = lookEdit; up((g) => ({ ...g, divine: { ...c, state: 'styled' } })); setLookEdit(null); }}>Save & return to the shop</Btn>
                 <Btn onClick={() => setLookEdit(null)}>Cancel</Btn>
               </div>
             }
@@ -868,8 +876,8 @@ const Evening: React.FC<{ s: GameState; onSleep: () => void; onPhone: () => void
 const DivineEditor: React.FC<{ cfg: CharacterConfig; setCfg: (c: CharacterConfig) => void; header: React.ReactNode; footer: React.ReactNode }> = ({ cfg, setCfg, header, footer }) => {
   const [camera, setCamera] = useState<'full' | 'bust' | 'portrait'>('full');
   return (
-    <div className="h-screen flex flex-col lg:flex-row overflow-hidden">
-      <div className="lg:flex-1 flex flex-col min-h-0 p-3 lg:p-6 gap-3 max-lg:h-[46vh]">
+    <div className="h-[100dvh] flex flex-col lg:flex-row overflow-hidden">
+      <div className="lg:flex-1 flex flex-col min-h-0 p-3 lg:p-6 gap-3 max-lg:h-[42dvh] shrink-0 lg:shrink">
         {header}
         <div className="relative flex-1 min-h-0 rounded-2xl border border-white/10 bg-gradient-to-b from-[#1b1d27] to-[#0f1016] flex justify-center overflow-hidden">
           <div className="absolute top-2 left-2 z-10 flex gap-1">
@@ -885,7 +893,7 @@ const DivineEditor: React.FC<{ cfg: CharacterConfig; setCfg: (c: CharacterConfig
         <div className="flex-1 min-h-0">
           <ControlsPanel config={{ ...cfg, state: 'styled' }} onChange={(c) => setCfg({ ...c, state: 'styled' })} mode="divine" />
         </div>
-        <div className="lg:hidden border-t border-white/10 bg-[#101219] p-3">{footer}</div>
+        <div className="lg:hidden border-t border-white/10 bg-[#101219] p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] shrink-0">{footer}</div>
       </div>
     </div>
   );
