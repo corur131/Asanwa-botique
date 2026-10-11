@@ -312,6 +312,7 @@ export const FURNITURE: FurnitureDef[] = [
   { id: 'waitingStool', name: 'Waiting stool pair', price: 12_000, w: 1, d: 1, mount: 'floor', group: 'Seating', seats: 2, patience: 0.05, prestige: 0, note: 'Two extra seats for walk-in customers.' },
   { id: 'designerRail', name: 'Designer gold rail', price: 95_000, w: 2, d: 1, mount: 'floor', group: 'Display', slots: 18, prestige: 3, minTier: 1, note: 'A premium rail for curated looks.' },
   { id: 'luxuryCheckout', name: 'Luxury checkout counter', price: 130_000, w: 2, d: 1, mount: 'floor', group: 'Display', prestige: 3, tipBonus: 0.04, minTier: 2, note: 'Polished checkout counter for an upscale shop.' },
+  { id: 'cashDrawer', name: 'Lockable cash drawer', price: 7_500, w: 1, d: 1, mount: 'floor', group: 'Display', prestige: 0, note: 'Keeps cash tidy and makes checkout feel organised.' },
 ];
 export const furnitureById = (id: string) => FURNITURE.find((f) => f.id === id)!;
 
