@@ -7,7 +7,7 @@ import { RoomStyle, finishes, room, cellsBlocked, footprint, furnitureById, wall
 import { solarCap, source } from '../power';
 import { stats } from '../engine';
 import { ApplianceOn, CeilingPiece, FloorPiece, WallPiece, B, MirrorLive } from './Furniture3D';
-import { Cell, FigureLook, Walker, lookToFigure } from './People';
+import { Cell, Figure, FigureLook, Walker, lookToFigure } from './People';
 
 export interface SceneProps {
   s: GameState;
@@ -370,6 +370,23 @@ function Yard({ s, selected, onTap }: { s: GameState; selected: string | null; o
                 </Shaker>
                 {running && st.gen === f.gen && <Smoke at={[0.3, 0.45, 0.1]} dense={f.gen === 'small'} />}
               </>
+            ) : p.id === 'securityPost' ? (
+              <group>
+                {/* Small staffed booth: base, walls, front window, and a projecting roof. */}
+                <B p={[0, 0.06, 0]} s={[0.9, 0.12, 0.82]} c="#77736B" />
+                <B p={[0, 0.48, -0.34]} s={[0.72, 0.76, 0.08]} c="#D6C6A6" />
+                <B p={[-0.34, 0.48, 0]} s={[0.08, 0.76, 0.68]} c="#B7A789" />
+                <B p={[0.34, 0.48, 0]} s={[0.08, 0.76, 0.68]} c="#B7A789" />
+                <B p={[0, 0.84, 0]} s={[0.96, 0.12, 0.92]} c="#2F4858" />
+                <B p={[0, 0.48, 0.08]} s={[0.5, 0.34, 0.025]} c="#6BA5B8" m={0.2} />
+                <B p={[0, 0.29, 0.095]} s={[0.54, 0.035, 0.04]} c="#E9D5A2" />
+                <B p={[0, 0.98, 0]} s={[1.05, 0.08, 1.0]} c="#1E252B" />
+                <B p={[0, 1.045, 0]} s={[0.62, 0.035, 0.35]} c="#E8B84A" />
+                <mesh position={[0.2, 1.12, 0.12]}>
+                  <sphereGeometry args={[0.045, 8, 8]} />
+                  <meshStandardMaterial color={s.security?.trip ? "#E8B84A" : "#46A36B"} emissive={s.security?.trip ? "#E8B84A" : "#46A36B"} emissiveIntensity={0.4} />
+                </mesh>
+              </group>
             ) : p.id === 'umbrellaCanopy' ? (
               <group>
                 {/* A real street parasol: weighted foot, pole, broad fabric canopy and scalloped edge. */}
@@ -427,6 +444,30 @@ function Yard({ s, selected, onTap }: { s: GameState; selected: string | null; o
           </group>
         );
       })}
+      {/* Fuel gallons are physical objects: click one to choose a generator to refill. */}
+      {(s.security?.gallons || []).map((g, i) => (
+        <group key={g.id} position={[X + 0.42, 0, 0.5 + items.length + i]} onClick={(e) => { e.stopPropagation(); onTap(`fuel-gallon:${g.id}`); }} onPointerOver={() => (document.body.style.cursor = 'pointer')} onPointerOut={() => (document.body.style.cursor = '')}>
+          <mesh position={[0, 0.19, 0]} castShadow>
+            <cylinderGeometry args={[0.14, 0.14, 0.34, 12]} />
+            <meshStandardMaterial color="#E5B82E" roughness={0.68} />
+          </mesh>
+          <mesh position={[0, 0.39, 0]}>
+            <cylinderGeometry args={[0.055, 0.055, 0.08, 10]} />
+            <meshStandardMaterial color="#30343A" />
+          </mesh>
+          <mesh position={[0.07, 0.36, 0]}>
+            <torusGeometry args={[0.075, 0.018, 5, 10, Math.PI]} />
+            <meshStandardMaterial color="#30343A" />
+          </mesh>
+        </group>
+      ))}
+      {s.security?.guard && (() => {
+        const index = items.findIndex((p) => p.id === 'securityPost');
+        if (index < 0) return null;
+        return <group key={s.security.guard.id} position={[X + 0.42, 0, 0.5 + index + 0.55]} rotation={[0, -0.25, 0]}>
+          <Figure look={lookToFigure(s.security.guard.look)} walking={!!s.security.trip && s.security.trip.carrier === 'guard'} pose={s.security.trip?.carrier === 'guard' ? 'work' : 'stand'} />
+        </group>;
+      })()}
     </group>
   );
 }
