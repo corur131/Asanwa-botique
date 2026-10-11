@@ -389,13 +389,17 @@ export const Walker: React.FC<{
   pose?: Pose;
   /** Which way to face once there (radians); default toward the camera. */
   face?: number;
+  /** Exact world-space cushion position for customers who are sitting. */
+  seatPosition?: [number, number, number];
+  /** Direction the customer faces while seated. */
+  seatFace?: number;
   onArrive?: () => void;
   onClick?: () => void;
-}> = ({ look, spawn, target, blocked, w, d, delay = 0, speed = 1.4, carryBag, highlight, pose, face, onArrive, onClick }) => {
+}> = ({ look, spawn, target, blocked, w, d, delay = 0, speed = 1.4, carryBag, highlight, pose, face, seatPosition, seatFace, onArrive, onClick }) => {
   const group = useRef<THREE.Group>(null);
   const state = useRef({ path: [] as Cell[], i: 0, pos: new THREE.Vector3(spawn[0] + 0.5, 0, spawn[1] + 0.5), wait: delay, arrived: false, key: '', walking: false });
   const [walking, setWalking] = React.useState(false);
-  const tKey = `${target[0]},${target[1]}`;
+  const tKey = `${target[0]},${target[1]}${seatPosition ? `|${seatPosition.join(',')}` : ''}`;
   if (state.current.key !== tKey) {
     const st = state.current;
     const fz = Math.floor(st.pos.z);
@@ -431,10 +435,34 @@ export const Walker: React.FC<{
       }
       if (dist < 0.02) st.i += 1;
       if (!st.walking) { st.walking = true; setWalking(true); }
+    } else if (pose === 'sit' && seatPosition) {
+      // The path ends on a walkable cell beside the furniture. Continue the last
+      // short step onto the actual cushion instead of stopping beside/on air.
+      const [sx, sy, sz] = seatPosition;
+      const dx = sx - st.pos.x;
+      const dz = sz - st.pos.z;
+      const dist = Math.hypot(dx, dz);
+      if (dist > 0.035) {
+        const step = Math.min(dist, speed * dt);
+        if (dist > 0.001) {
+          st.pos.x += (dx / dist) * step;
+          st.pos.z += (dz / dist) * step;
+          g.rotation.y = THREE.MathUtils.lerp(g.rotation.y, Math.atan2(dx, dz), 0.25);
+        }
+        st.pos.y = THREE.MathUtils.lerp(st.pos.y, sy, Math.min(1, dt * 8));
+        if (!st.walking) { st.walking = true; setWalking(true); }
+      } else {
+        st.pos.set(sx, sy, sz);
+        if (st.walking) { st.walking = false; setWalking(false); }
+        g.rotation.y = THREE.MathUtils.lerp(g.rotation.y, seatFace ?? 0.6, 0.12);
+        if (!st.arrived) {
+          st.arrived = true;
+          onArrive?.();
+        }
+      }
     } else {
       if (st.walking) { st.walking = false; setWalking(false); }
-      // Lift the seated figure to the cushion height once they arrive at a seat.
-      st.pos.y = pose === 'sit' ? 0.4 : 0;
+      st.pos.y = 0;
       // face the shop front (toward the camera) while standing
       g.rotation.y = THREE.MathUtils.lerp(g.rotation.y, face ?? 0.6, 0.08);
       if (!st.arrived) {
