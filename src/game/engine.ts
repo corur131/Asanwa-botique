@@ -171,6 +171,7 @@ export function shopBonus(s: GameState, c: Customer, choice: StyleChoice): { bon
   if (!c.male && choice.makeup && st.makeupBonus) { bonus += st.makeupBonus; notes.push(`Makeup station +${st.makeupBonus}`); }
   if (c.cls === 'rich' && st.richBonus) { bonus += st.richBonus; notes.push(`Fitting room +${st.richBonus}`); }
   if (st.scoreBonus) { bonus += st.scoreBonus; notes.push(`Steamer and lighting +${st.scoreBonus}`); }
+  if (c.influencer && s.furniture.some((f) => f.placed && f.id === 'redCarpet')) { bonus += 2; notes.push('Red carpet welcome +2'); }
   const placedIds = s.furniture.filter((f) => f.placed).map((f) => f.id);
   if (c.wants.some((w) => w.kind === 'gele') && placedIds.includes('geleStation')) { bonus += 2; notes.push('Gele station +2'); }
   if (c.wants.some((w) => w.kind === 'nails') && placedIds.some((id) => id === 'nailStation' || id === 'nailPolishRack')) { bonus += 2; notes.push('Nail bar +2'); }
@@ -266,7 +267,8 @@ export function tick(s0: GameState, minutes: number): GameState {
     s = { ...s, arrivals: rest };
     // passers-by look in at a dark, hot shop and keep walking
     const vip = !!a.c.contest;
-    if (!vip && source(s, a.at) === 'none' && chance({ poor: 0.2, middle: 0.35, rich: 0.6 }[a.c.cls])) { lostHeat++; continue; }
+    const lanternHelps = (s.power?.lanternBattery || 0) > 0 && s.furniture.some((f) => f.placed && f.id === 'emergencyLantern');
+    if (!vip && source(s, a.at) === 'none' && chance({ poor: lanternHelps ? 0.08 : 0.2, middle: lanternHelps ? 0.16 : 0.35, rich: lanternHelps ? 0.3 : 0.6 }[a.c.cls])) { lostHeat++; continue; }
     if (!vip && waiting(s).length >= waitingRoom(s)) { lostDoor++; continue; }
     // the speaker is switched off: fewer people wander in from the street
     if (!vip && s.off && s.furniture.some((p) => p.placed && p.id === 'speaker' && s.off![p.uid]) && chance(0.08)) continue;
@@ -286,6 +288,10 @@ export function tick(s0: GameState, minutes: number): GameState {
   s = { ...s, inShop: s.inShop.map((v) => (v.by ? v : { ...v, waited: (v.waited ?? Math.max(0, s0.clock - v.arrived)) + step * drainRate(s, v.c.cls) })) };
   for (const v of waiting(s)) {
     if ((v.waited || 0) > v.patience) {
+      if (s.rivals.length && Math.random() < 0.45) {
+        const rival = s.rivals[Math.floor(Math.random() * s.rivals.length)];
+        s = addShout(s, v.c.name, pick([`I'm tired of waiting. I'm taking my money to ${rival.shop}.`, `This queue is too much. ${rival.owner} at ${rival.shop} will attend to me faster.`, `Abeg, I'm leaving. Next time I'll go to ${rival.shop}.`]), 'complain');
+      }
       s = depart(s, v.c, v.c.look, false);
       s = { ...s, rep: clamp(s.rep - 0.4, 0, 100), today: { ...s.today, lost: s.today.lost + 1, impatient: (s.today.impatient || 0) + 1, repChange: s.today.repChange - 0.4 } };
     }
@@ -855,7 +861,8 @@ export function postLook(s: GameState, c: Customer, look: CharacterConfig, score
   if (!canPost(s, score)) return s;
   const clsMult = { poor: 0.6, middle: 1, rich: 2 }[c.cls];
   const fatigue = 1 / (1 + postsToday(s));
-  const gained = Math.max(5, Math.round((score - 60) * clsMult * (4 + Math.random() * 4) * fatigue * (1 + (s.followers || 0) / 6000)));
+  const flowerWall = s.furniture.some((f) => f.placed && f.id === 'flowerWall');
+  const gained = Math.max(5, Math.round((score - 60) * clsMult * (4 + Math.random() * 4) * fatigue * (1 + (s.followers || 0) / 6000) * (flowerWall ? 1.35 : 1)));
   const likes = Math.round(((s.followers || 0) + gained) * (0.08 + (score - 70) / 300) * (0.8 + Math.random() * 0.4));
   const post = { id: `p${s.day}-${Math.random().toString(36).slice(2, 7)}`, day: s.day, look, name: c.name, caption: pick(CAPTIONS), score, likes, gained };
   return { ...s, followers: (s.followers || 0) + gained, posts: [post, ...(s.posts || [])].slice(0, 24) };
