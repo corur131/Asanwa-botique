@@ -263,6 +263,15 @@ export const FURNITURE: FurnitureDef[] = [
   { id: 'curtainCorner', name: 'Curtain changing corner', price: 25_000, w: 1, d: 1, mount: 'floor', group: 'Decor', richBonus: 1, prestige: 1, note: 'Somewhere private to try on: rich clients +1.' },
   { id: 'fittingRoom', name: 'Fitting room', price: 180_000, w: 2, d: 2, mount: 'floor', group: 'Decor', prestige: 3, richBonus: 2, minTier: 1, note: 'Rich clients score +2.' },
   { id: 'windowPodium', name: 'Window display podium', price: 90_000, w: 2, d: 1, mount: 'floor', group: 'Decor', prestige: 2, traffic: 0.1, minTier: 1, note: 'Two dressed forms on a podium: more walk-ins.' },
+  // new Nigerian boutique systems: every item is wired into gameplay
+  { id: 'posTerminal', name: 'POS terminal', price: 45_000, w: 1, d: 1, mount: 'floor', group: 'Comfort & power', prestige: 1, minTier: 1, note: 'Accept card payments reliably; charges a small fee on POS sales.' },
+  { id: 'cctv', name: 'CCTV security camera', price: 85_000, w: 1, d: 1, mount: 'wall', group: 'Comfort & power', prestige: 1, minTier: 1, note: 'Keeps an eye on busy rails and reduces shoplifting.' },
+  { id: 'fireExtinguisher', name: 'Fire extinguisher', price: 18_000, w: 1, d: 1, mount: 'wall', group: 'Comfort & power', prestige: 0, note: 'Stops a generator flare-up before it becomes an expensive fire.' },
+  { id: 'alterationsCorner', name: 'Alterations corner', price: 95_000, w: 2, d: 1, mount: 'floor', group: 'Hair & makeup', prestige: 2, minTier: 1, note: 'Quick adjustments rescue fitted-clothes sales that would otherwise be lost.' },
+  { id: 'umbrellaCanopy', name: 'Street umbrella canopy', price: 32_000, w: 1, d: 1, mount: 'yard', group: 'Decor', patience: 0.05, prestige: 1, note: 'Shields the queue outside from Lagos sun and rain.' },
+  { id: 'flowerWall', name: 'Gidigram flower wall', price: 55_000, w: 2, d: 1, mount: 'wall', group: 'Decor', prestige: 2, traffic: 0.04, note: 'A photo backdrop that boosts Gidigram engagement.' },
+  { id: 'lantern', name: 'Rechargeable shop lantern', price: 12_000, w: 1, d: 1, mount: 'ceiling', group: 'Lighting', prestige: 0, note: 'Keeps the shop visible during outages and softens the dark-shop styling penalty.' },
+  { id: 'rechargeableFan', name: 'Rechargeable standing fan', price: 38_000, w: 1, d: 1, mount: 'floor', group: 'Comfort & power', cool: 0.12, prestige: 1, note: 'A backup fan helps Divine and customers cope when NEPA takes light.' },
   // paint and floor: one of each at a time, and they stay behind when you move
   { id: 'paintWhite', name: 'Fresh white paint', price: 15_000, w: 1, d: 1, mount: 'finish', group: 'Paint & floor', paint: ['#F2EEE6', '#D9D2C4'], prestige: 1, note: 'Clean and bright. Stays with the shop when you move.' },
   { id: 'paintBlush', name: 'Blush pink paint', price: 20_000, w: 1, d: 1, mount: 'finish', group: 'Paint & floor', paint: ['#F2CACC', '#DCA4AA'], prestige: 1, note: 'Soft and girly.' },
