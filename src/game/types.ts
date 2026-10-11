@@ -328,8 +328,12 @@ export interface Message {
   tone: 'info' | 'warn' | 'danger' | 'good';
 }
 
+export type LagosWeather = 'sunny' | 'rainy' | 'harmattan' | 'cloudy';
+
 export interface GameState {
   version: 4;
+  /** Lagos-season weather, optional so older saves continue loading. */
+  weather?: LagosWeather;
   /** The shop she rents now. */
   listing: Listing;
   /** Furniture she owns: placed in the room or in storage. */
