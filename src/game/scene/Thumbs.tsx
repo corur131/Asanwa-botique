@@ -7,10 +7,11 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { furnitureById } from '../shop';
 import { B, CeilingPiece, FloorPiece, WallPiece } from './Furniture3D';
+import { YardModel } from './YardModels';
 
 const SAMPLE = ['#C2262E', '#2846A8', '#E3B23C', '#2F5D3A', '#7A3A8C', '#F6F1E8', '#E86A2E', '#1E1E24', '#E07AA0', '#3C5A8A', '#C9A163', '#6B8E23', '#8E1F3A', '#1F6FB2', '#5A3A28', '#F2C8CC'];
 
-const STORE = 'asanwa-thumbs-v2';
+const STORE = 'asanwa-thumbs-v3';
 const cache = new Map<string, string>(
   (() => {
     try {
@@ -95,7 +96,8 @@ function Stage({ id, onDone }: { id: string; onDone: (url: string) => void }) {
     <group>
       <B p={[0, -0.02, 0]} s={[big + 1.2, 0.04, big + 1.2]} c="#8C8478" />
       {wall && <B p={[0, h / 2, -0.06]} s={[f.w + 1, h, 0.1]} c="#B9AE98" />}
-      {(f.mount === 'floor' || f.mount === 'yard') && <FloorPiece id={id} colors={SAMPLE.slice(0, f.slots || 0)} />}
+      {(f.mount === 'floor' || (f.mount === 'yard' && id !== 'umbrellaCanopy' && id !== 'securityPost')) && <FloorPiece id={id} colors={SAMPLE.slice(0, f.slots || 0)} />}
+      {f.mount === 'yard' && (id === 'umbrellaCanopy' || id === 'securityPost') && <YardModel id={id} />}
       {f.mount === 'yard' && f.solar && (
         <group>
           <B p={[0, 1.0, 0]} s={[0.95, 0.04, 0.75]} c="#1B2A4A" m={0.5} r={0.2} rot={[0.5, 0, 0]} />
