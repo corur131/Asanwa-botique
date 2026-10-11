@@ -884,10 +884,6 @@ const SecurityMenu: React.FC<{
                 </select>
               </label>
             </div>
-            <div className="grid sm:grid-cols-2 gap-2">
-              <Btn className="w-full" disabled={!!trip || s.cash < price} onClick={() => onBuy(litres)}>{guard && post ? 'Guard buys a gallon' : 'Divine goes to buy fuel'} · {naira(price)}</Btn>
-              <Btn className="w-full" tone="gold" disabled={!!trip || !generators.length || s.cash < price} onClick={() => onBuy(litres, selectedGenerator)}>{guard && post ? 'Guard buys & refills' : 'Buy & refill generator'} · {naira(price)}</Btn>
-            </div>
             {generators.length > 0 && (
               <label className="block text-xs text-slate-300">Generator to refill
                 <select value={selectedGenerator} onChange={(e) => setGeneratorUid(e.target.value)} className="mt-1 block w-full rounded-lg border border-white/15 bg-[#181b24] p-2 text-sm text-white">
@@ -895,6 +891,10 @@ const SecurityMenu: React.FC<{
                 </select>
               </label>
             )}
+            <div className="grid sm:grid-cols-2 gap-2">
+              <Btn className="w-full" disabled={!!trip || s.cash < price} onClick={() => onBuy(litres)}>{guard && post ? 'Guard buys a gallon' : 'Divine goes to buy fuel'} · {naira(price)}</Btn>
+              <Btn className="w-full" tone="gold" disabled={!!trip || !generators.length || s.cash < price} onClick={() => onBuy(litres, selectedGenerator)}>{guard && post ? 'Guard buys & refills' : 'Buy & refill generator'} · {naira(price)}</Btn>
+            </div>
             {(s.security?.gallons || []).length > 0 && <p className="text-xs text-slate-400">There are {s.security!.gallons!.length} physical gallon(s) outside. Click a gallon in the yard to pour it.</p>}
             <p className="text-[11px] text-slate-500">The fuel is paid for when the trip starts. A trip takes in-game time; when the carrier returns, the gallon appears outside or the selected generator is refilled. This can be started before opening or after closing.</p>
           </div>
