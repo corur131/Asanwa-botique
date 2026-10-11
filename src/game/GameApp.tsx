@@ -613,7 +613,7 @@ export default function GameApp({ onLab, initial, storageKey, cloud, notice }: {
                 const c = step.c;
                 const score = E.scoreInShop(s, c, step.choice);
                 const cost = lookCost(c, step.choice, s.stock);
-                const result = E.settle(c, score, price, cost.consumables);
+                const result = E.settleAtShop(s, c, score, price, cost.consumables);
                 setStep({ kind: 'reveal', c, choice: step.choice, stockBefore: s.stock, score, st: result });
                 done(c.id);
                 up((g) => E.applyLook(g, c, step.choice, result, score));
