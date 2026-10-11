@@ -63,6 +63,8 @@ import { Sparkles, Eye, Scissors, Heart, Shirt, Gem, Check, Info } from 'lucide-
 interface ControlsPanelProps {
   config: CharacterConfig;
   onChange: (newConfig: CharacterConfig) => void;
+  /** 'divine': the game's opening screen. Women's bodies only, always styled. */
+  mode?: 'lab' | 'divine';
 }
 
 type TabType = 'model' | 'face' | 'hair' | 'makeup' | 'outfit' | 'accessories';
@@ -175,7 +177,8 @@ const ACC_TABS: { id: AccTab; label: string }[] = [
 const colorSwatches = FABRIC_COLORS.map((c, i) => ({ name: `Colour ${i + 1}`, color: c }));
 
 // ---------------------------------------------------------------------------
-export const ControlsPanel: React.FC<ControlsPanelProps> = ({ config, onChange }) => {
+export const ControlsPanel: React.FC<ControlsPanelProps> = ({ config, onChange, mode = 'lab' }) => {
+  const divine = mode === 'divine';
   const [activeTab, setActiveTab] = useState<TabType>('model');
   const update = (partial: Partial<CharacterConfig>) => onChange({ ...config, ...partial });
 
@@ -246,7 +249,7 @@ export const ControlsPanel: React.FC<ControlsPanelProps> = ({ config, onChange }
             className={`flex items-center gap-1.5 px-3 py-2 rounded-md text-xs font-medium transition-colors whitespace-nowrap ${activeTab === t.id ? 'bg-amber-600 text-white shadow-sm' : 'text-slate-400 hover:text-white hover:bg-white/5'}`}
           >
             {t.icon}
-            {t.label}
+            {divine && t.id === 'hair' ? 'Hair' : divine && t.id === 'model' ? 'Body & skin' : t.label}
           </button>
         ))}
       </div>
@@ -255,9 +258,9 @@ export const ControlsPanel: React.FC<ControlsPanelProps> = ({ config, onChange }
         {activeTab === 'model' && (
           <>
             <Section title="Body">
-              <Chips options={BODIES} value={config.body} onPick={switchBody} cols={4} />
+              <Chips options={divine ? BODIES.filter((b) => b.id !== 'male') : BODIES} value={config.body} onPick={switchBody} cols={divine ? 3 : 4} />
             </Section>
-            <Section title="State" note="Plain is how customers walk in. Styled is after Divine is done with them.">
+            {!divine && <Section title="State" note="Plain is how customers walk in. Styled is after Divine is done with them.">
               <Chips
                 options={[
                   { id: 'styled', label: 'Styled', note: 'Hair done, makeup, outfit' },
@@ -267,7 +270,7 @@ export const ControlsPanel: React.FC<ControlsPanelProps> = ({ config, onChange }
                 onPick={(state) => update({ state })}
                 cols={2}
               />
-            </Section>
+            </Section>}
             <Section title="Skin tone">
               <div className="space-y-2">
                 {(Object.keys(SKIN_TONES) as SkinToneId[]).map((k) => {

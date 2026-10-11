@@ -1,8 +1,9 @@
 import React, { Suspense, lazy, useEffect, useRef, useState } from 'react';
 import { CharacterSvg } from '../components/renderer/renderCharacter';
-import { SKIN_TONES } from '../constants/skinTones';
 import { DIVINE_CONFIG } from '../constants/presets';
-import { CharacterConfig, SkinToneId } from '../types/character';
+import { CharacterConfig } from '../types/character';
+import { ControlsPanel } from '../components/ControlsPanel';
+import { generateRandomCustomer } from '../utils/randomizer';
 import { SHOP_MINUTES, TIERS, naira } from './economy';
 import * as E from './engine';
 import { lookCost, buildLook } from './scoring';
@@ -48,6 +49,7 @@ export default function GameApp({ onLab, initial, storageKey, cloud, notice }: {
   const [paused, setPaused] = useState(false);
   const [hidden, setHidden] = useState(false);
   const [confirmClose, setConfirmClose] = useState(false);
+  const [lookEdit, setLookEdit] = useState<CharacterConfig | null>(null);
   const [bubbles, setBubbles] = useState<Shout[]>([]);
   const seenShout = useRef<number>(s?.shoutSeq || 0);
   const [toast, setToast] = useState<{ from: string; text: string } | null>(null);
@@ -558,6 +560,22 @@ export default function GameApp({ onLab, initial, storageKey, cloud, notice }: {
         );
       })()}
 
+      {lookEdit && (
+        <div className="fixed inset-0 z-[65] bg-[#0d0e12]">
+          <DivineEditor
+            cfg={lookEdit}
+            setCfg={setLookEdit}
+            header={<h2 className="font-serif text-2xl font-bold text-white">Divine's look</h2>}
+            footer={
+              <div className="flex gap-2">
+                <Btn tone="gold" onClick={() => { const c = lookEdit; up((g) => ({ ...g, divine: { ...c, state: 'styled' } })); setLookEdit(null); }}>Save</Btn>
+                <Btn onClick={() => setLookEdit(null)}>Cancel</Btn>
+              </div>
+            }
+          />
+        </div>
+      )}
+
       {confirmClose && (
         <Modal onClose={() => setConfirmClose(false)}>
           <h2 className="font-serif text-xl font-bold text-white mb-2">Close early?</h2>
@@ -597,6 +615,7 @@ export default function GameApp({ onLab, initial, storageKey, cloud, notice }: {
               <Btn onClick={sound.toggleMusic}>Music: {sound.music ? 'on' : 'off'}</Btn>
               <Btn onClick={sound.toggleSfx}>Message pop: {sound.sfx ? 'on' : 'off'}</Btn>
             </div>
+            {s.phase !== 'shop' && <Btn className="w-full" onClick={() => { setMenu(false); setLookEdit(s.divine); }}>Change Divine's look</Btn>}
             <Btn className="w-full" onClick={onLab}>Character Lab</Btn>
             <Btn className="w-full" tone="danger" onClick={() => setConfirmNew(true)}>Start a new game</Btn>
           </div>
@@ -739,76 +758,61 @@ const Evening: React.FC<{ s: GameState; onSleep: () => void; onPhone: () => void
   );
 };
 
-const NewGame: React.FC<{ onStart: (cfg: CharacterConfig) => void; onLab: () => void }> = ({ onStart, onLab }) => {
-  const [cfg, setCfg] = useState<CharacterConfig>(DIVINE_CONFIG);
-  const set = (p: Partial<CharacterConfig>) => setCfg((c) => ({ ...c, ...p }));
+/** Divine's look: the full editor, used when starting and from the menu. */
+const DivineEditor: React.FC<{ cfg: CharacterConfig; setCfg: (c: CharacterConfig) => void; header: React.ReactNode; footer: React.ReactNode }> = ({ cfg, setCfg, header, footer }) => {
+  const [camera, setCamera] = useState<'full' | 'bust' | 'portrait'>('full');
   return (
-    <div className="min-h-screen p-4 flex items-center justify-center">
-      <div className="max-w-5xl w-full grid md:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)] gap-6 items-center">
-        <div className="rounded-2xl border border-white/10 bg-gradient-to-b from-[#1b1d27] to-[#0f1016] max-w-[380px] mx-auto w-full">
-          <CharacterSvg config={cfg} idPrefix="newgame" camera="full" />
-        </div>
-        <div className="space-y-4">
-          <div>
-            <div className="text-xs uppercase tracking-[0.3em] text-amber-300/80">Yaba, Lagos</div>
-            <h1 className="font-serif text-4xl font-bold text-white">Asanwa Boutique</h1>
-            <p className="text-sm text-slate-300 mt-2">
-              You are <b>Divine</b>, a stylist with a rough little container kiosk, ₦200,000 and big dreams. Style your customers, set your prices, pay your rent, fix up your shop, and grow from Yaba to the flagship store on Victoria Island.
-            </p>
+    <div className="h-screen flex flex-col lg:flex-row overflow-hidden">
+      <div className="lg:flex-1 flex flex-col min-h-0 p-3 lg:p-6 gap-3 max-lg:h-[46vh]">
+        {header}
+        <div className="relative flex-1 min-h-0 rounded-2xl border border-white/10 bg-gradient-to-b from-[#1b1d27] to-[#0f1016] flex justify-center overflow-hidden">
+          <div className="absolute top-2 left-2 z-10 flex gap-1">
+            {(['full', 'bust', 'portrait'] as const).map((v) => (
+              <Chip key={v} on={camera === v} onClick={() => setCamera(v)}>{v === 'full' ? 'Full' : v === 'bust' ? 'Bust' : 'Face'}</Chip>
+            ))}
           </div>
-          <Card title="Make Divine yours">
-            <div className="space-y-3">
-              <div>
-                <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1">Skin tone</div>
-                <div className="flex flex-wrap gap-1.5">
-                  {(Object.keys(SKIN_TONES) as SkinToneId[]).map((k) => (
-                    <button key={k} title={SKIN_TONES[k].name} onClick={() => set({ skinTone: k })} className={`w-8 h-8 rounded-full border-2 ${cfg.skinTone === k ? 'border-amber-400 scale-110' : 'border-white/20'}`} style={{ background: SKIN_TONES[k].base }} />
-                  ))}
-                </div>
-              </div>
-              <div>
-                <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1">Body</div>
-                <div className="flex flex-wrap gap-1.5">
-                  {([['femaleSlim', 'Slim'], ['femaleRegular', 'Curvy'], ['femalePlus', 'Plus-size']] as const).map(([id, l]) => (
-                    <Chip key={id} on={cfg.body === id} onClick={() => set({ body: id })}>{l}</Chip>
-                  ))}
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1">Face</div>
-                  <div className="flex flex-wrap gap-1.5">
-                    {(['oval', 'heart', 'square'] as const).map((f) => <Chip key={f} on={cfg.faceShape === f} onClick={() => set({ faceShape: f })}>{f[0].toUpperCase() + f.slice(1)}</Chip>)}
-                  </div>
-                </div>
-                <div>
-                  <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1">Eyes</div>
-                  <div className="flex flex-wrap gap-1.5">
-                    {(['almond', 'upturned', 'doe', 'hooded'] as const).map((f) => <Chip key={f} on={cfg.eyes.shape === f} onClick={() => set({ eyes: { ...cfg.eyes, shape: f } })}>{f[0].toUpperCase() + f.slice(1)}</Chip>)}
-                  </div>
-                </div>
-                <div>
-                  <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1">Nose</div>
-                  <div className="flex flex-wrap gap-1.5">
-                    {([['narrowDefined', 'Narrow'], ['button', 'Button'], ['broadAfrican', 'Broad'], ['softRegal', 'Regal']] as const).map(([id, l]) => <Chip key={id} on={cfg.nose === id} onClick={() => set({ nose: id })}>{l}</Chip>)}
-                  </div>
-                </div>
-                <div>
-                  <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1">Lips</div>
-                  <div className="flex flex-wrap gap-1.5">
-                    {([['fullPout', 'Full'], ['definedCupid', 'Cupid'], ['widePillowy', 'Wide'], ['subtleSoft', 'Soft']] as const).map(([id, l]) => <Chip key={id} on={cfg.lips.shape === id} onClick={() => set({ lips: { ...cfg.lips, shape: id } })}>{l}</Chip>)}
-                  </div>
-                </div>
-              </div>
-              <p className="text-[11px] text-slate-500">New hair, clothes and makeup for Divine come later, bought with money you earn.</p>
-            </div>
-          </Card>
-          <div className="flex gap-2">
-            <Btn tone="gold" size="lg" onClick={() => onStart(cfg)}>Open the kiosk →</Btn>
-            <Btn size="lg" onClick={onLab}>Character Lab</Btn>
-          </div>
+          <CharacterSvg config={{ ...cfg, state: 'styled' }} idPrefix="divine-edit" camera={camera} className="h-full w-auto max-w-full" />
         </div>
+        <div className="max-lg:hidden">{footer}</div>
+      </div>
+      <div className="flex-1 lg:flex-none lg:w-[440px] min-h-0 flex flex-col">
+        <div className="flex-1 min-h-0">
+          <ControlsPanel config={{ ...cfg, state: 'styled' }} onChange={(c) => setCfg({ ...c, state: 'styled' })} mode="divine" />
+        </div>
+        <div className="lg:hidden border-t border-white/10 bg-[#101219] p-3">{footer}</div>
       </div>
     </div>
+  );
+};
+
+const NewGame: React.FC<{ onStart: (cfg: CharacterConfig) => void; onLab: () => void }> = ({ onStart, onLab }) => {
+  const [cfg, setCfg] = useState<CharacterConfig>(DIVINE_CONFIG);
+  const randomise = () => {
+    let c = generateRandomCustomer('styled');
+    for (let k = 0; k < 30 && c.body === 'male'; k++) c = generateRandomCustomer('styled');
+    setCfg({ ...c, state: 'styled' });
+  };
+  return (
+    <DivineEditor
+      cfg={cfg}
+      setCfg={setCfg}
+      header={
+        <div>
+          <div className="text-xs uppercase tracking-[0.3em] text-amber-300/80">Yaba, Lagos</div>
+          <h1 className="font-serif text-2xl lg:text-4xl font-bold text-white">Asanwa Boutique</h1>
+          <p className="text-xs lg:text-sm text-slate-300 mt-1 max-lg:hidden">
+            You are <b>Divine</b>, a stylist with a rough little container kiosk, ₦200,000 and big dreams. Make her yours: body, skin, face, hair, makeup and outfit.
+          </p>
+        </div>
+      }
+      footer={
+        <div className="flex flex-wrap gap-2">
+          <Btn tone="gold" size="lg" onClick={() => onStart({ ...cfg, state: 'styled' })}>Open the kiosk →</Btn>
+          <Btn onClick={randomise}>Surprise me</Btn>
+          <Btn onClick={() => setCfg(DIVINE_CONFIG)}>Reset</Btn>
+          <Btn onClick={onLab}>Character Lab</Btn>
+        </div>
+      }
+    />
   );
 };
