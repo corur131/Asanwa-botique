@@ -5,7 +5,7 @@ import { canBuy, entryFor, isClothing, makeDesign, pieceCost } from './market';
 import { FabricId } from '../types/character';
 import { answerRival, competition, initRivals, poacher, reactToMove, simulateRivals } from './rivals';
 import { answerInvite, contestFor, contestModel, dropStep, judge, planDrop, planEvents, planTips, visitStep, wonListing } from './encounters';
-import { POWER as POWER_CFG, addShout, coolRunning, drainRate, fuelPrice, liveStats, nepaOff, outageAt, planOutages, powerStep, scarcity, source, tankSize } from './power';
+import { POWER as POWER_CFG, activeGeneratorUid, addShout, coolRunning, drainRate, fuelOf, fuelPrice, liveStats, nepaOff, outageAt, planOutages, pourFuel, powerStep, scarcity, source, tankSize } from './power';
 import { answerConvo, startGist } from './convos';
 import { ENERGY, busyNow, divineBonus, energyOf, energyStep, exhausted, payBills, spendEnergy } from './life';
 import { makeCustomer } from './customers';
@@ -239,7 +239,7 @@ export const staffCapacity = (s: GameState) => s.staff.length * STAFF_CAPACITY;
 export const inBlackout = (s: GameState, t = s.clock) => nepaOff(s, t);
 /** Fans and AC only work when there is light, solar or a generator. */
 export const coolNow = (s: GameState) => coolRunning(s);
-export { POWER, fuelOf, fuelPerHour, fuelPrice, loadKw, refuel, scarcity, setGen, solarCap, source, tankSize } from './power';
+export { POWER, activeGeneratorUid, fuelOf, fuelPerHour, fuelPrice, loadKw, pourFuel, refuel, scarcity, setGen, solarCap, source, tankSize } from './power';
 export { ENERGY, actionsFor, busyNow, energyOf, exhausted, interact, isTired, weeklyBills } from './life';
 export type { Action, ActionId } from './life';
 export const waiting = (s: GameState) => s.inShop.filter((v) => !v.by);
@@ -718,12 +718,16 @@ export function buyFurniture(s: GameState, id: string): GameState {
   if (f.mount === 'yard') {
     if (yardUsed(furniture) >= yardCapacity(s.listing)) return s;
     if (f.solar && furniture.filter((p) => furnitureById(p.id).solar).length >= POWER_CFG.maxPanels) return s;
-    const hadTank = tankSize(s);
-    const next = money({ ...s, furniture: [...furniture, { ...item, placed: true, x: yardUsed(furniture) }] }, -f.price, f.name);
+    const previousActive = activeGeneratorUid(s);
+    const knownFuel = { ...(s.power?.generatorFuel || {}) };
+    if (previousActive && knownFuel[previousActive] === undefined) knownFuel[previousActive] = fuelOf(s, previousActive);
+    const next = money({ ...s, power: { ...s.power, generatorFuel: knownFuel }, furniture: [...furniture, { ...item, placed: true, x: yardUsed(furniture) }] }, -f.price, f.name);
     if (f.solar) return { ...next, power: { ...next.power, solar: (next.power?.solar || 0) + POWER_CFG.minutesPerPanel } };
-    // a new generator comes with 5 litres in the tank
-    const fuel = hadTank ? Math.min(tankSize(next), (s.power?.fuel ?? hadTank)) : 5;
-    return { ...next, power: { ...next.power, fuel: Math.max(fuel, 5) } };
+    if (!f.gen) return next;
+    // Every generator starts with its own 5-litre reserve.
+    const generatorFuel = { ...(next.power?.generatorFuel || {}), [item.uid]: 5 };
+    const primary = activeGeneratorUid({ ...next, power: { ...next.power, generatorFuel } });
+    return { ...next, power: { ...next.power, generatorFuel, fuel: primary ? (generatorFuel[primary] ?? next.power.fuel ?? 0) : next.power.fuel } };
   }
   if (f.mount === 'finish') {
     // new paint goes over the old paint; new flooring replaces the old floor
