@@ -68,6 +68,7 @@ function wantLine(w: Want, male: boolean): string {
     case 'native': return pick(['I want native.', 'Make it native, I want to rep my culture.', 'Native wear, please.']);
     case 'english': return pick(['No native this time, I want English wear.', 'I want English, something modern.']);
     case 'gele': return pick(['I must tie gele.', "And gele! It's not complete without gele."]);
+    case 'nails': return pick(['Please make my nails pop too.', 'Fresh nails to match the outfit, please.', 'I need a proper nail colour for this look.']);
     case 'noHeels': return pick(['Please no heels, my legs no fit.', 'Flat shoes only, I go dance well well.']);
     case 'fitted': return pick(['Make it show my shape.', 'I want something that hugs my body.']);
     case 'covered': return pick(['Nothing too short or open.', 'Keep it decent please, nothing short.']);
@@ -90,7 +91,7 @@ function wantsFor(occasion: Occasion, male: boolean, cls: CustomerClass, wigs: b
   }
   if (occasion === 'church' && !male) pool.push({ kind: 'covered' });
   if (!male) {
-    if (['party', 'dateNight', 'birthday', 'redCarpet'].includes(occasion)) pool.push({ kind: 'fitted' }, { kind: 'glam' });
+    if (['party', 'dateNight', 'birthday', 'redCarpet'].includes(occasion)) pool.push({ kind: 'fitted' }, { kind: 'glam' }, { kind: 'nails' });
     if (['owambe', 'wedding'].includes(occasion)) pool.push({ kind: 'noHeels' }, { kind: 'glam' });
     if (['church', 'office', 'casual', 'brunch'].includes(occasion)) pool.push({ kind: 'naturalFace' });
     pool.push({ kind: 'hair', group: pick(wigs ? ['wig', 'braids', 'natural', 'updo'] : ['braids', 'natural', 'updo', 'twists']) });
@@ -150,6 +151,7 @@ function everydayWardrobe(male: boolean) {
   const c = () => pick(EVERYDAY);
   const g = (style: string, fabric: 'plain' | 'denim' | 'ankara' = 'plain') => ({ style, fabric, color: fabric === 'denim' ? '#3C5A8A' : c(), color2: c(), pattern: Math.floor(Math.random() * 10) });
   if (male) return pick([{ top: g('tee'), bottom: g('jeans', 'denim') }, { top: g('polo'), bottom: g('chinos') }, { top: g('mensBuba', 'plain'), bottom: g('sokoto') }]);
+  // 20 additional everyday and occasion outfit combinations, using the existing garment catalogue.
   return pick([
     { top: g('tshirt'), bottom: g('skinnyJeans', 'denim') },
     { top: g('tshirt'), bottom: g('maxiSkirt') },
@@ -157,6 +159,26 @@ function everydayWardrobe(male: boolean) {
     { top: g('buba', 'ankara'), bottom: g('iro', 'ankara') },
     { dress: g('bubu', 'ankara') },
     { top: g('cropTee'), bottom: g('baggyJeans', 'denim') },
+    { top: g('camisole'), bottom: g('pencilSkirt') },
+    { top: g('peplumTop', 'ankara'), bottom: g('iro', 'ankara') },
+    { top: g('offShoulderTop'), bottom: g('denimMaxiSkirt', 'denim') },
+    { top: g('wrapTop'), bottom: g('wideLegTrousers') },
+    { top: g('puffBlouse'), bottom: g('pleatedMidi') },
+    { top: g('laceBlouse', 'ankara'), bottom: g('georgeWrapper', 'ankara') },
+    { top: g('offShoulderBuba', 'ankara'), bottom: g('iro', 'ankara') },
+    { dress: g('bodyconMini') },
+    { dress: g('slipDress') },
+    { dress: g('wrapDress') },
+    { dress: g('shirtDress') },
+    { dress: g('tubeMidi') },
+    { dress: g('maxiDress') },
+    { dress: g('ruffleMaxi') },
+    { dress: g('mermaidGown', 'ankara') },
+    { dress: g('adireMaxi', 'ankara') },
+    { dress: g('jumpsuit') },
+    { dress: g('playsuit') },
+    { top: g('blazer'), bottom: g('straightTrousers') },
+    { top: g('kimono'), bottom: g('skinnyJeans', 'denim') },
   ]);
 }
 

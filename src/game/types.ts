@@ -30,6 +30,7 @@ export type Want =
   | { kind: 'native' }
   | { kind: 'english' }
   | { kind: 'gele' }
+  | { kind: 'nails' }
   | { kind: 'noHeels' }
   | { kind: 'fitted' }
   | { kind: 'covered' }
@@ -274,6 +275,8 @@ export interface DayLog {
   impatient?: number;
   doorLost?: number;
   heatLost?: number;
+  /** Walk-ins lost to bad weather. */
+  weatherLost?: number;
   closedOn?: number;
   fuel?: number;
   outageMinutes?: number;
@@ -328,8 +331,12 @@ export interface Message {
   tone: 'info' | 'warn' | 'danger' | 'good';
 }
 
+export type LagosWeather = 'sunny' | 'rainy' | 'harmattan' | 'cloudy';
+
 export interface GameState {
   version: 4;
+  /** Lagos-season weather, optional so older saves continue loading. */
+  weather?: LagosWeather;
   /** The shop she rents now. */
   listing: Listing;
   /** Furniture she owns: placed in the room or in storage. */
@@ -360,7 +367,7 @@ export interface GameState {
   /** NEPA cuts today, in shop minutes (can start before opening and run past closing). */
   outages: { from: number; to: number }[];
   /** Generator on, solar battery minutes, litres in the generator's tank. */
-  power: { gen: boolean; solar: number; fuel?: number };
+  power: { gen: boolean; solar: number; fuel?: number; /** Rechargeable fan battery, in minutes. */ fanBattery?: number };
   /** Divine's energy, 0..100. Full after a night's sleep. */
   energy?: number;
   /** Appliances switched off (fans, AC, speaker, TV), by furniture uid. */

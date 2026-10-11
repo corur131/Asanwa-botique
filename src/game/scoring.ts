@@ -198,6 +198,7 @@ export function scoreLook(c: Customer, choice: StyleChoice, stock: Design[]): Sc
       case 'native': ok = main.length && main.every((x) => itemById(x.itemId)?.native) ? 1 : main.some((x) => itemById(x.itemId)?.native) ? 0.5 : 0; break;
       case 'english': ok = main.length && main.every((x) => !itemById(x.itemId)?.native) ? 1 : 0; break;
       case 'gele': ok = d.headwear && (d.headwear.itemId === 'gele' || d.headwear.itemId === 'geleWrap') ? 1 : 0; break;
+      case 'nails': ok = !!choice.makeup?.nailColor ? 1 : 0; break;
       case 'noHeels': ok = d.shoes && !HEELS.has(d.shoes.itemId) ? 1 : 0; break;
       case 'fitted': ok = main.length && main.every((x) => FITTED.has(x.itemId)) ? 1 : main.some((x) => FITTED.has(x.itemId)) ? 0.5 : 0; break;
       case 'covered': ok = main.length && !main.some((x) => REVEALING.has(x.itemId)) ? 1 : 0; break;
@@ -258,6 +259,7 @@ function missLine(w: Customer['wants'][number]): string {
     case 'native': return 'She wanted native.';
     case 'english': return 'She wanted English wear, not native.';
     case 'gele': return 'She wanted gele.';
+    case 'nails': return 'She asked for nail styling.';
     case 'noHeels': return 'She said no heels.';
     case 'fitted': return 'She wanted something that shows her shape.';
     case 'covered': return 'Too short or open for what she asked.';

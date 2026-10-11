@@ -55,7 +55,8 @@ export function energyStep(s: GameState, minutes: number): GameState {
   if (s.busy?.pose === 'sit') return s;
   const cool = coolRunning(s);
   const k = cool >= 0.4 ? 0.55 : cool > 0 ? 0.75 : 1.35;
-  return setEnergy(s, energyOf(s) - ENERGY.perMinute * k * minutes);
+  const weatherHeat = s.weather === 'sunny' && cool < 0.4 ? 1.35 : s.weather === 'harmattan' ? 0.82 : s.weather === 'rainy' || s.weather === 'cloudy' ? 0.92 : 1;
+  return setEnergy(s, energyOf(s) - ENERGY.perMinute * k * weatherHeat * minutes);
 }
 
 /** Score changes from how Divine is doing today. */
@@ -268,7 +269,8 @@ export const busyNow = (s: GameState) => (s.phase === 'shop' && s.busy && s.busy
 /** A selfie in the mirror, posted to Gidigram. */
 export function postSelfie(s: GameState, look: CharacterConfig): GameState {
   const gained = Math.round((15 + Math.random() * 35) * (1 + (s.followers || 0) / 8000));
-  const likes = Math.round(((s.followers || 0) + gained) * (0.1 + Math.random() * 0.06));
+  const flowerWall = s.furniture.some((p) => p.placed && p.id === 'flowerWall');
+  const likes = Math.round(((s.followers || 0) + gained) * (0.1 + Math.random() * 0.06) * (flowerWall ? 1.5 : 1));
   const post = { id: `s${s.day}-${Math.random().toString(36).slice(2, 7)}`, day: s.day, look, name: 'Divine', caption: pick(SELFIE_CAPTIONS), score: 0, likes, gained };
   const next = { ...s, followers: (s.followers || 0) + gained, posts: [post, ...(s.posts || [])].slice(0, 24) };
   return addShout(next, 'Gidigram', `Selfie posted! ${likes} likes, +${gained} followers.`, 'good');

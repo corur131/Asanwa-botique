@@ -110,7 +110,7 @@ export function coolRunning(s: GameState): number {
     case 'solar':
       return Math.min(0.8, st.coolFans + (st.solarPanels >= POWER.acPanels ? st.coolAc : 0));
     default:
-      return 0;
+      return s.power?.fanBattery && s.power.fanBattery > 0 && s.furniture.some((p) => p.placed && p.id === 'rechargeableFan') ? 0.12 : 0;
   }
 }
 
@@ -154,7 +154,7 @@ export function powerStep(s0: GameState, from: number, to: number): GameState {
   const minutes = to - from;
   const wasOff = !!outageAt(s, from);
   const isOff = !!outageAt(s, to);
-  const power = { gen: !!s.power?.gen, solar: s.power?.solar || 0, fuel: fuelOf(s) };
+  const power = { gen: !!s.power?.gen, solar: s.power?.solar || 0, fuel: fuelOf(s), fanBattery: s.power?.fanBattery || 0 };
   const cap = st.solarPanels * POWER.minutesPerPanel;
 
   if (!wasOff && isOff) {
@@ -180,8 +180,12 @@ export function powerStep(s0: GameState, from: number, to: number): GameState {
       const acOn = st.coolAc > 0 && st.solarPanels >= POWER.acPanels;
       power.solar = Math.max(0, power.solar - minutes * (acOn ? 2 : 1));
       if (power.solar <= 0) s = addShout(s, 'Solar', st.gen ? 'Solar battery is flat. Start the generator!' : 'Solar battery is flat. The shop is dark now.', 'warn');
+    } else if (s.furniture.some((p) => p.placed && p.id === 'rechargeableFan') && power.fanBattery > 0) {
+      power.fanBattery = Math.max(0, power.fanBattery - minutes);
+      if (power.fanBattery <= 0) s = addShout(s, 'Fan', 'The rechargeable fan battery is flat. It will charge when NEPA returns.', 'warn');
     }
   } else {
+    if (s.furniture.some((p) => p.placed && p.id === 'rechargeableFan')) power.fanBattery = Math.min(120, power.fanBattery + minutes * 0.5);
     if (st.solarPanels && to < 600) {
       // sunshine and light: the batteries charge
       power.solar = Math.min(cap, power.solar + minutes * POWER.chargePerPanelPerMinute * st.solarPanels);

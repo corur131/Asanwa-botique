@@ -118,6 +118,7 @@ export function newGame(divine: CharacterConfig): GameState {
     stats: { served: 0, totalEarned: 0, demotions: 0, bestScore: 0 },
     seed: Math.floor(Math.random() * 1e9),
   };
+  s = { ...s, weather: weatherForDay(s.day, s.seed) };
   s = money(s, -spent, 'Starter stock from Yaba market');
   s = msg(s, 'Deborah', `Sis! The kiosk is ready. I helped you stock it with ${naira(spent)} of clothes from Yaba market. You have ${naira(s.cash)} left. Rent is ${naira(TIERS[0].rent)} every 7 days. The place is small and rough, but we'll fix it up as the money comes.`, 'good');
   s = msg(s, 'Deborah', `The shop opens 8am to 8pm. Customers come in all day, busiest at lunch and after work. If you're slow, they get tired of waiting and leave, so move fast! Some only want hair or makeup, no clothes.`, 'info');
@@ -130,11 +131,23 @@ export function newGame(divine: CharacterConfig): GameState {
 /** Followers bring people in: up to +40% traffic. */
 export const followerTraffic = (f: number) => 1 + 0.4 * (f / (f + 3000));
 
+export function weatherForDay(day: number, seed: number): NonNullable<GameState['weather']> {
+  // A 360-day Lagos year: wet season around May–October, harmattan in Dec–Jan.
+  const month = Math.floor(((Math.max(1, day) - 1) % 360) / 30);
+  const n = Math.sin((seed % 9973) * 0.137 + day * 12.9898 + 78.233) * 43758.5453;
+  const r = n - Math.floor(n);
+  if (month >= 4 && month <= 9) return r < 0.68 ? 'rainy' : r < 0.88 ? 'cloudy' : 'sunny';
+  if (month === 11 || month === 0) return r < 0.68 ? 'harmattan' : r < 0.9 ? 'cloudy' : 'sunny';
+  if (month >= 1 && month <= 3) return r < 0.68 ? 'sunny' : 'cloudy';
+  return r < 0.48 ? 'sunny' : r < 0.85 ? 'cloudy' : 'rainy';
+}
+
 export function customersToday(s: GameState, slow: boolean) {
   const t = TIERS[s.tier];
   const ramp = Math.min(1, NEW_SHOP_START + (1 - NEW_SHOP_START) * Math.max(0, s.day - s.movedDay) / NEW_SHOP_RAMP_DAYS);
   const traffic = prestigeTraffic(stats(s).prestige) * followerTraffic(s.followers || 0) * (1 + stats(s).traffic) * competition(s);
-  return Math.max(4, Math.round(t.customers * traffic * (0.6 + (s.rep / 100) * 0.8) * (0.85 + Math.random() * 0.3) * (slow ? 0.55 : 1) * ramp));
+  const weatherTraffic = s.weather === 'rainy' ? 0.82 : s.weather === 'sunny' ? 1.04 : 1;
+  return Math.max(4, Math.round(t.customers * traffic * (0.6 + (s.rep / 100) * 0.8) * (0.85 + Math.random() * 0.3) * (slow ? 0.55 : 1) * ramp * weatherTraffic));
 }
 
 /** How many people can wait inside: three standing, plus seats. */
@@ -167,17 +180,22 @@ export function shopBonus(s: GameState, c: Customer, choice: StyleChoice): { bon
   if (st.mirror) notes.push(`Mirror +${st.mirror}`);
   if (choice.hair && st.hairBonus) { bonus += st.hairBonus; notes.push(`Hair station +${st.hairBonus}`); }
   if (!c.male && choice.makeup && st.makeupBonus) { bonus += st.makeupBonus; notes.push(`Makeup station +${st.makeupBonus}`); }
+  if (c.wants.some((w) => w.kind === 'nails') && choice.makeup?.nailColor && st.nailBonus) { bonus += st.nailBonus; notes.push(`Nail station +${st.nailBonus}`); }
   if (c.cls === 'rich' && st.richBonus) { bonus += st.richBonus; notes.push(`Fitting room +${st.richBonus}`); }
   if (st.scoreBonus) { bonus += st.scoreBonus; notes.push(`Steamer and lighting +${st.scoreBonus}`); }
   if (Object.values(choice).some((uid) => typeof uid === 'string' && s.stock.some((d) => d.uid === uid && (d.trend || 0) >= s.day))) { bonus += 4; notes.push('Trending fabric +4'); }
   const src = s.phase === 'shop' ? source(s) : 'grid';
   if (src === 'solar') { bonus += 2; notes.push('Cool and quiet on solar +2'); }
-  if (src === 'none') { bonus -= 4; notes.push('Styled in the dark and heat -4'); }
+  if (src === 'none') {
+    const lantern = s.furniture.some((p) => p.placed && p.id === 'lantern');
+    bonus -= lantern ? 1 : 4;
+    notes.push(lantern ? 'Lantern keeps the look visible -1' : 'Styled in the dark and heat -4');
+  }
   return { bonus: Math.min(10, bonus), notes };
 }
 
 export function openShop(s0: GameState): GameState {
-  let s: GameState = { ...s0, phase: 'shop', ...freshDay, today: emptyLog(s0.day) };
+  let s: GameState = { ...s0, phase: 'shop', weather: weatherForDay(s0.day, s0.seed), ...freshDay, today: emptyLog(s0.day) };
   let slow = s.slowWeek;
   if (s.day % 7 === 1) {
     slow = s.day > 7 && chance(SLOW_WEEK_CHANCE);
@@ -199,6 +217,13 @@ export function openShop(s0: GameState): GameState {
   }
   arrivals.sort((a, b) => a.at - b.at);
   const outages = planOutages(s.day);
+  // Heavy rain makes grid faults more likely in the shop's neighbourhood.
+  if (s.weather === 'rainy' && chance(0.35)) {
+    const from = Math.round(30 + Math.random() * 540);
+    outages.push({ from, to: from + Math.round(45 + Math.random() * 150) });
+    outages.sort((a, b) => a.from - b.from);
+  }
+  if (s.weather === 'harmattan') s = addShout(s, 'Deborah', 'Harmattan dust everywhere this morning. Keep the clothes covered, sis.', 'warn');
   let next: GameState = { ...s, slowWeek: slow, arrivals, outages, busy: null, power: { ...s.power, gen: false, solar: s.power?.solar || 0 } };
   if (outageAt(next, 0)) {
     next = addShout(next, 'NEPA', 'No light this morning. NEPA took it before you opened.', 'nepa');
@@ -223,7 +248,8 @@ export const shopClosing = (s: GameState) => s.phase === 'shop' && s.clock >= SH
 
 function patienceFor(s: GameState, c: Customer) {
   const st = stats(s);
-  let p = PATIENCE[c.cls] * (1 + Math.min(0.4, 0.1 * st.seats)) * (1 + coolNow(s) * 0.6) * (1 + st.patience);
+  const weatherComfort = s.weather === 'rainy' || s.weather === 'harmattan' || s.weather === 'cloudy' ? 1.08 : 1;
+  let p = PATIENCE[c.cls] * (1 + Math.min(0.4, 0.1 * st.seats)) * (1 + coolNow(s) * 0.6) * (1 + st.patience) * weatherComfort;
   if (c.regularId) p += 20;
   return Math.round(p);
 }
@@ -231,6 +257,44 @@ function patienceFor(s: GameState, c: Customer) {
 function depart(s: GameState, c: Customer, look: CharacterConfig, bag: boolean): GameState {
   const d: Departure = { key: `${c.id}-${Math.floor(s.clock)}`, id: c.id, look, bag };
   return { ...s, inShop: s.inShop.filter((v) => v.c.id !== c.id), serving: s.serving === c.id ? null : s.serving, left: [...s.left, d].slice(-10) };
+}
+
+/** Small shop incidents. They only run during shop time and respect purchased safety equipment. */
+function shopIncidentStep(s0: GameState, minutes: number): GameState {
+  if (minutes <= 0) return s0;
+  let s = s0;
+  const has = (id: string) => s.furniture.some((p) => p.placed && p.id === id);
+  const crowded = s.inShop.length >= 3 && (!!s.serving || !!s.busy);
+  const theftRisk = has('cctv') ? 0.000015 : has('shopAlarm') ? 0.00006 : s.staff.length ? 0.00008 : 0.00016;
+  if (crowded && chance(1 - Math.pow(1 - theftRisk, minutes))) {
+    const available = s.stock.filter((d) => d.pieces > 0);
+    if (available.length) {
+      const stolen = available[Math.floor(Math.random() * available.length)];
+      s = { ...s, stock: s.stock.map((d) => d.uid === stolen.uid ? { ...d, pieces: Math.max(0, d.pieces - 1) } : d) };
+      s = addShout(s, 'Deborah', `Sis, one ${stolen.label} don miss from the rail 😩`, 'warn');
+      s = { ...s, today: { ...s.today, events: [...s.today.events, `Shoplifting: one ${stolen.label} went missing.`] } };
+    }
+  }
+  if (s.power?.gen && source(s) === 'gen') {
+    const baseRisk = scarcity(s) ? 0.00018 : 0.000035;
+    const risk = has('fireAlarm') ? baseRisk * 0.45 : baseRisk;
+    if (chance(1 - Math.pow(1 - risk, minutes))) {
+      if (has('fireExtinguisher') || has('fireBlanket')) {
+        s = { ...s, power: { ...s.power, gen: false } };
+        s = addShout(s, 'Deborah', 'Small flare-up at the gen! The extinguisher stopped it. Please check the generator before restarting.', 'warn');
+        s = { ...s, today: { ...s.today, events: [...s.today.events, 'A generator flare-up was put out with the fire extinguisher.'] } };
+      } else {
+        const repair = scarcity(s) ? 85000 : 45000;
+        s = money(s, -repair, 'Generator fire repairs');
+        s = { ...s, power: { ...s.power, gen: false }, today: { ...s.today, costs: s.today.costs + repair, events: [...s.today.events, `Generator fire: paid ${naira(repair)} for repairs; smoke drove customers out.`] } };
+        const sent = waiting(s);
+        for (const v of sent) s = depart(s, v.c, v.c.look, false);
+        if (sent.length) s = { ...s, today: { ...s.today, lost: s.today.lost + sent.length, closedOn: (s.today.closedOn || 0) + sent.length } };
+        s = addShout(s, 'Deborah', `Fire at the generator! The gen is off and repairs cost ${naira(repair)}. We need an extinguisher, sis!`, 'warn');
+      }
+    }
+  }
+  return s;
 }
 
 /**
@@ -245,11 +309,16 @@ export function tick(s0: GameState, minutes: number): GameState {
   // walk-ins
   let lostDoor = 0;
   let lostHeat = 0;
+  let lostWeather = 0;
   while (s.arrivals.length && s.arrivals[0].at <= end) {
     const [a, ...rest] = s.arrivals;
     s = { ...s, arrivals: rest };
     // passers-by look in at a dark, hot shop and keep walking
     const vip = !!a.c.contest;
+    const canopy = s.furniture.some((p) => p.placed && p.id === 'umbrellaCanopy');
+    // Rain sends some walk-ins home; a street canopy protects the queue.
+    if (!vip && s.weather === 'rainy' && chance(canopy ? 0.06 : 0.18)) { lostWeather++; continue; }
+    if (!vip && s.weather === 'sunny' && chance(canopy ? 0.02 : 0.08)) { lostWeather++; continue; }
     if (!vip && source(s, a.at) === 'none' && chance({ poor: 0.2, middle: 0.35, rich: 0.6 }[a.c.cls])) { lostHeat++; continue; }
     if (!vip && waiting(s).length >= waitingRoom(s)) { lostDoor++; continue; }
     // the speaker is switched off: fewer people wander in from the street
@@ -257,8 +326,9 @@ export function tick(s0: GameState, minutes: number): GameState {
     // a style-off model waits for you all day
     s = { ...s, inShop: [...s.inShop, { c: a.c, arrived: a.at, patience: vip ? 9999 : patienceFor(s, a.c), waited: 0 }] };
   }
-  if (lostDoor || lostHeat) s = { ...s, today: { ...s.today, lost: s.today.lost + lostDoor + lostHeat, doorLost: (s.today.doorLost || 0) + lostDoor, heatLost: (s.today.heatLost || 0) + lostHeat } };
+  if (lostDoor || lostHeat || lostWeather) s = { ...s, today: { ...s.today, lost: s.today.lost + lostDoor + lostHeat + lostWeather, doorLost: (s.today.doorLost || 0) + lostDoor, heatLost: (s.today.heatLost || 0) + lostHeat, weatherLost: (s.today.weatherLost || 0) + lostWeather } };
   s = powerStep(s, s.clock, end);
+  s = shopIncidentStep(s, end - s.clock);
   s = dropStep(s, end - s.clock);
   s = visitStep(s, end - s.clock);
   s = energyStep(s, end - s.clock);
@@ -268,6 +338,11 @@ export function tick(s0: GameState, minutes: number): GameState {
   const step = end - s0.clock;
   s = { ...s, inShop: s.inShop.map((v) => (v.by ? v : { ...v, waited: (v.waited ?? Math.max(0, s0.clock - v.arrived)) + step * drainRate(s, v.c.cls) })) };
   for (const v of waiting(s)) {
+    if (!v.complained && stats(s).seats > 0 && (v.waited || 0) > v.patience * 0.55) {
+      const rival = s.rivals.find((r) => r.main && r.id !== 'you');
+      s = addShout(s, v.c.name, rival ? `I don wait tire. I fit go ${rival.shop} instead, abeg.` : 'I don wait tire. Abeg, who go attend to me?', 'complain');
+      s = { ...s, inShop: s.inShop.map((x) => x.c.id === v.c.id ? { ...x, complained: true } : x) };
+    }
     if ((v.waited || 0) > v.patience) {
       s = depart(s, v.c, v.c.look, false);
       s = { ...s, rep: clamp(s.rep - 0.4, 0, 100), today: { ...s.today, lost: s.today.lost + 1, impatient: (s.today.impatient || 0) + 1, repChange: s.today.repChange - 0.4 } };
@@ -339,7 +414,7 @@ export function reactionFor(score: number): Settlement['reaction'] {
 }
 
 /** What the customer does with the price Divine names. */
-export function settle(c: Customer, score: ScoreBreakdown, price: number, supplies: number): Settlement {
+export function settle(c: Customer, score: ScoreBreakdown, price: number, supplies: number, context: { hasPOS?: boolean; hasAlterations?: boolean; fitted?: boolean } = {}): Settlement {
   const s = score.total;
   const reaction = reactionFor(s);
   let paid = price;
@@ -368,6 +443,29 @@ export function settle(c: Customer, score: ScoreBreakdown, price: number, suppli
   } else if (s < 65) {
     paid *= 0.88;
     if (outcome === 'paid') outcome = 'bargained';
+  }
+  // Fitted pieces sometimes need a quick adjustment. The alterations corner saves the sale.
+  if (context.fitted && chance(context.hasAlterations ? 0.04 : 0.2)) {
+    if (context.hasAlterations) {
+      paid = Math.round(paid * 0.95);
+      outcome = 'bargained';
+      line = 'This one is a bit tight, but the alterations corner fixed it on the spot. Thank you!';
+    } else {
+      return { price, paid: 0, tip: 0, cost: 0, outcome: 'walked', line: 'This one too tight for me. No alterations here? I will check another shop.', reaction: 'frown', repDelta: -1.2, becameRegular: false };
+    }
+  }
+  // Some customers need to pay electronically. Transfers can fail when the network misbehaves;
+  // a POS terminal makes card payments reliable but charges a small transaction fee.
+  if (chance(0.3)) {
+    if (!context.hasPOS && chance(0.35)) {
+      return { price, paid: 0, tip: 0, cost: 0, outcome: 'walked', line: 'Do you take transfer? Network no gree! I cannot wait for this alert. I am going.', reaction: 'frown', repDelta: -0.8, becameRegular: false };
+    }
+    if (context.hasPOS) {
+      paid = Math.round(paid * 0.99);
+      line = `${line} POS approved, but the terminal took its small transaction fee.`;
+    } else {
+      line = `${line} Transfer alert received. Thank goodness.`;
+    }
   }
   let tip = 0;
   if (s >= 85) tip = { poor: 0.03, middle: 0.08, rich: 0.15 }[c.cls] * paid;
@@ -526,7 +624,7 @@ export function closeShop(s0: GameState): GameState {
 }
 
 export function nextMorning(s: GameState): GameState {
-  return planDrop({ ...s, day: s.day + 1, phase: 'morning', ...freshDay, busy: null, energy: ENERGY.max, today: emptyLog(s.day + 1) });
+  return planDrop({ ...s, day: s.day + 1, weather: weatherForDay(s.day + 1, s.seed), phase: 'morning', ...freshDay, busy: null, energy: ENERGY.max, today: emptyLog(s.day + 1) });
 }
 
 /** A reply picked in WhatsApp. */
@@ -784,8 +882,9 @@ export function postLook(s: GameState, c: Customer, look: CharacterConfig, score
   if (!canPost(s, score)) return s;
   const clsMult = { poor: 0.6, middle: 1, rich: 2 }[c.cls];
   const fatigue = 1 / (1 + postsToday(s));
-  const gained = Math.max(5, Math.round((score - 60) * clsMult * (4 + Math.random() * 4) * fatigue * (1 + (s.followers || 0) / 6000)));
-  const likes = Math.round(((s.followers || 0) + gained) * (0.08 + (score - 70) / 300) * (0.8 + Math.random() * 0.4));
+  const flowerWall = s.furniture.some((p) => p.placed && p.id === 'flowerWall');
+  const gained = Math.max(5, Math.round((score - 60) * clsMult * (4 + Math.random() * 4) * fatigue * (1 + (s.followers || 0) / 6000) * (flowerWall ? 1.12 : 1)));
+  const likes = Math.round(((s.followers || 0) + gained) * (0.08 + (score - 70) / 300) * (0.8 + Math.random() * 0.4) * (flowerWall ? 1.5 : 1));
   const post = { id: `p${s.day}-${Math.random().toString(36).slice(2, 7)}`, day: s.day, look, name: c.name, caption: pick(CAPTIONS), score, likes, gained };
   return { ...s, followers: (s.followers || 0) + gained, posts: [post, ...(s.posts || [])].slice(0, 24) };
 }

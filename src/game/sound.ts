@@ -153,6 +153,23 @@ function syncGen() {
   }
 }
 
+/** Play the supplied Nigerian power-restoration sound when NEPA returns. */
+let nepaAudio: HTMLAudioElement | null = null;
+export function playNepaReturn() {
+  if (!unlocked || document.hidden || !settings.sfx) return;
+  try {
+    if (!nepaAudio) {
+      nepaAudio = new Audio(`${import.meta.env.BASE_URL}audio/nepa-power-return.mp3`);
+      nepaAudio.preload = 'auto';
+    }
+    nepaAudio.currentTime = 0;
+    nepaAudio.volume = Math.min(1, Math.max(0.1, settings.sfxVol * 1.35));
+    nepaAudio.play().catch(() => undefined);
+  } catch {
+    /* audio can be unavailable on some devices */
+  }
+}
+
 /** Tell the sound which generator is running (null: none). */
 export function setGenSound(kind: 'small' | 'big' | null) {
   if (genWant === kind) return;

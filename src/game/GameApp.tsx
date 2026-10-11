@@ -16,7 +16,7 @@ import { AppId, Phone } from './ui/Phone';
 import { furnitureById, turn, Rot } from './shop';
 import type { CloudSession } from '../cloud/AuthGate';
 import { AdminPanel } from '../cloud/AdminPanel';
-import { armSound, pop, setGenSound, useSound } from './sound';
+import { armSound, playNepaReturn, pop, setGenSound, useSound } from './sound';
 import { ActionMenu, Catalogue, EnergyBar, SoundSettings, ViewPicker } from './ui/Build';
 import type { View } from './scene/ShopScene';
 import type { Pose } from './types';
@@ -154,6 +154,7 @@ export default function GameApp({ onLab, initial, storageKey, cloud, notice }: {
     const fresh = (s.shouts || []).filter((x) => x.id > seenShout.current);
     if (!fresh.length) return;
     seenShout.current = s.shoutSeq;
+    if (fresh.some((x) => x.who === 'NEPA' && x.text.includes('Light is back'))) playNepaReturn();
     if (fresh.some((x) => x.tone !== 'good')) pop();
     setBubbles((b) => [...b, ...fresh].slice(-4));
     fresh.forEach((x) => window.setTimeout(() => setBubbles((b) => b.filter((y) => y.id !== x.id)), x.tone === 'nepa' ? 6000 : 4500));
@@ -301,6 +302,9 @@ export default function GameApp({ onLab, initial, storageKey, cloud, notice }: {
             </div>
           </div>
         </div>
+        {s.weather && <div className="text-xs text-sky-200" title="Lagos weather affects walk-ins, comfort and energy">
+          {s.weather === 'sunny' ? '☀️ Sunny · hot' : s.weather === 'rainy' ? '🌧️ Rainy · fewer walk-ins' : s.weather === 'harmattan' ? '🌫️ Harmattan · dusty' : '☁️ Cloudy · mild'}
+        </div>}
         <div className={`text-lg font-bold ${s.cash < 0 ? 'text-rose-300' : 'text-emerald-300'}`}>{naira(s.cash)}</div>
         <div className="w-32">
           <Bar label="Reputation" value={s.rep} max={100} tone={s.rep > 60 ? 'bg-emerald-400' : s.rep > 30 ? 'bg-amber-400' : 'bg-rose-400'} />
@@ -613,7 +617,11 @@ export default function GameApp({ onLab, initial, storageKey, cloud, notice }: {
                 const c = step.c;
                 const score = E.scoreInShop(s, c, step.choice);
                 const cost = lookCost(c, step.choice, s.stock);
-                const result = E.settle(c, score, price, cost.consumables);
+                const result = E.settle(c, score, price, cost.consumables, {
+                  hasPOS: s.furniture.some((p) => p.placed && p.id === 'posTerminal'),
+                  hasAlterations: s.furniture.some((p) => p.placed && p.id === 'alterationsCorner'),
+                  fitted: c.wants.some((w) => w.kind === 'fitted') && Object.values(step.choice).some((uid) => typeof uid === 'string' && s.stock.some((d) => d.uid === uid && ['bodyconMini', 'mermaidGown', 'tubeMidi', 'corsetGown', 'offShoulderGown', 'slitGown', 'pencilSkirt', 'skinnyJeans', 'corsetTop', 'tubeTop', 'jumpsuit', 'slipDress', 'laceGown', 'capeGown'].includes(d.itemId))),
+                });
                 setStep({ kind: 'reveal', c, choice: step.choice, stockBefore: s.stock, score, st: result });
                 done(c.id);
                 up((g) => E.applyLook(g, c, step.choice, result, score));
