@@ -145,7 +145,7 @@ export function weatherForDay(day: number, seed: number): NonNullable<GameState[
 export function customersToday(s: GameState, slow: boolean) {
   const t = TIERS[s.tier];
   const ramp = Math.min(1, NEW_SHOP_START + (1 - NEW_SHOP_START) * Math.max(0, s.day - s.movedDay) / NEW_SHOP_RAMP_DAYS);
-  const traffic = prestigeTraffic(stats(s).prestige) * followerTraffic(s.followers || 0) * (1 + stats(s).traffic) * competition(s);
+  const traffic = prestigeTraffic(stats(s).prestige) * followerTraffic(s.followers || 0) * (1 + stats(s).traffic) * competition(s) * (s.listing.signature ? 1.35 : 1);
   const weatherTraffic = s.weather === 'rainy' ? 0.82 : s.weather === 'sunny' ? 1.04 : 1;
   return Math.max(4, Math.round(t.customers * traffic * (0.6 + (s.rep / 100) * 0.8) * (0.85 + Math.random() * 0.3) * (slow ? 0.55 : 1) * ramp * weatherTraffic));
 }
@@ -206,8 +206,15 @@ export function openShop(s0: GameState): GameState {
   const n = customersToday(s, slow);
   const mix = [...TIERS[s.tier].mix] as [number, number, number];
   const shift = prestigeRichShift(st.prestige);
-  mix[0] = Math.max(0.05, mix[0] - shift);
-  mix[2] = Math.max(0, mix[2] + shift);
+  if (s.listing.signature) {
+    // Signature properties are luxury-only: poor customers are excluded and middle-class visits are uncommon.
+    mix[0] = 0.005;
+    mix[1] = 0.075;
+    mix[2] = 0.92;
+  } else {
+    mix[0] = Math.max(0.05, mix[0] - shift);
+    mix[2] = Math.max(0, mix[2] + shift);
+  }
   const arrivals = Array.from({ length: n }, () => ({ at: arrivalMinute(), c: makeCustomer(s, mix) }));
   // Signature shops draw rare celebrity visits: roughly 2–3 per fortnight on tiers 0–3, one on flagship.
   if (s.listing.signature && chance(s.tier === 4 ? 1 / 14 : 0.18)) {
