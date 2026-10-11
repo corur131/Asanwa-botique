@@ -496,7 +496,7 @@ function Yard({ s, selected, onTap }: { s: GameState; selected: string | null; o
       })}
       {/* Fuel gallons are physical objects: click one to choose a generator to refill. */}
       {(s.security?.gallons || []).map((g, i) => (
-        <group key={g.id} position={[X + 0.42, 0, 0.5 + items.length + i]} onClick={(e) => { e.stopPropagation(); onTap(`fuel-gallon:${g.id}`); }} onPointerOver={() => (document.body.style.cursor = 'pointer')} onPointerOut={() => (document.body.style.cursor = '')}>
+        <group key={g.id} position={[X + 0.42, 0, 0.5 + items.filter((p) => (p.yardSide || 'right') === 'right').length + i]} onClick={(e) => { e.stopPropagation(); onTap(`fuel-gallon:${g.id}`); }} onPointerOver={() => (document.body.style.cursor = 'pointer')} onPointerOut={() => (document.body.style.cursor = '')}>
           <mesh position={[0, 0.19, 0]} castShadow>
             <cylinderGeometry args={[0.14, 0.14, 0.34, 12]} />
             <meshStandardMaterial color="#E5B82E" roughness={0.68} />
@@ -512,9 +512,12 @@ function Yard({ s, selected, onTap }: { s: GameState; selected: string | null; o
         </group>
       ))}
       {s.security?.guard && s.security?.trip?.carrier !== 'guard' && (() => {
-        const index = items.findIndex((p) => p.id === 'securityPost');
-        if (index < 0) return null;
-        return <group key={s.security.guard.id} position={[X + 0.42, 0, 0.5 + index + 0.55]} rotation={[0, -0.25, 0]}>
+        const post = items.find((p) => p.id === 'securityPost');
+        if (!post) return null;
+        const side = post.yardSide || 'right';
+        const sideX = side === 'left' ? leftX : rightX;
+        const index = items.filter((p) => (p.yardSide || 'right') === side).findIndex((p) => p.uid === post.uid);
+        return <group key={s.security.guard.id} position={[sideX + (side === 'left' ? -0.42 : 0.42), 0, 0.5 + index + 0.55]} rotation={[0, -0.25, 0]}>
           <Figure look={lookToFigure(s.security.guard.look)} walking={false} pose="stand" />
         </group>;
       })()}
