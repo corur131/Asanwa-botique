@@ -182,6 +182,74 @@ function everydayWardrobe(male: boolean) {
   ]);
 }
 
+/** Real Nigerian entertainers are represented as fictional in-game guest events. */
+const CELEBRITY_POOLS: { name: string; male: boolean; rank: string }[][] = [
+  [
+    { name: 'Mavo', male: true, rank: 'Rising star' },
+    { name: 'FOLA', male: true, rank: 'Breakout artist' },
+    { name: 'Kiekie', male: false, rank: 'Digital favourite' },
+    { name: 'Broda Shaggi', male: true, rank: 'Comedy star' },
+  ],
+  [
+    { name: 'Rema', male: true, rank: 'Hitmaker' },
+    { name: 'Ayra Starr', male: false, rank: 'Afropop star' },
+    { name: 'Bimbo Ademoye', male: false, rank: 'Nollywood favourite' },
+    { name: 'Tobi Bakre', male: true, rank: 'Screen star' },
+    { name: 'Sabinus', male: true, rank: 'Comedy star' },
+  ],
+  [
+    { name: 'Asake', male: true, rank: 'Arena headliner' },
+    { name: 'Tiwa Savage', male: false, rank: 'Afrobeats icon' },
+    { name: 'Olamide', male: true, rank: 'Music mogul' },
+    { name: 'Kizz Daniel', male: true, rank: 'Hitmaker' },
+    { name: 'Ini Edo', male: false, rank: 'Nollywood star' },
+  ],
+  [
+    { name: 'Don Jazzy', male: true, rank: 'Music executive' },
+    { name: 'Funke Akindele', male: false, rank: 'Blockbuster filmmaker' },
+    { name: 'Tems', male: false, rank: 'Global music star' },
+    { name: 'Genevieve Nnaji', male: false, rank: 'Screen icon' },
+    { name: 'Olamide', male: true, rank: 'Music mogul' },
+  ],
+  [
+    { name: 'Davido', male: true, rank: 'SSS global superstar' },
+    { name: 'Wizkid', male: true, rank: 'SSS global superstar' },
+    { name: 'Burna Boy', male: true, rank: 'SSS global superstar' },
+    { name: 'Don Jazzy', male: true, rank: 'Industry heavyweight' },
+    { name: 'Funke Akindele', male: false, rank: 'Nollywood powerhouse' },
+    { name: 'Tiwa Savage', male: false, rank: 'Global Afrobeats icon' },
+  ],
+];
+
+export function makeCelebrityCustomer(state: GameState): Customer {
+  const tier = Math.max(0, Math.min(4, state.tier));
+  const profile = pick(CELEBRITY_POOLS[tier]);
+  let base = makeCustomer(state, [0, 0, 1]);
+  // The visual avatar is randomly generated, while the public figure is a fictional guest-event portrayal.
+  if (base.male !== profile.male) {
+    const candidates = Array.from({ length: 12 }, () => generateRandomCustomer('plain')).find((c) => (c.body === 'male') === profile.male);
+    if (candidates) base = { ...base, look: { ...candidates, state: 'plain' }, male: profile.male };
+  }
+  const spendFloor = [1_500_000, 2_500_000, 4_000_000, 7_500_000, 15_000_000][tier];
+  const budget = [3_000_000, 5_000_000, 8_000_000, 15_000_000, 35_000_000][tier];
+  const guest = {
+    ...base,
+    id: `vip-${state.day}-${Math.random().toString(36).slice(2, 8)}`,
+    name: profile.name,
+    cls: 'rich' as const,
+    occasion: 'redCarpet' as Occasion,
+    budget,
+    male: profile.male,
+    influencer: true,
+    regularId: undefined,
+    celebrity: { tier, rank: profile.rank, spendFloor },
+  };
+  return {
+    ...guest,
+    request: `A special Lagos celebrity guest has arrived: ${profile.name} · ${profile.rank}. I need a show-stopping luxury look. Money is not the issue, and my team is waiting outside. Please make this memorable. Budget: ₦${budget.toLocaleString('en-NG')}.`,
+  };
+}
+
 export function makeCustomer(state: GameState, mix: [number, number, number]): Customer {
   // regulars come back
   const regular = state.regulars.length && chance(Math.min(0.35, 0.08 + state.regulars.length * 0.03)) ? pick(state.regulars) : undefined;
