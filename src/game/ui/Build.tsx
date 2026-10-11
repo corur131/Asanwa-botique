@@ -14,8 +14,9 @@ const Thumb: React.FC<{ id: string }> = ({ id }) => {
 };
 
 /** The strip of furniture at the bottom of build mode. */
-export const Catalogue: React.FC<{ s: GameState; onBuy: (id: string) => void; onInstall: (uid: string) => void }> = ({ s, onBuy, onInstall }) => {
+export const Catalogue: React.FC<{ s: GameState; onBuy: (id: string, yardSide?: 'left' | 'right') => void; onInstall: (uid: string) => void }> = ({ s, onBuy, onInstall }) => {
   const [tab, setTab] = useState<FurnitureGroup | 'Stored'>('Display');
+  const [yardSide, setYardSide] = useState<'left' | 'right'>('right');
   const stored = s.furniture.filter((p) => !p.placed && furnitureById(p.id).mount !== 'finish');
   const items = tab === 'Stored' ? [] : FURNITURE.filter((f) => f.group === tab && !f.starter);
   const fin = s.furniture.filter((p) => furnitureById(p.id).mount === 'finish').map((p) => p.id);
@@ -29,6 +30,17 @@ export const Catalogue: React.FC<{ s: GameState; onBuy: (id: string) => void; on
           </button>
         ))}
       </div>
+      {FURNITURE.some((f) => f.group === tab && f.mount === 'yard') && (
+        <div className="flex flex-wrap items-center gap-1.5 px-1 pb-1 text-[11px]">
+          <span className="text-slate-400 mr-1">Outdoor placement:</span>
+          {(['left', 'right'] as const).map((side) => (
+            <button key={side} onClick={() => setYardSide(side)} className={`rounded-full px-3 py-1.5 font-semibold ${yardSide === side ? 'bg-amber-500 text-black' : 'bg-white/10 text-slate-200'}`}>
+              {side === 'left' ? 'Left side' : 'Right side'}
+            </button>
+          ))}
+          <span className="text-slate-500">New outdoor pieces use this side.</span>
+        </div>
+      )}
       <div className="flex gap-2 overflow-x-auto pb-1">
         {tab === 'Stored' &&
           stored.map((p) => {
@@ -50,7 +62,7 @@ export const Catalogue: React.FC<{ s: GameState; onBuy: (id: string) => void; on
           const full = f.mount === 'yard' && yardFull;
           const off = locked || poor || have || full;
           return (
-            <button key={f.id} disabled={off} onClick={() => onBuy(f.id)} title={f.note} className={`shrink-0 w-24 rounded-xl border overflow-hidden text-left ${off ? 'border-white/5 opacity-50' : 'border-white/15 hover:border-amber-400/60'} bg-white/5`}>
+            <button key={f.id} disabled={off} onClick={() => onBuy(f.id, f.mount === 'yard' ? yardSide : undefined)} title={f.note} className={`shrink-0 w-24 rounded-xl border overflow-hidden text-left ${off ? 'border-white/5 opacity-50' : 'border-white/15 hover:border-amber-400/60'} bg-white/5`}>
               <div className="h-20 bg-[#2b2440]"><Thumb id={f.id} /></div>
               <div className="px-1.5 py-1">
                 <div className="text-[11px] text-white leading-tight line-clamp-2 min-h-[26px]">{f.name}</div>
