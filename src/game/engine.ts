@@ -274,7 +274,7 @@ export function staffCanServeCustomer(staff: Pick<StaffMember, 'level' | 'profes
 /** Whether at least one qualified employee can take this unassigned visitor. */
 export function canAssignToStaff(s: GameState, id: string): boolean {
   const v = visitor(s, id);
-  return !!v && !v.by && s.staff.some((m) => staffCanServeCustomer(m, v.c));
+  return !!v && !v.by && s.staff.some((m) => staffCanServeCustomer(m, v.c) && staffChoice(s, v.c) !== null);
 }
 export const shopClosing = (s: GameState) => s.phase === 'shop' && s.clock >= SHOP_MINUTES;
 
