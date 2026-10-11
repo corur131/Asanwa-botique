@@ -53,6 +53,8 @@ export default function GameApp({ onLab, initial, storageKey, cloud, notice }: {
   /** Last floor tile chosen by the player; the scene keeps Divine there until another destination is chosen. */
   const [manualTarget, setManualTarget] = useState<[number, number] | null>(null);
   const [localAct, setLocalAct] = useState<{ uid: string; pose: Pose } | null>(null);
+  /** Persistent player-controlled seat; unlike short actions, this remains until Divine is sent elsewhere. */
+  const [sitting, setSitting] = useState<{ uid: string; pose: Pose } | null>(null);
   const [phone, setPhone] = useState(false);
   const [phoneApp, setPhoneApp] = useState<AppId>('home');
   const [chat, setChat] = useState<string | null>(null);
@@ -195,7 +197,7 @@ export default function GameApp({ onLab, initial, storageKey, cloud, notice }: {
   const nepaOff = s.phase === 'shop' && E.inBlackout(s);
   const selectedPiece = selected ? (() => { const p = s.furniture.find((x) => x.uid === selected && x.placed); return p ? furnitureById(p.id) : null; })() : null;
   const busy = E.busyNow(s);
-  const act = busy ? { uid: busy.uid, pose: busy.pose } : localAct;
+  const act = busy ? { uid: busy.uid, pose: busy.pose } : localAct || sitting;
   const say = (who: string, text: string) => {
     const b: Shout = { id: -Date.now(), who, text, tone: 'warn' };
     setBubbles((x) => [...x, b].slice(-4));
@@ -253,7 +255,13 @@ export default function GameApp({ onLab, initial, storageKey, cloud, notice }: {
     setS(res.s);
     setMenuFor(null);
     const a = E.actionsFor(s, uid).find((x) => x.id === id);
-    if (a && !(s.phase === 'shop' && a.minutes > 0)) setLocalAct({ uid, pose: a.pose });
+    if (id === 'sit') {
+      setSitting({ uid, pose: 'sit' });
+      setLocalAct(null);
+    } else {
+      setSitting(null);
+      if (a && !(s.phase === 'shop' && a.minutes > 0)) setLocalAct({ uid, pose: a.pose });
+    }
     if (res.ui === 'fixLook') setLookEdit(s.divine);
     if (res.ui === 'checkStock' || res.ui === 'restock') setPanel('rail');
   };
@@ -273,12 +281,14 @@ export default function GameApp({ onLab, initial, storageKey, cloud, notice }: {
   };
   const styleCustomer = (id: string) => {
     if (s.phase !== 'shop') return;
+    setSitting(null);
     if (!s.serving && E.exhausted(s)) return say('Deborah', "Divine has no energy left. Sit down or drink water first.");
     if (!s.serving && busy) return say('Divine', `Give me small time, I'm busy till ${E.clockText(busy.until)}.`);
     if (s.serving && s.serving !== id) {
       setStyling(true);
       return;
     }
+    setSitting(null);
     up((g) => E.startStyling(g, id));
     setStep({ kind: 'style' });
     setStyling(true);
@@ -344,11 +354,11 @@ export default function GameApp({ onLab, initial, storageKey, cloud, notice }: {
             view={view}
             act={build ? null : act}
             manualTarget={manualTarget}
-            onMoveTo={(x, z) => { setManualTarget([x, z]); setMenuFor(null); }}
+            onMoveTo={(x, z) => { setManualTarget([x, z]); setSitting(null); setLocalAct(null); setMenuFor(null); }}
             reflections={sound.reflections}
             onHover={(x, z) => (trying ? setTrying({ ...trying, x, z }) : placing && setPlacing({ ...placing, x, z }))}
             onSelect={(uid) => { if (!placing && !trying) setSelected(uid); }}
-            onItem={(uid) => { if (!styling) setMenuFor(uid); }}
+            onItem={(uid) => { if (!styling) { setSitting(null); setMenuFor(uid); } }}
             onCustomer={styleCustomer}
           />
         </Suspense>
