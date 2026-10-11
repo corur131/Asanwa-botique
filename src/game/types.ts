@@ -58,6 +58,8 @@ export interface Customer {
   service?: 'hair' | 'makeup' | 'both';
   /** A style-off model: Divine's score is compared with a rival's. */
   contest?: { eventId: string; rivalId: string; rivalScore: number; prize: number; title: string };
+  /** Celebrity guest created by a premium property visit. */
+  celebrity?: { tier: number; rank: string; spendFloor: number };
 }
 
 export type Speciality = 'bridal' | 'genz' | 'native' | 'cheap' | 'wigs' | 'menswear' | 'luxury' | 'thrift' | 'everyday';
