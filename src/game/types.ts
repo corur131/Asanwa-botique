@@ -390,8 +390,10 @@ export interface GameState {
   /** Last message id read, per chat. */
   read: Record<string, number>;
   rivals: Rival[];
-  /** Weekly ladder: ids in order ('you' is Divine). */
+  /** Official weekly ladder: ids in order ('you' is Divine). */
   ranking: { week: number; order: string[] }[];
+  /** Recent daily ladder snapshots, separate from the official weekly history. */
+  dailyRanking?: { day: number; order: string[] }[];
   rivalPosts: RivalPost[];
   gist: Gist[];
   drop: Drop | null;
