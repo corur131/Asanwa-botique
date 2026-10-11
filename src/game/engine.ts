@@ -264,8 +264,8 @@ function shopIncidentStep(s0: GameState, minutes: number): GameState {
   let s = s0;
   const has = (id: string) => s.furniture.some((p) => p.placed && p.id === id);
   const crowded = s.inShop.length >= 3 && (!!s.serving || !!s.busy);
-  const theftRisk = s.staff.length ? 0.00008 : 0.00016;
-  if (crowded && !has('cctv') && chance(1 - Math.pow(1 - theftRisk, minutes))) {
+  const theftRisk = has('cctv') ? 0.000015 : has('shopAlarm') ? 0.00006 : s.staff.length ? 0.00008 : 0.00016;
+  if (crowded && chance(1 - Math.pow(1 - theftRisk, minutes))) {
     const available = s.stock.filter((d) => d.pieces > 0);
     if (available.length) {
       const stolen = available[Math.floor(Math.random() * available.length)];
@@ -275,9 +275,10 @@ function shopIncidentStep(s0: GameState, minutes: number): GameState {
     }
   }
   if (s.power?.gen && source(s) === 'gen') {
-    const risk = scarcity(s) ? 0.00018 : 0.000035;
+    const baseRisk = scarcity(s) ? 0.00018 : 0.000035;
+    const risk = has('fireAlarm') ? baseRisk * 0.45 : baseRisk;
     if (chance(1 - Math.pow(1 - risk, minutes))) {
-      if (has('fireExtinguisher')) {
+      if (has('fireExtinguisher') || has('fireBlanket')) {
         s = { ...s, power: { ...s.power, gen: false } };
         s = addShout(s, 'Deborah', 'Small flare-up at the gen! The extinguisher stopped it. Please check the generator before restarting.', 'warn');
         s = { ...s, today: { ...s.today, events: [...s.today.events, 'A generator flare-up was put out with the fire extinguisher.'] } };
