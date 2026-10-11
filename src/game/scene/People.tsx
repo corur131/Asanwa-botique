@@ -328,8 +328,8 @@ export type Cell = [number, number];
 /** A* over the floor grid; outside cells (z >= d) are always walkable. */
 export function findPath(blocked: boolean[][], from: Cell, to: Cell, w: number, d: number): Cell[] {
   const key = (c: Cell) => `${c[0]},${c[1]}`;
-  // x == w (z < d) is the strip outside the right wall, by the generator and solar panels
-  const free = (x: number, z: number) => x >= -1 && x <= w && z >= 0 && z <= d + 5 && (z >= d || x === w ? true : x >= 0 && x < w && !blocked[z]?.[x]);
+  // Exterior paving runs along both sides and the full shop frontage.
+  const free = (x: number, z: number) => x >= -1 && x <= w && z >= 0 && z <= d + 5 && (z >= d || x === -1 || x === w || (x >= 0 && x < w && !blocked[z]?.[x]));
   const door = Math.floor(w / 2);
   const open: { c: Cell; g: number; f: number }[] = [{ c: from, g: 0, f: 0 }];
   const came = new Map<string, Cell>();
@@ -353,11 +353,10 @@ export function findPath(blocked: boolean[][], from: Cell, to: Cell, w: number, 
       const n: Cell = [cur.c[0] + dx, cur.c[1] + dz];
       const nk = key(n);
       if (!free(n[0], n[1]) && nk !== goal) continue;
-      // the front wall: only through the door
-      if (((cur.c[1] === d - 1 && n[1] === d) || (cur.c[1] === d && n[1] === d - 1)) && n[0] !== door && n[0] !== w) continue;
-      if (n[1] < d && (n[0] < 0 || n[0] > w)) continue;
-      // no walking through the right wall: into the yard strip only from the street
-      if (n[1] < d && ((cur.c[0] === w - 1 && n[0] === w) || (cur.c[0] === w && n[0] === w - 1))) continue;
+      // Front wall: enter or leave the shop only through its front door.
+      if (((cur.c[1] === d - 1 && n[1] === d) || (cur.c[1] === d && n[1] === d - 1)) && n[0] !== door) continue;
+      // Side lanes are walkable, but never let a character pass through a side wall.
+      if (n[1] < d && ((cur.c[0] === 0 && n[0] === -1) || (cur.c[0] === -1 && n[0] === 0) || (cur.c[0] === w - 1 && n[0] === w) || (cur.c[0] === w && n[0] === w - 1))) continue;
       const g = cur.g + 1;
       if (g < (gs.get(nk) ?? 1e9)) {
         gs.set(nk, g);
