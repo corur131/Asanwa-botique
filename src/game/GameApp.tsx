@@ -233,11 +233,11 @@ export default function GameApp({ onLab, initial, storageKey, cloud, notice }: {
     setPlacing({ uid, rot: spot.rot || 0, x: spot.x, z: spot.z, fresh });
   };
   /** Tap in the catalogue: try it in the shop first; Buy or Cancel. */
-  const buy = (id: string) => {
+  const buy = (id: string, yardSide: 'left' | 'right' = 'right') => {
     setPlacing(null);
     setSelected(null);
     const pv = E.withPreview(s, id);
-    setTrying({ id, x: pv.x, z: pv.z, rot: pv.rot, yardSide: 'right' });
+    setTrying({ id, x: pv.x, z: pv.z, rot: pv.rot, yardSide });
   };
   const tryView = trying ? E.withPreview(s, trying.id, furnitureById(trying.id).mount === 'floor' ? trying : undefined) : null;
   const confirmBuy = () => {
@@ -507,7 +507,10 @@ export default function GameApp({ onLab, initial, storageKey, cloud, notice }: {
                     <div className="text-sm text-white">{current.name}</div>
                   </button>
                 )}
-                {queue.map((v) => <WaitChip key={v.c.id} v={v} clock={s.clock} disabled={!!current} onClick={() => styleCustomer(v.c.id)} onStaff={s.staff.length && v.c.cls !== 'rich' && !v.forStaff ? () => up((g) => E.sendToStaff(g, v.c.id)) : undefined} />)}
+                {queue.map((v) => {
+                  const canSendToStaff = E.canAssignToStaff(s, v.c.id);
+                  return <WaitChip key={v.c.id} v={v} clock={s.clock} disabled={!!current} onClick={() => styleCustomer(v.c.id)} onStaff={canSendToStaff && !v.forStaff ? () => up((g) => E.sendToStaff(g, v.c.id)) : undefined} staffHint={!v.forStaff && s.staff.length > 0 && !canSendToStaff ? 'No suitably qualified staff' : undefined} />;
+                })}
                 {s.inShop.filter((v) => v.by && v.by !== 'divine').map((v) => (
                   <div key={v.c.id} className="shrink-0 rounded-xl border border-white/10 bg-white/5 px-3 py-2 opacity-70">
                     <div className="text-[10px] text-slate-400">With {s.staff.find((m) => m.id === v.by)?.name}</div>
@@ -932,7 +935,7 @@ const PhoneButton: React.FC<{ unread: number; onClick: () => void }> = ({ unread
   </button>
 );
 
-const WaitChip: React.FC<{ v: Visitor; clock: number; disabled: boolean; onClick: () => void; onStaff?: () => void }> = ({ v, clock, disabled, onClick, onStaff }) => {
+const WaitChip: React.FC<{ v: Visitor; clock: number; disabled: boolean; onClick: () => void; onStaff?: () => void; staffHint?: string }> = ({ v, clock, disabled, onClick, onStaff, staffHint }) => {
   const left = Math.max(0, 1 - (v.waited ?? clock - v.arrived) / v.patience);
   return (
     <div className={`shrink-0 w-36 rounded-xl border px-2.5 py-2 ${disabled ? 'border-white/10 bg-white/5 opacity-60' : 'border-white/15 bg-white/5 hover:border-amber-400/60'}`}>
@@ -945,6 +948,7 @@ const WaitChip: React.FC<{ v: Visitor; clock: number; disabled: boolean; onClick
         <div className="h-1 mt-1 rounded-full bg-white/10 overflow-hidden"><div className={`h-full ${left > 0.5 ? 'bg-emerald-400' : left > 0.25 ? 'bg-amber-400' : 'bg-rose-500'}`} style={{ width: `${left * 100}%` }} /></div>
       </button>
       {onStaff && <button onClick={onStaff} className="text-[10px] text-sky-300 mt-1 hover:underline">Send to staff</button>}
+      {staffHint && <div className="text-[10px] text-amber-200 mt-1">{staffHint}</div>}
     </div>
   );
 };
