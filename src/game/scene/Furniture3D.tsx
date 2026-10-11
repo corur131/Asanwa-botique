@@ -699,6 +699,46 @@ export function FloorPiece({ id, colors, selected }: { id: string; colors: strin
           ))}
         </group>
       );
+    case 'boutiqueDesk':
+      return <group>{glow}<B p={[0,0.48,0]} s={[0.9,0.9,0.65]} c="#7A4A2A" r={0.65}/><B p={[0,0.95,0.02]} s={[1,0.08,0.72]} c="#C69A63" r={0.4}/><B p={[0,0.72,0.35]} s={[0.58,0.18,0.02]} c="#F4EFE6"/><B p={[0.25,1.02,0.02]} s={[0.2,0.02,0.12]} c={GOLD}/></group>;
+    case 'doubleSofa':
+      return <group>{glow}<B p={[0,0.25,0]} s={[1.85,0.3,0.78]} c="#4F688B" r={0.95}/><B p={[0,0.48,-0.25]} s={[1.85,0.55,0.22]} c="#3F5474" r={0.95}/>{[-0.48,0.48].map(x=><B key={x} p={[x,0.5,0.03]} s={[0.76,0.12,0.54]} c="#6F87A9" r={0.95}/>)}{[-0.86,0.86].map(x=><B key={x} p={[x,0.43,0.02]} s={[0.14,0.42,0.78]} c="#344660" r={0.95}/>)}</group>;
+    case 'luxeOttoman':
+      return <group>{glow}<Cyl p={[0,0.22,0]} r1={0.36} h={0.42} c="#8E1F3A" seg={16}/><Cyl p={[0,0.45,0]} r1={0.38} h={0.12} c="#C85C7A" seg={16}/><Cyl p={[0,0.05,0]} r1={0.29} h={0.08} c={GOLD} seg={16} m={0.7}/></group>;
+    case 'litMannequin':
+    case 'goldMannequin':
+      return <group>{glow}<Cyl p={[0,0.04,0]} r1={0.28} h={0.08} c={id==='goldMannequin'?GOLD:'#292929'} m={0.65}/><Cyl p={[0,0.52,0]} r1={0.025} h={0.9} c={CHROME} m={0.85}/><Cyl p={[0,1.13,0]} r1={0.16} r2={0.22} h={0.52} c={pal(colors,0,'#E9A4B7')}/><Cyl p={[0,0.83,0]} r1={0.25} r2={0.14} h={0.38} c={pal(colors,1,'#263C69')}/><Ball p={[0,1.48,0]} r={0.095} c="#F2EDE6"/>{id==='goldMannequin'&&<Cyl p={[0,0.1,0]} r1={0.2} h={0.08} c={GOLD} m={0.8}/>}</group>;
+    case 'sunglassesSpinner':
+      return <group>{glow}<Cyl p={[0,0.08,0]} r1={0.3} h={0.14} c={CHROME} m={0.8}/><Cyl p={[0,0.53,0]} r1={0.035} h={0.85} c={GOLD} m={0.8}/><Cyl p={[0,0.98,0]} r1={0.28} h={0.06} c="#222" m={0.4}/>{Array.from({length:8},(_,i)=><group key={i} rotation={[0,i*Math.PI/4,0]}><B p={[0,0.82,0.24]} s={[0.2,0.06,0.1]} c={['#222','#8E1F3A','#C69A63'][i%3]}/><B p={[0,0.88,0.29]} s={[0.08,0.05,0.02]} c="#171717"/></group>)}</group>;
+    case 'jewelleryDisplay':
+      return <group>{glow}<B p={[0,0.42,0]} s={[1.75,0.8,0.58]} c="#E9E2D7"/><B p={[0,0.84,0]} s={[1.8,0.06,0.62]} c={GOLD} m={0.8}/><B p={[0,1.03,0]} s={[1.72,0.3,0.55]} c="#BBD8E6" o={0.32}/>{Array.from({length:8},(_,i)=><group key={i} position={[-0.72+i*0.205,0.9,0]}><Cyl p={[0,0.03,0]} r1={0.045} h={0.025} c={GOLD} m={0.8}/><Ball p={[0,0.08,0]} r={0.035} c={['#C2262E','#3C6EAA','#58A879'][i%3]} e="#FFFFFF" ei={0.15}/></group>)}</group>;
+    case 'purseIsland':
+      return <group>{glow}<B p={[0,0.12,0]} s={[1.8,0.24,1.65]} c="#E7D8C2"/><B p={[0,0.25,0]} s={[1.72,0.06,1.55]} c={GOLD} m={0.65}/>{[-0.55,0,0.55].map((x,i)=><group key={x} position={[x,0.28,0]}><B p={[0,0.24,0]} s={[0.34,0.42,0.24]} c={['#8E1F3A','#171717','#C69A63'][i]}/><mesh position={[0,0.49,0]}><torusGeometry args={[0.09,0.018,6,12]}/><meshStandardMaterial color={GOLD} metalness={0.7}/></mesh><B p={[0,0.5,0]} s={[0.16,0.02,0.02]} c={GOLD}/></group>)}</group>;
+    case 'scarfStand':
+      return <group>{glow}<Cyl p={[0,0.08,0]} r1={0.26} h={0.14} c="#6B452E"/><Cyl p={[0,0.65,0]} r1={0.025} h={1.15} c={GOLD} m={0.65}/><Cyl p={[0,1.22,0]} r1={0.32} h={0.06} c="#8A6440"/>{Array.from({length:7},(_,i)=><B key={i} p={[Math.cos(i*Math.PI*2/7)*0.24,0.98,Math.sin(i*Math.PI*2/7)*0.24]} s={[0.16,0.28,0.05]} c={['#C2262E','#F2C14E','#1C7C54','#6D4AA0'][i%4]} rot={[0,i*Math.PI/3,0]}/>)}</group>;
+    case 'shoeBench':
+      return <group>{glow}<B p={[0,0.42,0]} s={[1.82,0.12,0.55]} c="#8A6440" r={0.6}/>{[-0.78,0.78].map(x=><B key={x} p={[x,0.21,0]} s={[0.08,0.42,0.5]} c="#5B3B26"/>)}<B p={[0,0.5,-0.2]} s={[1.8,0.04,0.08]} c={GOLD}/></group>;
+    case 'premiumFitting':
+      return <group>{glow}<B p={[0,1,0]} s={[1.8,0.08,1.8]} c="#D6C5A6"/>{[-0.82,0.82].map(x=><B key={x} p={[x,1,0]} s={[0.08,2,1.8]} c="#8E1F3A"/>)}<B p={[0,1,0.9]} s={[1.8,2,0.08]} c="#8E1F3A"/><B p={[0,1.97,0.82]} s={[1.7,0.06,0.06]} c={GOLD}/><B p={[0.55,0.9,0.96]} s={[0.28,0.12,0.02]} c="#E8C7D0"/></group>;
+    case 'makeupChair':
+      return <group>{glow}<Cyl p={[0,0.07,0]} r1={0.22} h={0.12} c={CHROME} m={0.8}/><Cyl p={[0,0.28,0]} r1={0.045} h={0.34} c={CHROME}/><B p={[0,0.48,0]} s={[0.55,0.14,0.52]} c="#8E1F3A" r={0.95}/><B p={[0,0.82,-0.18]} s={[0.55,0.62,0.12]} c="#8E1F3A" r={0.95}/><B p={[0,1.16,-0.2]} s={[0.48,0.08,0.12]} c={GOLD}/></group>;
+    case 'hairMirror':
+    case 'fullLengthMirror':
+      return <group>{glow}<B p={[0,0.98,-0.04]} s={[0.76,1.78,0.08]} c={id==='fullLengthMirror'?GOLD:'#2A2A2E'} m={id==='fullLengthMirror'?0.75:0.2}/><Glass p={[0,0.98,0.01]} s={[0.64,1.62,0.01]}/>{id==='hairMirror'&&<><B p={[0,0.18,0.2]} s={[0.8,0.32,0.48]} c="#8A6440"/><B p={[0,0.38,0.42]} s={[0.72,0.08,0.05]} c="#C69A63"/>{[-0.25,0,0.25].map(x=><Cyl key={x} p={[x,0.48,0.42]} r1={0.035} h={0.12} c={GOLD}/>)}</>}</group>;
+    case 'salonWashBasin':
+      return <group>{glow}<B p={[0,0.36,0]} s={[0.72,0.68,0.55]} c="#F4EFE6"/><B p={[0,0.72,0]} s={[0.78,0.08,0.6]} c="#E7E9EC"/><B p={[0,0.78,0.04]} s={[0.54,0.03,0.34]} c="#BBD8E6" o={0.8}/><Cyl p={[0,0.84,-0.15]} r1={0.025} h={0.2} c={CHROME}/><B p={[0,0.94,-0.15]} s={[0.16,0.03,0.04]} c={CHROME}/></group>;
+    case 'nailPolishRack':
+      return <group>{glow}<B p={[0,0.36,0]} s={[0.82,0.72,0.42]} c="#8A6440"/>{[0.18,0.4,0.62].map((y,k)=><B key={y} p={[0,y,0.23]} s={[0.78,0.035,0.03]} c={GOLD}/>)}{Array.from({length:12},(_,i)=><group key={i} position={[-0.34+(i%4)*0.23,0.24+Math.floor(i/4)*0.2,0.26]}><Cyl p={[0,0.05,0]} r1={0.035} h={0.1} c={['#C2262E','#F06292','#6D4AA0','#171717','#E8B84A'][i%5]}/><Cyl p={[0,0.12,0]} r1={0.014} h={0.05} c="#222"/></group>)}</group>;
+    case 'nailDryer':
+      return <group>{glow}<B p={[0,0.22,0]} s={[0.82,0.4,0.56]} c="#E9E9E5" r={0.4}/><B p={[0,0.44,0.02]} s={[0.5,0.06,0.38]} c="#C9D6DF"/><B p={[0,0.27,0.29]} s={[0.4,0.08,0.02]} c="#333"/><Ball p={[0,0.3,0.31]} r={0.035} c="#35B8D8" e="#35B8D8" ei={0.7}/></group>;
+    case 'softboxLight':
+      return <group>{glow}{[-0.3,0.3].map(x=><B key={x} p={[x,0.62,0]} s={[0.035,1.2,0.035]} c="#222"/>) }<B p={[0,1.22,0]} s={[0.78,0.65,0.1]} c="#222"/><B p={[0,1.22,0.06]} s={[0.68,0.55,0.02]} c="#FFF7E6" e="#FFF1CC" ei={0.6}/><Cyl p={[0,0.06,0]} r1={0.28} h={0.08} c="#222"/></group>;
+    case 'aromaMachine':
+      return <group>{glow}<Cyl p={[0,0.23,0]} r1={0.22} h={0.42} c="#E9E3D7" seg={16}/><Cyl p={[0,0.47,0]} r1={0.17} h={0.06} c={GOLD}/><Cyl p={[0,0.52,0]} r1={0.035} h={0.12} c="#444"/><Ball p={[0,0.68,0]} r={0.12} c="#DCECF5" o={0.25}/></group>;
+    case 'chilledWater':
+      return <group>{glow}<B p={[0,0.48,0]} s={[0.52,0.88,0.5]} c="#F4EFE6"/><B p={[0,0.92,0]} s={[0.56,0.06,0.54]} c="#C9D6DF"/><Cyl p={[0,1.22,0]} r1={0.17} r2={0.2} h={0.52} c="#BBD8E6" o={0.8}/><Cyl p={[0,1.28,0]} r1={0.18} h={0.06} c="#5B8CB8"/><B p={[0,0.67,0.28]} s={[0.08,0.18,0.02]} c="#C2262E"/><B p={[0.15,0.67,0.28]} s={[0.08,0.18,0.02]} c="#2C6DA4"/></group>;
+    case 'inverterPanel':
+      return <group>{glow}<B p={[0,0.55,0]} s={[0.95,0.05,0.68]} c="#202B45" m={0.35} rot={[0.35,0,0]}/><B p={[0,0.57,0.02]} s={[0.88,0.015,0.6]} c="#3268A5" m={0.4} rot={[0.35,0,0]}/>{[-0.3,0,0.3].map(x=><B key={x} p={[x,0.6,0.05]} s={[0.01,0.02,0.56]} c="#8DB9E7" rot={[0.35,0,0]}/>)}</group>;
     default:
       return <B p={[0, 0.4, 0]} s={[0.6, 0.8, 0.6]} c="#999" />;
   }
@@ -706,6 +746,14 @@ export function FloorPiece({ id, colors, selected }: { id: string; colors: strin
 
 export function WallPiece({ id, colors }: { id: string; colors: string[] }) {
   switch (id) {
+    case 'hangerWall':
+      return <group position={[0,0,0.16]}><B p={[0,1.4,0]} s={[1.9,1.8,0.08]} c="#6B452E"/>{[0.85,1.35,1.85].map(y=><group key={y}><B p={[0,y,0.13]} s={[1.8,0.04,0.24]} c={GOLD}/><B p={[0,y+0.12,0.1]} s={[1.7,0.12,0.05]} c="#8A6440"/>{Array.from({length:6},(_,i)=><group key={i} position={[-0.72+i*0.29,y+0.12,0.18]}><Cyl p={[0,0.08,0]} r1={0.012} h={0.16} c={CHROME}/><B p={[0,0.02,0]} s={[0.16,0.12,0.035]} c={pal(colors,i,'#C2262E')}/></group>)}</group>)}</group>;
+    case 'bagWall':
+      return <group position={[0,0,0.12]}><B p={[0,1.4,0]} s={[1.9,1.8,0.08]} c="#E9E0D3"/>{[0,1,2,3,4].map(i=><group key={i} position={[-0.75+i*0.37,1.25+(i%2)*0.28,0.1]}><B p={[0,0,0]} s={[0.26,0.28,0.13]} c={['#8E1F3A','#171717','#C69A63','#315D87'][i%4]}/><mesh position={[0,0.17,0]}><torusGeometry args={[0.07,0.012,6,12,Math.PI]}/><meshStandardMaterial color={GOLD} metalness={0.65}/></mesh><B p={[0,0.05,0.075]} s={[0.18,0.04,0.01]} c={GOLD}/></group>)}</group>;
+    case 'shopAlarm':
+      return <group position={[0,1.95,0.04]}><B p={[0,0,0]} s={[0.48,0.28,0.08]} c="#F4EFE6"/><Ball p={[0.14,0,0.06]} r={0.06} c="#C2262E" e="#C2262E" ei={0.5}/><B p={[-0.08,0,0.05]} s={[0.14,0.09,0.02]} c="#222"/></group>;
+    case 'fireBlanket':
+      return <group position={[0,1.65,0.04]}><B p={[0,0,0]} s={[0.48,0.6,0.08]} c="#C2262E"/><B p={[0,0,0.05]} s={[0.35,0.45,0.02]} c="#F4EFE6"/><B p={[0,0.05,0.07]} s={[0.25,0.05,0.02]} c="#C2262E"/><B p={[0,-0.05,0.07]} s={[0.25,0.05,0.02]} c="#C2262E"/></group>;
     case 'crackedMirror':
       return (
         <group position={[0, 1.45, 0.03]}>
@@ -932,6 +980,18 @@ export function CeilingPiece({ id, h, at, off }: { id: string; h: number; at: V3
         {!off && <pointLight position={[0, h - 1, 0]} intensity={5} distance={8} color="#FFE2B0" />}
       </group>
     );
+  if (id === 'ceilingSpots')
+    return <group position={at}>
+      <B p={[0,h-0.05,0]} s={[1.25,0.06,0.12]} c={GOLD} m={0.7}/>
+      {[-0.42,0,0.42].map((x,i)=><group key={x} position={[x,h-0.13,0]}><Cyl p={[0,0,0]} r1={0.09} r2={0.12} h={0.14} c="#292929"/><Ball p={[0,-0.08,0]} r={0.055} c="#FFF3D0" e="#FFF0C0" ei={1.6*glowK}/></group>)}
+      {!off && <pointLight position={[0,h-0.45,0.3]} intensity={3.2} distance={6} color="#FFF0D8"/>}
+    </group>;
+  if (id === 'fireAlarm')
+    return <group position={at}>
+      <B p={[0,h-0.08,0]} s={[0.26,0.08,0.26]} c="#E8E8E2"/>
+      <B p={[0,h-0.14,0]} s={[0.2,0.04,0.2]} c="#C2262E" e="#C2262E" ei={off?0:0.3}/>
+      {!off && <pointLight position={[0,h-0.25,0]} intensity={0.2} distance={2} color="#FF4444"/>}
+    </group>;
   if (id === 'chandelier')
     return (
       <group position={at}>
