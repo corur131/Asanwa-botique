@@ -231,7 +231,7 @@ export function visitStep(s0: GameState, minutes: number): GameState {
     if (s.clock - s.visit.at > 40) s = endVisit(s, true);
     return s;
   }
-  if (s.day < 4 || s.clock > 640 || !chance(0.00125 * minutes)) return s;
+  if (s.day < 2 || s.clock > 680 || !chance(0.0032 * minutes)) return s;
   const pool = mainRivals(s).filter((r) => r.id !== 'tolani' || chance(0.45));
   if (!pool.length) return s;
   const r = pick(pool);
