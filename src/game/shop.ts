@@ -18,6 +18,8 @@ export interface Listing {
   moveIn: number;
   landlord: string;
   grace: number;
+  /** Rare, spacious signature property with exclusive clientele. */
+  signature?: boolean;
 }
 
 const AREAS: [string, string][][] = [
@@ -49,7 +51,7 @@ export const KIOSK_LISTING: Listing = { id: 'kiosk', tier: 0, area: 'Yaba', stre
 
 /** Four listings for a shop size. They change every week. */
 export function listingsFor(tier: number, week: number): Listing[] {
-  if (tier === 0) return [KIOSK_LISTING];
+  if (tier === 0) return [KIOSK_LISTING, { ...KIOSK_LISTING, id: `signature-${tier}-${week}`, street: 'Yaba Signature Courtyard', stars: 4, signature: true, rent: 125_000, moveIn: 350_000, landlord: 'Chief Bisi Akinwale', grace: 0 }];
   const t = TIERS[tier];
   const r = rng(week * 97 + tier * 13 + 5);
   const areas = AREAS[tier];
@@ -68,6 +70,13 @@ export function listingsFor(tier: number, week: number): Listing[] {
       landlord: LANDLORDS[stars - 1][Math.floor(r() * 4)],
       grace: Math.max(0, STAR_GRACE[stars] + (r() < 0.3 ? (stars <= 2 ? -2 : 1) : 0)),
     };
+  }).concat({
+    id: `signature-${tier}-${week}`, tier, area: tier >= 3 ? 'Victoria Island' : tier === 2 ? 'Lekki Phase 1' : 'Ikeja',
+    street: ['','Allen Avenue Signature Maison','Lekki Signature Atelier','Ikoyi Grand Maison','Banana Island Crown House'][tier],
+    stars: 4, signature: true,
+    rent: Math.round(t.rent * 2.7 / 5_000) * 5_000,
+    moveIn: Math.round(t.moveIn * 3.2 / 5_000) * 5_000,
+    landlord: 'The Signature Property Group', grace: 0,
   });
 }
 
@@ -116,16 +125,16 @@ function shade(hex: string, toward: string, k: number) {
 }
 
 /** The room a listing comes with: size and how well kept it is. */
-export function roomOf(l: Pick<Listing, 'tier' | 'stars'>): RoomStyle {
+export function roomOf(l: Pick<Listing, 'tier' | 'stars'> & Partial<Pick<Listing, 'signature'>>): RoomStyle {
   const base = ROOMS[l.tier];
   const sizes = SIZES[l.tier];
-  const [w, d] = sizes[Math.min(sizes.length, Math.max(1, l.stars)) - 1];
-  const finish = l.tier === 0 ? 1 : l.stars;
+  const [w, d] = l.signature ? ([[8, 5], [13, 8], [16, 10], [19, 13], [23, 16]][l.tier] as [number, number]) : sizes[Math.min(sizes.length, Math.max(1, l.stars)) - 1];
+  const finish = l.signature ? 4 : l.tier === 0 ? 1 : l.stars;
   // tired places look dull and grubby; the best ones are fresh and bright
   const dull = [0, 0.32, 0.16, 0, 0][finish];
   const bright = finish === 4 ? 0.12 : 0;
   const tone = (c: string) => (bright ? shade(c, '#FFFFFF', base.kind === 'flagship' ? 0.02 : bright) : shade(c, '#6E6A62', dull));
-  return { ...base, w, d, finish, wall: tone(base.wall), wallLow: tone(base.wallLow), floor: tone(base.floor), floor2: tone(base.floor2), height: base.height + (finish - 2) * 0.1 };
+  return { ...base, w, d, finish, wall: l.signature ? '#F8F3E8' : tone(base.wall), wallLow: l.signature ? '#E5D6BD' : tone(base.wallLow), floor: l.signature ? '#F3E8D2' : tone(base.floor), floor2: l.signature ? '#D8C39C' : tone(base.floor2), trim: l.signature ? '#D4AF37' : base.trim, height: base.height + (finish - 2) * 0.1 + (l.signature ? 0.45 : 0) };
 }
 
 export type RoomKey = number | Pick<Listing, 'tier' | 'stars'>;
