@@ -353,8 +353,11 @@ export function findPath(blocked: boolean[][], from: Cell, to: Cell, w: number, 
       const n: Cell = [cur.c[0] + dx, cur.c[1] + dz];
       const nk = key(n);
       if (!free(n[0], n[1]) && nk !== goal) continue;
-      // Front wall: enter or leave the shop only through its front door.
-      if (((cur.c[1] === d - 1 && n[1] === d) || (cur.c[1] === d && n[1] === d - 1)) && n[0] !== door) continue;
+      // Only cross the shop's front wall at its door. Outside, the same
+      // front pavement must connect to the left and right service lanes.
+      const frontCrossing = (cur.c[1] === d - 1 && n[1] === d) || (cur.c[1] === d && n[1] === d - 1);
+      const sideLane = cur.c[0] === -1 || cur.c[0] === w || n[0] === -1 || n[0] === w;
+      if (frontCrossing && n[0] !== door && !sideLane) continue;
       // Side lanes are walkable, but never let a character pass through a side wall.
       if (n[1] < d && ((cur.c[0] === 0 && n[0] === -1) || (cur.c[0] === -1 && n[0] === 0) || (cur.c[0] === w - 1 && n[0] === w) || (cur.c[0] === w && n[0] === w - 1))) continue;
       const g = cur.g + 1;

@@ -216,8 +216,11 @@ export function openShop(s0: GameState): GameState {
     mix[2] = Math.max(0, mix[2] + shift);
   }
   const arrivals = Array.from({ length: n }, () => ({ at: arrivalMinute(), c: makeCustomer(s, mix) }));
-  // Signature shops draw rare celebrity visits: roughly 2–3 per fortnight on tiers 0–3, one on flagship.
-  if (s.listing.signature && chance(s.tier === 4 ? 1 / 14 : 0.18)) {
+  // Keep celebrity visits rare but predictable: three per 14 days for tiers 0–3,
+  // and one per 14 days for the flagship tier, instead of relying on random luck.
+  const fortnightDay = s.day % 14;
+  const celebrityScheduled = s.tier === 4 ? fortnightDay === 7 : [3, 8, 12].includes(fortnightDay);
+  if (s.listing.signature && celebrityScheduled) {
     const c = makeCelebrityCustomer(s);
     arrivals.push({ at: 100 + Math.random() * 560, c });
   }
@@ -256,6 +259,23 @@ export { ENERGY, actionsFor, busyNow, energyOf, exhausted, interact, isTired, we
 export type { Action, ActionId } from './life';
 export const waiting = (s: GameState) => s.inShop.filter((v) => !v.by);
 export const visitor = (s: GameState, id: string | null) => (id ? s.inShop.find((v) => v.c.id === id) : undefined);
+
+/** Staff need level 6 before they may serve wealthy customers. */
+export const RICH_CUSTOMER_STAFF_LEVEL = 6;
+
+/** Shared eligibility rule for automatic dispatch and player-directed assignments. */
+export function staffCanServeCustomer(staff: Pick<StaffMember, 'level' | 'profession'>, customer: Customer): boolean {
+  if (customer.cls === 'rich' && staff.level < RICH_CUSTOMER_STAFF_LEVEL) return false;
+  const profession = staff.profession || 'stylist';
+  if (profession === 'makeup') return customer.service === 'makeup' || customer.service === 'both';
+  return customer.service !== 'makeup';
+}
+
+/** Whether at least one qualified employee can take this unassigned visitor. */
+export function canAssignToStaff(s: GameState, id: string): boolean {
+  const v = visitor(s, id);
+  return !!v && !v.by && s.staff.some((m) => staffCanServeCustomer(m, v.c) && staffChoice(s, v.c) !== null);
+}
 export const shopClosing = (s: GameState) => s.phase === 'shop' && s.clock >= SHOP_MINUTES;
 
 function patienceFor(s: GameState, c: Customer) {
@@ -343,7 +363,7 @@ export function tick(s0: GameState, minutes: number): GameState {
     // the speaker is switched off: fewer people wander in from the street
     if (!vip && s.off && s.furniture.some((p) => p.placed && p.id === 'speaker' && s.off![p.uid]) && chance(0.08)) continue;
     // a style-off model waits for you all day
-    s = { ...s, inShop: [...s.inShop, { c: a.c, arrived: a.at, patience: vip ? 9999 : patienceFor(s, a.c) * (s.listing.signature ? 1.8 : 1), waited: 0 }] };
+    s = { ...s, inShop: [...s.inShop, { c: a.c, arrived: a.at, patience: vip ? 9999 : patienceFor(s, a.c) * (s.listing.signature ? 2.1 : 1), waited: 0 }] };
   }
   if (lostDoor || lostHeat || lostWeather) s = { ...s, today: { ...s.today, lost: s.today.lost + lostDoor + lostHeat + lostWeather, doorLost: (s.today.doorLost || 0) + lostDoor, heatLost: (s.today.heatLost || 0) + lostHeat, weatherLost: (s.today.weatherLost || 0) + lostWeather } };
   s = powerStep(s, s.clock, end);
@@ -375,8 +395,10 @@ export function tick(s0: GameState, minutes: number): GameState {
       s = staffFinish(s, mine.c, m);
     }
     if (!s.inShop.some((v) => v.by === m.id)) {
-      // Let walk-ins settle into the waiting area briefly, then dispatch the right profession; player-directed clients go first.
-      const next = waiting(s).filter((v) => v.c.cls !== 'rich' && (m.profession === 'makeup' ? v.c.service === 'makeup' || v.c.service === 'both' : v.c.service !== 'makeup')).sort((a, b) => Number(!!b.forStaff) - Number(!!a.forStaff) || a.arrived - b.arrived).find((v) => v.forStaff || end - v.arrived >= 2);
+      // Dispatch the oldest eligible customer as soon as an employee is free; explicit requests go first.
+      const next = waiting(s)
+        .filter((v) => staffCanServeCustomer(m, v.c) && staffChoice(s, v.c) !== null)
+        .sort((a, b) => Number(!!b.forStaff) - Number(!!a.forStaff) || a.arrived - b.arrived)[0];
       if (next && end < SHOP_MINUTES) s = { ...s, inShop: s.inShop.map((v) => (v.c.id === next.c.id ? { ...v, by: m.id, until: end + staffMinutes(m.level) } : v)) };
     }
   }
@@ -412,9 +434,8 @@ export function startStyling(s: GameState, id: string): GameState {
 }
 
 export function sendToStaff(s: GameState, id: string): GameState {
-  if (!s.staff.length) return s;
   const v = visitor(s, id);
-  if (!v || v.c.cls === 'rich') return s;
+  if (!v || !canAssignToStaff(s, id)) return s;
   return { ...s, serving: s.serving === id ? null : s.serving, inShop: s.inShop.map((x) => (x.c.id === id ? { ...x, by: undefined, forStaff: true, arrived: Math.min(x.arrived, s.clock), patience: x.patience + 30 } : x)) };
 }
 

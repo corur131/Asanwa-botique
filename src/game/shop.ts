@@ -98,6 +98,8 @@ export interface RoomStyle {
   height: number;
   /** 1..4: how well kept the place is (the listing's stars). Never as fine as the next size up. */
   finish: number;
+  /** Signature properties get unique architectural details in the 3D room. */
+  signature?: boolean;
 }
 export const ROOMS: RoomStyle[] = [
   { w: 5, d: 3, wall: '#5E7A86', wallLow: '#3E525C', floor: '#8C8C86', floor2: '#7C7C76', trim: '#9A5A2E', kind: 'container', height: 2.4, finish: 2 },
@@ -134,7 +136,7 @@ export function roomOf(l: Pick<Listing, 'tier' | 'stars'> & Partial<Pick<Listing
   const dull = [0, 0.32, 0.16, 0, 0][finish];
   const bright = finish === 4 ? 0.12 : 0;
   const tone = (c: string) => (bright ? shade(c, '#FFFFFF', base.kind === 'flagship' ? 0.02 : bright) : shade(c, '#6E6A62', dull));
-  return { ...base, w, d, finish, wall: l.signature ? '#F8F3E8' : tone(base.wall), wallLow: l.signature ? '#E5D6BD' : tone(base.wallLow), floor: l.signature ? '#F3E8D2' : tone(base.floor), floor2: l.signature ? '#D8C39C' : tone(base.floor2), trim: l.signature ? '#D4AF37' : base.trim, height: base.height + (finish - 2) * 0.1 + (l.signature ? 0.45 : 0) };
+  return { ...base, w, d, finish, wall: l.signature ? '#F8F3E8' : tone(base.wall), wallLow: l.signature ? '#E5D6BD' : tone(base.wallLow), floor: l.signature ? '#F3E8D2' : tone(base.floor), floor2: l.signature ? '#D8C39C' : tone(base.floor2), trim: l.signature ? '#D4AF37' : base.trim, height: base.height + (finish - 2) * 0.1 + (l.signature ? 0.45 : 0), signature: !!l.signature };
 }
 
 export type RoomKey = number | (Pick<Listing, 'tier' | 'stars'> & Partial<Pick<Listing, 'signature'>>);

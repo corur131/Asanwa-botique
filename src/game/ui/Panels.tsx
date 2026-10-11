@@ -1,6 +1,6 @@
 import React, { Suspense, lazy, useState } from 'react';
 import { MARKUP, STAFF, TIERS, naira } from '../economy';
-import { POWER, contestFor, fuelOf, fuelPerHour, tankSize, Candidate, RaiseAnswer, candidates, canHire, daysToRent, displayCap, displayedCount, listingsNow, marketWage, restockAllCost, stats, waitingRoom } from '../engine';
+import { POWER, RICH_CUSTOMER_STAFF_LEVEL, contestFor, fuelOf, fuelPerHour, tankSize, Candidate, RaiseAnswer, candidates, canHire, daysToRent, displayCap, displayedCount, listingsNow, marketWage, restockAllCost, stats, waitingRoom } from '../engine';
 import { FURNITURE, FURNITURE_GROUPS, FurnitureDef, FurnitureGroup, Listing, ceilingCapacity, ceilingUsed, finishes, furnitureById, listingsFor, roomOf, wallCapacity, wallUsed } from '../shop';
 
 const FurniturePreview = lazy(() => import('../scene/Previews').then((m) => ({ default: m.FurniturePreview })));
@@ -281,7 +281,8 @@ export const MovePanel: React.FC<{ s: GameState; onMove: (l: Listing) => void }>
             <div className="flex items-start justify-between gap-2">
               <div>
                 <div className="text-sm font-semibold text-white">{l.street} {l.signature && <Pill tone="gold">✦ SIGNATURE</Pill>}</div>
-                <div className="text-[11px] text-slate-400">{l.area} · <Stars n={l.stars} /> · {roomOf(l).w}×{roomOf(l).d} m floor {l.signature && <Pill tone="gold">SIGNATURE</Pill>}</div>
+                <div className="text-[10px] font-semibold uppercase tracking-wider text-amber-300">{l.signature ? `${l.tier === s.tier ? 'Current level' : 'Next level'} · ${TIERS[l.tier].name} Signature` : `${TIERS[l.tier].name} · Standard listing`}</div>
+                <div className="text-[11px] text-slate-400">{l.area} · <Stars n={l.stars} /> · {roomOf(l).w}×{roomOf(l).d} m floor</div>
               </div>
               <Btn size="sm" tone="gold" onClick={() => setPick(l0)}>View</Btn>
             </div>
@@ -341,13 +342,13 @@ export const StaffPanel: React.FC<{ s: GameState; a: StaffActions }> = ({ s, a }
   const hiring = canHire(s);
   return (
     <div className="space-y-2">
-      <p className="text-xs text-slate-400">{s.staff.length}/{t.staff} hired. Staff style low-budget and middle-class customers when you're busy. Trainees are cheap and grow loyal; experts are good from day one but leave for money.</p>
+      <p className="text-xs text-slate-400">{s.staff.length}/{t.staff} hired. Staff automatically attend compatible waiting customers. Levels 1–{RICH_CUSTOMER_STAFF_LEVEL - 1} handle poor and middle-class customers; level {RICH_CUSTOMER_STAFF_LEVEL}+ can also serve rich customers. Trainees are cheap and grow loyal; experts are good from day one but leave for money.</p>
       {s.staff.map((m) => (
         <div key={m.id} className="rounded-lg border border-white/10 bg-white/5 p-2.5">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div>
               <div className="text-sm font-semibold text-white">{m.name} <Pill tone={m.trained ? 'green' : 'gold'}>{m.trained ? 'Trained by you' : 'Expert'}</Pill></div>
-              <div className="text-[11px] text-slate-400">{m.profession === 'makeup' ? 'Makeup artist' : 'Hair & styling'} · Level {m.level} · {naira(m.wage)}/week · {m.weeks} wk · market {naira(marketWage(m.level))}</div>
+              <div className="text-[11px] text-slate-400">{m.profession === 'makeup' ? 'Makeup artist' : 'Hair & styling'} · Level {m.level} · {m.level >= RICH_CUSTOMER_STAFF_LEVEL ? 'rich clients eligible' : 'poor/middle clients only'} · {naira(m.wage)}/week · {m.weeks} wk · market {naira(marketWage(m.level))}</div>
             </div>
             <div className="flex gap-1.5">
               <Btn size="sm" tone="green" disabled={m.level >= 10 || s.cash < STAFF.trainFee(m.level)} onClick={() => a.train(m.id)}>Train · {naira(STAFF.trainFee(m.level))}</Btn>
@@ -367,8 +368,8 @@ export const StaffPanel: React.FC<{ s: GameState; a: StaffActions }> = ({ s, a }
           )}
         </div>
       ))}
-      {s.staff.length < t.staff && (
-        <div className="space-y-2">
+      <div className="space-y-2">
+        {!hiring && <p className="text-xs text-amber-200">All {t.staff} staff slots are filled. Dismiss an employee to create a vacancy.</p>}
         <label className="block text-xs text-slate-300">Profession to hire
           <select value={profession} onChange={(e) => setProfession(e.target.value as StaffProfession)} className="mt-1 block w-full rounded-lg border border-white/15 bg-[#181b24] p-2 text-sm text-white">
             <option value="stylist">Hair stylist / styling</option>
@@ -385,8 +386,7 @@ export const StaffPanel: React.FC<{ s: GameState; a: StaffActions }> = ({ s, a }
             </div>
           ))}
         </div>
-        </div>
-      )}
+      </div>
     </div>
   );
 };
