@@ -2,6 +2,7 @@ import { Canvas } from '@react-three/fiber';
 import { OrbitControls } from '@react-three/drei';
 import { furnitureById } from '../shop';
 import { B, CeilingPiece, FloorPiece, WallPiece } from './Furniture3D';
+import { YardModel } from './YardModels';
 
 export { RoomPreview } from './ShopScene';
 
@@ -24,6 +25,8 @@ export function FurniturePreview({ id }: { id: string }) {
       <B p={[0, -0.02, 0]} s={[big + 1.4, 0.04, big + 1.4]} c="#8C8478" />
       {f.mount === 'wall' && <B p={[0, h / 2, -0.06]} s={[f.w + 1, h, 0.1]} c="#B9AE98" />}
       {f.mount === 'floor' && <FloorPiece id={id} colors={SAMPLE.slice(0, f.slots || 0)} />}
+      {f.mount === 'yard' && (id === 'umbrellaCanopy' || id === 'securityPost') && <YardModel id={id} />}
+      {f.mount === 'yard' && id !== 'umbrellaCanopy' && id !== 'securityPost' && <FloorPiece id={id} colors={SAMPLE.slice(0, f.slots || 0)} />}
       {f.mount === 'wall' && <WallPiece id={id} colors={SAMPLE.slice(0, f.slots || 0)} />}
       {ceiling && <CeilingPiece id={id} h={h} at={[0, 0, 0]} />}
     </Canvas>
