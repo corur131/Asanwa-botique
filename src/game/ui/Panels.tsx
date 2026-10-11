@@ -6,7 +6,7 @@ import { FURNITURE, FURNITURE_GROUPS, FurnitureDef, FurnitureGroup, Listing, cei
 const FurniturePreview = lazy(() => import('../scene/Previews').then((m) => ({ default: m.FurniturePreview })));
 const RoomPreview = lazy(() => import('../scene/Previews').then((m) => ({ default: m.RoomPreview })));
 const Loading = () => <div className="w-full h-full flex items-center justify-center text-xs text-slate-500">Loading picture…</div>;
-import { GameState } from '../types';
+import { GameState, StaffProfession } from '../types';
 import { Bar, Btn, Card, Modal, Pill, Swatch } from './kit';
 
 const graceText = (g: number) => (g === 0 ? 'No grace: pay on the day' : `${g} day${g > 1 ? 's' : ''} of grace if late`);
@@ -333,8 +333,9 @@ export interface StaffActions {
 
 export const StaffPanel: React.FC<{ s: GameState; a: StaffActions }> = ({ s, a }) => {
   const t = TIERS[s.tier];
+  const [profession, setProfession] = useState<StaffProfession>('stylist');
   if (!t.staff) return <p className="text-sm text-slate-300">Staff unlock when you move into a Boutique.</p>;
-  const cands = candidates(s);
+  const cands = candidates(s, profession);
   const hiring = canHire(s);
   return (
     <div className="space-y-2">
@@ -344,7 +345,7 @@ export const StaffPanel: React.FC<{ s: GameState; a: StaffActions }> = ({ s, a }
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div>
               <div className="text-sm font-semibold text-white">{m.name} <Pill tone={m.trained ? 'green' : 'gold'}>{m.trained ? 'Trained by you' : 'Expert'}</Pill></div>
-              <div className="text-[11px] text-slate-400">Level {m.level} · {naira(m.wage)}/week · {m.weeks} wk · market {naira(marketWage(m.level))}</div>
+              <div className="text-[11px] text-slate-400">{m.profession === 'makeup' ? 'Makeup artist' : 'Hair & styling'} · Level {m.level} · {naira(m.wage)}/week · {m.weeks} wk · market {naira(marketWage(m.level))}</div>
             </div>
             <div className="flex gap-1.5">
               <Btn size="sm" tone="green" disabled={m.level >= 10 || s.cash < STAFF.trainFee(m.level)} onClick={() => a.train(m.id)}>Train · {naira(STAFF.trainFee(m.level))}</Btn>
@@ -365,14 +366,23 @@ export const StaffPanel: React.FC<{ s: GameState; a: StaffActions }> = ({ s, a }
         </div>
       ))}
       {s.staff.length < t.staff && (
+        <div className="space-y-2">
+        <label className="block text-xs text-slate-300">Profession to hire
+          <select value={profession} onChange={(e) => setProfession(e.target.value as StaffProfession)} className="mt-1 block w-full rounded-lg border border-white/15 bg-[#181b24] p-2 text-sm text-white">
+            <option value="stylist">Hair stylist / styling</option>
+            <option value="makeup">Makeup artist</option>
+          </select>
+        </label>
         <div className="grid sm:grid-cols-2 gap-2">
           {cands.map((c) => (
             <div key={c.kind} className="rounded-lg border border-dashed border-white/20 p-2.5">
               <div className="text-sm font-semibold text-white">{c.name} · {c.kind === 'trainee' ? 'Trainee' : 'Expert'}</div>
+              <div className="text-[11px] text-amber-200">{c.profession === 'makeup' ? 'Makeup artist' : 'Hair & styling'}</div>
               <div className="text-[11px] text-slate-400 mb-2">Level {c.level} · {naira(c.wage)}/week · {c.kind === 'trainee' ? 'signing fee' : 'signing bonus'} {naira(c.signing)}</div>
-              <Btn size="sm" tone="gold" disabled={!hiring || s.cash < c.signing} onClick={() => a.hire(c)}>{hiring ? 'Hire' : `Next hire from day ${s.hireOkDay}`}</Btn>
+              <Btn size="sm" tone="gold" disabled={!hiring || s.cash < c.signing} onClick={() => a.hire(c)}>{hiring ? 'Hire now' : 'No staff slots available'}</Btn>
             </div>
           ))}
+        </div>
         </div>
       )}
     </div>
