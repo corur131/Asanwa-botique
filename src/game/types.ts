@@ -30,6 +30,7 @@ export type Want =
   | { kind: 'native' }
   | { kind: 'english' }
   | { kind: 'gele' }
+  | { kind: 'nails' }
   | { kind: 'noHeels' }
   | { kind: 'fitted' }
   | { kind: 'covered' }
