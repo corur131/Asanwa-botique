@@ -343,7 +343,7 @@ export function tick(s0: GameState, minutes: number): GameState {
     // the speaker is switched off: fewer people wander in from the street
     if (!vip && s.off && s.furniture.some((p) => p.placed && p.id === 'speaker' && s.off![p.uid]) && chance(0.08)) continue;
     // a style-off model waits for you all day
-    s = { ...s, inShop: [...s.inShop, { c: a.c, arrived: a.at, patience: vip ? 9999 : patienceFor(s, a.c), waited: 0 }] };
+    s = { ...s, inShop: [...s.inShop, { c: a.c, arrived: a.at, patience: vip ? 9999 : patienceFor(s, a.c) * (s.listing.signature ? 1.8 : 1), waited: 0 }] };
   }
   if (lostDoor || lostHeat || lostWeather) s = { ...s, today: { ...s.today, lost: s.today.lost + lostDoor + lostHeat + lostWeather, doorLost: (s.today.doorLost || 0) + lostDoor, heatLost: (s.today.heatLost || 0) + lostHeat, weatherLost: (s.today.weatherLost || 0) + lostWeather } };
   s = powerStep(s, s.clock, end);
@@ -504,6 +504,7 @@ export function settle(c: Customer, score: ScoreBreakdown, price: number, suppli
 /** Applies a finished look: stock leaves the shop, money and reputation move, the customer walks out. */
 export function applyLook(s0: GameState, c: Customer, choice: StyleChoice, st0: Settlement, score: ScoreBreakdown): GameState {
   let st = st0;
+  if (s0.listing.signature && !c.celebrity) st = { ...st, tip: Math.max(st.tip, Math.round(st.paid * 0.12 / 100) * 100) };
   // styling wears Divine out: a full look more than a quick hair or makeup job
   const s = s0.serving === c.id ? spendEnergy(s0, c.service ? ENERGY.service : ENERGY.fullLook) : s0;
   const sold = st.outcome === 'paid' || st.outcome === 'bargained';
