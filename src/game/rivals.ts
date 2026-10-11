@@ -80,9 +80,9 @@ export const mainRivals = (s: GameState) => (s.rivals || []).filter((r) => r.mai
 // ---------------------------------------------------------------------------
 // The ladder
 // ---------------------------------------------------------------------------
-/** One number to rank boutiques: takings this week, reputation, followers, shop size. */
+/** Recent trading performance leads the ladder; reputation, audience and premises still matter. */
 export function boutiqueScore(weekTakings: number, rep: number, followers: number, tier: number) {
-  return weekTakings / 10_000 + rep * 3 + Math.sqrt(followers) * 1.5 + tier * 60;
+  return weekTakings / 5_000 + rep * 2.4 + Math.sqrt(followers) * 0.75 + tier * 45;
 }
 export function playerWeek(s: GameState) {
   return s.history.slice(-7).reduce((a, d) => a + d.income, 0);
@@ -203,36 +203,68 @@ export function simulateRivals(s0: GameState): GameState {
   let s = s0;
   if (!s.rivals?.length) return s;
   const today = s.day;
-  const youRank = playerRank(s);
+  // Snapshot the current order once, so rivals can react to the actual race for rank.
+  const currentOrder = ladder(s).map((row) => row.id);
+  const rankById = new Map(currentOrder.map((id, index) => [id, index + 1] as const));
+  const youRank = rankById.get('you') || 20;
   const rivals: Rival[] = [];
-  const news: { kind: 'up' | 'down' | 'viral' | 'scandal'; r: Rival }[] = [];
+  const news: { kind: 'up' | 'down' | 'viral' | 'scandal' | 'campaign'; r: Rival }[] = [];
   for (const r0 of s.rivals) {
     const r = { ...r0, week: [...r0.week] };
     const t = TIERS[r.tier];
     const repK = 0.6 + (r.rep / 100) * 0.8;
     const followK = 1 + 0.3 * (r.followers / (r.followers + 8000));
     const ramp = Math.min(1, 0.55 + (today - r.moved) / 20);
-    // good months and bad months
+    const rivalRank = rankById.get(r.id) || 20;
+    const chasingDivine = Math.abs(rivalRank - youRank) <= (r.main ? 5 : 2);
+    const guardingTopFive = rivalRank <= 5;
+    const campaignChance = clamp(
+      0.035 + r.aggression * 0.055 + (chasingDivine ? 0.07 : 0) + (guardingTopFive ? 0.025 : 0),
+      0.03,
+      0.22,
+    );
+    // Each boutique can have one defining event today: a push for customers, a viral win or a setback.
+    const dayEvent: 'campaign' | 'viral' | 'scandal' | null = chance(campaignChance)
+      ? 'campaign'
+      : chance(0.038 * (r.main ? 1.25 : 1))
+        ? 'viral'
+        : chance(0.01)
+          ? 'scandal'
+          : null;
+    const eventMultiplier = dayEvent === 'campaign'
+      ? rand(1.25, 1.65)
+      : dayEvent === 'viral'
+        ? rand(1.7, 2.4)
+        : dayEvent === 'scandal'
+          ? rand(0.38, 0.72)
+          : 1;
+    // A shop's daily form is volatile enough that a strong week can overtake an established name.
     const form = 1 + 0.2 * Math.sin(today / 9 + hash(r.id));
-    const takings = DAILY[r.tier] * r.skill * form * repK * followK * ramp * rand(0.6, 1.35) * (r.stars === 1 ? 0.9 : r.stars >= 3 ? 1.1 : 1);
+    const takings = DAILY[r.tier] * r.skill * form * repK * followK * ramp * rand(0.58, 1.48) * eventMultiplier * (r.stars === 1 ? 0.9 : r.stars >= 3 ? 1.1 : 1);
     r.week.push(takings);
     r.week = r.week.slice(-7);
     r.cash += takings * (1 - STOCK_SHARE[r.tier]) - t.running;
     if (today % 7 === 0) r.cash -= t.rent * [0, 0.75, 1, 1.33, 1.75][r.stars] + WAGES[r.tier];
-    // reputation drifts toward what their skill earns
+    // reputation drifts toward what their skill earns, with small daily swings.
     const target = 30 + r.skill * 45;
     r.rep = clamp(r.rep + (target - r.rep) * 0.04 + rand(-1.5, 1.5), 5, 99);
     r.followers = Math.round(r.followers * (1 + (r.rep - 45) / 9000) + rand(0, 6) * (r.tier + 1));
-    // bad weeks happen: stolen stock, a landlord's "service charge", a dead generator
+    // Campaigns cost money but can turn into customers; aggressive rivals spend more readily.
+    if (dayEvent === 'campaign') {
+      r.cash -= takings * rand(0.07, 0.13);
+      r.followers += Math.round(rand(90, 260) * (r.tier + 1) + takings / 10_000 * rand(1, 3));
+      r.rep = clamp(r.rep + rand(0.2, 0.8), 5, 99);
+      if (r.main) news.push({ kind: 'campaign', r });
+    }
+    // Bad weeks still hurt: theft, a landlord's surprise charge or a dead generator.
     if (chance(0.025)) r.cash -= takings * rand(2, 4);
-    // the odd big day or bad day
-    if (chance(0.012 * (r.main ? 1.5 : 1))) {
-      r.followers += Math.round(rand(400, 2500) * (r.tier + 1));
-      r.rep = clamp(r.rep + 5, 0, 99);
+    if (dayEvent === 'viral') {
+      r.followers += Math.round(rand(1_200, 4_800) * (r.tier + 1));
+      r.rep = clamp(r.rep + rand(3, 7), 0, 99);
       news.push({ kind: 'viral', r });
-    } else if (chance(0.008)) {
-      r.rep = clamp(r.rep - 9, 0, 99);
-      r.cash -= DAILY[r.tier] * 2;
+    } else if (dayEvent === 'scandal') {
+      r.rep = clamp(r.rep - rand(6, 12), 0, 99);
+      r.cash -= DAILY[r.tier] * rand(0.9, 1.8);
       news.push({ kind: 'scandal', r });
     }
     // move up when they can afford it; get thrown down when broke too long
@@ -276,8 +308,10 @@ export function simulateRivals(s0: GameState): GameState {
       s = gist(s, `Landlord locks ${r.shop}!`, `${r.owner} could not pay rent and has moved to a ${TIERS[r.tier].name}. Lagos is hard o.`, r.id, true);
       for (const o of mainRivals(s).filter((x) => x.id !== r.id && chance(0.35))) s = inGroup(s, o, pick(LINES.mock(r.owner.split(' ')[0])));
     } else if (n.kind === 'viral') {
-      s = gist(s, `${r.shop} goes viral 🔥`, `A look from ${r.owner}'s shop is all over Gidigram.`, r.id);
+      s = gist(s, `${r.shop} goes viral 🔥`, `A look from ${r.owner}'s shop is all over Gidigram. The sudden attention has brought a surge of bookings and followers.`, r.id);
       if (r.main) s = rivalPost(s, r, pick(LINES.brag[r.personality]));
+    } else if (n.kind === 'campaign') {
+      s = gist(s, `${r.shop} launches an aggressive campaign`, `${r.owner} is spending on promotions and discounts to pull customers from rival boutiques. It is working, but the marketing bill is not small.`, r.id);
     } else {
       s = gist(s, `Customer drags ${r.shop} online`, `"They spoilt my wedding look," says a bride. ${r.owner} has not responded.`, r.id, true);
     }
