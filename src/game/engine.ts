@@ -179,12 +179,17 @@ export function shopBonus(s: GameState, c: Customer, choice: StyleChoice): { bon
   if (st.mirror) notes.push(`Mirror +${st.mirror}`);
   if (choice.hair && st.hairBonus) { bonus += st.hairBonus; notes.push(`Hair station +${st.hairBonus}`); }
   if (!c.male && choice.makeup && st.makeupBonus) { bonus += st.makeupBonus; notes.push(`Makeup station +${st.makeupBonus}`); }
+  if (c.wants.some((w) => w.kind === 'nails') && choice.makeup?.nailColor && st.nailBonus) { bonus += st.nailBonus; notes.push(`Nail station +${st.nailBonus}`); }
   if (c.cls === 'rich' && st.richBonus) { bonus += st.richBonus; notes.push(`Fitting room +${st.richBonus}`); }
   if (st.scoreBonus) { bonus += st.scoreBonus; notes.push(`Steamer and lighting +${st.scoreBonus}`); }
   if (Object.values(choice).some((uid) => typeof uid === 'string' && s.stock.some((d) => d.uid === uid && (d.trend || 0) >= s.day))) { bonus += 4; notes.push('Trending fabric +4'); }
   const src = s.phase === 'shop' ? source(s) : 'grid';
   if (src === 'solar') { bonus += 2; notes.push('Cool and quiet on solar +2'); }
-  if (src === 'none') { bonus -= 4; notes.push('Styled in the dark and heat -4'); }
+  if (src === 'none') {
+    const lantern = s.furniture.some((p) => p.placed && p.id === 'lantern');
+    bonus -= lantern ? 1 : 4;
+    notes.push(lantern ? 'Lantern keeps the look visible -1' : 'Styled in the dark and heat -4');
+  }
   return { bonus: Math.min(10, bonus), notes };
 }
 
@@ -873,8 +878,9 @@ export function postLook(s: GameState, c: Customer, look: CharacterConfig, score
   if (!canPost(s, score)) return s;
   const clsMult = { poor: 0.6, middle: 1, rich: 2 }[c.cls];
   const fatigue = 1 / (1 + postsToday(s));
-  const gained = Math.max(5, Math.round((score - 60) * clsMult * (4 + Math.random() * 4) * fatigue * (1 + (s.followers || 0) / 6000)));
-  const likes = Math.round(((s.followers || 0) + gained) * (0.08 + (score - 70) / 300) * (0.8 + Math.random() * 0.4));
+  const flowerWall = s.furniture.some((p) => p.placed && p.id === 'flowerWall');
+  const gained = Math.max(5, Math.round((score - 60) * clsMult * (4 + Math.random() * 4) * fatigue * (1 + (s.followers || 0) / 6000) * (flowerWall ? 1.12 : 1)));
+  const likes = Math.round(((s.followers || 0) + gained) * (0.08 + (score - 70) / 300) * (0.8 + Math.random() * 0.4) * (flowerWall ? 1.5 : 1));
   const post = { id: `p${s.day}-${Math.random().toString(36).slice(2, 7)}`, day: s.day, look, name: c.name, caption: pick(CAPTIONS), score, likes, gained };
   return { ...s, followers: (s.followers || 0) + gained, posts: [post, ...(s.posts || [])].slice(0, 24) };
 }
