@@ -381,6 +381,7 @@ function Yard({ s, selected, onTap }: { s: GameState; selected: string | null; o
   const running = !!s.power?.gen && src === 'gen';
   const rightX = r.w + 1.5;
   const leftX = -1.5;
+  const X = rightX; // gallons and guard remain near the main service side unless assigned to a side
   return (
     <group>
       {/* Matching concrete service strips on both sides of the shop. */}
