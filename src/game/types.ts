@@ -215,6 +215,8 @@ export interface Regular {
   favName: string;
 }
 
+export type StaffProfession = 'stylist' | 'makeup';
+
 export interface StaffMember {
   id: string;
   name: string;
@@ -224,6 +226,8 @@ export interface StaffMember {
   trained: boolean;
   weeks: number;
   look: CharacterConfig;
+  /** Optional for compatibility with existing saves; new hires have a defined profession. */
+  profession?: StaffProfession;
   /** A pending raise demand (weekly wage asked for). */
   raiseAsk?: number;
 }
@@ -353,6 +357,13 @@ export interface GameState {
   regulars: Regular[];
   staff: StaffMember[];
   hireOkDay: number;
+  /** Optional security/fuel workflow; absent in older saves. */
+  security?: {
+    guard?: { id: string; name: string; wage: number };
+    postUid?: string;
+    trip?: { remaining: number; litres: number; cost: number; refillUid?: string } | null;
+    gallons?: { id: string; litres: number }[];
+  };
   divine: CharacterConfig;
   slowWeek: boolean;
   phase: 'morning' | 'shop' | 'evening';
