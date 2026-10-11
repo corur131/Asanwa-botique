@@ -864,7 +864,7 @@ const SecurityMenu: React.FC<{
                     {generators.map((g) => <option key={g.uid} value={g.uid}>{furnitureById(g.id).name} · {Math.round(E.fuelOf(s, g.uid) * 10) / 10}/{E.tankSize(s, g.uid)} L</option>)}
                   </select>
                 </label>
-                <Btn block tone="gold" onClick={() => selectedGenerator && onPour?.(gallon.id, selectedGenerator)}>{guard ? `Ask ${guard.name} to fill it` : 'Fill the generator'}</Btn>
+                <Btn className="w-full" tone="gold" onClick={() => selectedGenerator && onPour?.(gallon.id, selectedGenerator)}>{guard ? `Ask ${guard.name} to fill it` : 'Fill the generator'}</Btn>
               </>
             ) : <p className="text-sm text-amber-200">Buy and place a generator before pouring this fuel.</p>}
           </div>
@@ -873,7 +873,7 @@ const SecurityMenu: React.FC<{
             <div className="rounded-xl border border-white/10 bg-white/5 p-3">
               <div className="font-semibold">{guard ? `${guard.name} · security guard` : 'No security guard hired'}</div>
               <p className="text-xs text-slate-400 mt-1">{guard ? (post ? 'On duty at the outside security post when not running an errand.' : 'The post is missing, so Divine will handle errands until it is placed again.') : post ? 'You own a security post. Hire a guard to protect the shop and run errands.' : 'Divine will go out herself for fuel. To hire a guard, buy and place the small security post from the Furniture Store first.'}</p>
-              {post && !guard && <Btn block tone="gold" onClick={onHire} className="mt-2">Hire security guard · ₦35,000</Btn>}
+              {post && !guard && <Btn className="w-full" tone="gold" onClick={onHire} className="mt-2">Hire security guard · ₦35,000</Btn>}
               {guard && <p className="text-xs text-emerald-200 mt-2">Weekly wage: {naira(guard.wage)}</p>}
             </div>
             {trip && <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-sm text-amber-100">{busyText} Ordered: {trip.litres} L.</div>}
@@ -885,8 +885,8 @@ const SecurityMenu: React.FC<{
               </label>
             </div>
             <div className="grid sm:grid-cols-2 gap-2">
-              <Btn block disabled={!!trip || s.cash < price} onClick={() => onBuy(litres)}>{guard && post ? 'Guard buys a gallon' : 'Divine goes to buy fuel'} · {naira(price)}</Btn>
-              <Btn block tone="gold" disabled={!!trip || !generators.length || s.cash < price} onClick={() => onBuy(litres, selectedGenerator)}>{guard && post ? 'Guard buys & refills' : 'Buy & refill generator'} · {naira(price)}</Btn>
+              <Btn className="w-full" disabled={!!trip || s.cash < price} onClick={() => onBuy(litres)}>{guard && post ? 'Guard buys a gallon' : 'Divine goes to buy fuel'} · {naira(price)}</Btn>
+              <Btn className="w-full" tone="gold" disabled={!!trip || !generators.length || s.cash < price} onClick={() => onBuy(litres, selectedGenerator)}>{guard && post ? 'Guard buys & refills' : 'Buy & refill generator'} · {naira(price)}</Btn>
             </div>
             {generators.length > 0 && (
               <label className="block text-xs text-slate-300">Generator to refill
