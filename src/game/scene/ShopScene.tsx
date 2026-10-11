@@ -617,9 +617,12 @@ export default function ShopScene(p: SceneProps) {
     !blocked[p.manualTarget[1]]?.[p.manualTarget[0]]
       ? p.manualTarget
       : null;
-  const divineAt: Cell = p.build ? [Math.min(r.w, sp.door[0] + 2), r.d + 1] : act ? act.cell : manual || sp.divine;
+  const trip = s.security?.trip;
+  const errandTarget: Cell | null = trip?.carrier === 'divine' ? (trip.remaining > trip.total / 2 ? sp.outside : sp.door) : null;
+  const divineAt: Cell = p.build ? [Math.min(r.w, sp.door[0] + 2), r.d + 1] : errandTarget || (act ? act.cell : manual || sp.divine);
   const tired = s.energy !== undefined && s.energy < 30;
-  people.push(<Walker key="divine" look={divineLook} spawn={sp.divine} target={divineAt} blocked={blocked} w={r.w} d={r.d} speed={tired ? 0.85 : 1.4} pose={act && !p.build ? (act.stand ? 'stand' : p.act!.pose) : undefined} face={act && !p.build ? act.face : undefined} />);
+  const carryingFuel = !!trip && trip.carrier === 'divine' && trip.remaining <= trip.total / 2;
+  people.push(<Walker key="divine" look={divineLook} spawn={sp.divine} target={divineAt} blocked={blocked} w={r.w} d={r.d} speed={tired ? 0.85 : 1.4} carryBag={carryingFuel} pose={!errandTarget && act && !p.build ? (act.stand ? 'stand' : p.act!.pose) : undefined} face={!errandTarget && act && !p.build ? act.face : undefined} />);
   const serviceStation = (profession: 'stylist' | 'makeup' | undefined) => {
     const ids = profession === 'makeup'
       ? ['makeupStation', 'vanity', 'salonChair', 'hairStation']
