@@ -17,7 +17,7 @@ export const hairGroup = (id: string) => {
 
 const HEELS = new Set(['heels', 'blockHeels', 'platforms', 'mules', 'ankleBoots', 'kneeBoots']);
 const CASUAL_SHOES = new Set(['sneakers', 'slides', 'palmSlippers']);
-const FITTED = new Set(['bodyconMini', 'mermaidGown', 'tubeMidi', 'corsetGown', 'offShoulderGown', 'slitGown', 'pencilSkirt', 'skinnyJeans', 'corsetTop', 'tubeTop', 'jumpsuit', 'slipDress', 'laceGown']);
+const FITTED = new Set(['bodyconMini', 'mermaidGown', 'tubeMidi', 'corsetGown', 'offShoulderGown', 'slitGown', 'pencilSkirt', 'skinnyJeans', 'corsetTop', 'tubeTop', 'jumpsuit', 'slipDress', 'laceGown', 'capeGown']);
 const REVEALING = new Set(['cropTop', 'tubeTop', 'halterTop', 'cropTee', 'miniSkirt', 'shorts', 'bodyconMini', 'slipDress', 'slitGown', 'playsuit', 'mensShorts']);
 const FORMAL: Occasion[] = ['owambe', 'wedding', 'redCarpet', 'party', 'dateNight'];
 const NEAR: Partial<Record<Occasion, Occasion[]>> = {

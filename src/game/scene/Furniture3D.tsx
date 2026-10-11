@@ -33,6 +33,78 @@ const Ball: React.FC<{ p: V3; r: number; c: string; e?: string; ei?: number; m?:
 
 const MIRROR = '#BFD6E2';
 
+/** Whether this appliance has power and is switched on (fans spin, etc.). */
+export const ApplianceOn = createContext(true);
+
+/** Spins its children around one axis; speeds up and slows down smoothly. */
+function Spin({ axis, speed, on, sway, children }: { axis: 'y' | 'z'; speed: number; on: boolean; sway?: boolean; children: React.ReactNode }) {
+  const spin = useRef<THREE.Group>(null);
+  const head = useRef<THREE.Group>(null);
+  const v = useRef(on ? speed : 0);
+  useFrame(({ clock }, dt) => {
+    const target = on ? speed : 0;
+    v.current += (target - v.current) * Math.min(1, dt * (on ? 1.2 : 0.6));
+    if (spin.current) spin.current.rotation[axis] += v.current * dt;
+    // a standing fan's head turns slowly from side to side while it runs
+    if (sway && head.current) head.current.rotation.y = Math.sin(clock.getElapsedTime() * 0.5) * 0.6;
+  });
+  return (
+    <group ref={head}>
+      <group ref={spin}>{children}</group>
+    </group>
+  );
+}
+
+function StandingFanHead() {
+  const on = useContext(ApplianceOn);
+  return (
+    <group position={[0, 1.25, 0]}>
+      <Spin axis="y" speed={0} on={false} sway={on}>
+        <group>
+          {/* motor at the back, cage and spinning blades in front */}
+          <Cyl p={[0, 0, -0.08]} r1={0.07} h={0.14} c="#E8E8E8" rot={[Math.PI / 2, 0, 0]} />
+          <mesh position={[0, 0, 0.05]}>
+            <torusGeometry args={[0.24, 0.012, 6, 28]} />
+            <meshStandardMaterial color="#DADADA" metalness={0.4} roughness={0.4} />
+          </mesh>
+          {[0, 1, 2, 3].map((i) => (
+            <B key={i} p={[0, 0, 0.05]} s={[0.48, 0.006, 0.006]} c="#CFCFCF" rot={[0, 0, (i * Math.PI) / 4]} />
+          ))}
+          <group position={[0, 0, 0.03]}>
+            <Spin axis="z" speed={22} on={on}>
+              <Cyl p={[0, 0, 0]} r1={0.035} h={0.04} c="#7FB8D8" rot={[Math.PI / 2, 0, 0]} />
+              {[0, 1, 2].map((i) => (
+                <group key={i} rotation={[0, 0, (i * Math.PI * 2) / 3]}>
+                  <mesh position={[0.11, 0, 0]} rotation={[0.35, 0, 0]}>
+                    <boxGeometry args={[0.2, 0.09, 0.008]} />
+                    <meshStandardMaterial color="#7FB8D8" transparent opacity={0.85} />
+                  </mesh>
+                </group>
+              ))}
+            </Spin>
+          </group>
+        </group>
+      </Spin>
+    </group>
+  );
+}
+
+function CeilingFanBlades({ y }: { y: number }) {
+  const on = useContext(ApplianceOn);
+  return (
+    <group position={[0, y, 0]}>
+      <Spin axis="y" speed={9} on={on}>
+        <Cyl p={[0, 0.02, 0]} r1={0.1} h={0.1} c="#EEE" />
+        {[0, 1, 2].map((i) => (
+          <group key={i} rotation={[0, (-i * Math.PI * 2) / 3, 0]}>
+            <B p={[0.4, 0, 0]} s={[0.7, 0.02, 0.13]} c="#8A6440" rot={[0.12, 0, 0]} />
+          </group>
+        ))}
+      </Spin>
+    </group>
+  );
+}
+
 /** Whether the mirror glass inside this piece shows a live reflection. */
 export const MirrorLive = createContext(false);
 
@@ -298,7 +370,7 @@ export function FloorPiece({ id, colors, selected }: { id: string; colors: strin
           {glow}
           <Cyl p={[0, 0.03, 0]} r1={0.2} h={0.05} c="#EEE" />
           <Cyl p={[0, 0.6, 0]} r1={0.02} h={1.15} c="#DDD" />
-          <Cyl p={[0, 1.25, 0.05]} r1={0.24} h={0.08} c="#7FB8D8" rot={[Math.PI / 2, 0, 0]} />
+          <StandingFanHead />
         </group>
       );
     case 'generator':
@@ -821,8 +893,9 @@ export function CeilingPiece({ id, h, at, off }: { id: string; h: number; at: V3
     return (
       <group position={at}>
         <B p={[0, h - 0.2, 0]} s={[0.03, 0.4, 0.03]} c="#DDD" />
-        <Cyl p={[0, h - 0.42, 0]} r1={0.1} h={0.1} c="#EEE" />
-        {[0, 1, 2].map((i) => <B key={i} p={[Math.cos((i * Math.PI * 2) / 3) * 0.4, h - 0.44, Math.sin((i * Math.PI * 2) / 3) * 0.4]} s={[0.7, 0.02, 0.13]} c="#8A6440" rot={[0, (-i * Math.PI * 2) / 3, 0]} />)}
+        <ApplianceOn.Provider value={!off}>
+          <CeilingFanBlades y={h - 0.44} />
+        </ApplianceOn.Provider>
       </group>
     );
   if (id === 'tubeLight')

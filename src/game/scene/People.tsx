@@ -35,7 +35,7 @@ const BRAIDS = new Set(['knotlessBraids', 'fulaniBraids', 'fauxLocs', 'passionTw
 const AFRO = new Set(['afroWig', 'afro', 'curlyBob']);
 const BUN = new Set(['highBun', 'sleekPonytail', 'bantuKnots']);
 const PUFF = new Set(['afroPuff', 'highTopFade']);
-const TROUSERS = new Set(['skinnyJeans', 'baggyJeans', 'wideLegTrousers', 'cargoPants', 'straightTrousers', 'trousers', 'jeans', 'chinos', 'mensCargo', 'sokoto', 'jumpsuit']);
+const TROUSERS = new Set(['skinnyJeans', 'baggyJeans', 'wideLegTrousers', 'cargoPants', 'straightTrousers', 'trousers', 'jeans', 'chinos', 'mensCargo', 'sokoto', 'jumpsuit', 'joggers']);
 const SHORT_BOTTOM = new Set(['miniSkirt', 'shorts', 'mensShorts', 'playsuit', 'bodyconMini']);
 
 export function lookToFigure(cfg: CharacterConfig): FigureLook {
@@ -48,7 +48,7 @@ export function lookToFigure(cfg: CharacterConfig): FigureLook {
   const hairKind: FigureLook['hairKind'] = hair === 'bald' ? 'bald' : LONG.has(hair) ? 'long' : BRAIDS.has(hair) ? 'braids' : AFRO.has(hair) ? 'afro' : BUN.has(hair) ? 'bun' : PUFF.has(hair) ? 'puff' : 'short';
   const dressItem = w.dress ? itemById(w.dress.style) : undefined;
   const isSet = !!dressItem && (dressItem.id === 'senator' || dressItem.id === 'kaftan' || dressItem.id === 'agbada');
-  const dressLength = w.dress ? (SHORT_BOTTOM.has(w.dress.style) ? 0.35 : /maxi|Gown|bubu|laceGown|corset|ball|slit|mermaid|offShoulderGown|adire/i.test(w.dress.style) ? 1 : 0.62) : 0;
+  const dressLength = w.dress ? (SHORT_BOTTOM.has(w.dress.style) ? 0.35 : /maxi|Maxi|Gown|bubu|laceGown|corset|ball|slit|mermaid|offShoulderGown|adire|cape/i.test(w.dress.style) ? 1 : 0.62) : 0;
   const bottomStyle = w.bottom?.style || '';
   const acc = cfg.accessories;
   return {
@@ -59,7 +59,7 @@ export function lookToFigure(cfg: CharacterConfig): FigureLook {
     bottom: g(w.bottom) || g(w.dress) || '#5A5A60',
     dress: w.dress && !isSet && w.dress.style !== 'jumpsuit' ? w.dress.color : null,
     dressLength: isSet ? 0.75 : dressLength,
-    dressFlare: w.dress && /ball|maxiDress|fitFlare|bubu|adire/i.test(w.dress.style) ? 0.18 : 0.06,
+    dressFlare: w.dress && /ball|maxiDress|ruffleMaxi|fitFlare|bubu|adire/i.test(w.dress.style) ? 0.18 : 0.06,
     trousers: isSet || TROUSERS.has(bottomStyle) || w.dress?.style === 'jumpsuit',
     shoes: acc?.shoesColor || '#3A3A40',
     male,

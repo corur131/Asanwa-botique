@@ -370,12 +370,14 @@ export const WARDROBE: WardrobeItem[] = [
   W('buba', 'Buba', 'top', 'Native Tops', true, ['owambe', 'church', 'wedding'], 'poor', 3000, 'ankara'),
   W('laceBlouse', 'Lace Blouse', 'top', 'Native Tops', true, ['owambe', 'wedding', 'church'], 'middle', 9000, 'lace'),
   W('offShoulderBuba', 'Off-Shoulder Buba', 'top', 'Native Tops', true, ['owambe', 'wedding', 'party'], 'middle', 6500, 'lace'),
+  W('puffBlouse', 'Puff-Sleeve Blouse', 'top', 'Tops', false, ['brunch', 'office', 'church', 'dateNight'], 'middle', 3500, 'chiffon'),
   // ---- women's bottoms ----
   W('pencilSkirt', 'Pencil Skirt', 'bottom', 'Skirts', false, ['office', 'dateNight', 'church'], 'middle', 2500, 'plain'),
   W('miniSkirt', 'Mini Skirt', 'bottom', 'Skirts', false, ['party', 'birthday', 'casual'], 'poor', 2000, 'denim'),
   W('aLineSkirt', 'A-Line Skirt', 'bottom', 'Skirts', false, ['church', 'office', 'brunch'], 'poor', 2000, 'plain'),
   W('pleatedMidi', 'Pleated Midi Skirt', 'bottom', 'Skirts', false, ['church', 'brunch', 'office'], 'middle', 3000, 'satin'),
   W('maxiSkirt', 'Maxi Skirt', 'bottom', 'Skirts', false, ['church', 'casual', 'brunch'], 'poor', 2500, 'chiffon'),
+  W('denimMaxiSkirt', 'Denim Maxi Skirt', 'bottom', 'Skirts', false, ['casual', 'brunch', 'church'], 'poor', 3500, 'denim'),
   W('iro', 'Iro (Wrapper)', 'bottom', 'Native Wrappers', true, ['owambe', 'church', 'wedding'], 'poor', 3000, 'ankara'),
   W('georgeWrapper', 'George Wrapper', 'bottom', 'Native Wrappers', true, ['wedding', 'owambe', 'church'], 'rich', 22500, 'george'),
   W('skinnyJeans', 'Skinny Jeans', 'bottom', 'Trousers', false, ['casual', 'dateNight'], 'poor', 3000, 'denim'),
@@ -391,6 +393,7 @@ export const WARDROBE: WardrobeItem[] = [
   W('shirtDress', 'Shirt Dress', 'dress', 'Dresses', false, ['office', 'casual', 'church'], 'middle', 4000, 'plain'),
   W('tubeMidi', 'Tube Midi Dress', 'dress', 'Dresses', false, ['party', 'birthday', 'dateNight'], 'middle', 4500, 'satin'),
   W('maxiDress', 'Maxi Dress', 'dress', 'Dresses', false, ['brunch', 'church', 'casual'], 'poor', 3500, 'chiffon'),
+  W('ruffleMaxi', 'Tiered Ruffle Maxi', 'dress', 'Dresses', false, ['brunch', 'birthday', 'church', 'casual'], 'middle', 6000, 'chiffon'),
   W('fitFlare', 'Ankara Flare Dress', 'dress', 'Native Gowns', true, ['church', 'owambe', 'office'], 'poor', 4000, 'ankara'),
   W('mermaidGown', 'Mermaid Gown', 'dress', 'Native Gowns', true, ['owambe', 'wedding'], 'middle', 10500, 'ankara'),
   W('laceGown', 'Aso-ebi Lace Gown', 'dress', 'Native Gowns', true, ['wedding', 'owambe'], 'rich', 40000, 'lace'),
@@ -400,6 +403,7 @@ export const WARDROBE: WardrobeItem[] = [
   W('ballGown', 'Ball Gown', 'dress', 'Evening Gowns', false, ['redCarpet', 'wedding'], 'rich', 75000, 'satin'),
   W('offShoulderGown', 'Off-Shoulder Gown', 'dress', 'Evening Gowns', false, ['redCarpet', 'wedding', 'party'], 'rich', 42500, 'velvet'),
   W('slitGown', 'High-Slit Gown', 'dress', 'Evening Gowns', false, ['redCarpet', 'party'], 'rich', 47500, 'sequin'),
+  W('capeGown', 'Cape-Sleeve Gown', 'dress', 'Evening Gowns', false, ['wedding', 'redCarpet', 'owambe'], 'rich', 55000, 'satin'),
   W('jumpsuit', 'Jumpsuit', 'dress', 'Jumpsuits', false, ['brunch', 'dateNight', 'office'], 'middle', 5000, 'satin'),
   W('playsuit', 'Playsuit', 'dress', 'Jumpsuits', false, ['casual', 'birthday', 'brunch'], 'poor', 3000, 'plain'),
   // ---- women's outerwear ----
@@ -410,6 +414,7 @@ export const WARDROBE: WardrobeItem[] = [
   W('kimono', 'Kimono', 'outer', 'Outerwear', false, ['brunch', 'casual'], 'poor', 3000, 'chiffon'),
   W('trenchCoat', 'Trench Coat', 'outer', 'Outerwear', false, ['office', 'casual'], 'rich', 22500, 'plain'),
   W('laceShrug', 'Lace Shrug', 'outer', 'Outerwear', true, ['owambe', 'wedding', 'church'], 'middle', 4000, 'lace'),
+  W('ankaraBlazer', 'Ankara Blazer', 'outer', 'Outerwear', true, ['office', 'church', 'owambe', 'brunch'], 'middle', 8000, 'ankara'),
   // ---- men's tops ----
   W('shirt', 'Shirt', 'top', 'Tops', false, ['office', 'church', 'dateNight'], 'middle', 3000, 'plain', 'm'),
   W('tee', 'T-Shirt', 'top', 'Tops', false, ['casual'], 'poor', 1000, 'plain', 'm'),
@@ -417,12 +422,14 @@ export const WARDROBE: WardrobeItem[] = [
   W('hoodie', 'Hoodie', 'top', 'Tops', false, ['casual'], 'middle', 4000, 'plain', 'm'),
   W('dashiki', 'Dashiki', 'top', 'Native Tops', true, ['casual', 'owambe', 'church'], 'poor', 2500, 'ankara', 'm'),
   W('mensBuba', 'Buba', 'top', 'Native Tops', true, ['owambe', 'church', 'wedding'], 'poor', 3000, 'asoOke', 'm'),
+  W('isiagu', 'Isiagu (Chieftaincy Top)', 'top', 'Native Tops', true, ['owambe', 'wedding', 'church'], 'middle', 12000, 'plain', 'm'),
   // ---- men's bottoms ----
   W('trousers', 'Trousers', 'bottom', 'Bottoms', false, ['office', 'church', 'dateNight'], 'middle', 3000, 'plain', 'm'),
   W('jeans', 'Jeans', 'bottom', 'Bottoms', false, ['casual', 'dateNight'], 'poor', 3000, 'denim', 'm'),
   W('chinos', 'Chinos', 'bottom', 'Bottoms', false, ['casual', 'brunch', 'office'], 'poor', 2500, 'plain', 'm'),
   W('mensCargo', 'Cargo Pants', 'bottom', 'Bottoms', false, ['casual'], 'poor', 3000, 'plain', 'm'),
   W('mensShorts', 'Shorts', 'bottom', 'Bottoms', false, ['casual'], 'poor', 1500, 'plain', 'm'),
+  W('joggers', 'Joggers', 'bottom', 'Bottoms', false, ['casual', 'birthday'], 'poor', 3000, 'plain', 'm'),
   W('sokoto', 'Sokoto', 'bottom', 'Native Bottoms', true, ['owambe', 'church', 'wedding'], 'poor', 2000, 'asoOke', 'm'),
   // ---- men's native long sets ----
   W('senator', 'Senator Kaftan', 'dress', 'Native Sets', true, ['church', 'owambe', 'office'], 'middle', 9000, 'plain', 'm'),
@@ -432,6 +439,7 @@ export const WARDROBE: WardrobeItem[] = [
   W('mensBlazer', 'Blazer', 'outer', 'Outerwear', false, ['office', 'church', 'wedding'], 'middle', 9000, 'plain', 'm'),
   W('mensDenimJacket', 'Denim Jacket', 'outer', 'Outerwear', false, ['casual'], 'poor', 4000, 'denim', 'm'),
   W('mensLeatherJacket', 'Leather Jacket', 'outer', 'Outerwear', false, ['casual', 'party'], 'middle', 10500, 'leather', 'm'),
+  W('bomberJacket', 'Bomber Jacket', 'outer', 'Outerwear', false, ['casual', 'party', 'birthday'], 'middle', 8000, 'satin', 'm'),
 ];
 
 export const itemById = (id?: string) => WARDROBE.find((w) => w.id === id);

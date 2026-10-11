@@ -4,7 +4,7 @@ import { darken, lighten } from './color';
 import { Pt, curveThrough } from './geometry';
 import { CAP, CAP_STRANDS } from './refPaths';
 import { Grain, HairProps, SLICK_CAP, coils, recolor, seeded } from './hair';
-import { ScalpCap, StyleLayers, backBraids, braidCap, curlCloud, frontBraids, hang, scalpRows, shineOf, toD } from './hair2';
+import { ScalpCap, StyleLayers, backBraids, braidCap, curlCloud, frontBraids, hairMass, hang, scalpRows, shineOf, toD } from './hair2';
 
 /**
  * Wigs and the last braids/twists (11 styles). Drawn in divine.svg head space like the rest.
@@ -238,12 +238,23 @@ const afroWig: StyleLayers = {
 // ---------------------------------------------------------------------------
 // Braids and twists
 // ---------------------------------------------------------------------------
+/** Straight-back cornrows: tight rows over the scalp, finished in braids down the back. */
+const cornrows: StyleLayers = {
+  back: (p) => <>{backBraids(p, 10, 520, 10, 171)}</>,
+  front: (p) => (
+    <>
+      <ScalpCap p={p} />
+      {scalpRows(p, 12, 13, { spread: 0.98 })}
+    </>
+  ),
+};
+
 const ghanaWeaving: StyleLayers = {
   back: (p) => <>{backBraids(p, 12, 720, 11, 113)}</>,
   front: (p) => (
     <>
       <ScalpCap p={p} />
-      {scalpRows(p, 8, 13, { spread: 0.92 })}
+      {scalpRows(p, 11, 15, { spread: 0.98 })}
     </>
   ),
 };
@@ -265,11 +276,14 @@ const Twist: React.FC<{ p: HairProps; pts: Pt[]; w: number; seed: number }> = ({
 
 function twists(p: HairProps, n: number, len: number, w: number, seed: number, sway: number) {
   const rnd = seeded(seed);
-  return Array.from({ length: n }, (_, i) => {
+  const rows: Pt[][] = [];
+  const out = Array.from({ length: n }, (_, i) => {
     const t = i / (n - 1);
-    const pts = hang(196 + t * 208, 250 + Math.abs(t - 0.5) * 120, len * (0.9 + rnd() * 0.14), sway + rnd() * 8, rnd() * 6, (t - 0.5) * 130, 14);
+    const pts = hang(194 + t * 212, 248 + Math.abs(t - 0.5) * 110, len * (0.9 + rnd() * 0.14), sway + rnd() * 8, rnd() * 6, (t - 0.5) * 180, 14);
+    rows.push(pts);
     return <Twist key={i} p={p} pts={pts} w={w} seed={seed + i} />;
   });
+  return [hairMass(p, rows), ...out];
 }
 
 const passionTwists: StyleLayers = {
@@ -344,6 +358,7 @@ export const WIG_STYLES: Partial<Record<HairStyle, StyleLayers>> = {
   curlyBob,
   afroWig,
   ghanaWeaving,
+  cornrows,
   passionTwists,
   goddessLocs,
 };

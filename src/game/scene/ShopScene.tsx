@@ -6,7 +6,7 @@ import { GameState, Pose } from '../types';
 import { RoomStyle, finishes, room, cellsBlocked, footprint, furnitureById, wallLayout, Placed, canPlace, yardCapacity, Rot, rotAngle } from '../shop';
 import { solarCap, source } from '../power';
 import { stats } from '../engine';
-import { CeilingPiece, FloorPiece, WallPiece, B, MirrorLive } from './Furniture3D';
+import { ApplianceOn, CeilingPiece, FloorPiece, WallPiece, B, MirrorLive } from './Furniture3D';
 import { Cell, FigureLook, Walker, lookToFigure } from './People';
 
 export interface SceneProps {
@@ -358,6 +358,8 @@ function Furniture({ s, selected, placing, onTap, dark, reflections }: Pick<Scen
     return out;
   };
   const ceiling = s.furniture.filter((p) => p.placed && furnitureById(p.id).mount === 'ceiling');
+  // fans run when there is light (NEPA, solar or gen)
+  const powered = !dark;
   const hover = { onPointerOver: () => (document.body.style.cursor = 'pointer'), onPointerOut: () => (document.body.style.cursor = '') };
   return (
     <group>
@@ -387,7 +389,9 @@ function Furniture({ s, selected, placing, onTap, dark, reflections }: Pick<Scen
         return (
           <group key={p.uid} position={[p.x + w / 2, 0, p.z + d / 2]} rotation={[0, rotAngle(p.rot), 0]} onClick={click} {...hover}>
             <MirrorLive.Provider value={live.has(p.uid)}>
-              <FloorPiece id={p.id} colors={colors} />
+              <ApplianceOn.Provider value={powered && !s.off?.[p.uid]}>
+                <FloorPiece id={p.id} colors={colors} />
+              </ApplianceOn.Provider>
             </MirrorLive.Provider>
             {selected === p.uid && <B p={[0, 0.012, 0]} s={[f.w - 0.04, 0.02, f.d - 0.04]} c="#F59E0B" e="#F59E0B" ei={0.6} o={0.5} />}
           </group>

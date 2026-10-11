@@ -584,6 +584,219 @@ const cutBuild = (key: string, part: 'top' | 'all' = 'all'): Build => ({
 });
 
 // ---------------------------------------------------------------------------
+// Newer pieces
+// ---------------------------------------------------------------------------
+/** Half-width of a flared skirt at height y (matches skirtPath). */
+function skirtHalf(s: BodySpec, y: number, hemY: number, flare: number, pow: number, ease = 6) {
+  if (y <= s.hip[0]) return bodyHalf(s, y) + ease;
+  return s.hip[1] + ease + flare * ((y - s.hip[0]) / Math.max(1, hemY - s.hip[0])) ** pow;
+}
+
+/** A frilled seam across a skirt: the line where one tier is sewn to the next. */
+function tierSeam(c: Ctx, y: number, half: number, k: number) {
+  const n = Math.max(6, Math.round(half / 11));
+  const step = (half * 2) / n;
+  let d = `M ${300 - half} ${y}`;
+  for (let i = 0; i < n; i++) d += ` q ${step / 2} ${10} ${step} 0`;
+  return (
+    <g key={k}>
+      <path d={d} fill="none" stroke={darken(c.p.base, 0.32)} strokeWidth="2" />
+      <path d={d} transform="translate(0 3)" fill="none" stroke={lighten(c.p.base, 0.25)} strokeWidth="1.2" opacity="0.6" />
+    </g>
+  );
+}
+
+/** Big rounded puff sleeves, gathered at the shoulder and banded above the elbow. */
+function puffSleeves(c: Ctx) {
+  const { s } = c;
+  const cx = 300 - s.shoulder[1] - 6;
+  const top = s.shoulder[0] - 14;
+  const band = s.shoulder[0] + 96;
+  const rx = 40;
+  const one = (side: string) => {
+    const d = `M ${cx + 26} ${top + 6} C ${cx - 14} ${top - 18} ${cx - rx - 16} ${top + 10} ${cx - rx - 8} ${top + 52} C ${cx - rx - 2} ${band - 10} ${cx - 22} ${band + 4} ${cx - 8} ${band} L ${cx + 30} ${band - 4} C ${cx + 34} ${top + 60} ${cx + 36} ${top + 26} ${cx + 26} ${top + 6} Z`;
+    return (
+      <g>
+        <Piece id={c.id} name={`puff-${c.k}${side}`} d={d} paint={c.p} folds={[-24, -10, 4, 18].map((dx) => `M ${cx + dx + 10} ${top + 2} Q ${cx + dx - 6} ${top + 50} ${cx + dx * 0.6} ${band - 4}`)} plain={c.plain} box={[cx - rx - 20, cx + 40, top - 20, band + 6]} />
+        <path d={`M ${cx - 8} ${band - 1} L ${cx + 30} ${band - 5}`} stroke={darken(c.p.base, 0.32)} strokeWidth="5" strokeLinecap="round" />
+        <path d={`M ${cx - 20} ${top + 22} q 10 -10 22 -4`} stroke={lighten(c.p.base, 0.35)} strokeWidth="3" fill="none" opacity="0.5" strokeLinecap="round" />
+      </g>
+    );
+  };
+  return (
+    <>
+      {one('L')}
+      <g transform={MIRROR}>{one('R')}</g>
+    </>
+  );
+}
+
+/** Tiered ruffle maxi: puff sleeves, a smocked bodice and three tiers to the ankle. */
+const ruffleMaxi: Build = (() => {
+  const base = dress('vneck', { hem: D.maxi, flare: 96, pow: 1, bodiceHem: (s) => s.waist[0] + 16, pleats: 9 });
+  return {
+    under: (c) => {
+      const { s } = c;
+      const hem = D.maxi(s);
+      const top = s.waist[0] + 6;
+      const tiers = [0.33, 0.66].map((t) => top + (hem - top) * t);
+      return (
+        <>
+          {base.under?.(c)}
+          {tiers.map((y, i) => tierSeam(c, y, skirtHalf(s, y, hem, 96, 1), i))}
+          {tierSeam(c, hem - 2, skirtHalf(s, hem, hem, 96, 1) - 4, 9)}
+          {/* smocking lines on the bodice */}
+          {[0, 1, 2].map((i) => {
+            const y = s.waist[0] - 18 + i * 9;
+            const w = torsoHalfAt(s, y) + 3;
+            return <path key={`sm${i}`} d={`M ${300 - w} ${y} L ${300 + w} ${y}`} stroke={darken(c.p.base, 0.25)} strokeWidth="1" strokeDasharray="3 3" />;
+          })}
+        </>
+      );
+    },
+    over: (c) => puffSleeves(c),
+  };
+})();
+
+/** Cape-sleeve gown: a fitted floor-length gown with a sheer cape falling from the shoulders. */
+const capeGown: Build = (() => {
+  const base = dress('straight', { hem: D.floor, flare: 80, pow: 2.2, fitted: true });
+  return {
+    under: base.under,
+    over: (c) => {
+      const { s } = c;
+      const [ny, nh] = s.neck;
+      const sx = 300 - s.shoulder[1] - 10;
+      const end = s.hip[0] + 60;
+      const cape = (side: string) => (
+        <g>
+          <path
+            d={`M ${300 - nh - 2} ${ny + 8} C ${300 - s.shoulder[1] * 0.7} ${ny + 2} ${sx - 6} ${s.shoulder[0] - 4} ${sx - 14} ${s.shoulder[0] + 20} C ${sx - 34} ${s.elbow[1]} ${sx - 44} ${end - 60} ${sx - 30} ${end} Q ${sx + 10} ${end + 18} ${300 - s.waist[1] - 2} ${end - 20} C ${300 - s.pit[1]} ${s.waist[0]} ${300 - s.pit[1] + 6} ${s.pit[0]} ${300 - s.bust[1] * 0.6} ${s.pit[0] - 6} Z`}
+            fill={lighten(c.p.base, 0.12)}
+            opacity="0.5"
+            stroke={darken(c.p.base, 0.2)}
+            strokeWidth="1"
+          />
+          {[0.3, 0.55, 0.8].map((t, i) => (
+            <path key={side + i} d={`M ${sx - 10 + t * 40} ${s.shoulder[0] + 10} Q ${sx - 30 + t * 40} ${s.elbow[1]} ${sx - 30 + t * 50} ${end + 4}`} fill="none" stroke={darken(c.p.base, 0.15)} strokeWidth="1" opacity="0.45" />
+          ))}
+          <path d={`M ${300 - nh - 2} ${ny + 8} C ${300 - s.shoulder[1] * 0.7} ${ny + 2} ${sx - 6} ${s.shoulder[0] - 4} ${sx - 14} ${s.shoulder[0] + 20}`} fill="none" stroke={gold(c)} strokeWidth="3" />
+        </g>
+      );
+      return (
+        <>
+          {base.over?.(c)}
+          {cape('L')}
+          <g transform={MIRROR}>{cape('R')}</g>
+        </>
+      );
+    },
+  };
+})();
+
+/** Isiagu: the Igbo chieftaincy top, scattered with little lion heads, gold buttons down the front. */
+const isiagu: Build = {
+  under: (c) => {
+    const { s, p } = c;
+    const hemY = s.hip[0] + 24;
+    const e = 16;
+    const left: Pt[] = [...shoulderLeft(s), [300 - s.pit[1] - e, s.pit[0]], [300 - s.bust[1] - e, s.bust[0]], [300 - s.waist[1] - e, s.waist[0]], [300 - s.waist[1] - e - 4, hemY]];
+    const d = symmetric(left, crew(s, 16));
+    const [ny] = s.neck;
+    const motif = c.p2.base;
+    const heads: React.ReactElement[] = [];
+    let k = 0;
+    for (let y = ny + 46; y < hemY - 16; y += 46) {
+      const w = torsoHalfAt(s, y) + e - 18;
+      const off = (Math.round((y - ny) / 46) % 2) * 23;
+      for (let x = 300 - w + off; x < 300 + w; x += 46) {
+        if (Math.abs(x - 300) < 12) continue;
+        heads.push(
+          <g key={k++} transform={`translate(${x.toFixed(1)} ${y.toFixed(1)})`}>
+            {/* mane */}
+            {Array.from({ length: 8 }, (_, i) => {
+              const a = (i / 8) * Math.PI * 2;
+              return <circle key={i} cx={(Math.cos(a) * 7).toFixed(1)} cy={(Math.sin(a) * 7).toFixed(1)} r="3.4" fill={motif} />;
+            })}
+            <circle r="5.2" fill={darken(motif, 0.25)} />
+            <circle cx="-1.8" cy="-1" r="0.9" fill={p.base} />
+            <circle cx="1.8" cy="-1" r="0.9" fill={p.base} />
+          </g>,
+        );
+      }
+    }
+    const clip = c.id(`isi-${c.k}`);
+    return (
+      <>
+        <Piece id={c.id} name={`isi-${c.k}`} d={d} paint={p} folds={bodiceFolds(s, hemY)} plain={c.plain} box={box(s, ny, hemY)} />
+        <clipPath id={clip}>
+          <path d={d} />
+        </clipPath>
+        <g clipPath={`url(#${clip})`} opacity={c.plain ? 0.7 : 0.95}>
+          {heads}
+        </g>
+        <path d={`M 300 ${ny + 14} L 300 ${s.bust[0] + 30}`} stroke={darken(p.base, 0.3)} strokeWidth="1.6" />
+        {[0, 1, 2, 3].map((i) => <circle key={`b${i}`} cx="300" cy={ny + 24 + i * 22} r="4" fill={gold(c)} stroke="#7A5A20" strokeWidth="0.8" />)}
+      </>
+    );
+  },
+  over: (c) => sleeveSet(c, 'long', { ease: 8 }),
+};
+
+/** Joggers: relaxed legs gathered into ribbed cuffs, drawstring waist. */
+const joggers: Build = {
+  under: (c) => {
+    const { s, p } = c;
+    const top = s.waist[0] + 14;
+    const hem = s.ankle[1] - 14;
+    const cuffH = 22;
+    const legMid = (x: number) => x;
+    return (
+      <>
+        {trouserSet(c, `jg-${c.k}`, top, hem, { ease: 16, easeIn: 9, flare: -6 })}
+        {[0, 1].map((m) => {
+          const xo = edgeXAt(s.legOuter, hem);
+          const xi = edgeXAt(s.legInner, hem);
+          return (
+            <g key={m} transform={m ? MIRROR : undefined}>
+              <rect x={legMid(xo) - 6} y={hem - cuffH} width={xi - xo + 10} height={cuffH} rx="5" fill={darken(p.base, 0.14)} />
+              {[0.25, 0.5, 0.75].map((t) => <path key={t} d={`M ${xo - 4 + (xi - xo + 8) * t} ${hem - cuffH + 3} l 0 ${cuffH - 6}`} stroke={darken(p.base, 0.32)} strokeWidth="1" />)}
+            </g>
+          );
+        })}
+        <path d={`M 292 ${top + 6} q -4 26 -10 40 M 308 ${top + 6} q 4 26 10 40`} stroke={lighten(p.base, 0.6)} strokeWidth="2.2" strokeLinecap="round" fill="none" />
+        <path d={`M ${300 - torsoHalfAt(s, top + 6) - 6} ${top + 6} L ${300 + torsoHalfAt(s, top + 6) + 6} ${top + 6}`} stroke={darken(p.base, 0.3)} strokeWidth="1" strokeDasharray="2 3" />
+      </>
+    );
+  },
+};
+
+/** Bomber jacket: zip front, ribbed collar, cuffs and waistband. */
+const bomberJacket: Build = (() => {
+  const base = jacket({ hem: (s) => s.waist[0] + 46, collar: 'none', zip: true, ease: 14, opening: 34 });
+  return {
+    under: (c) => {
+      const { s, p } = c;
+      const hemY = s.waist[0] + 46;
+      const w = torsoHalfAt(s, hemY - 8) + 14;
+      const [ny, nh] = s.neck;
+      const rib = darken(c.p2.base === c.p.base ? p.base : c.p2.base, 0.1);
+      return (
+        <>
+          {base.under?.(c)}
+          <rect x={300 - w} y={hemY - 18} width={w * 2} height="20" rx="6" fill={rib} />
+          {Array.from({ length: Math.round(w / 6) }, (_, i) => <path key={i} d={`M ${300 - w + 6 + i * 12} ${hemY - 15} l 0 14`} stroke={darken(rib, 0.3)} strokeWidth="1" />)}
+          <path d={`M ${300 - nh - 10} ${ny + 2} Q 300 ${ny + 26} ${300 + nh + 10} ${ny + 2}`} fill="none" stroke={rib} strokeWidth="9" strokeLinecap="round" />
+          <path d={`M 300 ${ny + 14} L 300 ${hemY - 18}`} stroke="#C8C8D0" strokeWidth="2.4" />
+          <rect x="296" y={ny + 30} width="8" height="12" rx="2" fill="#D8D8E0" />
+        </>
+      );
+    },
+    over: base.over,
+  };
+})();
+
+// ---------------------------------------------------------------------------
 // The registry
 // ---------------------------------------------------------------------------
 export const GARMENTS: Record<string, Build> = {
@@ -603,12 +816,29 @@ export const GARMENTS: Record<string, Build> = {
   laceBlouse: top('scoop', (s) => s.hip[0] - 4, { sleeve: 'threeQuarter', flare: 10, ease: 6, sheer: true, extra: (c, y) => <path d={`M ${300 - torsoHalfAt(c.s, y)} ${y - 4} q 10 10 20 0 q 10 10 20 0 q 10 10 20 0 q 10 10 20 0 q 10 10 20 0 q 10 10 20 0 q 10 10 20 0 q 10 10 20 0 q 10 10 20 0 q 10 10 20 0 q 10 10 20 0`} fill="none" stroke={darken(c.p.base, 0.3)} strokeWidth="1.4" /> }),
   offShoulderBuba: top('offShoulder', (s) => s.hip[0] - 6, { sleeve: 'bell', flare: 50, ease: 10, hemEase: 8, extra: (c) => <path d={`M ${300 - c.s.shoulder[1] + 4} ${offY(c.s) + 6} Q 300 ${offY(c.s) + 20} ${300 + c.s.shoulder[1] - 4} ${offY(c.s) + 6}`} fill="none" stroke={gold(c)} strokeWidth="2.6" /> }),
 
+  puffBlouse: { ...top('square', H.waist, { ease: 6, extra: (c, y) => <path d={`M ${300 - torsoHalfAt(c.s, y - 10) - 4} ${y - 10} Q 300 ${y - 4} ${300 + torsoHalfAt(c.s, y - 10) + 4} ${y - 10}`} fill="none" stroke={darken(c.p.base, 0.25)} strokeWidth="1.4" /> }), over: (c: Ctx) => puffSleeves(c) },
+
   // ---- women's bottoms ----
   pencilSkirt: { under: (c) => pencilPiece(cut(c), c.p, c.s.waist[0] + 8, c.s.knee[1] - 24, `pencil-${c.k}`) },
   miniSkirt: { under: (c) => pencilPiece(cut(c), c.p, c.s.waist[0] + 16, c.s.crotch + 92, `mini-${c.k}`, 16) },
   aLineSkirt: { under: (c) => <>{skirtPiece(c, `aline-${c.k}`, c.s.waist[0] + 6, c.s.knee[1] - 10, 56, { pow: 1 })}{waistband(c, c.s.waist[0] + 6)}</> },
   pleatedMidi: { under: (c) => <>{skirtPiece(c, `pleat-${c.k}`, c.s.waist[0] + 6, D.midi(c.s), 70, { pow: 1, pleats: 13 })}{waistband(c, c.s.waist[0] + 6)}</> },
   maxiSkirt: { under: (c) => <>{skirtPiece(c, `maxi-${c.k}`, c.s.waist[0] + 6, D.maxi(c.s), 60, { pow: 1.2, pleats: 7 })}{waistband(c, c.s.waist[0] + 6, 16)}</> },
+  denimMaxiSkirt: {
+    under: (c) => (
+      <>
+        {skirtPiece(c, `dmx-${c.k}`, c.s.waist[0] + 10, D.maxi(c.s), 38, { pow: 1, pleats: 3 })}
+        {waistband(c, c.s.waist[0] + 10, 14)}
+        {/* front seam with buttons and a split at the hem */}
+        <path d={`M 300 ${c.s.waist[0] + 24} L 300 ${D.maxi(c.s) - 120}`} stroke="#E0B060" strokeWidth="1.4" strokeDasharray="4 3" />
+        <path d={`M 300 ${D.maxi(c.s) - 120} L 292 ${D.maxi(c.s) + 10} M 300 ${D.maxi(c.s) - 120} L 308 ${D.maxi(c.s) + 10}`} stroke={darken(c.p.base, 0.4)} strokeWidth="1.6" />
+        {[0, 1, 2, 3, 4, 5].map((i) => <circle key={i} cx="300" cy={c.s.waist[0] + 18 + i * 60} r="3.4" fill="#C9A060" />)}
+        {[0, 1].map((m) => (
+          <path key={`pk${m}`} transform={m ? MIRROR : undefined} d={`M ${300 - torsoHalfAt(c.s, c.s.waist[0] + 30) + 4} ${c.s.waist[0] + 30} Q ${300 - torsoHalfAt(c.s, c.s.waist[0] + 30) + 26} ${c.s.waist[0] + 60} 268 ${c.s.waist[0] + 34}`} fill="none" stroke="#E0B060" strokeWidth="1.2" strokeDasharray="3 2" />
+        ))}
+      </>
+    ),
+  },
   iro: { under: (c) => iroPiece(c, false) },
   georgeWrapper: { under: (c) => iroPiece(c, true) },
   skinnyJeans: { under: (c) => trouserSet(c, `sj-${c.k}`, c.s.waist[0] + 14, c.s.ankle[1] - 20, { ease: 3, easeIn: 1, jeans: true }) },
@@ -625,6 +855,8 @@ export const GARMENTS: Record<string, Build> = {
   shirtDress: dress('collar', { hem: D.knee, flare: 34, pow: 1, sleeve: 'elbow', extra: (c) => <>{buttons(c, c.s.neck[0] + 40, c.s.hip[0], 7)}{belt(c, c.s.waist[0] + 4)}</> }),
   tubeMidi: dress('straight', { hem: D.midi, flare: 6, fitted: true }),
   maxiDress: dress('sweetheart', { hem: D.maxi, flare: 70, pow: 1.1, pleats: 7 }),
+  ruffleMaxi,
+  capeGown,
   fitFlare: dress('scoop', { hem: D.knee, flare: 70, pow: 1, sleeve: 'cap', pleats: 7 }),
   mermaidGown: cutBuild('mermaidGown'),
   laceGown: cutBuild('laceGown'),
@@ -654,6 +886,7 @@ export const GARMENTS: Record<string, Build> = {
   kimono: jacket({ hem: D.knee, ease: 14, sleeve: 'bell', sleeveFlare: 54, sheer: true, opening: 50, flare: 20 }),
   trenchCoat: jacket({ hem: (s) => s.knee[1] + 50, lapels: true, belt: true, ease: 14, flare: 40, opening: 20 }),
   laceShrug: jacket({ hem: (s) => s.under[0] + 10, ease: 5, sleeve: 'elbow', sleeveFlare: 10, sheer: true, opening: 60 }),
+  ankaraBlazer: jacket({ hem: (s) => s.hip[0] + 10, lapels: true, ease: 9, sleeve: 'threeQuarter' }),
 
   // ---- men's tops ----
   shirt: mensTop('shirt'),
@@ -662,6 +895,7 @@ export const GARMENTS: Record<string, Build> = {
   hoodie: mensTop('hoodie'),
   dashiki: mensTop('dashiki'),
   mensBuba: bubaBuild((s) => s.hip[0] + 30, 'long', 18, 16),
+  isiagu,
 
   // ---- men's bottoms ----
   trousers: { under: (c) => trouserPiece(cut(c), c.p, `tr-${c.k}`) },
@@ -669,6 +903,7 @@ export const GARMENTS: Record<string, Build> = {
   chinos: { under: (c) => trouserSet(c, `ch-${c.k}`, c.s.waist[0] + 14, c.s.ankle[1] - 16, { ease: 8, easeIn: 3 }) },
   mensCargo: { under: (c) => trouserSet(c, `mc-${c.k}`, c.s.waist[0] + 14, c.s.ankle[1] + 4, { ease: 16, easeIn: 8, cargo: true }) },
   mensShorts: { under: (c) => trouserSet(c, `ms-${c.k}`, c.s.waist[0] + 14, c.s.knee[1] - 30, { ease: 14, easeIn: 8, flare: 6 }) },
+  joggers,
   sokoto: { under: (c) => trouserSet(c, `sk-${c.k}`, c.s.waist[0] + 14, c.s.ankle[1] - 14, { ease: 16, easeIn: 8, flare: 4 }) },
 
   // ---- men's native sets ----
@@ -688,6 +923,7 @@ export const GARMENTS: Record<string, Build> = {
   mensBlazer: jacket({ hem: (s) => s.hip[0] + 30, lapels: true, ease: 10, opening: 26 }),
   mensDenimJacket: jacket({ hem: (s) => s.waist[0] + 40, collar: 'shirt', pockets: true, ease: 12 }),
   mensLeatherJacket: jacket({ hem: (s) => s.waist[0] + 40, collar: 'shirt', zip: true, ease: 10, opening: 40 }),
+  bomberJacket,
 };
 
 function iroPiece(c: Ctx, george: boolean) {

@@ -98,10 +98,17 @@ export const Braid: React.FC<{ p: HairProps; pts: Pt[]; w: number; cuffs?: numbe
     extras.push(<circle key="b1" cx={end[0]} cy={end[1] + 4} r={w * 0.55} fill={`url(#${p.id('gold')})`} />);
     extras.push(<circle key="b2" cx={end[0]} cy={end[1] + 4 + w * 1.1} r={w * 0.45} fill="#C2452D" />);
   }
+  // a slim tapered tip past the last plait, like a real braid end
+  const pre = pts[pts.length - 2];
+  const len = Math.hypot(end[0] - pre[0], end[1] - pre[1]) || 1;
+  const ux = (end[0] - pre[0]) / len;
+  const uy = (end[1] - pre[1]) / len;
+  const tip = `M ${f(end[0] - uy * w * 0.42)} ${f(end[1] + ux * w * 0.42)} L ${f(end[0] + ux * w * 1.6)} ${f(end[1] + uy * w * 1.6)} L ${f(end[0] + uy * w * 0.42)} ${f(end[1] - ux * w * 0.42)} Z`;
   return (
     <g>
       <path d={d} fill="none" stroke={p.pal.darkShadow} strokeWidth={w + 2.4} strokeLinecap="round" />
       <path d={d} fill="none" stroke={`url(#${p.id('hairLong')})`} strokeWidth={w} strokeLinecap="round" />
+      {!beads && <path d={tip} fill={p.pal.mid} stroke={p.pal.darkShadow} strokeWidth="1" />}
       {chev}
       {extras}
     </g>
@@ -160,7 +167,7 @@ export function scalpRows(p: HairProps, n: number, w: number, opts: { spread?: n
 export function braidCap(p: HairProps, w: number, opts: { part?: number; rope?: boolean; cap?: string; n?: number } = {}) {
   const part = opts.part ?? 300;
   const cap = opts.cap || CORN_CAP;
-  const n = opts.n ?? 17;
+  const n = Math.max(opts.n ?? 17, 24);
   const clip = p.id('braidCap');
   const strands: React.ReactElement[] = [];
   for (let i = 0; i < n; i++) {
@@ -175,7 +182,7 @@ export function braidCap(p: HairProps, w: number, opts: { part?: number; rope?: 
       <clipPath id={clip}>
         <path d={cap} />
       </clipPath>
-      <path d={cap} fill={scalpFill(p)} />
+      <path d={cap} fill={p.pal.darkShadow} />
       <g clipPath={`url(#${clip})`}>
         {strands}
         <path d={`M ${part} 160 L ${part} 240`} stroke={lighten(scalpFill(p), 0.2)} strokeWidth="2" opacity="0.8" />
@@ -185,7 +192,7 @@ export function braidCap(p: HairProps, w: number, opts: { part?: number; rope?: 
   );
 }
 
-export const scalpFill = (p: HairProps) => mix(p.skin.contour, p.pal.darkShadow, 0.35);
+export const scalpFill = (p: HairProps) => mix(p.skin.contour, p.pal.darkShadow, 0.62);
 
 /** Partly-visible scalp under braids, locs and knots. */
 export const ScalpCap: React.FC<{ p: HairProps; d?: string }> = ({ p, d = CORN_CAP }) => <path d={d} fill={scalpFill(p)} />;
@@ -193,31 +200,67 @@ export const ScalpCap: React.FC<{ p: HairProps; d?: string }> = ({ p, d = CORN_C
 // ---------------------------------------------------------------------------
 // Women's styles
 // ---------------------------------------------------------------------------
+/**
+ * A solid fall of hair behind a row of braids (ordered left to right), so the
+ * background never shows through the gaps: real braids are a full, dense mass.
+ */
+export function hairMass(p: HairProps, rows: Pt[][], key = 'mass') {
+  if (rows.length < 2) return null;
+  const left = rows[0];
+  const right = rows[rows.length - 1];
+  const bottom = rows.map((r) => {
+    const e = r[Math.max(1, r.length - 2)];
+    return [e[0], e[1]] as Pt;
+  });
+  const pts: Pt[] = [...left, ...bottom.slice(1, -1), ...[...right].reverse()];
+  const d = `M ${pts.map(([x, y]) => `${f(x)} ${f(y)}`).join(' L ')} Z`;
+  return (
+    <g key={key}>
+      <path d={d} fill={p.pal.darkShadow} stroke={p.pal.darkShadow} strokeWidth="10" strokeLinejoin="round" />
+      <path d={d} fill={`url(#${p.id('hairLong')})`} opacity="0.35" />
+    </g>
+  );
+}
+
 export function backBraids(p: HairProps, n: number, len: number, w: number, seed: number, rope = false, beads = false) {
   const rnd = seeded(seed);
+  const rows: Pt[][] = [];
   const out: React.ReactElement[] = [];
-  for (let i = 0; i < n; i++) {
-    const t = i / (n - 1);
-    const x0 = 196 + t * 208;
-    const y0 = 250 + Math.abs(t - 0.5) * 120;
-    const spreadOut = (t - 0.5) * 120;
-    const pts = hang(x0, y0, len * (0.92 + rnd() * 0.1), 10 + rnd() * 8, rnd() * 6, spreadOut, 12);
-    out.push(rope ? <LocRope key={i} p={p} pts={pts} w={w} /> : <Braid key={i} p={p} pts={pts} w={w} beads={beads && i % 3 === 0} />);
+  // two layers: an underlayer of braids filling in, then the top layer
+  const total = Math.round(n * 1.5);
+  for (let i = 0; i < total; i++) {
+    const t = i / (total - 1);
+    const x0 = 192 + t * 216;
+    const y0 = 244 + Math.abs(t - 0.5) * 110;
+    const spreadOut = (t - 0.5) * 190;
+    const pts = hang(x0, y0, len * (0.93 + rnd() * 0.09), 8 + rnd() * 7, rnd() * 6, spreadOut, 14);
+    rows.push(pts);
+    out.push(rope ? <LocRope key={i} p={p} pts={pts} w={w} /> : <Braid key={i} p={p} pts={pts} w={w} beads={beads && i % 4 === 0} />);
   }
-  return out;
+  // under layer first so the front layer overlaps it
+  const under = out.filter((_, i) => i % 2 === 1);
+  const over = out.filter((_, i) => i % 2 === 0);
+  return [hairMass(p, rows), ...under, ...over];
 }
 
 export function frontBraids(p: HairProps, n: number, len: number, w: number, seed: number, rope = false, cuffs = false, beads = false) {
   const rnd = seeded(seed);
-  const side = (mirror: boolean) => (
-    <g transform={mirror ? MIRROR : undefined}>
-      {Array.from({ length: n }, (_, i) => {
-        const x0 = 194 - i * (w * 0.75);
-        const pts = hang(x0, 290 + i * 8, len * (0.9 + rnd() * 0.12), 6 + rnd() * 6, rnd() * 5, -28 - i * 3, 12);
-        return rope ? <LocRope key={i} p={p} pts={pts} w={w} cuff={cuffs && i % 2 === 0} /> : <Braid key={i} p={p} pts={pts} w={w} cuffs={cuffs && i % 2 === 0 ? [0.35, 0.6] : undefined} beads={beads} />;
-      })}
-    </g>
-  );
+  const m = Math.max(n, Math.round(n * 1.6));
+  const side = (mirror: boolean) => {
+    const rows: Pt[][] = [];
+    const braids = Array.from({ length: m }, (_, i) => {
+      const x0 = 200 - i * (w * 0.62);
+      const pts = hang(x0, 284 + i * 6, len * (0.9 + rnd() * 0.12), 5 + rnd() * 5, rnd() * 5, -22 - i * 3.2, 14);
+      rows.push(pts);
+      return rope ? <LocRope key={i} p={p} pts={pts} w={w} cuff={cuffs && i % 2 === 0} /> : <Braid key={i} p={p} pts={pts} w={w} cuffs={cuffs && i % 2 === 0 ? [0.35, 0.6] : undefined} beads={beads && i % 2 === 0} />;
+    });
+    return (
+      <g transform={mirror ? MIRROR : undefined}>
+        {hairMass(p, [...rows].reverse())}
+        {braids.reverse()}
+      </g>
+    );
+  };
   return (
     <>
       {side(false)}
