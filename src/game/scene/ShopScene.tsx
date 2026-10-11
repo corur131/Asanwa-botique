@@ -173,6 +173,22 @@ export function Room({ r, tier, painted }: { r: RoomStyle; tier: number; painted
       {/* trim */}
       <B p={[r.w / 2, H - 0.05, 0.01]} s={[r.w, 0.1, 0.03]} c={r.trim} m={r.kind === 'marble' || r.kind === 'flagship' ? 0.8 : 0} />
       <B p={[0.01, H - 0.05, r.d / 2]} s={[0.03, 0.1, r.d]} c={r.trim} m={r.kind === 'marble' || r.kind === 'flagship' ? 0.8 : 0} />
+      {r.signature && (
+        <>
+          {/* Signature entrance portal, carpeted central aisle, and designer feature wall. */}
+          <B p={[door - 0.1, H / 2, r.d + 0.1]} s={[0.08, H, 0.12]} c="#D4AF37" m={0.8} e="#D4AF37" ei={0.12} />
+          <B p={[door + 1.1, H / 2, r.d + 0.1]} s={[0.08, H, 0.12]} c="#D4AF37" m={0.8} e="#D4AF37" ei={0.12} />
+          <B p={[door + 0.5, H - 0.04, r.d + 0.1]} s={[1.28, 0.09, 0.13]} c="#D4AF37" m={0.8} e="#D4AF37" ei={0.2} />
+          <B p={[door + 0.5, 0.012, r.d / 2 + 0.2]} s={[0.66, 0.014, Math.max(1, r.d - 1)]} c="#6B1424" r={0.45} />
+          <B p={[r.w * 0.25, 0.03, r.d / 2]} s={[0.035, 0.02, r.d - 0.15]} c="#D4AF37" m={0.7} e="#D4AF37" ei={0.08} />
+          <B p={[r.w * 0.75, 0.03, r.d / 2]} s={[0.035, 0.02, r.d - 0.15]} c="#D4AF37" m={0.7} e="#D4AF37" ei={0.08} />
+          <B p={[r.w / 2, H * 0.7, 0.016]} s={[r.w * 0.44, 0.04, 0.025]} c="#D4AF37" m={0.8} e="#D4AF37" ei={0.18} />
+          {Array.from({ length: Math.max(2, tier + 2) }, (_, i) => {
+            const n = Math.max(2, tier + 2);
+            return <B key={`signature-light-${i}`} p={[r.w / 2, H - 0.09, 1 + (i * Math.max(0, r.d - 2)) / Math.max(1, n - 1)]} s={[0.42, 0.035, 0.42]} c="#D4AF37" m={0.7} e="#FFE7A0" ei={0.35} />;
+          })}
+        </>
+      )}
       {ridges &&
         Array.from({ length: Math.floor(r.w / 0.25) }, (_, i) => <B key={`rb${i}`} p={[0.12 + i * 0.25, H / 2, 0.01]} s={[0.05, H, 0.03]} c={painted ? r.wallLow : '#4E6670'} m={0.3} r={0.6} />)}
       {ridges &&
