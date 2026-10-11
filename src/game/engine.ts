@@ -332,6 +332,7 @@ export function tick(s0: GameState, minutes: number): GameState {
   s = dropStep(s, end - s.clock);
   s = visitStep(s, end - s.clock);
   s = energyStep(s, end - s.clock);
+  s = securityStep(s, end - s.clock);
   s = { ...s, clock: end };
   if (s.busy && s.busy.until <= end) s = { ...s, busy: null };
   // tired of waiting: heat and darkness use patience up faster
@@ -600,6 +601,7 @@ export function closeShop(s0: GameState): GameState {
   // weekly
   if (s.day % 7 === 0) {
     s = weeklyStaff(s);
+    if (s.security?.guard) s = money(s, -s.security.guard.wage, `Security guard wages: ${s.security.guard.name}`);
     s = payBills(s);
     s = payRent(s);
     s = { ...s, followers: Math.round((s.followers || 0) * 0.98) };
@@ -739,6 +741,67 @@ export function buyFurniture(s: GameState, id: string): GameState {
     if (wallUsed(furniture) + f.w <= wallCapacity(s.listing)) placedItem = { ...item, placed: true, x: wallUsed(furniture) };
   } else placedItem = findSpot(furniture, s.listing, item) || item;
   return money({ ...s, furniture: [...furniture, placedItem] }, -f.price, f.name);
+}
+
+/** Hire a dedicated guard. A security post must be purchased and placed first. */
+export function hireSecurityGuard(s: GameState): GameState {
+  const post = s.furniture.find((p) => p.placed && p.id === 'securityPost');
+  if (!post) return addShout(s, 'Security', 'Buy and place a small security post outside before hiring a guard.', 'warn');
+  if (s.security?.guard) return s;
+  const signing = 35_000;
+  if (s.cash < signing) return addShout(s, 'Security', `You need ${naira(signing)} to hire a guard.`, 'warn');
+  const guard = { id: `guard-${s.day}-${Math.random().toString(36).slice(2, 7)}`, name: ['Tunde', 'Chuka', 'Bashir', 'Emeka', 'Seyi'][Math.floor(Math.random() * 5)], wage: 18_000, look: generateRandomCustomer('styled').look };
+  let next = money({ ...s, security: { ...(s.security || {}), guard, postUid: post.uid, gallons: s.security?.gallons || [] } }, -signing, 'Security guard signing fee');
+  next = msg(next, 'Security', `${guard.name} has been hired. Weekly pay is ${naira(guard.wage)}. I will stay at the post and protect the shop.`, 'good');
+  return next;
+}
+
+/** Buy fuel now; the courier trip happens in game time and can optionally refill a selected generator. */
+export function startFuelTrip(s: GameState, litres: number, refillUid?: string): GameState {
+  if (![5, 10, 20].includes(litres)) return s;
+  if (s.security?.trip) return addShout(s, 'Security', 'A fuel trip is already in progress.', 'warn');
+  const gen = refillUid ? s.furniture.find((p) => p.uid === refillUid && p.placed && !!furnitureById(p.id).gen) : undefined;
+  if (refillUid && !gen) return addShout(s, 'Security', 'That generator is no longer available. Choose an installed generator.', 'warn');
+  const cost = Math.round(litres * fuelPrice(s));
+  if (s.cash < cost) return addShout(s, 'Security', `Fuel costs ${naira(cost)}. There is not enough cash for this trip.`, 'warn');
+  const post = s.furniture.find((p) => p.placed && p.id === 'securityPost');
+  const guardOnDuty = !!s.security?.guard && !!post;
+  const total = guardOnDuty ? 58 : 92;
+  let next = money({ ...s, security: { ...(s.security || {}), postUid: post?.uid || s.security?.postUid, gallons: s.security?.gallons || [], trip: { remaining: total, total, litres, cost, refillUid, carrier: guardOnDuty ? 'guard' : 'divine' } } }, -cost, `Fuel purchase: ${litres} L`);
+  next = { ...next, today: { ...next.today, fuel: (next.today.fuel || 0) + cost, litres: (next.today.litres || 0) + litres, costs: next.today.costs + cost } };
+  return addShout(next, guardOnDuty ? s.security!.guard!.name : 'Divine', guardOnDuty ? `I'm going to buy ${litres} litres of fuel. I'll announce when I'm back.` : `I'm heading out to buy ${litres} litres of fuel. I'll be back after the trip.`, 'info');
+}
+
+/** Advance an errand using the in-game clock, including after-hours trips once time resumes. */
+function securityStep(s0: GameState, minutes: number): GameState {
+  const trip = s0.security?.trip;
+  if (!trip || minutes <= 0) return s0;
+  const remaining = Math.max(0, trip.remaining - minutes);
+  if (remaining > 0) return { ...s0, security: { ...s0.security!, trip: { ...trip, remaining } } };
+  let s: GameState = { ...s0, security: { ...s0.security!, trip: null, gallons: s0.security?.gallons || [] } };
+  let gallonLeft = trip.litres;
+  if (trip.refillUid) {
+    const poured = pourFuel(s, trip.litres, trip.refillUid);
+    s = poured.s;
+    gallonLeft = poured.remaining;
+  }
+  const gallons = [...(s.security?.gallons || [])];
+  if (gallonLeft > 0.05) gallons.push({ id: `fuel-${s.day}-${Math.random().toString(36).slice(2, 7)}`, litres: gallonLeft });
+  s = { ...s, security: { ...(s.security || {}), trip: null, gallons } };
+  const who = trip.carrier === 'guard' ? s.security?.guard?.name || 'Security' : 'Divine';
+  s = addShout(s, who, trip.refillUid && gallonLeft <= 0.05 ? 'I am back! I bought the fuel and filled the selected generator.' : `I am back! The ${Math.round(gallonLeft * 10) / 10} L gallon is here. Click it to refill a generator.`, 'good');
+  return s;
+}
+
+/** Pour a delivered gallon into one selected generator without paying twice. */
+export function pourSecurityGallon(s: GameState, gallonId: string, generatorUid: string): GameState {
+  const gallon = (s.security?.gallons || []).find((g) => g.id === gallonId);
+  if (!gallon) return s;
+  const result = pourFuel(s, gallon.litres, generatorUid);
+  if (result.used <= 0) return addShout(s, 'Generator', 'That generator has no room for more fuel. Choose another one.', 'warn');
+  const gallons = (s.security?.gallons || []).filter((g) => g.id !== gallonId);
+  if (result.remaining > 0.05) gallons.push({ ...gallon, litres: result.remaining });
+  return { ...result.s, security: { ...(result.s.security || {}), gallons } };
 }
 
 /** Turn a piece 90 degrees where it stands (or the nearest spot it fits). */
