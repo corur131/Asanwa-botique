@@ -205,6 +205,7 @@ export function scoreLook(c: Customer, choice: StyleChoice, stock: Design[]): Sc
       case 'hair': ok = choice.hair && (w.group === 'male' || hairGroup(choice.hair) === w.group) ? 1 : 0; break;
       case 'glam': ok = glam >= 0.7 ? 1 : glam >= 0.5 ? 0.5 : 0; break;
       case 'naturalFace': ok = glam > 0.05 && glam <= 0.4 ? 1 : glam <= 0.55 ? 0.5 : 0; break;
+      case 'nails': ok = choice.makeup?.nailColor ? 1 : 0; break;
     }
     if (ok < 1) notes.push(missLine(w));
     hit += ok;
@@ -265,5 +266,6 @@ function missLine(w: Customer['wants'][number]): string {
     case 'hair': if (w.group === 'male') return 'She wanted a fresh cut.'; return `She wanted ${w.group === 'wig' ? 'a wig' : w.group === 'natural' ? 'natural hair' : w.group}.`;
     case 'glam': return 'She wanted full glam.';
     case 'naturalFace': return 'She wanted light makeup.';
+    case 'nails': return 'She wanted matching nails.';
   }
 }
