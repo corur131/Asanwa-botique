@@ -509,7 +509,7 @@ export default function GameApp({ onLab, initial, storageKey, cloud, notice }: {
                 )}
                 {queue.map((v) => {
                   const canSendToStaff = E.canAssignToStaff(s, v.c.id);
-                  return <WaitChip key={v.c.id} v={v} clock={s.clock} disabled={!!current} onClick={() => styleCustomer(v.c.id)} onStaff={canSendToStaff && !v.forStaff ? () => up((g) => E.sendToStaff(g, v.c.id)) : undefined} staffHint={!v.forStaff && s.staff.length > 0 && !canSendToStaff ? 'No suitably qualified staff' : undefined} />;
+                  return <WaitChip key={v.c.id} v={v} clock={s.clock} disabled={!!current} onClick={() => styleCustomer(v.c.id)} onStaff={canSendToStaff && !v.forStaff ? () => up((g) => E.sendToStaff(g, v.c.id)) : undefined} staffHint={!v.forStaff && s.staff.length > 0 && !canSendToStaff ? 'No staff/stock match yet' : undefined} />;
                 })}
                 {s.inShop.filter((v) => v.by && v.by !== 'divine').map((v) => (
                   <div key={v.c.id} className="shrink-0 rounded-xl border border-white/10 bg-white/5 px-3 py-2 opacity-70">
