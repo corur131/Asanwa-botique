@@ -14,7 +14,7 @@ import { FEMALE_HAIR, MAKEUP_LOOKS } from '../constants/catalog';
 import { colourName } from './colours';
 import { FURNITURE, KIOSK_LISTING, Listing, Placed, STARTER_FURNITURE, autoPlace,
   findSpot, canPlace, turn, Rot, ceilingCapacity, ceilingUsed, yardCapacity, yardUsed, cheapestListing, furnitureById, listingsFor, newUid, prestigeRichShift, prestigeTraffic, shopStats, usesFloor, wallCapacity, wallUsed } from './shop';
-import { Customer, DayLog, Departure, Design, ReplyChoice, GameState, LedgerLine, Message, Regular, ScoreBreakdown, Settlement, StaffMember, StyleChoice } from './types';
+import { Customer, DayLog, Departure, Design, ReplyChoice, GameState, LedgerLine, Message, Regular, ScoreBreakdown, Settlement, StaffMember, StaffProfession, StyleChoice } from './types';
 
 const pick = <T,>(a: readonly T[]): T => a[Math.floor(Math.random() * a.length)];
 const chance = (p: number) => Math.random() < p;
@@ -356,7 +356,7 @@ export function tick(s0: GameState, minutes: number): GameState {
     }
     if (!s.inShop.some((v) => v.by === m.id)) {
       // Divine's picks first: staff take people she sent, or anyone small who has waited 10 minutes
-      const next = waiting(s).filter((v) => v.c.cls !== 'rich').sort((a, b) => Number(!!b.forStaff) - Number(!!a.forStaff) || a.arrived - b.arrived).find((v) => v.forStaff || end - v.arrived >= 10);
+      const next = waiting(s).filter((v) => v.c.cls !== 'rich' && (m.profession === 'makeup' ? v.c.service === 'makeup' || v.c.service === 'both' : v.c.service !== 'makeup')).sort((a, b) => Number(!!b.forStaff) - Number(!!a.forStaff) || a.arrived - b.arrived).find((v) => v.forStaff || end - v.arrived >= 10);
       if (next && end < SHOP_MINUTES) s = { ...s, inShop: s.inShop.map((v) => (v.c.id === next.c.id ? { ...v, by: m.id, until: end + staffMinutes(m.level) } : v)) };
     }
   }
@@ -915,28 +915,28 @@ export function markRead(s: GameState, from: string): GameState {
 // ---------------------------------------------------------------------------
 const STAFF_NAMES = ['Kemi', 'Blessing', 'Chidinma', 'Sola', 'Grace', 'Rukayat', 'Amarachi', 'Tosin', 'Ladi', 'Nneka', 'Bimpe', 'Jumoke', 'Ese', 'Rita', 'Seun', 'Uju'];
 
-export interface Candidate { name: string; kind: 'trainee' | 'expert'; level: number; wage: number; signing: number }
+export interface Candidate { name: string; kind: 'trainee' | 'expert'; level: number; wage: number; signing: number; profession: StaffProfession }
 
-export function candidates(s: GameState): Candidate[] {
+export function candidates(s: GameState, profession: StaffProfession = 'stylist'): Candidate[] {
   const used = new Set(s.staff.map((x) => x.name));
   const free = STAFF_NAMES.filter((n) => !used.has(n));
   const seed = s.day * 31 + s.staff.length * 7;
   const a = free[seed % free.length];
   const b = free[(seed * 7 + 3) % free.length] === a ? free[(seed + 1) % free.length] : free[(seed * 7 + 3) % free.length];
   return [
-    { name: a, kind: 'trainee', level: STAFF.traineeLevel, wage: STAFF.traineeWage, signing: STAFF.traineeWage * 0.5 },
-    { name: b, kind: 'expert', level: STAFF.expertLevel, wage: STAFF.expertWage, signing: STAFF.expertWage * 2 },
+    { name: a, kind: 'trainee', level: STAFF.traineeLevel, wage: STAFF.traineeWage, signing: STAFF.traineeWage * 0.5, profession },
+    { name: b, kind: 'expert', level: STAFF.expertLevel, wage: STAFF.expertWage, signing: STAFF.expertWage * 2, profession },
   ];
 }
 
 export function canHire(s: GameState) {
-  return TIERS[s.tier].staff > s.staff.length && s.day >= s.hireOkDay;
+  return TIERS[s.tier].staff > s.staff.length;
 }
 
 export function hire(s: GameState, c: Candidate): GameState {
   if (!canHire(s) || s.cash < c.signing) return s;
-  const member: StaffMember = { id: `s${Date.now().toString(36)}`, name: c.name, level: c.level, wage: c.wage, loyalty: c.kind === 'trainee' ? 30 : 20, trained: c.kind === 'trainee', weeks: 0, look: { ...generateRandomCustomer('styled') } };
-  return msg(money({ ...s, staff: [...s.staff, member], hireOkDay: s.day + STAFF.hireDelayDays }, -c.signing, `Signing: ${c.name}`), c.name, c.kind === 'trainee' ? 'Thank you for this chance, ma. I will learn fast!' : `I'm the best in Lagos. Pay me well and we'll have no problem.`, 'good');
+  const member: StaffMember = { id: `s${Date.now().toString(36)}`, name: c.name, level: c.level, wage: c.wage, loyalty: c.kind === 'trainee' ? 30 : 20, trained: c.kind === 'trainee', weeks: 0, profession: c.profession || 'stylist', look: { ...generateRandomCustomer('styled') } };
+  return msg(money({ ...s, staff: [...s.staff, member], hireOkDay: s.day }, -c.signing, `Signing: ${c.name}`), c.name, c.profession === 'makeup' ? 'I specialise in makeup, ma. I will take care of the face clients.' : c.kind === 'trainee' ? 'Thank you for this chance, ma. I will learn fast!' : `I'm a stylist. Pay me well and I'll keep your customers looking good.`, 'good');
 }
 
 export function train(s: GameState, id: string): GameState {
