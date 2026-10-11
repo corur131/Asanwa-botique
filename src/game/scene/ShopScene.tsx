@@ -375,19 +375,31 @@ function Yard({ s, selected, onTap }: { s: GameState; selected: string | null; o
                 {/* A real street parasol: weighted foot, pole, broad fabric canopy and scalloped edge. */}
                 <mesh position={[0, 0.06, 0]} castShadow><cylinderGeometry args={[0.25, 0.25, 0.12, 20]} /><meshStandardMaterial color="#51483F" /></mesh>
                 <mesh position={[0, 1.0, 0]} castShadow><cylinderGeometry args={[0.035, 0.035, 1.85, 12]} /><meshStandardMaterial color="#C9CED6" metalness={0.65} /></mesh>
-                <mesh position={[0, 1.92, 0]}>
-                  <coneGeometry args={[0.9, 0.32, 10]} />
-                  <meshStandardMaterial color="#C2262E" roughness={0.75} side={THREE.DoubleSide} />
+                {/* A curved, fabric umbrella dome rather than a flat box or square slab. */}
+                <mesh position={[0, 1.98, 0]} scale={[1, 0.36, 1]} castShadow>
+                  <sphereGeometry args={[0.92, 32, 12, 0, Math.PI * 2, 0, Math.PI / 2]} />
+                  <meshStandardMaterial color="#C2262E" roughness={0.82} side={THREE.DoubleSide} />
                 </mesh>
-                <mesh position={[0, 1.94, 0]}>
-                  <torusGeometry args={[0.72, 0.028, 6, 24]} />
+                {/* Alternating rounded scallops give the edge a soft parasol silhouette. */}
+                {Array.from({ length: 12 }, (_, i) => {
+                  const a = (i * Math.PI * 2) / 12;
+                  return (
+                    <mesh key={i} position={[Math.cos(a) * 0.82, 1.955, Math.sin(a) * 0.82]} scale={[0.19, 0.065, 0.13]} castShadow>
+                      <sphereGeometry args={[1, 10, 8]} />
+                      <meshStandardMaterial color={i % 2 ? "#B91F2A" : "#D83A42"} roughness={0.82} />
+                    </mesh>
+                  );
+                })}
+                <mesh position={[0, 1.97, 0]}>
+                  <torusGeometry args={[0.84, 0.018, 6, 32]} />
                   <meshStandardMaterial color="#F4EFE6" roughness={0.75} />
                 </mesh>
-                {Array.from({ length: 10 }, (_, i) => {
-                  const a = (i * Math.PI * 2) / 10;
-                  return <B key={i} p={[Math.cos(a) * 0.48, 1.98, Math.sin(a) * 0.48]} s={[0.035, 0.2, 0.035]} c="#E8B84A" rot={[0, -a, 0]} />;
+                {/* Fine radial ribs visible beneath the fabric. */}
+                {Array.from({ length: 12 }, (_, i) => {
+                  const a = (i * Math.PI * 2) / 12;
+                  return <B key={`rib-${i}`} p={[Math.cos(a) * 0.43, 2.08, Math.sin(a) * 0.43]} s={[0.014, 0.014, 0.82]} c="#E8B84A" rot={[0, -a, 0]} />;
                 })}
-                <mesh position={[0, 2.1, 0]} castShadow><sphereGeometry args={[0.055, 10, 8]} /><meshStandardMaterial color="#D4AF37" metalness={0.8} /></mesh>
+                <mesh position={[0, 2.31, 0]} castShadow><sphereGeometry args={[0.055, 10, 8]} /><meshStandardMaterial color="#D4AF37" metalness={0.8} /></mesh>
               </group>
             ) : (
               <group>
