@@ -129,7 +129,7 @@ export function spots(s: GameState) {
   const seatWait = seatWaitPool.filter((seat) => availableForCustomers(seat.cell));
   // overflow queue on the pavement outside the door
   const street: Cell[] = Array.from({ length: 12 }, (_, k) => [door[0] + [1, -1, 2, -2][k % 4], r.d + 1 + Math.floor(k / 4)] as Cell);
-  return { door, outside, style, divine, wait, seatWait, staff, staffClient, street };
+  return { door, outside, style, divine, wait, seatWait, seatSpots: seatWaitPool, staff, staffClient, street };
 }
 
 export function Room({ r, tier, painted }: { r: RoomStyle; tier: number; painted?: boolean }) {
@@ -660,7 +660,7 @@ export default function ShopScene(p: SceneProps) {
       : null;
   const trip = s.security?.trip;
   const errandTarget: Cell | null = trip?.carrier === 'divine' ? (trip.remaining > trip.total / 2 ? sp.outside : sp.door) : null;
-  const divineSeat = !p.build && p.act?.pose === 'sit' ? sp.seatWait.find((seat) => seat.uid === p.act!.uid) : undefined;
+  const divineSeat = !p.build && p.act?.pose === 'sit' ? sp.seatSpots.find((seat) => seat.uid === p.act!.uid) : undefined;
   const divineAt: Cell = p.build ? [Math.min(r.w, sp.door[0] + 2), r.d + 1] : errandTarget || (divineSeat?.cell || (act ? act.cell : manual || sp.divine));
   const tired = s.energy !== undefined && s.energy < 30;
   const carryingFuel = !!trip && trip.carrier === 'divine' && trip.remaining <= trip.total / 2;
