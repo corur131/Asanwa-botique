@@ -1114,6 +1114,21 @@ export function CeilingPiece({ id, h, at, off }: { id: string; h: number; at: V3
       <B p={[0,h-0.14,0]} s={[0.2,0.04,0.2]} c="#C2262E" e="#C2262E" ei={off?0:0.3}/>
       {!off && <pointLight position={[0,h-0.25,0]} intensity={0.2} distance={2} color="#FF4444"/>}
     </group>;
+  if (id === 'lantern')
+    return (
+      <group position={at}>
+        <B p={[0, h - 0.18, 0]} s={[0.025, 0.32, 0.025]} c="#343434" />
+        <mesh position={[0, h - 0.36, 0]}>
+          <torusGeometry args={[0.12, 0.015, 8, 20]} />
+          <meshStandardMaterial color="#D4AF37" metalness={0.7} />
+        </mesh>
+        <Cyl p={[0, h - 0.54, 0]} r1={0.1} r2={0.13} h={0.27} c="#30343A" seg={12} />
+        <Cyl p={[0, h - 0.54, 0]} r1={0.075} h={0.18} c="#FFE8A8" seg={12} e="#FFD26A" ei={1.5 * glowK} />
+        <B p={[0, h - 0.69, 0]} s={[0.26, 0.025, 0.26]} c="#292D32" />
+        <B p={[0, h - 0.39, 0]} s={[0.24, 0.025, 0.24]} c="#292D32" />
+        {!off && <pointLight position={[0, h - 0.58, 0.08]} intensity={2.3} distance={5} color="#FFDDA0" />}
+      </group>
+    );
   if (id === 'chandelier')
     return (
       <group position={at}>
