@@ -282,7 +282,7 @@ function shopIncidentStep(s0: GameState, minutes: number): GameState {
         const sent = waiting(s);
         for (const v of sent) s = depart(s, v.c, v.c.look, false);
         if (sent.length) s = { ...s, today: { ...s.today, lost: s.today.lost + sent.length, closedOn: (s.today.closedOn || 0) + sent.length } };
-        s = addShout(s, 'Deborah', `Fire at the generator! The gen is off and repairs cost ${naira(repair)}. We need an extinguisher, sis!`, 'danger');
+        s = addShout(s, 'Deborah', `Fire at the generator! The gen is off and repairs cost ${naira(repair)}. We need an extinguisher, sis!`, 'warn');
       }
     }
   }
