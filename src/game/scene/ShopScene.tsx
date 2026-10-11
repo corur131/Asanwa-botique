@@ -64,7 +64,8 @@ export function spots(s: GameState) {
   // waiting: next to seats first, then along the front
   const seats = placed.filter((p) => (furnitureById(p.id).seats || 0) > 0);
   const waitPool: Cell[] = [];
-  for (const st of seats) for (const c of near([st.x, st.z + 1], all).slice(0, furnitureById(st.id).seats || 1)) { waitPool.push(c); taken.add(`${c[0]},${c[1]}`); }
+  const seatWaitPool: Cell[] = [];
+  for (const st of seats) for (const c of near([st.x, st.z + 1], all).slice(0, furnitureById(st.id).seats || 1)) { waitPool.push(c); seatWaitPool.push(c); taken.add(`${c[0]},${c[1]}`); }
   for (const c of near([r.w - 1, r.d - 1], all)) { waitPool.push(c); taken.add(`${c[0]},${c[1]}`); }
   const staff = near([0, 0], all).slice(0, 6);
   staff.forEach((c) => taken.add(`${c[0]},${c[1]}`));
@@ -73,10 +74,12 @@ export function spots(s: GameState) {
     taken.add(`${n[0]},${n[1]}`);
     return n;
   });
-  const wait = waitPool.filter((c) => !staff.some((x) => x[0] === c[0] && x[1] === c[1]) && !staffClient.some((x) => x[0] === c[0] && x[1] === c[1]));
+  const availableForCustomers = (c: Cell) => !staff.some((x) => x[0] === c[0] && x[1] === c[1]) && !staffClient.some((x) => x[0] === c[0] && x[1] === c[1]);
+  const wait = waitPool.filter(availableForCustomers);
+  const seatWait = seatWaitPool.filter(availableForCustomers);
   // overflow queue on the pavement outside the door
   const street: Cell[] = Array.from({ length: 12 }, (_, k) => [door[0] + [1, -1, 2, -2][k % 4], r.d + 1 + Math.floor(k / 4)] as Cell);
-  return { door, outside, style, divine, wait, staff, staffClient, street };
+  return { door, outside, style, divine, wait, seatWait, staff, staffClient, street };
 }
 
 export function Room({ r, tier, painted }: { r: RoomStyle; tier: number; painted?: boolean }) {
@@ -505,6 +508,7 @@ export default function ShopScene(p: SceneProps) {
         k++;
       }
       lastSpot.current[v.c.id] = target;
+      const seated = !v.by && sp.seatWait.some((c) => c[0] === target[0] && c[1] === target[1]);
       const mine = v.by === 'divine';
       const clickable = !v.by || mine;
       people.push(
@@ -517,6 +521,7 @@ export default function ShopScene(p: SceneProps) {
           w={r.w}
           d={r.d}
           highlight={mine || (!s.serving && !v.by && k === 1)}
+          pose={seated ? 'sit' : undefined}
           onClick={clickable ? () => p.onCustomer(v.c.id) : undefined}
         />,
       );
