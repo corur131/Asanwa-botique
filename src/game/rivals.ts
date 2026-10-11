@@ -332,8 +332,13 @@ export function simulateRivals(s0: GameState): GameState {
   }
   for (const r of s.rivals.filter((x) => !x.main && chance(0.05))) s = rivalPost(s, r, pick(LINES.brag.pro));
 
-  // Sunday: the Top 20
+  // Sunday: publish the official Top 20, but keep day-to-day movement separately.
   if (today % 7 === 0) s = publishLadder(s);
+  const dailyOrder = ladder(s).map((row) => row.id);
+  s = {
+    ...s,
+    dailyRanking: [...(s.dailyRanking || []), { day: today, order: dailyOrder }].slice(-30),
+  };
   return s;
 }
 
