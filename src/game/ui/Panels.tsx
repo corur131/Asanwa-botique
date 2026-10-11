@@ -279,8 +279,8 @@ export const MovePanel: React.FC<{ s: GameState; onMove: (l: Listing) => void }>
           <div key={l.id} className="rounded-xl border border-white/10 bg-[#15171f] p-3">
             <div className="flex items-start justify-between gap-2">
               <div>
-                <div className="text-sm font-semibold text-white">{l.street}</div>
-                <div className="text-[11px] text-slate-400">{l.area} · <Stars n={l.stars} /> · {roomOf(l).w}×{roomOf(l).d} m floor</div>
+                <div className="text-sm font-semibold text-white">{l.street} {l.signature && <Pill tone="gold">✦ SIGNATURE</Pill>}</div>
+                <div className="text-[11px] text-slate-400">{l.area} · <Stars n={l.stars} /> · {roomOf(l).w}×{roomOf(l).d} m floor {l.signature && <Pill tone="gold">SIGNATURE</Pill>}</div>
               </div>
               <Btn size="sm" tone="gold" onClick={() => setPick(l0)}>View</Btn>
             </div>
@@ -298,17 +298,18 @@ export const MovePanel: React.FC<{ s: GameState; onMove: (l: Listing) => void }>
         <Modal onClose={() => setPick(null)}>
           <div className="h-56 -mx-1 mb-3 rounded-xl overflow-hidden">
             <Suspense fallback={<Loading />}>
-              <RoomPreview tier={pick.tier} stars={pick.stars} />
+              <RoomPreview tier={pick.tier} stars={pick.stars} signature={pick.signature} />
             </Suspense>
           </div>
           <h2 className="font-serif text-2xl font-bold text-white">{pick.street}</h2>
-          <p className="text-sm text-slate-400 mb-3">{pick.area} · {next.name} · <Stars n={pick.stars} /></p>
+          <p className="text-sm text-slate-400 mb-3">{pick.area} · {next.name} · <Stars n={pick.stars} /> {pick.signature && <Pill tone="gold">SIGNATURE PROPERTY</Pill>}</p>
           <ul className="text-sm space-y-1 mb-3">
             <li>Floor: <b>{roomOf(pick).w}×{roomOf(pick).d} m</b>, {wallCapacity(pick)} m of wall{pick.stars === 1 ? ', tired and in need of paint' : pick.stars === 4 ? ', freshly done with a feature wall' : ''}</li>
             <li>Move-in: <b>{naira(pick.moveIn + (contestFor(s, pick)?.extra || 0))}</b> (you have {naira(s.cash)}){contestFor(s, pick) ? `, outbidding ${contestFor(s, pick)!.rival.owner}` : ''}</li>
             <li>Rent: <b>{naira(pick.rent)}</b> every 7 days</li>
             <li>Landlord: <b>{pick.landlord}</b>, {graceText(pick.grace)}</li>
             <li>Prestige from location: <b>{pick.stars * 2}</b> (more customers, more rich ones)</li>
+            {pick.signature && <li className="text-amber-200">Signature benefits: extra customer traffic, rich-only walk-ins, much larger tips, celebrity visits with multi-million-naira spending, trending posts and large follower gains. Celebrity frequency is rare by design.</li>}
           </ul>
           {s.cash - pick.moveIn < pick.rent * 2 && <p className="text-sm text-rose-300 mb-3">Careful: the first two weeks in a new shop are quiet, and you'd have less than two weeks of rent saved.</p>}
           <div className="flex gap-2 justify-end">
