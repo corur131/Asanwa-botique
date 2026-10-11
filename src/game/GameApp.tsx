@@ -873,7 +873,7 @@ const SecurityMenu: React.FC<{
             <div className="rounded-xl border border-white/10 bg-white/5 p-3">
               <div className="font-semibold">{guard ? `${guard.name} · security guard` : 'No security guard hired'}</div>
               <p className="text-xs text-slate-400 mt-1">{guard ? (post ? 'On duty at the outside security post when not running an errand.' : 'The post is missing, so Divine will handle errands until it is placed again.') : post ? 'You own a security post. Hire a guard to protect the shop and run errands.' : 'Divine will go out herself for fuel. To hire a guard, buy and place the small security post from the Furniture Store first.'}</p>
-              {post && !guard && <Btn className="w-full" tone="gold" onClick={onHire} className="mt-2">Hire security guard · ₦35,000</Btn>}
+              {post && !guard && <Btn className="w-full mt-2" tone="gold" onClick={onHire}>Hire security guard · ₦35,000</Btn>}
               {guard && <p className="text-xs text-emerald-200 mt-2">Weekly wage: {naira(guard.wage)}</p>}
             </div>
             {trip && <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-sm text-amber-100">{busyText} Ordered: {trip.litres} L.</div>}
