@@ -68,6 +68,7 @@ function wantLine(w: Want, male: boolean): string {
     case 'native': return pick(['I want native.', 'Make it native, I want to rep my culture.', 'Native wear, please.']);
     case 'english': return pick(['No native this time, I want English wear.', 'I want English, something modern.']);
     case 'gele': return pick(['I must tie gele.', "And gele! It's not complete without gele."]);
+    case 'nails': return pick(['Please make my nails pop too.', 'Fresh nails to match the outfit, please.', 'I need a proper nail colour for this look.']);
     case 'noHeels': return pick(['Please no heels, my legs no fit.', 'Flat shoes only, I go dance well well.']);
     case 'fitted': return pick(['Make it show my shape.', 'I want something that hugs my body.']);
     case 'covered': return pick(['Nothing too short or open.', 'Keep it decent please, nothing short.']);
@@ -90,7 +91,7 @@ function wantsFor(occasion: Occasion, male: boolean, cls: CustomerClass, wigs: b
   }
   if (occasion === 'church' && !male) pool.push({ kind: 'covered' });
   if (!male) {
-    if (['party', 'dateNight', 'birthday', 'redCarpet'].includes(occasion)) pool.push({ kind: 'fitted' }, { kind: 'glam' });
+    if (['party', 'dateNight', 'birthday', 'redCarpet'].includes(occasion)) pool.push({ kind: 'fitted' }, { kind: 'glam' }, { kind: 'nails' });
     if (['owambe', 'wedding'].includes(occasion)) pool.push({ kind: 'noHeels' }, { kind: 'glam' });
     if (['church', 'office', 'casual', 'brunch'].includes(occasion)) pool.push({ kind: 'naturalFace' });
     pool.push({ kind: 'hair', group: pick(wigs ? ['wig', 'braids', 'natural', 'updo'] : ['braids', 'natural', 'updo', 'twists']) });
