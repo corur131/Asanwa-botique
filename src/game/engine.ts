@@ -405,7 +405,7 @@ export function reactionFor(score: number): Settlement['reaction'] {
 }
 
 /** What the customer does with the price Divine names. */
-export function settle(c: Customer, score: ScoreBreakdown, price: number, supplies: number): Settlement {
+export function settle(c: Customer, score: ScoreBreakdown, price: number, supplies: number, context: { hasPOS?: boolean; hasAlterations?: boolean; fitted?: boolean } = {}): Settlement {
   const s = score.total;
   const reaction = reactionFor(s);
   let paid = price;
@@ -434,6 +434,29 @@ export function settle(c: Customer, score: ScoreBreakdown, price: number, suppli
   } else if (s < 65) {
     paid *= 0.88;
     if (outcome === 'paid') outcome = 'bargained';
+  }
+  // Fitted pieces sometimes need a quick adjustment. The alterations corner saves the sale.
+  if (context.fitted && chance(context.hasAlterations ? 0.04 : 0.2)) {
+    if (context.hasAlterations) {
+      paid = Math.round(paid * 0.95);
+      outcome = 'bargained';
+      line = 'This one is a bit tight, but the alterations corner fixed it on the spot. Thank you!';
+    } else {
+      return { price, paid: 0, tip: 0, cost: 0, outcome: 'walked', line: 'This one too tight for me. No alterations here? I will check another shop.', reaction: 'frown', repDelta: -1.2, becameRegular: false };
+    }
+  }
+  // Some customers need to pay electronically. Transfers can fail when the network misbehaves;
+  // a POS terminal makes card payments reliable but charges a small transaction fee.
+  if (chance(0.3)) {
+    if (!context.hasPOS && chance(0.35)) {
+      return { price, paid: 0, tip: 0, cost: 0, outcome: 'walked', line: 'Do you take transfer? Network no gree! I cannot wait for this alert. I am going.', reaction: 'frown', repDelta: -0.8, becameRegular: false };
+    }
+    if (context.hasPOS) {
+      paid = Math.round(paid * 0.99);
+      line = `${line} POS approved, but the terminal took its small transaction fee.`;
+    } else {
+      line = `${line} Transfer alert received. Thank goodness.`;
+    }
   }
   let tip = 0;
   if (s >= 85) tip = { poor: 0.03, middle: 0.08, rich: 0.15 }[c.cls] * paid;
