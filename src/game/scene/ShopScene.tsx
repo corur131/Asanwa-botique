@@ -309,6 +309,35 @@ function Shaker({ on, children }: { on: boolean; children: React.ReactNode }) {
   return <group ref={g}>{children}</group>;
 }
 
+/** Staff wander, take short idle breaks, and use a seat when one is free. */
+function StaffRoutine({ look, spawn, workTarget, blocked, w, d, assigned, seats }: {
+  look: FigureLook; spawn: Cell; workTarget: Cell; blocked: boolean[][]; w: number; d: number;
+  assigned: boolean; seats: { cell: Cell; position: [number, number, number]; face: number }[];
+}) {
+  const [routine, setRoutine] = useState<{ target: Cell; pose: Pose; seatPosition?: [number, number, number]; seatFace?: number }>({ target: spawn, pose: 'stand' });
+  useEffect(() => {
+    if (assigned) {
+      setRoutine({ target: workTarget, pose: 'work' });
+      return;
+    }
+    setRoutine({ target: spawn, pose: 'stand' });
+    const timer = window.setInterval(() => {
+      if (seats.length && Math.random() < 0.24) {
+        const seat = seats[Math.floor(Math.random() * seats.length)];
+        setRoutine({ target: seat.cell, pose: 'sit', seatPosition: seat.position, seatFace: seat.face });
+        return;
+      }
+      const free: Cell[] = [];
+      for (let z = 0; z < d; z++) for (let x = 0; x < w; x++) if (!blocked[z]?.[x]) free.push([x, z]);
+      const target = free[Math.floor(Math.random() * free.length)] || spawn;
+      const poses: Pose[] = ['stand', 'phone', 'drink', 'reach'];
+      setRoutine({ target, pose: poses[Math.floor(Math.random() * poses.length)] });
+    }, 8500);
+    return () => window.clearInterval(timer);
+  }, [assigned, workTarget[0], workTarget[1], spawn[0], spawn[1], seats, blocked, w, d]);
+  return <Walker look={look} spawn={spawn} target={assigned ? workTarget : routine.target} blocked={blocked} w={w} d={d} speed={1.15} pose={assigned ? 'work' : routine.pose} seatPosition={assigned ? undefined : routine.seatPosition} seatFace={assigned ? undefined : routine.seatFace} />;
+}
+
 /** Grey puffs from the exhaust while the generator runs. */
 function Smoke({ at, dense }: { at: [number, number, number]; dense: boolean }) {
   const puffs = useRef<(THREE.Mesh | null)[]>([]);
@@ -639,7 +668,7 @@ export default function ShopScene(p: SceneProps) {
     const station = assigned ? serviceStation(m.profession) : null;
     const workCell = station || sp.staffClient[i] || sp.style;
     const c = p.build ? ([Math.max(-1, sp.door[0] - 2 - i), r.d + 1] as Cell) : assigned ? nextTo(workCell) : sp.staff[i] || sp.divine;
-    people.push(<Walker key={m.id} look={lookToFigure(m.look)} spawn={sp.staff[i] || sp.divine} target={c} blocked={blocked} w={r.w} d={r.d} pose={assigned ? 'work' : undefined} />);
+    people.push(<StaffRoutine key={m.id} look={lookToFigure(m.look)} spawn={sp.staff[i] || sp.divine} workTarget={c} blocked={blocked} w={r.w} d={r.d} assigned={!!assigned && !p.build} seats={sp.seatWait} />);
   });
   if (s.phase === 'shop') {
     let k = 0;
