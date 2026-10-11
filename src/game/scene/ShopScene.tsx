@@ -147,7 +147,7 @@ export function Room({ r, tier, painted }: { r: RoomStyle; tier: number; painted
     return out;
   }, [r]);
   const door = Math.floor(r.w / 2);
-  const ridges = r.kind === 'container';
+  const ridges = r.kind === 'container' && !r.signature;
   return (
     <group>
       {/* street around the shop */}
