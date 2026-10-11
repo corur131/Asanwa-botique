@@ -10,7 +10,7 @@ import type { CartLine } from '../engine';
 import { GROUP, ladder } from '../rivals';
 import { TIERS } from '../economy';
 
-export type AppId = 'home' | 'chats' | 'market' | 'bank' | 'property' | 'gidigram' | 'staff' | 'top20' | 'gist';
+export type AppId = 'home' | 'chats' | 'market' | 'bank' | 'property' | 'gidigram' | 'staff' | 'top20' | 'gist' | 'weather';
 
 const APPS: { id: Exclude<AppId, 'home'>; name: string; bg: string; glyph: string }[] = [
   { id: 'chats', name: 'WhatsApp', bg: 'bg-[#25D366]', glyph: '✆' },
@@ -21,6 +21,7 @@ const APPS: { id: Exclude<AppId, 'home'>; name: string; bg: string; glyph: strin
   { id: 'staff', name: 'Staff', bg: 'bg-gradient-to-br from-slate-500 to-slate-800', glyph: '☺' },
   { id: 'top20', name: 'Top 20', bg: 'bg-gradient-to-br from-amber-400 to-yellow-700', glyph: '🏆' },
   { id: 'gist', name: 'GistLagos', bg: 'bg-gradient-to-br from-red-500 to-rose-800', glyph: '☕' },
+  { id: 'weather', name: 'Lagos Weather', bg: 'bg-gradient-to-br from-sky-500 to-blue-800', glyph: '🌦️' },
 ];
 
 export interface PhoneProps {
@@ -82,6 +83,7 @@ export const Phone: React.FC<PhoneProps> = (p) => {
           {app === 'gidigram' && <Gidigram s={s} profile={p.profile} setProfile={p.setProfile} onVisit={p.onVisit} />}
           {app === 'top20' && <Top20 s={s} open={(id) => { p.setProfile(id); setApp('gidigram'); }} />}
           {app === 'gist' && <GistApp s={s} />}
+          {app === 'weather' && <WeatherApp s={s} />}
           {app === 'staff' && (
             <AppFrame title="Staff" sub="Hire, train, pay" tone="bg-slate-800">
               <div className="p-3">
@@ -424,6 +426,40 @@ const Gidigram: React.FC<{ s: GameState; profile: string | null; setProfile: (id
 };
 
 // ---------------------------------------------------------------------------
+
+const weatherForForecast = (day: number): NonNullable<GameState['weather']> => {
+  const d = ((day - 1) % 365) + 1;
+  const seasonal = d >= 90 && d <= 300 ? 'rainy' : d >= 335 || d <= 55 ? 'harmattan' : 'sunny';
+  return day % 4 === 0 ? 'cloudy' : seasonal;
+};
+const WEATHER_COPY: Record<NonNullable<GameState['weather']>, { icon: string; title: string; advice: string }> = {
+  sunny: { icon: '☀️', title: 'Sunny and hot', advice: 'Run the fan or AC if you can. Divine loses energy faster in an uncooled shop.' },
+  rainy: { icon: '🌧️', title: 'Rainy', advice: 'Expect fewer walk-ins, but customers who arrive are more patient. Your street canopy helps.' },
+  harmattan: { icon: '🌫️', title: 'Harmattan', advice: 'Cooler, dusty air. The shop stays cooler, but keep the floor and displays tidy.' },
+  cloudy: { icon: '☁️', title: 'Cloudy', advice: 'Mild weather. A steady day for the shop.' },
+};
+const WeatherApp: React.FC<{ s: GameState }> = ({ s }) => {
+  const today = WEATHER_COPY[s.weather || weatherForForecast(s.day)];
+  const forecast = WEATHER_COPY[weatherForForecast(s.day + 1)];
+  return (
+    <AppFrame title="Lagos Weather" sub="Shop-floor forecast">
+      <div className="p-4 space-y-3">
+        <div className="rounded-2xl bg-gradient-to-br from-sky-700/70 to-indigo-900/80 border border-white/10 p-4">
+          <div className="text-xs text-sky-200">TODAY · DAY {s.day}</div>
+          <div className="text-3xl mt-2">{today.icon} <span className="text-xl font-bold">{today.title}</span></div>
+          <p className="text-sm text-slate-200 mt-3">{today.advice}</p>
+        </div>
+        <div className="rounded-2xl bg-white/5 border border-white/10 p-4">
+          <div className="text-xs text-slate-400">TOMORROW · DAY {s.day + 1}</div>
+          <div className="text-xl mt-2">{forecast.icon} <b className="text-white">{forecast.title}</b></div>
+          <p className="text-sm text-slate-300 mt-2">{forecast.advice}</p>
+        </div>
+        <p className="text-[11px] text-slate-500">The forecast follows Lagos' rainy season and harmattan cycle. It is a game forecast, not a live weather report.</p>
+      </div>
+    </AppFrame>
+  );
+};
+
 // Rival pages, the Top 20 and the gist blog
 // ---------------------------------------------------------------------------
 const SPECIAL: Record<string, string> = { bridal: 'Bridal & luxury', genz: 'Gen Z wear', native: 'Native & aso-ebi', cheap: 'Cheap and fast', wigs: 'Wigs & glam', menswear: 'Menswear', luxury: 'Luxury', thrift: 'Thrift', everyday: 'Everyday wear' };
