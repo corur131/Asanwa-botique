@@ -155,6 +155,8 @@ export function scoreInShop(s: GameState, c: Customer, choice: StyleChoice): Sco
   // Divine's own state counts when she is the one styling
   const d = s.serving === c.id ? divineBonus(s, !!choice.hair, !c.male && !!choice.makeup) : { bonus: 0, notes: [] };
   const b = { bonus: b0.bonus + d.bonus, notes: [...b0.notes, ...d.notes] };
+  const fitBonus = c.fitIssue && s.furniture.some((f) => f.placed && f.id === 'alterationsCorner') ? 2 : 0;
+  if (fitBonus) { b.bonus += fitBonus; b.notes.push('Alterations corner +2'); }
   if (!b.bonus) return base;
   return { ...base, total: Math.max(0, Math.min(100, base.total + b.bonus)), bonus: b.bonus, bonusNotes: b.notes } as ScoreBreakdown;
 }
@@ -273,6 +275,7 @@ export function tick(s0: GameState, minutes: number): GameState {
   }
   if (lostDoor || lostHeat) s = { ...s, today: { ...s.today, lost: s.today.lost + lostDoor + lostHeat, doorLost: (s.today.doorLost || 0) + lostDoor, heatLost: (s.today.heatLost || 0) + lostHeat } };
   s = powerStep(s, s.clock, end);
+  s = shopHazards(s, end - s.clock);
   s = dropStep(s, end - s.clock);
   s = visitStep(s, end - s.clock);
   s = energyStep(s, end - s.clock);
@@ -392,6 +395,60 @@ export function settle(c: Customer, score: ScoreBreakdown, price: number, suppli
 }
 
 /** Applies a finished look: stock leaves the shop, money and reputation move, the customer walks out. */
+
+/** State-aware checkout: transfer reliability, POS fees, and fit problems. */
+export function settleAtShop(s: GameState, c: Customer, score: ScoreBreakdown, price: number, supplies: number): Settlement {
+  let result = settle(c, score, price, supplies);
+  if (result.outcome !== 'paid' && result.outcome !== 'bargained') return result;
+  const ids = s.furniture.filter((f) => f.placed).map((f) => f.id);
+  const hasPos = ids.includes('posTerminal') || ids.includes('jewelCounter') || ids.includes('luxuryCheckout');
+  if (c.paymentMethod === 'transfer') {
+    const networkFails = Math.random() < (hasPos ? 0.04 : 0.34);
+    if (networkFails) return { ...result, paid: 0, tip: 0, cost: 0, outcome: 'walked', line: hasPos ? 'The POS network is acting up. I will come back when it works.' : 'Abeg, network no gree. I need to go, I will try another shop.', reaction: 'frown', repDelta: -0.8, becameRegular: false };
+    if (hasPos) {
+      const fee = Math.round(result.paid * 0.015);
+      result = { ...result, cost: result.cost + fee, line: `${result.line} POS/transfer charge: ${naira(fee)}.` };
+    } else result = { ...result, line: `${result.line} Transfer received.` };
+  }
+  if (c.fitIssue && !ids.includes('alterationsCorner')) {
+    if (score.total < 55 && c.cls !== 'rich') return { ...result, paid: 0, tip: 0, cost: 0, outcome: 'walked', line: 'Sis, this one no fit me at all. I cannot pay for it like this.', reaction: 'frown', repDelta: -1.2, becameRegular: false };
+    const discount = Math.round(result.paid * 0.12);
+    result = { ...result, paid: Math.max(0, result.paid - discount), line: `${result.line} “It doesn't fit properly.” You give a 12% fit discount.` };
+  } else if (c.fitIssue && ids.includes('alterationsCorner')) result = { ...result, line: `${result.line} Quick alteration fixed the fit.` };
+  return result;
+}
+
+function shopHazards(s0: GameState, minutes: number): GameState {
+  let s = s0;
+  const ids = s.furniture.filter((f) => f.placed).map((f) => f.id);
+  const crowded = waiting(s).length + (s.serving ? 1 : 0) >= 3;
+  if (crowded && s.lastTheftDay !== s.day && Math.random() < Math.min(0.025, minutes * 0.000035)) {
+    const security = ids.includes('cctv') || ids.includes('antiTheftTags') || ids.includes('storageCabinet');
+    if (Math.random() < (security ? 0.18 : 0.7)) {
+      const pieces = s.stock.filter((d) => d.pieces > 0 && d.displayed);
+      if (pieces.length) {
+        const target = pieces[Math.floor(Math.random() * pieces.length)];
+        s = { ...s, stock: s.stock.map((d) => d.uid === target.uid ? { ...d, pieces: Math.max(0, d.pieces - 1) } : d), lastTheftDay: s.day };
+        s = addShout(s, 'Deborah', `Sis, one ${target.label} don miss from the rail 😩${security ? ' CCTV caught it, but we still lost the piece.' : ' The shop was crowded and nobody saw who took it.'}`, 'warn');
+        s = { ...s, rep: clamp(s.rep - (security ? 0.1 : 0.4), 0, 100) };
+      }
+    } else s = { ...s, lastTheftDay: s.day };
+  }
+  if (s.power?.gen && s.fireIncidentDay !== s.day && Math.random() < Math.min(0.008, minutes * (scarcity(s) ? 0.000012 : 0.000004))) {
+    s = { ...s, fireIncidentDay: s.day, power: { ...s.power, gen: false } };
+    if (ids.includes('fireExtinguisher')) s = addShout(s, 'Generator', 'Small gen fire! You grabbed the extinguisher and put it out. Everybody is safe.', 'warn');
+    else {
+      const repair = liveStats(s).gen === 'big' ? 95_000 : 35_000;
+      s = money(s, -repair, 'Generator fire repairs');
+      const lost = waiting(s).slice(0, 2);
+      for (const v of lost) s = depart(s, v.c, v.c.look, false);
+      s = { ...s, rep: clamp(s.rep - 1.5, 0, 100), today: { ...s.today, lost: s.today.lost + lost.length, events: [...s.today.events, `Generator fire: repairs cost ${naira(repair)}.`] } };
+      s = addShout(s, 'Deborah', `GENERATOR FIRE! Smoke everywhere. Repairs will cost ${naira(repair)}. Get an extinguisher next time!`, 'warn');
+    }
+  }
+  return s;
+}
+
 export function applyLook(s0: GameState, c: Customer, choice: StyleChoice, st0: Settlement, score: ScoreBreakdown): GameState {
   let st = st0;
   // styling wears Divine out: a full look more than a quick hair or makeup job
