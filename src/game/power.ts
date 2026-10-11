@@ -120,6 +120,9 @@ export function drainRate(s: GameState, cls: CustomerClass): number {
   if (src === 'none') return { poor: 1.3, middle: 2, rich: 3 }[cls];
   const hot = coolRunning(s) <= 0;
   let r = hot ? { poor: 1.1, middle: 1.2, rich: 1.35 }[cls] : 1;
+  if (s.weather === 'sunny' && hot) r *= 1.12;
+  if (s.weather === 'rainy') r *= 0.9;
+  if (s.weather === 'harmattan') r *= 0.94;
   if (src === 'solar') r *= 0.9; // cool, quiet, and they're impressed
   return r;
 }
@@ -165,6 +168,7 @@ export function powerStep(s0: GameState, from: number, to: number): GameState {
   }
   if (wasOff && !isOff) {
     s = addShout(s, 'NEPA', 'Up NEPA! Light is back.', 'good');
+    playNepaSound();
     power.gen = false;
   }
 
