@@ -23,6 +23,10 @@ export interface SceneProps {
   onSelect: (uid: string | null) => void;
   /** Outside build mode: a piece was tapped. */
   onItem?: (uid: string) => void;
+  /** Last manually chosen destination for Divine; kept so she stays where the player leaves her. */
+  manualTarget?: Cell | null;
+  /** Player clicked/tapped an open floor cell. */
+  onMoveTo?: (x: number, z: number) => void;
   /** Divine is using a piece. */
   act?: { uid: string; pose: Pose } | null;
   /** Live mirror reflections. */
@@ -552,9 +556,15 @@ export default function ShopScene(p: SceneProps) {
   if (gone.current === null) gone.current = new Set((s.left || []).map((l) => l.key));
   const [, rerender] = useState(0);
   const people: React.ReactNode[] = [];
-  // Divine: at work, busy with a piece of furniture, or out of the way in build mode
+  // Divine's job/interaction takes priority; otherwise she remains at the player's last destination.
   const act = p.act ? actionSpot(s, p.act.uid) : null;
-  const divineAt: Cell = p.build ? [Math.min(r.w, sp.door[0] + 2), r.d + 1] : act ? act.cell : sp.divine;
+  const manual = p.manualTarget &&
+    p.manualTarget[0] >= 0 && p.manualTarget[0] < r.w &&
+    p.manualTarget[1] >= 0 && p.manualTarget[1] < r.d &&
+    !blocked[p.manualTarget[1]]?.[p.manualTarget[0]]
+      ? p.manualTarget
+      : null;
+  const divineAt: Cell = p.build ? [Math.min(r.w, sp.door[0] + 2), r.d + 1] : act ? act.cell : manual || sp.divine;
   const tired = s.energy !== undefined && s.energy < 30;
   people.push(<Walker key="divine" look={divineLook} spawn={sp.divine} target={divineAt} blocked={blocked} w={r.w} d={r.d} speed={tired ? 0.85 : 1.4} pose={act && !p.build ? (act.stand ? 'stand' : p.act!.pose) : undefined} face={act && !p.build ? act.face : undefined} />);
   s.staff.forEach((m, i) => {
@@ -624,11 +634,16 @@ export default function ShopScene(p: SceneProps) {
 
   const free = view === 'free';
   const top = view === 'top';
-  const cellAt = (e: { point: THREE.Vector3 }) => {
-    if (!p.placing) return null;
-    const fp = s.furniture.find((x) => x.uid === p.placing!.uid);
-    const { w, d } = fp ? footprint({ id: fp.id, rot: p.placing.rot }) : { w: 1, d: 1 };
-    return [Math.floor(e.point.x - w / 2 + 0.5), Math.floor(e.point.z - d / 2 + 0.5)] as Cell;
+  const cellAt = (e: { point: THREE.Vector3 }): Cell => {
+    if (p.placing) {
+      const fp = s.furniture.find((x) => x.uid === p.placing!.uid);
+      const { w, d } = fp ? footprint({ id: fp.id, rot: p.placing.rot }) : { w: 1, d: 1 };
+      return [Math.floor(e.point.x - w / 2 + 0.5), Math.floor(e.point.z - d / 2 + 0.5)];
+    }
+    return [
+      Math.max(0, Math.min(r.w - 1, Math.floor(e.point.x))),
+      Math.max(0, Math.min(r.d - 1, Math.floor(e.point.z))),
+    ];
   };
   return (
     <div style={{ width: '100%', height: '100%', touchAction: 'none' }}>
@@ -648,14 +663,26 @@ export default function ShopScene(p: SceneProps) {
           position={[cx, 0.001, cz]}
           rotation={[-Math.PI / 2, 0, 0]}
           onPointerMove={(e) => {
+            if (!p.placing) return;
             const c = cellAt(e);
-            if (c && e.pointerType === 'mouse' && (c[0] !== p.placing!.x || c[1] !== p.placing!.z)) p.onHover?.(c[0], c[1]);
+            if (e.pointerType === 'mouse' && (c[0] !== p.placing.x || c[1] !== p.placing.z)) p.onHover?.(c[0], c[1]);
           }}
           onClick={(e) => {
             e.stopPropagation();
             const c = cellAt(e);
-            if (c) p.onHover?.(c[0], c[1]);
-            else p.onSelect(null);
+            if (p.placing) {
+              p.onHover?.(c[0], c[1]);
+              return;
+            }
+            if (p.build) {
+              p.onSelect(null);
+              return;
+            }
+            if (c[0] >= 0 && c[0] < r.w && c[1] >= 0 && c[1] < r.d && !blocked[c[1]]?.[c[0]]) {
+              p.onMoveTo?.(c[0], c[1]);
+            } else {
+              p.onSelect(null);
+            }
           }}
         >
           <planeGeometry args={[r.w, r.d]} />
