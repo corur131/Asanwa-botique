@@ -297,7 +297,7 @@ export default function GameApp({ onLab, initial, storageKey, cloud, notice }: {
           <div className="leading-tight">
             <div className="font-serif font-bold text-white">Asanwa Boutique</div>
             <div className="text-[10px] text-slate-400">
-              Day {s.day} · {t.name} · {s.phase === 'morning' ? 'Morning' : s.phase === 'shop' ? 'Shop open' : 'Evening'}
+              Day {s.day} · {t.name} · {s.phase === 'morning' ? 'Morning' : s.phase === 'shop' ? 'Shop open' : 'Evening'} · {({ sunny: '☀️ Sunny', rainy: '🌧️ Rainy', harmattan: '🌫️ Harmattan', cloudy: '☁️ Cloudy' } as const)[s.weather || 'cloudy']}
             </div>
           </div>
         </div>
