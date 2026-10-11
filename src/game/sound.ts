@@ -4,6 +4,7 @@
  * touched the page, so everything starts on the first tap.
  */
 import { useEffect, useState } from 'react';
+import { NEPA_AUDIO_BASE64 } from './nepaAudio';
 
 const KEY = 'asanwa-sound';
 export type Settings = {
@@ -161,6 +162,23 @@ export function setGenSound(kind: 'small' | 'big' | null) {
 }
 
 // ---------------------------------------------------------------------------
+/** Play the supplied Nigerian grid-return recording when NEPA restores power. */
+let nepaAudio: HTMLAudioElement | null = null;
+export function playNepaSound() {
+  if (!unlocked || !settings.sfx || document.hidden) return;
+  try {
+    if (!nepaAudio) {
+      nepaAudio = new Audio(`data:audio/mpeg;base64,${NEPA_AUDIO_BASE64}`);
+      nepaAudio.preload = 'auto';
+    }
+    nepaAudio.currentTime = 0;
+    nepaAudio.volume = Math.min(1, Math.max(0.75, settings.sfxVol * 1.25));
+    nepaAudio.play().catch(() => undefined);
+  } catch {
+    /* sound is optional; never interrupt the game */
+  }
+}
+
 // Pops
 // ---------------------------------------------------------------------------
 /** A short notification pop, and a buzz on phones that can vibrate. */
