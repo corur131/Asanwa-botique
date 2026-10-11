@@ -183,7 +183,7 @@ export default function GameApp({ onLab, initial, storageKey, cloud, notice }: {
     }
   }, [s?.phase]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  if (!s) return <NewGame onStart={(cfg) => { const g = E.newGame(cfg); seenMsg.current = g.msgSeq; setManualTarget(null); setS(g); }} onLab={onLab} />;
+  if (!s) return <NewGame onStart={(cfg) => { const g = E.newGame(cfg); seenMsg.current = g.msgSeq; setManualTarget(null); setSitting(null); setLocalAct(null); setS(g); }} onLab={onLab} />;
 
   const up = (f: (g: GameState) => GameState) => setS((g) => (g ? f(g) : g));
   const t = TIERS[s.tier];
@@ -358,7 +358,7 @@ export default function GameApp({ onLab, initial, storageKey, cloud, notice }: {
             reflections={sound.reflections}
             onHover={(x, z) => (trying ? setTrying({ ...trying, x, z }) : placing && setPlacing({ ...placing, x, z }))}
             onSelect={(uid) => { if (!placing && !trying) setSelected(uid); }}
-            onItem={(uid) => { if (!styling) { setSitting(null); setMenuFor(uid); } }}
+            onItem={(uid) => { if (!styling) { setSitting(null); setLocalAct(null); setMenuFor(uid); } }}
             onCustomer={styleCustomer}
           />
         </Suspense>
