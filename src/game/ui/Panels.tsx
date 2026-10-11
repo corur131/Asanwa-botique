@@ -1,7 +1,7 @@
 import React, { Suspense, lazy, useState } from 'react';
 import { MARKUP, STAFF, TIERS, naira } from '../economy';
 import { POWER, contestFor, fuelOf, fuelPerHour, tankSize, Candidate, RaiseAnswer, candidates, canHire, daysToRent, displayCap, displayedCount, listingsNow, marketWage, restockAllCost, stats, waitingRoom } from '../engine';
-import { FURNITURE, FURNITURE_GROUPS, FurnitureDef, FurnitureGroup, Listing, ceilingCapacity, ceilingUsed, finishes, furnitureById, roomOf, wallCapacity, wallUsed } from '../shop';
+import { FURNITURE, FURNITURE_GROUPS, FurnitureDef, FurnitureGroup, Listing, ceilingCapacity, ceilingUsed, finishes, furnitureById, listingsFor, roomOf, wallCapacity, wallUsed } from '../shop';
 
 const FurniturePreview = lazy(() => import('../scene/Previews').then((m) => ({ default: m.FurniturePreview })));
 const RoomPreview = lazy(() => import('../scene/Previews').then((m) => ({ default: m.RoomPreview })));
@@ -259,18 +259,18 @@ export const FurniturePanel: React.FC<{ s: GameState; a: FurnitureActions; selec
 // ---------------------------------------------------------------------------
 export const MovePanel: React.FC<{ s: GameState; onMove: (l: Listing) => void }> = ({ s, onMove }) => {
   const [pick, setPick] = useState<Listing | null>(null);
-  const list = listingsNow(s);
   const next = TIERS[s.tier + 1];
-  if (!next) return <p className="text-sm text-slate-300">You're in the flagship. There's nowhere bigger in Lagos.</p>;
+  const weekNo = Math.floor((s.day - 1) / 7);
+  const list = [...(next ? listingsNow(s) : []), ...(!s.listing.signature ? listingsFor(s.tier, weekNo).filter((l) => l.signature) : [])];
   return (
     <div className="space-y-3">
       <div className="text-sm text-slate-300">
         Now: <b className="text-white">{TIERS[s.tier].name}</b>, {s.listing.street}, {s.listing.area} <Stars n={s.listing.stars} /> · rent {naira(s.listing.rent)}
       </div>
-      <div className="rounded-lg border border-white/10 bg-white/5 p-3 text-xs text-slate-300">
+      {next ? <div className="rounded-lg border border-white/10 bg-white/5 p-3 text-xs text-slate-300">
         <b className="text-white">{next.name}</b>: bigger, better listings are roomier and hold more{next.staff ? `, ${next.staff} staff` : ''}{next.luxury ? ', luxury suppliers' : ''}. Your furniture comes with you; buy more rails to fill the bigger room. Listings change every week.
-        <p className="mt-2 text-amber-200">Signature properties are substantially larger and more luxurious. They draw wealthy clients, bring rare celebrity visits with million-naira purchases and tips, and can make your shop trend while rivals get jealous. Weekly rent and move-in costs are much higher.</p>
-      </div>
+      </div> : <div className="rounded-lg border border-white/10 bg-white/5 p-3 text-xs text-slate-300">You have reached the highest standard level in Lagos. You can still upgrade to the Signature flagship if you have not already.</div>}
+      <div className="rounded-lg border border-amber-500/25 bg-amber-500/5 p-3 text-xs text-amber-100">Signature properties are substantially larger and more luxurious. They draw wealthy clients, bring rare celebrity visits with million-naira purchases and tips, and can make your shop trend while rivals get jealous. Weekly rent and move-in costs are much higher.</div>
       {list.map((l0) => {
         const fight = contestFor(s, l0);
         const l = fight ? { ...l0, moveIn: l0.moveIn + fight.extra } : l0;
@@ -303,7 +303,7 @@ export const MovePanel: React.FC<{ s: GameState; onMove: (l: Listing) => void }>
             </Suspense>
           </div>
           <h2 className="font-serif text-2xl font-bold text-white">{pick.street}</h2>
-          <p className="text-sm text-slate-400 mb-3">{pick.area} · {next.name} · <Stars n={pick.stars} /> {pick.signature && <Pill tone="gold">SIGNATURE PROPERTY</Pill>}</p>
+          <p className="text-sm text-slate-400 mb-3">{pick.area} · {TIERS[pick.tier].name} · <Stars n={pick.stars} /> {pick.signature && <Pill tone="gold">SIGNATURE PROPERTY</Pill>}</p>
           <ul className="text-sm space-y-1 mb-3">
             <li>Floor: <b>{roomOf(pick).w}×{roomOf(pick).d} m</b>, {wallCapacity(pick)} m of wall{pick.stars === 1 ? ', tired and in need of paint' : pick.stars === 4 ? ', freshly done with a feature wall' : ''}</li>
             <li>Move-in: <b>{naira(pick.moveIn + (contestFor(s, pick)?.extra || 0))}</b> (you have {naira(s.cash)}){contestFor(s, pick) ? `, outbidding ${contestFor(s, pick)!.rival.owner}` : ''}</li>
