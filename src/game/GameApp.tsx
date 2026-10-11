@@ -46,6 +46,8 @@ export default function GameApp({ onLab, initial, storageKey, cloud, notice }: {
   /** A floor piece in Divine's hands (build mode); `fresh` when just bought or taken out of storage. */
   const [placing, setPlacing] = useState<{ uid: string; rot: Rot; x: number; z: number; fresh?: boolean } | null>(null);
   const [build, setBuild] = useState(false);
+  /** A catalogue piece you're trying before you buy it. */
+  const [trying, setTrying] = useState<{ id: string; x: number; z: number; rot: Rot } | null>(null);
   const [view, setView] = useState<View>('angle');
   const [menuFor, setMenuFor] = useState<string | null>(null);
   const [localAct, setLocalAct] = useState<{ uid: string; pose: Pose } | null>(null);
@@ -70,12 +72,13 @@ export default function GameApp({ onLab, initial, storageKey, cloud, notice }: {
     const on = (e: KeyboardEvent) => {
       if (e.key !== 'r' && e.key !== 'R') return;
       if ((e.target as HTMLElement)?.tagName === 'INPUT') return;
-      if (placing) setPlacing({ ...placing, rot: turn(placing.rot) });
+      if (trying) setTrying((x) => (x ? { ...x, rot: turn(x.rot) } : x));
+      else if (placing) setPlacing({ ...placing, rot: turn(placing.rot) });
       else if (selected && build) setS((g) => (g && g.phase !== 'shop' ? E.rotateFurniture(g, selected) : g));
     };
     window.addEventListener('keydown', on);
     return () => window.removeEventListener('keydown', on);
-  }, [placing, selected, build]);
+  }, [placing, selected, build, trying]);
   const fileRef = useRef<HTMLInputElement>(null);
 
   // every change is saved on this device; signed-in players are also saved to their account
@@ -207,6 +210,7 @@ export default function GameApp({ onLab, initial, storageKey, cloud, notice }: {
     setBuild(true);
   };
   const exitBuild = () => {
+    setTrying(null);
     setBuild(false);
     setPlacing(null);
     setSelected(null);
@@ -220,13 +224,19 @@ export default function GameApp({ onLab, initial, storageKey, cloud, notice }: {
     setSelected(uid);
     setPlacing({ uid, rot: spot.rot || 0, x: spot.x, z: spot.z, fresh });
   };
+  /** Tap in the catalogue: try it in the shop first; Buy or Cancel. */
   const buy = (id: string) => {
-    const before = new Set(s.furniture.map((x) => x.uid));
-    const next = E.buyFurniture(s, id);
-    if (next === s) return;
-    setS(next);
-    const fresh = next.furniture.find((x) => !before.has(x.uid));
-    if (fresh) pickUp(next, fresh.uid, true);
+    setPlacing(null);
+    setSelected(null);
+    const pv = E.withPreview(s, id);
+    setTrying({ id, x: pv.x, z: pv.z, rot: pv.rot });
+  };
+  const tryView = trying ? E.withPreview(s, trying.id, furnitureById(trying.id).mount === 'floor' ? trying : undefined) : null;
+  const confirmBuy = () => {
+    if (!trying || !tryView?.ok) return;
+    const floor = furnitureById(trying.id).mount === 'floor';
+    up((g) => E.buyPreviewed(g, trying.id, floor ? trying : undefined));
+    setTrying(null);
   };
   const install = (uid: string) => {
     const p = s.furniture.find((x) => x.uid === uid);
@@ -319,17 +329,17 @@ export default function GameApp({ onLab, initial, storageKey, cloud, notice }: {
       <div className="relative flex-1 min-h-0">
         <Suspense fallback={<div className="absolute inset-0 flex items-center justify-center text-slate-400 text-sm">Opening the shop…</div>}>
           <ShopScene
-            s={s}
-            placing={placing}
-            selected={build ? selected : menuFor}
+            s={tryView ? tryView.view : s}
+            placing={trying && furnitureById(trying.id).mount === 'floor' ? { uid: E.PREVIEW_UID, rot: trying.rot, x: trying.x, z: trying.z } : placing}
+            selected={trying ? E.PREVIEW_UID : build ? selected : menuFor}
             night={s.phase === 'evening' && !build}
             dark={dark}
             build={build}
             view={view}
             act={build ? null : act}
             reflections={sound.reflections}
-            onHover={(x, z) => placing && setPlacing({ ...placing, x, z })}
-            onSelect={(uid) => { if (!placing) setSelected(uid); }}
+            onHover={(x, z) => (trying ? setTrying({ ...trying, x, z }) : placing && setPlacing({ ...placing, x, z }))}
+            onSelect={(uid) => { if (!placing && !trying) setSelected(uid); }}
             onItem={(uid) => { if (!styling) setMenuFor(uid); }}
             onCustomer={styleCustomer}
           />
@@ -372,7 +382,22 @@ export default function GameApp({ onLab, initial, storageKey, cloud, notice }: {
                 <Btn size="sm" tone="gold" onClick={exitBuild}>Done</Btn>
               </div>
             </div>
-            {placing && (() => {
+            {trying && tryView && (() => {
+              const f = furnitureById(trying.id);
+              const floor = f.mount === 'floor';
+              return (
+                <div className="absolute top-14 left-1/2 -translate-x-1/2 z-20 rounded-xl border border-amber-500/50 bg-[#12141c]/95 p-2 flex flex-wrap items-center justify-center gap-2 text-sm max-w-[94vw]">
+                  <span className="px-1 leading-tight">
+                    <span className="block text-white font-semibold text-xs">{f.name} · {naira(f.price)}</span>
+                    <span className={`block text-[11px] ${tryView.ok ? 'text-emerald-300' : 'text-rose-300'}`}>{tryView.ok ? (floor ? 'Fits here · tap the floor to move it' : f.mount === 'finish' ? 'This is how it will look' : 'This is where it will go') : tryView.why}</span>
+                  </span>
+                  {floor && <Btn size="sm" onClick={() => setTrying({ ...trying, rot: turn(trying.rot) })}>↻ Rotate</Btn>}
+                  <Btn size="sm" tone="green" disabled={!tryView.ok} onClick={confirmBuy}>Buy</Btn>
+                  <Btn size="sm" onClick={() => setTrying(null)}>Cancel</Btn>
+                </div>
+              );
+            })()}
+            {placing && !trying && (() => {
               const f = furnitureById(s.furniture.find((x) => x.uid === placing.uid)?.id || '');
               return (
                 <div className="absolute top-14 left-1/2 -translate-x-1/2 z-20 rounded-xl border border-amber-500/50 bg-[#12141c]/95 p-2 flex flex-wrap items-center justify-center gap-2 text-sm max-w-[94vw]">
@@ -387,7 +412,7 @@ export default function GameApp({ onLab, initial, storageKey, cloud, notice }: {
                 </div>
               );
             })()}
-            {selectedPiece && !placing && (
+            {selectedPiece && !placing && !trying && (
               <div className="absolute top-14 left-1/2 -translate-x-1/2 z-20 rounded-xl border border-amber-500/50 bg-[#12141c]/95 p-2 flex flex-wrap items-center justify-center gap-2 text-sm max-w-[94vw]">
                 <span className="text-white font-semibold px-1">{selectedPiece.name}</span>
                 {selectedPiece.mount === 'floor' && <Btn size="sm" onClick={() => pickUp(s, selected!, false)}>Move</Btn>}

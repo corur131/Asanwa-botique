@@ -1060,3 +1060,56 @@ export function actionLabel(s: GameState, b: { uid: string; action: string }) {
   const names: Record<string, string> = { tidy: 'tidying up', restock: 'restocking', selfie: 'taking a selfie', sit: 'resting', drink: 'drinking water', genStart: 'starting the gen', refuel5: 'pouring fuel', refuel10: 'pouring fuel', refuelFull: 'filling the tank', tiktok: 'filming a TikTok', practiseMakeup: 'practising makeup', practiseHair: 'practising a style', countMoney: 'counting money' };
   return names[b.action] || 'busy';
 }
+
+// ---------------------------------------------------------------------------
+// Trying a piece before buying it
+// ---------------------------------------------------------------------------
+export const PREVIEW_UID = '__preview';
+
+/**
+ * The shop as it would look with this piece in it, for build mode's
+ * "Buy / Cancel" step. Paint and flooring show on the walls and floor;
+ * floor pieces sit where they would go (x, z, rot), others in their spot.
+ */
+export function withPreview(s: GameState, id: string, at?: { x: number; z: number; rot: Rot }): { view: GameState; ok: boolean; why?: string; x: number; z: number; rot: Rot } {
+  const f = furnitureById(id);
+  const base = { uid: PREVIEW_UID, id, x: 0, z: 0, rot: 0 as Rot, placed: true };
+  let furniture = s.furniture;
+  let item: Placed = base;
+  let ok = true;
+  let why: string | undefined;
+  if (f.mount === 'floor') {
+    if (at) item = { ...base, ...at };
+    else item = findSpot(furniture, s.listing, { ...base, placed: false }) || { ...base, placed: true };
+    ok = canPlace(furniture, s.listing, { ...item, placed: true });
+    if (!ok) why = "Can't go here";
+    item = { ...item, placed: false };
+  } else if (f.mount === 'finish') {
+    furniture = furniture.filter((p) => { const o = furnitureById(p.id); return o.mount !== 'finish' || (f.paint ? !o.paint : !o.floorTiles); });
+  } else if (f.mount === 'wall') {
+    ok = wallUsed(furniture) + f.w <= wallCapacity(s.listing);
+    item = { ...base, x: wallUsed(furniture), placed: ok };
+    if (!ok) why = 'No wall space left';
+  } else if (f.mount === 'ceiling') {
+    ok = ceilingUsed(furniture) < ceilingCapacity(s.listing);
+    item = { ...base, placed: ok };
+    if (!ok) why = 'No ceiling space left';
+  } else if (f.mount === 'yard') {
+    ok = yardUsed(furniture) < yardCapacity(s.listing) && !(f.solar && furniture.filter((p) => furnitureById(p.id).solar).length >= POWER_CFG.maxPanels);
+    item = { ...base, placed: ok, x: yardUsed(furniture) };
+    if (!ok) why = 'The yard is full';
+  }
+  if (s.cash < f.price) { ok = false; why = `You need ${naira(f.price)}`; }
+  if ((f.minTier || 0) > s.tier) { ok = false; why = `Needs a ${TIERS[f.minTier || 0].name}`; }
+  return { view: { ...s, furniture: [...furniture, item] }, ok, why, x: item.x, z: item.z, rot: item.rot };
+}
+
+/** Buy the piece you were trying, where you put it. */
+export function buyPreviewed(s: GameState, id: string, at?: { x: number; z: number; rot: Rot }): GameState {
+  const before = new Set(s.furniture.map((p) => p.uid));
+  let next = buyFurniture(s, id);
+  if (next === s) return s;
+  const fresh = next.furniture.find((p) => !before.has(p.uid));
+  if (fresh && at && furnitureById(id).mount === 'floor') next = placeFurniture(next, fresh.uid, at.x, at.z, at.rot);
+  return next;
+}
