@@ -579,9 +579,23 @@ export default function ShopScene(p: SceneProps) {
   const divineAt: Cell = p.build ? [Math.min(r.w, sp.door[0] + 2), r.d + 1] : act ? act.cell : manual || sp.divine;
   const tired = s.energy !== undefined && s.energy < 30;
   people.push(<Walker key="divine" look={divineLook} spawn={sp.divine} target={divineAt} blocked={blocked} w={r.w} d={r.d} speed={tired ? 0.85 : 1.4} pose={act && !p.build ? (act.stand ? 'stand' : p.act!.pose) : undefined} face={act && !p.build ? act.face : undefined} />);
+  const serviceStation = (profession: 'stylist' | 'makeup' | undefined) => {
+    const ids = profession === 'makeup'
+      ? ['makeupStation', 'vanity', 'salonChair', 'hairStation']
+      : ['salonChair', 'hairStation', 'hoodDryer', 'makeupStation', 'vanity'];
+    const piece = s.furniture.find((x) => x.placed && ids.includes(x.id));
+    return piece ? actionSpot(s, piece.uid)?.cell || null : null;
+  };
+  const nextTo = (c: Cell): Cell => {
+    const candidates: Cell[] = [[c[0] + 1, c[1]], [c[0] - 1, c[1]], [c[0], c[1] + 1], [c[0], c[1] - 1]];
+    return candidates.find(([x, z]) => x >= 0 && x < r.w && z >= 0 && z < r.d && !blocked[z]?.[x]) || c;
+  };
   s.staff.forEach((m, i) => {
-    const c = p.build ? ([Math.max(-1, sp.door[0] - 2 - i), r.d + 1] as Cell) : sp.staff[i] || sp.divine;
-    people.push(<Walker key={m.id} look={lookToFigure(m.look)} spawn={sp.staff[i] || sp.divine} target={c} blocked={blocked} w={r.w} d={r.d} />);
+    const assigned = s.inShop.find((v) => v.by === m.id);
+    const station = assigned ? serviceStation(m.profession) : null;
+    const workCell = station || sp.staffClient[i] || sp.style;
+    const c = p.build ? ([Math.max(-1, sp.door[0] - 2 - i), r.d + 1] as Cell) : assigned ? nextTo(workCell) : sp.staff[i] || sp.divine;
+    people.push(<Walker key={m.id} look={lookToFigure(m.look)} spawn={sp.staff[i] || sp.divine} target={c} blocked={blocked} w={r.w} d={r.d} pose={assigned ? 'work' : undefined} />);
   });
   if (s.phase === 'shop') {
     let k = 0;
@@ -590,8 +604,9 @@ export default function ShopScene(p: SceneProps) {
       let target: Cell;
       if (v.by === 'divine') target = sp.style;
       else if (v.by) {
-        const i = s.staff.findIndex((m) => m.id === v.by);
-        target = sp.staffClient[i] || sp.style;
+        const worker = s.staff.find((m) => m.id === v.by);
+        const station = serviceStation(worker?.profession);
+        target = station || sp.staffClient[s.staff.findIndex((m) => m.id === v.by)] || sp.style;
       } else {
         target = sp.wait[k] || sp.street[k - sp.wait.length] || sp.outside;
         k++;
@@ -610,7 +625,7 @@ export default function ShopScene(p: SceneProps) {
           w={r.w}
           d={r.d}
           highlight={mine || (!s.serving && !v.by && k === 1)}
-          pose={seat ? 'sit' : undefined}
+          pose={seat || (v.by && v.by !== 'divine' && v.c.service) ? 'sit' : undefined}
           seatPosition={seat?.position}
           seatFace={seat?.face}
           onClick={clickable ? () => p.onCustomer(v.c.id) : undefined}
