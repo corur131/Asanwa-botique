@@ -121,7 +121,7 @@ export function actionsFor(s: GameState, uid: string): Action[] {
     out.push({ id: 'selfie', label: 'Take a selfie', minutes: 5, pose: 'phone', hint: 'Post to Gidigram', blocked: did.selfie ? 'One selfie a day' : undefined });
     out.push({ id: 'fixLook', label: 'Fix my look', minutes: 0, pose: 'stand' });
   }
-  if (f.group === 'Seating') out.push({ id: 'sit', label: 'Sit down', minutes: 20, pose: 'sit', hint: energyOf(s) >= ENERGY.max ? 'Take a break; energy is already full' : '+30 energy' });
+  if (f.group === 'Seating') out.push({ id: 'sit', label: 'Sit down and rest', minutes: 20, pose: 'sit', hint: 'Available any time; restores up to 30 energy and pauses energy drain while resting' });
   if (f.id === 'waterDispenser') out.push({ id: 'drink', label: 'Drink water', minutes: 5, pose: 'drink', hint: '+12 energy', blocked: energyOf(s) >= ENERGY.max ? 'Not thirsty' : undefined });
   if (SWITCHABLE.has(f.id)) {
     const on = !s.off?.[uid];
