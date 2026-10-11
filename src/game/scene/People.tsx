@@ -416,6 +416,7 @@ export const Walker: React.FC<{
     }
     g.visible = true;
     if (st.i < st.path.length) {
+      st.pos.y = 0;
       const [cx, cz] = st.path[st.i];
       const tx = cx + 0.5;
       const tz = cz + 0.5;
@@ -432,6 +433,8 @@ export const Walker: React.FC<{
       if (!st.walking) { st.walking = true; setWalking(true); }
     } else {
       if (st.walking) { st.walking = false; setWalking(false); }
+      // Lift the seated figure to the cushion height once they arrive at a seat.
+      st.pos.y = pose === 'sit' ? 0.4 : 0;
       // face the shop front (toward the camera) while standing
       g.rotation.y = THREE.MathUtils.lerp(g.rotation.y, face ?? 0.6, 0.08);
       if (!st.arrived) {
