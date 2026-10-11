@@ -231,11 +231,12 @@ export function visitStep(s0: GameState, minutes: number): GameState {
     if (s.clock - s.visit.at > 40) s = endVisit(s, true);
     return s;
   }
-  if (s.day < 4 || s.clock > 640 || !chance(0.00035 * minutes)) return s;
-  const pool = mainRivals(s).filter((r) => r.id !== 'tolani' || chance(0.25));
+  if (s.day < 4 || s.clock > 640 || !chance(0.00125 * minutes)) return s;
+  const pool = mainRivals(s).filter((r) => r.id !== 'tolani' || chance(0.45));
+  if (!pool.length) return s;
   const r = pick(pool);
-  const waitingNow = s.inShop.filter((v) => !v.by);
-  const target = waitingNow.length && chance(r.aggression) ? pick(waitingNow).c : undefined;
+  const waitingNow = s.inShop.filter((v) => !v.by).sort((a, b) => (b.waited || 0) - (a.waited || 0));
+  const target = waitingNow.length && chance(Math.min(0.92, 0.52 + r.aggression * 0.45)) ? pick(waitingNow.slice(0, Math.min(4, waitingNow.length))).c : undefined;
   const line = target ? pick(POACH(target.name)) : pick(VISIT_LINES[r.personality]);
   return { ...s, visit: { rivalId: r.id, at: s.clock, target: target?.id, line } };
 }
