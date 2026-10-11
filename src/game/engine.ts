@@ -1305,5 +1305,6 @@ export function buyPreviewed(s: GameState, id: string, at?: { x: number; z: numb
   if (next === s) return s;
   const fresh = next.furniture.find((p) => !before.has(p.uid));
   if (fresh && at && furnitureById(id).mount === 'floor') next = placeFurniture(next, fresh.uid, at.x, at.z, at.rot);
+  if (fresh && at && furnitureById(id).mount === 'yard') next = { ...next, furniture: next.furniture.map((p) => p.uid === fresh.uid ? { ...p, yardSide: at.x < 0 ? 'left' : 'right' } : p) };
   return next;
 }
