@@ -607,7 +607,10 @@ export function closeShop(s0: GameState): GameState {
   // weekly
   if (s.day % 7 === 0) {
     s = weeklyStaff(s);
-    if (s.security?.guard) s = money(s, -s.security.guard.wage, `Security guard wages: ${s.security.guard.name}`);
+    if (s.security?.guard) {
+      const wage = s.security.guard.wage;
+      s = money({ ...s, today: { ...s.today, costs: s.today.costs + wage, events: [...s.today.events, `Paid ${naira(wage)} in security wages.`] } }, -wage, `Security guard wages: ${s.security.guard.name}`);
+    }
     s = payBills(s);
     s = payRent(s);
     s = { ...s, followers: Math.round((s.followers || 0) * 0.98) };
@@ -757,7 +760,7 @@ export function hireSecurityGuard(s: GameState): GameState {
   const signing = 35_000;
   if (s.cash < signing) return addShout(s, 'Security', `You need ${naira(signing)} to hire a guard.`, 'warn');
   const guard = { id: `guard-${s.day}-${Math.random().toString(36).slice(2, 7)}`, name: ['Tunde', 'Chuka', 'Bashir', 'Emeka', 'Seyi'][Math.floor(Math.random() * 5)], wage: 18_000, look: generateRandomCustomer('styled') };
-  let next = money({ ...s, security: { ...(s.security || {}), guard, postUid: post.uid, gallons: s.security?.gallons || [] } }, -signing, 'Security guard signing fee');
+  let next = money({ ...s, today: { ...s.today, costs: s.today.costs + signing }, security: { ...(s.security || {}), guard, postUid: post.uid, gallons: s.security?.gallons || [] } }, -signing, 'Security guard signing fee');
   next = msg(next, 'Security', `${guard.name} has been hired. Weekly pay is ${naira(guard.wage)}. I will stay at the post and protect the shop.`, 'good');
   return next;
 }

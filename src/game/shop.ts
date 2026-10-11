@@ -217,6 +217,7 @@ export const FURNITURE: FurnitureDef[] = [
   { id: 'hairStation', name: 'Hair station', price: 45_000, w: 1, d: 1, mount: 'floor', group: 'Hair & makeup', hairBonus: 1, wigs: true, prestige: 1, note: 'Needed to install wigs. +1 on hair.' },
   { id: 'hoodDryer', name: 'Hood dryer', price: 35_000, w: 1, d: 1, mount: 'floor', group: 'Hair & makeup', hairBonus: 2, prestige: 1, note: '+2 on hair: sets braids and curls properly.' },
   { id: 'salonChair', name: 'Salon chair and dryer', price: 160_000, w: 1, d: 1, mount: 'floor', group: 'Hair & makeup', hairBonus: 3, wigs: true, prestige: 2, minTier: 1, note: 'Installs wigs. +3 on hair.' },
+  { id: 'makeupChair', name: 'Makeup chair', price: 48_000, w: 1, d: 1, mount: 'floor', group: 'Hair & makeup', makeupBonus: 1, prestige: 1, note: 'A proper chair for makeup clients; staff can seat clients here.' },
   { id: 'ringLight', name: 'Ring light', price: 18_000, w: 1, d: 1, mount: 'floor', group: 'Hair & makeup', makeupBonus: 1, prestige: 1, note: '+1 on made-up looks.' },
   { id: 'makeupStation', name: 'Makeup station', price: 75_000, w: 2, d: 1, mount: 'floor', group: 'Hair & makeup', makeupBonus: 3, prestige: 2, note: '+3 on made-up looks.' },
   { id: 'nailStation', name: 'Nail styling station', price: 58_000, w: 1, d: 1, mount: 'floor', group: 'Hair & makeup', nailBonus: 3, prestige: 1, note: 'Customers asking for fresh nails get a +3 styling bonus when you choose a nail colour.' },

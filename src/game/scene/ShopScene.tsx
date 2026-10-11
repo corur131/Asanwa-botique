@@ -278,7 +278,7 @@ export function actionSpot(s: GameState, uid: string): { cell: Cell; face: numbe
   }
   const reach = (c: Cell) => seen.has(`${c[0]},${c[1]}`);
   const touching = (c: Cell) => [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dz]) => reach([c[0] + dx, c[1] + dz]));
-  if (f.group === 'Seating') {
+  if (f.group === 'Seating' || p.id === 'makeupChair' || p.id === 'salonChair') {
     const seatCells: Cell[] = [];
     for (let x = p.x; x < p.x + w; x++) for (let z = p.z; z < p.z + d; z++) seatCells.push([x, z]);
     const seat = seatCells.find(touching);
@@ -654,8 +654,8 @@ export default function ShopScene(p: SceneProps) {
   people.push(<Walker key="divine" look={divineLook} spawn={sp.divine} target={divineAt} blocked={blocked} w={r.w} d={r.d} speed={tired ? 0.85 : 1.4} carryBag={carryingFuel} pose={!errandTarget && act && !p.build ? (act.stand ? 'stand' : p.act!.pose) : undefined} face={!errandTarget && act && !p.build ? act.face : undefined} />);
   const serviceStation = (profession: 'stylist' | 'makeup' | undefined) => {
     const ids = profession === 'makeup'
-      ? ['makeupStation', 'vanity', 'salonChair', 'hairStation']
-      : ['salonChair', 'hairStation', 'hoodDryer', 'makeupStation', 'vanity'];
+      ? ['makeupChair', 'salonChair', 'makeupStation', 'vanity', 'hairStation']
+      : ['salonChair', 'makeupChair', 'hairStation', 'hoodDryer', 'makeupStation', 'vanity'];
     const piece = s.furniture.find((x) => x.placed && ids.includes(x.id));
     return piece ? actionSpot(s, piece.uid)?.cell || null : null;
   };
@@ -686,6 +686,12 @@ export default function ShopScene(p: SceneProps) {
       }
       lastSpot.current[v.c.id] = target;
       const seat = !v.by ? sp.seatWait.find((item) => item.cell[0] === target[0] && item.cell[1] === target[1]) : undefined;
+      const serviceWorker = v.by && v.by !== 'divine' ? s.staff.find((m) => m.id === v.by) : undefined;
+      const serviceChair = serviceWorker && v.c.service
+        ? s.furniture.find((x) => x.placed && (serviceWorker.profession === 'makeup' ? ['makeupChair', 'salonChair'].includes(x.id) : ['salonChair', 'makeupChair'].includes(x.id)))
+        : undefined;
+      const serviceSeatPosition: [number, number, number] | undefined = serviceChair ? [serviceChair.x + 0.5, 0.08, serviceChair.z + 0.5] : undefined;
+      const serviceSeatFace = serviceChair ? rotAngle(serviceChair.rot) : undefined;
       const mine = v.by === 'divine';
       const clickable = !v.by || mine;
       people.push(
@@ -699,8 +705,8 @@ export default function ShopScene(p: SceneProps) {
           d={r.d}
           highlight={mine || (!s.serving && !v.by && k === 1)}
           pose={seat || (v.by && v.by !== 'divine' && v.c.service) ? 'sit' : undefined}
-          seatPosition={seat?.position}
-          seatFace={seat?.face}
+          seatPosition={serviceSeatPosition || seat?.position}
+          seatFace={serviceSeatFace ?? seat?.face}
           onClick={clickable ? () => p.onCustomer(v.c.id) : undefined}
         />,
       );

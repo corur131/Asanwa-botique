@@ -315,6 +315,19 @@ export function FloorPiece({ id, colors, selected }: { id: string; colors: strin
         </group>
       );
     }
+    case 'makeupChair':
+      return (
+        <group>
+          {glow}
+          <Cyl p={[0, 0.06, 0]} r1={0.23} h={0.08} c={CHROME} m={0.8} />
+          <Cyl p={[0, 0.27, 0]} r1={0.045} h={0.36} c={CHROME} m={0.8} />
+          <B p={[0, 0.48, 0]} s={[0.58, 0.12, 0.58]} c="#E46A9A" r={0.85} />
+          <B p={[0, 0.79, -0.22]} s={[0.58, 0.56, 0.12]} c="#C2262E" r={0.85} />
+          <B p={[-0.31, 0.5, 0.02]} s={[0.08, 0.24, 0.48]} c="#C2262E" r={0.85} />
+          <B p={[0.31, 0.5, 0.02]} s={[0.08, 0.24, 0.48]} c="#C2262E" r={0.85} />
+          <B p={[0, 0.31, 0.36]} s={[0.52, 0.06, 0.08]} c={CHROME} m={0.8} />
+        </group>
+      );
     case 'ringLight':
       return (
         <group>
