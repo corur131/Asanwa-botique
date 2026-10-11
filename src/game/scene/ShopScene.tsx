@@ -377,18 +377,24 @@ function Yard({ s, selected, onTap }: { s: GameState; selected: string | null; o
   const ledI = src === 'solar' ? 2.4 : 1.4;
   const st = stats(s);
   const running = !!s.power?.gen && src === 'gen';
-  const X = r.w + 1.5;
+  const rightX = r.w + 1.5;
+  const leftX = -1.5;
   return (
     <group>
-      {/* concrete strip with a low fence */}
-      <mesh position={[X, -0.045, cap / 2]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
-        <planeGeometry args={[1.9, cap + 0.2]} />
-        <meshStandardMaterial color="#8E8A80" roughness={1} />
-      </mesh>
-      <B p={[X + 0.95, 0.35, cap / 2]} s={[0.06, 0.7, cap + 0.2]} c="#6A5A48" />
+      {/* Matching concrete service strips on both sides of the shop. */}
+      {[leftX, rightX].map((x) => <React.Fragment key={x}>
+        <mesh position={[x, -0.045, cap / 2]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
+          <planeGeometry args={[1.9, cap + 0.2]} />
+          <meshStandardMaterial color="#8E8A80" roughness={1} />
+        </mesh>
+        <B p={[x + (x < 0 ? -0.95 : 0.95), 0.35, cap / 2]} s={[0.06, 0.7, cap + 0.2]} c="#6A5A48" />
+      </React.Fragment>)}
       {items.map((p, i) => {
         const f = furnitureById(p.id);
-        const z = 0.5 + i;
+        const side = p.yardSide || 'right';
+        const sideItems = items.filter((item) => (item.yardSide || 'right') === side);
+        const z = 0.5 + sideItems.findIndex((item) => item.uid === p.uid);
+        const X = side === 'left' ? leftX : rightX;
         const tap = (e: { stopPropagation: () => void }) => { e.stopPropagation(); onTap(p.uid); };
         return (
           <group key={p.uid} position={[X, 0, z]} rotation={[0, -Math.PI / 2, 0]} onClick={tap} onPointerOver={() => (document.body.style.cursor = 'pointer')} onPointerOut={() => (document.body.style.cursor = '')}>
@@ -653,9 +659,9 @@ export default function ShopScene(p: SceneProps) {
   // Divine's job/interaction takes priority; otherwise she remains at the player's last destination.
   const act = p.act ? actionSpot(s, p.act.uid) : null;
   const manual = p.manualTarget &&
-    p.manualTarget[0] >= 0 && p.manualTarget[0] < r.w &&
-    p.manualTarget[1] >= 0 && p.manualTarget[1] < r.d &&
-    !blocked[p.manualTarget[1]]?.[p.manualTarget[0]]
+    p.manualTarget[0] >= -1 && p.manualTarget[0] <= r.w &&
+    p.manualTarget[1] >= 0 && p.manualTarget[1] <= r.d + 5 &&
+    (p.manualTarget[1] >= r.d || p.manualTarget[0] === -1 || p.manualTarget[0] === r.w || !blocked[p.manualTarget[1]]?.[p.manualTarget[0]])
       ? p.manualTarget
       : null;
   const trip = s.security?.trip;
@@ -760,8 +766,8 @@ export default function ShopScene(p: SceneProps) {
       return [Math.floor(e.point.x - w / 2 + 0.5), Math.floor(e.point.z - d / 2 + 0.5)];
     }
     return [
-      Math.max(0, Math.min(r.w - 1, Math.floor(e.point.x))),
-      Math.max(0, Math.min(r.d - 1, Math.floor(e.point.z))),
+      Math.max(-1, Math.min(r.w, Math.floor(e.point.x))),
+      Math.max(0, Math.min(r.d + 5, Math.floor(e.point.z))),
     ];
   };
   return (
@@ -779,7 +785,7 @@ export default function ShopScene(p: SceneProps) {
         {p.placing && <PlacingGhost s={s} placing={p.placing} />}
         {/* invisible floor to catch taps and the placing cursor */}
         <mesh
-          position={[cx, 0.001, cz]}
+          position={[cx, 0.001, (r.d + 5) / 2]}
           rotation={[-Math.PI / 2, 0, 0]}
           onPointerMove={(e) => {
             if (!p.placing) return;
@@ -797,14 +803,14 @@ export default function ShopScene(p: SceneProps) {
               p.onSelect(null);
               return;
             }
-            if (c[0] >= 0 && c[0] < r.w && c[1] >= 0 && c[1] < r.d && !blocked[c[1]]?.[c[0]]) {
+            if (c[1] >= r.d || c[0] === -1 || c[0] === r.w || (c[0] >= 0 && c[0] < r.w && c[1] < r.d && !blocked[c[1]]?.[c[0]])) {
               p.onMoveTo?.(c[0], c[1]);
             } else {
               p.onSelect(null);
             }
           }}
         >
-          <planeGeometry args={[r.w, r.d]} />
+          <planeGeometry args={[r.w + 4, r.d + 5]} />
           <meshBasicMaterial visible={false} />
         </mesh>
       </Canvas>
@@ -813,8 +819,8 @@ export default function ShopScene(p: SceneProps) {
 }
 
 /** A slowly turning look at an empty room, for the shop listings. */
-export function RoomPreview({ tier, stars }: { tier: number; stars: number }) {
-  const r = room({ tier, stars });
+export function RoomPreview({ tier, stars, signature }: { tier: number; stars: number; signature?: boolean }) {
+  const r = room({ tier, stars, signature });
   const dist = Math.max(r.w, r.d) * 0.78 + 1.6;
   return (
     <Canvas dpr={[1, 1.5]} camera={{ fov: 32, position: [r.w / 2 + dist * 0.75, dist * 0.95, r.d / 2 + dist * 1.05], near: 0.1, far: 200 }} style={{ background: 'linear-gradient(#24305a,#3a4a7a)' }}>
