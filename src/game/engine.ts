@@ -317,6 +317,7 @@ export function tick(s0: GameState, minutes: number): GameState {
     const canopy = s.furniture.some((p) => p.placed && p.id === 'umbrellaCanopy');
     // Rain sends some walk-ins home; a street canopy protects the queue.
     if (!vip && s.weather === 'rainy' && chance(canopy ? 0.06 : 0.18)) { lostWeather++; continue; }
+    if (!vip && s.weather === 'sunny' && chance(canopy ? 0.02 : 0.08)) { lostWeather++; continue; }
     if (!vip && source(s, a.at) === 'none' && chance({ poor: 0.2, middle: 0.35, rich: 0.6 }[a.c.cls])) { lostHeat++; continue; }
     if (!vip && waiting(s).length >= waitingRoom(s)) { lostDoor++; continue; }
     // the speaker is switched off: fewer people wander in from the street
