@@ -440,6 +440,7 @@ export default function GameApp({ onLab, initial, storageKey, cloud, notice }: {
                 <span className="text-white font-semibold px-1">{selectedPiece.name}</span>
                 {selectedPiece.mount === 'floor' && <Btn size="sm" onClick={() => pickUp(s, selected!, false)}>Move</Btn>}
                 {selectedPiece.mount === 'floor' && <Btn size="sm" onClick={() => up((g) => E.rotateFurniture(g, selected!))}>↻ Rotate</Btn>}
+                {selectedPiece.mount === 'yard' && <><Btn size="sm" tone={s.furniture.find((p) => p.uid === selected)?.yardSide === 'left' ? 'gold' : 'ghost'} onClick={() => up((g) => ({ ...g, furniture: g.furniture.map((p) => p.uid === selected ? { ...p, yardSide: 'left' } : p) }))}>← Left side</Btn><Btn size="sm" tone={s.furniture.find((p) => p.uid === selected)?.yardSide !== 'left' ? 'gold' : 'ghost'} onClick={() => up((g) => ({ ...g, furniture: g.furniture.map((p) => p.uid === selected ? { ...p, yardSide: 'right' } : p) }))}>Right side →</Btn></>}
                 <Btn size="sm" onClick={() => { up((g) => E.storeFurniture(g, selected!)); setSelected(null); }}>Store</Btn>
                 <Btn size="sm" onClick={() => { up((g) => E.sellFurniture(g, selected!)); setSelected(null); }}>Sell · {naira(selectedPiece.price * 0.4)}</Btn>
                 <Btn size="sm" tone="gold" onClick={() => setSelected(null)}>OK</Btn>
