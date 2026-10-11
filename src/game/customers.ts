@@ -151,6 +151,7 @@ function everydayWardrobe(male: boolean) {
   const c = () => pick(EVERYDAY);
   const g = (style: string, fabric: 'plain' | 'denim' | 'ankara' = 'plain') => ({ style, fabric, color: fabric === 'denim' ? '#3C5A8A' : c(), color2: c(), pattern: Math.floor(Math.random() * 10) });
   if (male) return pick([{ top: g('tee'), bottom: g('jeans', 'denim') }, { top: g('polo'), bottom: g('chinos') }, { top: g('mensBuba', 'plain'), bottom: g('sokoto') }]);
+  // 20 additional everyday and occasion outfit combinations, using the existing garment catalogue.
   return pick([
     { top: g('tshirt'), bottom: g('skinnyJeans', 'denim') },
     { top: g('tshirt'), bottom: g('maxiSkirt') },
@@ -158,6 +159,26 @@ function everydayWardrobe(male: boolean) {
     { top: g('buba', 'ankara'), bottom: g('iro', 'ankara') },
     { dress: g('bubu', 'ankara') },
     { top: g('cropTee'), bottom: g('baggyJeans', 'denim') },
+    { top: g('camisole'), bottom: g('pencilSkirt') },
+    { top: g('peplumTop', 'ankara'), bottom: g('iro', 'ankara') },
+    { top: g('offShoulderTop'), bottom: g('denimMaxiSkirt', 'denim') },
+    { top: g('wrapTop'), bottom: g('wideLegTrousers') },
+    { top: g('puffBlouse'), bottom: g('pleatedMidi') },
+    { top: g('laceBlouse', 'ankara'), bottom: g('georgeWrapper', 'ankara') },
+    { top: g('offShoulderBuba', 'ankara'), bottom: g('iro', 'ankara') },
+    { dress: g('bodyconMini') },
+    { dress: g('slipDress') },
+    { dress: g('wrapDress') },
+    { dress: g('shirtDress') },
+    { dress: g('tubeMidi') },
+    { dress: g('maxiDress') },
+    { dress: g('ruffleMaxi') },
+    { dress: g('mermaidGown', 'ankara') },
+    { dress: g('adireMaxi', 'ankara') },
+    { dress: g('jumpsuit') },
+    { dress: g('playsuit') },
+    { top: g('blazer'), bottom: g('straightTrousers') },
+    { top: g('kimono'), bottom: g('skinnyJeans', 'denim') },
   ]);
 }
 
