@@ -57,6 +57,12 @@ export interface Customer {
   service?: 'hair' | 'makeup' | 'both';
   /** A style-off model: Divine's score is compared with a rival's. */
   contest?: { eventId: string; rivalId: string; rivalScore: number; prize: number; title: string };
+  /** Cash customers pay normally; transfer customers may need a POS or a working network. */
+  paymentMethod?: 'cash' | 'transfer';
+  /** Clothes occasionally need a quick alteration before the customer is happy. */
+  fitIssue?: boolean;
+  /** Some customers request matching nails as part of the look. */
+  nailsRequest?: boolean;
 }
 
 export type Speciality = 'bridal' | 'genz' | 'native' | 'cheap' | 'wigs' | 'menswear' | 'luxury' | 'thrift' | 'everyday';
@@ -360,7 +366,12 @@ export interface GameState {
   /** NEPA cuts today, in shop minutes (can start before opening and run past closing). */
   outages: { from: number; to: number }[];
   /** Generator on, solar battery minutes, litres in the generator's tank. */
-  power: { gen: boolean; solar: number; fuel?: number };
+  power: { gen: boolean; solar: number; fuel?: number; fanBattery?: number; lanternBattery?: number };
+  /** Lagos weather for this in-game day; optional so old saves still load. */
+  weather?: 'sunny' | 'rainy' | 'harmattan' | 'cloudy';
+  /** Keeps shoplifting and generator-fire events to a single incident per day. */
+  lastTheftDay?: number;
+  fireIncidentDay?: number;
   /** Divine's energy, 0..100. Full after a night's sleep. */
   energy?: number;
   /** Appliances switched off (fans, AC, speaker, TV), by furniture uid. */
