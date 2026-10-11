@@ -8,7 +8,7 @@ import { answerInvite, contestFor, contestModel, dropStep, judge, planDrop, plan
 import { POWER as POWER_CFG, activeGeneratorUid, addShout, coolRunning, drainRate, fuelOf, fuelPrice, liveStats, nepaOff, outageAt, planOutages, pourFuel, powerStep, scarcity, source, tankSize } from './power';
 import { answerConvo, startGist } from './convos';
 import { ENERGY, busyNow, divineBonus, energyOf, energyStep, exhausted, payBills, spendEnergy } from './life';
-import { makeCustomer } from './customers';
+import { makeCustomer, makeCelebrityCustomer } from './customers';
 import { buildLook, hairGroup, lookCost, scoreLook } from './scoring';
 import { FEMALE_HAIR, MAKEUP_LOOKS } from '../constants/catalog';
 import { colourName } from './colours';
@@ -209,6 +209,11 @@ export function openShop(s0: GameState): GameState {
   mix[0] = Math.max(0.05, mix[0] - shift);
   mix[2] = Math.max(0, mix[2] + shift);
   const arrivals = Array.from({ length: n }, () => ({ at: arrivalMinute(), c: makeCustomer(s, mix) }));
+  // Signature shops draw rare celebrity visits: roughly 2–3 per fortnight on tiers 0–3, one on flagship.
+  if (s.listing.signature && chance(s.tier === 4 ? 1 / 14 : 0.18)) {
+    const c = makeCelebrityCustomer(s);
+    arrivals.push({ at: 100 + Math.random() * 560, c });
+  }
   const model = contestModel(s);
   if (model) arrivals.push(model);
   if (s.celebDay === s.day) {
@@ -321,7 +326,7 @@ export function tick(s0: GameState, minutes: number): GameState {
     const [a, ...rest] = s.arrivals;
     s = { ...s, arrivals: rest };
     // passers-by look in at a dark, hot shop and keep walking
-    const vip = !!a.c.contest;
+    const vip = !!a.c.contest || !!a.c.celebrity;
     const canopy = s.furniture.some((p) => p.placed && p.id === 'umbrellaCanopy');
     // Rain sends some walk-ins home; a street canopy protects the queue.
     if (!vip && s.weather === 'rainy' && chance(canopy ? 0.06 : 0.18)) { lostWeather++; continue; }
@@ -453,7 +458,7 @@ export function settle(c: Customer, score: ScoreBreakdown, price: number, suppli
     if (outcome === 'paid') outcome = 'bargained';
   }
   // Fitted pieces sometimes need a quick adjustment. The alterations corner saves the sale.
-  if (context.fitted && chance(context.hasAlterations ? 0.04 : 0.2)) {
+  if (!c.celebrity && context.fitted && chance(context.hasAlterations ? 0.04 : 0.2)) {
     if (context.hasAlterations) {
       paid = Math.round(paid * 0.95);
       outcome = 'bargained';
@@ -465,7 +470,7 @@ export function settle(c: Customer, score: ScoreBreakdown, price: number, suppli
   // Some customers need to pay electronically. Transfers can fail when the network misbehaves;
   // a POS terminal makes card payments reliable but charges a small transaction fee.
   if (chance(0.3)) {
-    if (!context.hasPOS && chance(0.35)) {
+    if (!c.celebrity && !context.hasPOS && chance(0.35)) {
       return { price, paid: 0, tip: 0, cost: 0, outcome: 'walked', line: 'Do you take transfer? Network no gree! I cannot wait for this alert. I am going.', reaction: 'frown', repDelta: -0.8, becameRegular: false };
     }
     if (context.hasPOS) {
@@ -479,6 +484,12 @@ export function settle(c: Customer, score: ScoreBreakdown, price: number, suppli
   if (s >= 85) tip = { poor: 0.03, middle: 0.08, rich: 0.15 }[c.cls] * paid;
   else if (s >= 75) tip = { poor: 0.01, middle: 0.04, rich: 0.07 }[c.cls] * paid;
   if (c.male) tip *= 1.5; // men tip big
+  if (c.celebrity) {
+    paid = Math.max(paid, c.celebrity.spendFloor);
+    outcome = 'paid';
+    tip = Math.max(tip, Math.round(paid * (0.22 + c.celebrity.tier * 0.035) / 100) * 100);
+    line = `${c.name} loved the luxury look and paid lavishly, with a generous celebrity tip.`;
+  }
   const repDelta = ((s - 65) / 18) * (c.influencer ? 3 : 1);
   return { price, paid: Math.round(paid), tip: Math.round(tip / 100) * 100, cost: supplies, outcome, line, reaction, repDelta, becameRegular: s >= 80 && !c.regularId };
 }
@@ -528,6 +539,13 @@ export function applyLook(s0: GameState, c: Customer, choice: StyleChoice, st0: 
     next = money(next, -st.cost, 'Hair and makeup supplies');
   }
   if (c.influencer && score.total >= 80) next = { ...next, followers: (next.followers || 0) + Math.round(60 + Math.random() * 120) };
+  if (c.celebrity && sold) {
+    const gained = Math.round((8_000 + Math.random() * 10_000) * (1 + c.celebrity.tier * 0.85));
+    const rivals = next.rivals.map((r) => r.id === 'you' ? r : { ...r, feeling: clamp(r.feeling - (8 + c.celebrity!.tier * 3), -100, 100) });
+    next = { ...next, followers: (next.followers || 0) + gained, rep: clamp(next.rep + 3 + c.celebrity.tier * 2, 0, 100), rivals,
+      today: { ...next.today, events: [...next.today.events, `TRENDING IN LAGOS: ${c.name} visited your Signature shop, spent millions, tipped lavishly and posted your look. +${gained.toLocaleString('en-NG')} followers. Rivals are watching.`] } };
+    next = msg(next, 'Gidigram', `TRENDING NOW 🔥 ${c.name} posted the look from your shop! +${gained.toLocaleString('en-NG')} followers, a huge reputation boost, and your rivals are jealous.`, 'good');
+  }
   if (c.contest) next = judge(next, c, score.total);
   next = depart(next, c, lookOut, sold);
   return next;
