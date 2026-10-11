@@ -64,8 +64,54 @@ export function spots(s: GameState) {
   // waiting: next to seats first, then along the front
   const seats = placed.filter((p) => (furnitureById(p.id).seats || 0) > 0);
   const waitPool: Cell[] = [];
-  const seatWaitPool: Cell[] = [];
-  for (const st of seats) for (const c of near([st.x, st.z + 1], all).slice(0, furnitureById(st.id).seats || 1)) { waitPool.push(c); seatWaitPool.push(c); taken.add(`${c[0]},${c[1]}`); }
+  const seatWaitPool: { cell: Cell; position: [number, number, number]; face: number }[] = [];
+  const seatLayout = (id: string, count: number): { x: number; z: number; top: number }[] => {
+    switch (id) {
+      case 'plasticChair': return [{ x: 0, z: 0.02, top: 0.44 }];
+      case 'stool': return [{ x: 0, z: 0, top: 0.5 }];
+      case 'bench': return [{ x: -0.55, z: 0, top: 0.485 }, { x: 0, z: 0, top: 0.485 }, { x: 0.55, z: 0, top: 0.485 }];
+      case 'ottoman': return [{ x: -0.18, z: 0, top: 0.47 }, { x: 0.18, z: 0, top: 0.47 }];
+      case 'sofa': return [{ x: -0.63, z: 0.02, top: 0.55 }, { x: -0.21, z: 0.02, top: 0.55 }, { x: 0.21, z: 0.02, top: 0.55 }, { x: 0.63, z: 0.02, top: 0.55 }];
+      case 'velvetSofa': return [{ x: -1.0, z: 0.02, top: 0.55 }, { x: -0.6, z: 0.02, top: 0.55 }, { x: -0.2, z: 0.02, top: 0.55 }, { x: 0.2, z: 0.02, top: 0.55 }, { x: 0.6, z: 0.02, top: 0.55 }, { x: 1.0, z: 0.02, top: 0.55 }];
+      case 'doubleSofa': return [{ x: -0.72, z: 0.02, top: 0.55 }, { x: -0.36, z: 0.02, top: 0.55 }, { x: 0, z: 0.02, top: 0.55 }, { x: 0.36, z: 0.02, top: 0.55 }, { x: 0.72, z: 0.02, top: 0.55 }];
+      case 'luxeOttoman': return [{ x: -0.17, z: 0, top: 0.51 }, { x: 0.17, z: 0, top: 0.51 }];
+      case 'shoeBench': return [{ x: -0.52, z: 0, top: 0.48 }, { x: 0.52, z: 0, top: 0.48 }];
+      default: {
+        const spread = count > 1 ? Math.min(0.42, 0.9 / (count - 1)) : 0;
+        return Array.from({ length: count }, (_, i) => ({ x: (i - (count - 1) / 2) * spread, z: 0, top: 0.46 }));
+      }
+    }
+  };
+  for (const st of seats) {
+    const f = furnitureById(st.id);
+    const count = Math.max(1, f.seats || 1);
+    const { w, d } = footprint(st);
+    const centerX = st.x + w / 2;
+    const centerZ = st.z + d / 2;
+    const angle = rotAngle(st.rot);
+    // Find walking cells immediately in front of the actual furniture, then
+    // assign each arriving customer a real seat coordinate on its cushion.
+    const frontDist = f.d / 2 + 0.1;
+    const frontX = centerX + Math.sin(angle) * frontDist;
+    const frontZ = centerZ + Math.cos(angle) * frontDist;
+    const frontCell: Cell = [
+      Math.max(0, Math.min(r.w - 1, Math.floor(frontX))),
+      Math.max(0, Math.min(r.d - 1, Math.floor(frontZ))),
+    ];
+    const approaches = near(frontCell, all).slice(0, count);
+    const offsets = seatLayout(st.id, count);
+    approaches.forEach((c, i) => {
+      const offset = offsets[i] || { x: 0, z: 0, top: 0.46 };
+      const x = centerX + Math.cos(angle) * offset.x + Math.sin(angle) * offset.z;
+      const z = centerZ - Math.sin(angle) * offset.x + Math.cos(angle) * offset.z;
+      // Figure's seated hip pivot is 0.46 m above its floor-level root.
+      // Put that pivot at the cushion top, rather than lifting the whole person.
+      const y = Math.max(0, offset.top - 0.46);
+      waitPool.push(c);
+      seatWaitPool.push({ cell: c, position: [x, y, z], face: angle });
+      taken.add(`${c[0]},${c[1]}`);
+    });
+  }
   for (const c of near([r.w - 1, r.d - 1], all)) { waitPool.push(c); taken.add(`${c[0]},${c[1]}`); }
   const staff = near([0, 0], all).slice(0, 6);
   staff.forEach((c) => taken.add(`${c[0]},${c[1]}`));
@@ -76,7 +122,7 @@ export function spots(s: GameState) {
   });
   const availableForCustomers = (c: Cell) => !staff.some((x) => x[0] === c[0] && x[1] === c[1]) && !staffClient.some((x) => x[0] === c[0] && x[1] === c[1]);
   const wait = waitPool.filter(availableForCustomers);
-  const seatWait = seatWaitPool.filter(availableForCustomers);
+  const seatWait = seatWaitPool.filter((seat) => availableForCustomers(seat.cell));
   // overflow queue on the pavement outside the door
   const street: Cell[] = Array.from({ length: 12 }, (_, k) => [door[0] + [1, -1, 2, -2][k % 4], r.d + 1 + Math.floor(k / 4)] as Cell);
   return { door, outside, style, divine, wait, seatWait, staff, staffClient, street };
@@ -320,20 +366,41 @@ function Yard({ s, selected, onTap }: { s: GameState; selected: string | null; o
                 </Shaker>
                 {running && st.gen === f.gen && <Smoke at={[0.3, 0.45, 0.1]} dense={f.gen === 'small'} />}
               </>
+            ) : p.id === 'umbrellaCanopy' ? (
+              <group>
+                {/* A real street parasol: weighted foot, pole, broad fabric canopy and scalloped edge. */}
+                <Cyl p={[0, 0.06, 0]} r1={0.25} h={0.12} c="#51483F" seg={20} />
+                <Cyl p={[0, 1.0, 0]} r1={0.035} h={1.85} c={CHROME} m={0.65} />
+                <mesh position={[0, 1.92, 0]}>
+                  <coneGeometry args={[0.9, 0.32, 10]} />
+                  <meshStandardMaterial color="#C2262E" roughness={0.75} side={THREE.DoubleSide} />
+                </mesh>
+                <mesh position={[0, 1.94, 0]}>
+                  <torusGeometry args={[0.72, 0.028, 6, 24]} />
+                  <meshStandardMaterial color="#F4EFE6" roughness={0.75} />
+                </mesh>
+                {Array.from({ length: 10 }, (_, i) => {
+                  const a = (i * Math.PI * 2) / 10;
+                  return <B key={i} p={[Math.cos(a) * 0.48, 1.98, Math.sin(a) * 0.48]} s={[0.035, 0.2, 0.035]} c="#E8B84A" rot={[0, -a, 0]} />;
+                })}
+                <Ball p={[0, 2.1, 0]} r={0.055} c={GOLD} m={0.8} />
+              </group>
             ) : (
               <group>
-                {/* panel on a frame, battery box with its light */}
+                {/* Tilted photovoltaic panel with cell grid, legs, and the charge controller below. */}
                 <B p={[-0.35, 0.55, -0.2]} s={[0.05, 1.1, 0.05]} c="#888" m={0.6} />
                 <B p={[0.35, 0.75, -0.2]} s={[0.05, 1.5, 0.05]} c="#888" m={0.6} />
-                <B p={[0, 1.2, -0.2]} s={[0.95, 0.04, 0.75]} c="#1B2A4A" m={0.5} r={0.2} rot={[0.5, 0, 0]} />
-                <B p={[0, 1.22, -0.2]} s={[0.9, 0.01, 0.7]} c="#2C4A7A" m={0.7} r={0.15} rot={[0.5, 0, 0]} />
-                <B p={[0, 0.22, 0.25]} s={[0.42, 0.44, 0.26]} c="#E9EEF2" />
-                <mesh position={[0.1, 0.34, 0.385]}>
+                <B p={[0, 1.2, -0.2]} s={[0.98, 0.05, 0.78]} c="#303A50" m={0.65} r={0.25} rot={[0.5, 0, 0]} />
+                <B p={[0, 1.225, -0.18]} s={[0.91, 0.012, 0.69]} c="#173B69" m={0.55} r={0.18} rot={[0.5, 0, 0]} />
+                {[-0.3, -0.1, 0.1, 0.3].map((x) => <B key={x} p={[x, 1.24, -0.17]} s={[0.012, 0.012, 0.67]} c="#8DB9E7" rot={[0.5, 0, 0]} />)}
+                {[-0.18, 0, 0.18].map((z) => <B key={z} p={[0, 1.24, -0.18 + z]} s={[0.9, 0.012, 0.012]} c="#8DB9E7" rot={[0.5, 0, 0]} />)}
+                <B p={[0, 0.22, 0.25]} s={[0.42, 0.44, 0.26]} c="#E9EEF2" r={0.45} />
+                <B p={[0, 0.25, 0.385]} s={[0.26, 0.16, 0.012]} c="#202B45" />
+                <B p={[-0.07, 0.34, 0.392]} s={[0.14, 0.045, 0.01]} c="#123" e="#3AA0D0" ei={0.4} />
+                <mesh position={[0.1, 0.34, 0.395]}>
                   <sphereGeometry args={[0.03, 10, 8]} />
                   <meshStandardMaterial color={led} emissive={led} emissiveIntensity={ledI} />
                 </mesh>
-                <B p={[-0.07, 0.34, 0.382]} s={[0.14, 0.06, 0.01]} c="#123" e="#3AA0D0" ei={0.4} />
-                {/* the same light on top, so it shows from the street */}
                 <mesh position={[0, 0.45, 0.25]}>
                   <sphereGeometry args={[0.035, 10, 8]} />
                   <meshStandardMaterial color={led} emissive={led} emissiveIntensity={ledI} />
@@ -508,7 +575,7 @@ export default function ShopScene(p: SceneProps) {
         k++;
       }
       lastSpot.current[v.c.id] = target;
-      const seated = !v.by && sp.seatWait.some((c) => c[0] === target[0] && c[1] === target[1]);
+      const seat = !v.by ? sp.seatWait.find((item) => item.cell[0] === target[0] && item.cell[1] === target[1]) : undefined;
       const mine = v.by === 'divine';
       const clickable = !v.by || mine;
       people.push(
@@ -521,7 +588,9 @@ export default function ShopScene(p: SceneProps) {
           w={r.w}
           d={r.d}
           highlight={mine || (!s.serving && !v.by && k === 1)}
-          pose={seated ? 'sit' : undefined}
+          pose={seat ? 'sit' : undefined}
+          seatPosition={seat?.position}
+          seatFace={seat?.face}
           onClick={clickable ? () => p.onCustomer(v.c.id) : undefined}
         />,
       );
