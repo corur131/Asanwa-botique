@@ -10,7 +10,7 @@ import type { CartLine } from '../engine';
 import { GROUP, ladder } from '../rivals';
 import { TIERS } from '../economy';
 
-export type AppId = 'home' | 'chats' | 'market' | 'bank' | 'property' | 'gidigram' | 'staff' | 'top20' | 'gist';
+export type AppId = 'home' | 'chats' | 'market' | 'bank' | 'property' | 'gidigram' | 'staff' | 'top20' | 'gist' | 'weather';
 
 const APPS: { id: Exclude<AppId, 'home'>; name: string; bg: string; glyph: string }[] = [
   { id: 'chats', name: 'WhatsApp', bg: 'bg-[#25D366]', glyph: '✆' },
@@ -21,6 +21,7 @@ const APPS: { id: Exclude<AppId, 'home'>; name: string; bg: string; glyph: strin
   { id: 'staff', name: 'Staff', bg: 'bg-gradient-to-br from-slate-500 to-slate-800', glyph: '☺' },
   { id: 'top20', name: 'Top 20', bg: 'bg-gradient-to-br from-amber-400 to-yellow-700', glyph: '🏆' },
   { id: 'gist', name: 'GistLagos', bg: 'bg-gradient-to-br from-red-500 to-rose-800', glyph: '☕' },
+  { id: 'weather', name: 'Lagos Weather', bg: 'bg-gradient-to-br from-sky-400 to-blue-700', glyph: '🌦️' },
 ];
 
 export interface PhoneProps {
@@ -82,6 +83,7 @@ export const Phone: React.FC<PhoneProps> = (p) => {
           {app === 'gidigram' && <Gidigram s={s} profile={p.profile} setProfile={p.setProfile} onVisit={p.onVisit} />}
           {app === 'top20' && <Top20 s={s} open={(id) => { p.setProfile(id); setApp('gidigram'); }} />}
           {app === 'gist' && <GistApp s={s} />}
+          {app === 'weather' && <WeatherApp s={s} />}
           {app === 'staff' && (
             <AppFrame title="Staff" sub="Hire, train, pay" tone="bg-slate-800">
               <div className="p-3">
@@ -495,6 +497,39 @@ const Top20: React.FC<{ s: GameState; open: (id: string) => void }> = ({ s, open
             </button>
           );
         })}
+      </div>
+    </AppFrame>
+  );
+};
+
+const WEATHER: Record<NonNullable<GameState['weather']>, { icon: string; title: string; detail: string }> = {
+  sunny: { icon: '☀️', title: 'Sunny and hot', detail: 'Fans and AC matter more; Divine loses energy faster without cooling.' },
+  rainy: { icon: '🌧️', title: 'Rainy season', detail: 'Fewer walk-ins, customers wait a little longer, and NEPA faults are more likely. A street canopy protects the queue.' },
+  harmattan: { icon: '🌫️', title: 'Harmattan', detail: 'Cool, dusty mornings. Keep clothes covered and expect milder heat.' },
+  cloudy: { icon: '☁️', title: 'Cloudy', detail: 'Mild weather with normal customer traffic.' },
+};
+const WeatherApp: React.FC<{ s: GameState }> = ({ s }) => {
+  const today = s.weather || E.weatherForDay(s.day, s.seed);
+  return (
+    <AppFrame title="Lagos Weather" sub="Forecast for your boutique" tone="bg-gradient-to-r from-sky-600 to-blue-800">
+      <div className="p-4">
+        <div className="rounded-2xl border border-sky-400/20 bg-sky-500/10 p-4 mb-3">
+          <div className="text-xs uppercase tracking-wider text-sky-200">Today · Day {s.day}</div>
+          <div className="text-2xl font-bold text-white mt-1">{WEATHER[today].icon} {WEATHER[today].title}</div>
+          <p className="text-sm text-slate-300 mt-2">{WEATHER[today].detail}</p>
+        </div>
+        <div className="text-xs uppercase tracking-wider text-slate-400 mb-2">Next 5 days</div>
+        <div className="space-y-2">
+          {Array.from({ length: 5 }, (_, i) => {
+            const weather = E.weatherForDay(s.day + i + 1, s.seed);
+            return <div key={i} className="flex items-center gap-3 rounded-xl bg-white/5 border border-white/5 px-3 py-2">
+              <div className="text-xs text-slate-400 w-14">Day {s.day + i + 1}</div>
+              <div className="text-xl">{WEATHER[weather].icon}</div>
+              <div className="text-sm text-white">{WEATHER[weather].title}</div>
+            </div>;
+          })}
+        </div>
+        <p className="text-[11px] text-slate-500 mt-3">This is the game's seasonal forecast, based on Lagos weather patterns.</p>
       </div>
     </AppFrame>
   );
