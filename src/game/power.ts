@@ -109,8 +109,11 @@ export function coolRunning(s: GameState): number {
       return st.gen === 'big' ? st.cool : st.coolFans;
     case 'solar':
       return Math.min(0.8, st.coolFans + (st.solarPanels >= POWER.acPanels ? st.coolAc : 0));
-    default:
-      return 0;
+    default: {
+      const fanBattery = s.power?.fanBattery ?? 0;
+      const hasRechargeable = s.furniture.some((f) => f.placed && f.id === 'rechargeableFan');
+      return hasRechargeable && fanBattery > 0 ? 0.12 : 0;
+    }
   }
 }
 
@@ -157,7 +160,7 @@ export function powerStep(s0: GameState, from: number, to: number): GameState {
   const minutes = to - from;
   const wasOff = !!outageAt(s, from);
   const isOff = !!outageAt(s, to);
-  const power = { gen: !!s.power?.gen, solar: s.power?.solar || 0, fuel: fuelOf(s) };
+  const power = { gen: !!s.power?.gen, solar: s.power?.solar || 0, fuel: fuelOf(s), fanBattery: s.power?.fanBattery ?? 100, lanternBattery: s.power?.lanternBattery ?? 100 };
   const cap = st.solarPanels * POWER.minutesPerPanel;
 
   if (!wasOff && isOff) {
@@ -173,6 +176,10 @@ export function powerStep(s0: GameState, from: number, to: number): GameState {
   }
 
   if (isOff) {
+    const hasFanBattery = s.furniture.some((f) => f.placed && f.id === 'rechargeableFan');
+    const hasLantern = s.furniture.some((f) => f.placed && f.id === 'emergencyLantern');
+    if (hasFanBattery) power.fanBattery = Math.max(0, power.fanBattery - minutes * 0.8);
+    if (hasLantern) power.lanternBattery = Math.max(0, power.lanternBattery - minutes * 0.5);
     s = { ...s, today: { ...s.today, outageMinutes: (s.today.outageMinutes || 0) + minutes } };
     if (power.gen && st.gen) {
       power.fuel = Math.max(0, power.fuel - (POWER.burn[st.gen] * minutes) / 60);
