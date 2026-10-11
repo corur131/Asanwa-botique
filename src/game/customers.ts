@@ -253,7 +253,7 @@ export function makeCelebrityCustomer(state: GameState): Customer {
 export function makeCustomer(state: GameState, mix: [number, number, number]): Customer {
   // regulars come back
   const regular = state.regulars.length && chance(Math.min(0.35, 0.08 + state.regulars.length * 0.03)) ? pick(state.regulars) : undefined;
-  const cls = regular ? regular.cls : classFor(state, mix);
+  const cls = state.listing.signature ? (chance(0.08) ? 'middle' : 'rich') : regular ? regular.cls : classFor(state, mix);
   const rolled = regular ? { ...regular.look, state: 'plain' as const } : { ...generateRandomCustomer('plain'), state: 'plain' as const };
   const male = rolled.body === 'male';
   const look = regular ? rolled : { ...rolled, wardrobe: everydayWardrobe(male), outfit: undefined, accessories: { ...(rolled.accessories || {}), headwear: 'none', shoes: male ? 'slides' : 'flats' } as typeof rolled.accessories };
