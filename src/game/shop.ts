@@ -137,7 +137,7 @@ export function roomOf(l: Pick<Listing, 'tier' | 'stars'> & Partial<Pick<Listing
   return { ...base, w, d, finish, wall: l.signature ? '#F8F3E8' : tone(base.wall), wallLow: l.signature ? '#E5D6BD' : tone(base.wallLow), floor: l.signature ? '#F3E8D2' : tone(base.floor), floor2: l.signature ? '#D8C39C' : tone(base.floor2), trim: l.signature ? '#D4AF37' : base.trim, height: base.height + (finish - 2) * 0.1 + (l.signature ? 0.45 : 0) };
 }
 
-export type RoomKey = number | Pick<Listing, 'tier' | 'stars'>;
+export type RoomKey = number | (Pick<Listing, 'tier' | 'stars'> & Partial<Pick<Listing, 'signature'>>);
 export const room = (k: RoomKey): RoomStyle => (typeof k === 'number' ? roomOf({ tier: k, stars: k === 0 ? 1 : 2 }) : roomOf(k));
 
 // ---------------------------------------------------------------------------
