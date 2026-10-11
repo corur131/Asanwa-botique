@@ -1,6 +1,6 @@
 import React, { Suspense, lazy, useState } from 'react';
 import { MARKUP, STAFF, TIERS, naira } from '../economy';
-import { POWER, contestFor, fuelPerHour, Candidate, RaiseAnswer, candidates, canHire, daysToRent, displayCap, displayedCount, listingsNow, marketWage, restockAllCost, stats, waitingRoom } from '../engine';
+import { POWER, contestFor, fuelOf, fuelPerHour, tankSize, Candidate, RaiseAnswer, candidates, canHire, daysToRent, displayCap, displayedCount, listingsNow, marketWage, restockAllCost, stats, waitingRoom } from '../engine';
 import { FURNITURE, FURNITURE_GROUPS, FurnitureDef, FurnitureGroup, Listing, ceilingCapacity, ceilingUsed, finishes, furnitureById, roomOf, wallCapacity, wallUsed } from '../shop';
 
 const FurniturePreview = lazy(() => import('../scene/Previews').then((m) => ({ default: m.FurniturePreview })));
@@ -134,7 +134,7 @@ export const ShopStatsCard: React.FC<{ s: GameState }> = ({ s }) => {
         ['Look bonus', `+${st.mirror + st.scoreBonus}`, `mirror +${st.mirror}${st.scoreBonus ? `, steamer/lights +${st.scoreBonus}` : ''}`],
         ['Hair / makeup', `+${st.hairBonus} / +${st.makeupBonus}`, st.wigs ? 'wigs: yes' : 'wigs: need a hair station'],
         ['Cooling', st.cool ? pct(st.cool) : 'Hot', st.cool ? 'off in blackouts unless solar or gen' : 'buy a fan or AC: customers complain of heat'],
-        ['Power', st.solarPanels ? `${st.solarPanels} solar` : st.gen ? 'Generator' : 'NEPA only', `${st.gen ? `${st.gen === 'big' ? 'big' : 'small'} gen (${naira(fuelPerHour(s))}/hr)` : 'no gen'} · solar ${Math.round(s.power?.solar || 0)}/${st.solarPanels * POWER.minutesPerPanel} min${st.solarPanels >= POWER.acPanels ? ' · runs AC' : ''}`],
+        ['Power', st.solarPanels ? `${st.solarPanels} solar` : st.gen ? 'Generator' : 'NEPA only', `${st.gen ? `${st.gen === 'big' ? 'big' : 'small'} gen (${fuelPerHour(s)} L/hr, ${Math.round(fuelOf(s) * 10) / 10}/${tankSize(s)} L)` : 'no gen'} · solar ${Math.round(s.power?.solar || 0)}/${st.solarPanels * POWER.minutesPerPanel} min${st.solarPanels >= POWER.acPanels ? ' · runs AC' : ''}`],
         ['Walk-ins', st.traffic ? pct(st.traffic) : '+0%', 'signs, music, window display'],
         ['Tips', st.tipBonus ? pct(st.tipBonus) : '+0%', 'counter, scent'],
       ].map(([k, v, n]) => (

@@ -5,13 +5,14 @@ import { canBuy, entryFor, isClothing, makeDesign, pieceCost } from './market';
 import { FabricId } from '../types/character';
 import { answerRival, competition, initRivals, poacher, reactToMove, simulateRivals } from './rivals';
 import { answerInvite, contestFor, contestModel, dropStep, judge, planDrop, planEvents, planTips, visitStep, wonListing } from './encounters';
-import { POWER as POWER_CFG, addShout, coolRunning, drainRate, nepaOff, outageAt, planOutages, powerStep, source } from './power';
+import { POWER as POWER_CFG, addShout, coolRunning, drainRate, fuelPrice, liveStats, nepaOff, outageAt, planOutages, powerStep, scarcity, source, tankSize } from './power';
+import { ENERGY, busyNow, divineBonus, energyOf, energyStep, exhausted, payBills, spendEnergy } from './life';
 import { makeCustomer } from './customers';
 import { buildLook, hairGroup, lookCost, scoreLook } from './scoring';
 import { FEMALE_HAIR, MAKEUP_LOOKS } from '../constants/catalog';
 import { colourName } from './colours';
 import { FURNITURE, KIOSK_LISTING, Listing, Placed, STARTER_FURNITURE, autoPlace,
-  findSpot, canPlace, ceilingCapacity, ceilingUsed, cheapestListing, furnitureById, listingsFor, newUid, prestigeRichShift, prestigeTraffic, shopStats, usesFloor, wallCapacity, wallUsed } from './shop';
+  findSpot, canPlace, ceilingCapacity, ceilingUsed, yardCapacity, yardUsed, cheapestListing, furnitureById, listingsFor, newUid, prestigeRichShift, prestigeTraffic, shopStats, usesFloor, wallCapacity, wallUsed } from './shop';
 import { Customer, DayLog, Departure, Design, ReplyChoice, GameState, LedgerLine, Message, Regular, ScoreBreakdown, Settlement, StaffMember, StyleChoice } from './types';
 
 const pick = <T,>(a: readonly T[]): T => a[Math.floor(Math.random() * a.length)];
@@ -23,7 +24,7 @@ const emptyLog = (day: number): DayLog => ({ day, served: 0, walkedOut: 0, lost:
 export const daysToRent = (day: number) => (7 - (day % 7)) % 7;
 export const rentDue = (s: GameState) => s.listing.rent;
 export const week = (day: number) => Math.floor((day - 1) / 7);
-export const stats = (s: GameState) => shopStats(s.furniture, s.tier, s.listing.stars);
+export const stats = (s: GameState) => liveStats(s);
 export const displayCap = (s: GameState) => stats(s).display;
 
 /** Shop clock as "2:35pm". */
@@ -100,7 +101,9 @@ export function newGame(divine: CharacterConfig): GameState {
     slowWeek: false,
     phase: 'morning',
     ...freshDay,
-    power: { gen: false, solar: 0 },
+    power: { gen: false, solar: 0, fuel: 0 },
+    energy: 100,
+    meter: { kwh: 0 },
     shoutSeq: 0,
     ledger: [],
     followers: 120,
@@ -147,7 +150,10 @@ function arrivalMinute() {
 /** The look's score including what the shop adds. */
 export function scoreInShop(s: GameState, c: Customer, choice: StyleChoice): ScoreBreakdown {
   const base = scoreLook(c, choice, s.stock);
-  const b = shopBonus(s, c, choice);
+  const b0 = shopBonus(s, c, choice);
+  // Divine's own state counts when she is the one styling
+  const d = s.serving === c.id ? divineBonus(s, !!choice.hair, !c.male && !!choice.makeup) : { bonus: 0, notes: [] };
+  const b = { bonus: b0.bonus + d.bonus, notes: [...b0.notes, ...d.notes] };
   if (!b.bonus) return base;
   return { ...base, total: Math.max(0, Math.min(100, base.total + b.bonus)), bonus: b.bonus, bonusNotes: b.notes } as ScoreBreakdown;
 }
@@ -175,6 +181,7 @@ export function openShop(s0: GameState): GameState {
   if (s.day % 7 === 1) {
     slow = s.day > 7 && chance(SLOW_WEEK_CHANCE);
     if (slow) s = msg(s, 'Deborah', pick(['Rain has started o. Customers will be few this week.', 'Fuel scarcity everywhere. People are not going out this week.', 'Exam week for the students. The market is quiet.']), 'warn');
+    if (scarcity(s) && tankSize(s)) s = msg(s, 'Deborah', `Fuel scarcity o! Petrol is ${naira(fuelPrice(s))} a litre this week, and the queues are long. Use the gen small small.`, 'warn');
   }
   const st = stats(s);
   const n = customersToday(s, slow);
@@ -191,7 +198,7 @@ export function openShop(s0: GameState): GameState {
   }
   arrivals.sort((a, b) => a.at - b.at);
   const outages = planOutages(s.day);
-  let next: GameState = { ...s, slowWeek: slow, arrivals, outages, power: { gen: false, solar: s.power?.solar || 0 } };
+  let next: GameState = { ...s, slowWeek: slow, arrivals, outages, busy: null, power: { ...s.power, gen: false, solar: s.power?.solar || 0 } };
   if (outageAt(next, 0)) {
     next = addShout(next, 'NEPA', 'No light this morning. NEPA took it before you opened.', 'nepa');
     if (stats(next).solarPanels && next.power.solar > 0) next = addShout(next, 'Solar', 'Solar is running the shop for now.', 'good');
@@ -206,7 +213,9 @@ export const staffCapacity = (s: GameState) => s.staff.length * STAFF_CAPACITY;
 export const inBlackout = (s: GameState, t = s.clock) => nepaOff(s, t);
 /** Fans and AC only work when there is light, solar or a generator. */
 export const coolNow = (s: GameState) => coolRunning(s);
-export { POWER, fuelPerHour, setGen, source } from './power';
+export { POWER, fuelOf, fuelPerHour, fuelPrice, loadKw, refuel, scarcity, setGen, solarCap, source, tankSize } from './power';
+export { ENERGY, actionsFor, busyNow, energyOf, exhausted, interact, isTired, weeklyBills } from './life';
+export type { Action, ActionId } from './life';
 export const waiting = (s: GameState) => s.inShop.filter((v) => !v.by);
 export const visitor = (s: GameState, id: string | null) => (id ? s.inShop.find((v) => v.c.id === id) : undefined);
 export const shopClosing = (s: GameState) => s.phase === 'shop' && s.clock >= SHOP_MINUTES;
@@ -242,6 +251,8 @@ export function tick(s0: GameState, minutes: number): GameState {
     const vip = !!a.c.contest;
     if (!vip && source(s, a.at) === 'none' && chance({ poor: 0.2, middle: 0.35, rich: 0.6 }[a.c.cls])) { lostHeat++; continue; }
     if (!vip && waiting(s).length >= waitingRoom(s)) { lostDoor++; continue; }
+    // the speaker is switched off: fewer people wander in from the street
+    if (!vip && s.off && s.furniture.some((p) => p.placed && p.id === 'speaker' && s.off![p.uid]) && chance(0.08)) continue;
     // a style-off model waits for you all day
     s = { ...s, inShop: [...s.inShop, { c: a.c, arrived: a.at, patience: vip ? 9999 : patienceFor(s, a.c), waited: 0 }] };
   }
@@ -249,7 +260,9 @@ export function tick(s0: GameState, minutes: number): GameState {
   s = powerStep(s, s.clock, end);
   s = dropStep(s, end - s.clock);
   s = visitStep(s, end - s.clock);
+  s = energyStep(s, end - s.clock);
   s = { ...s, clock: end };
+  if (s.busy && s.busy.until <= end) s = { ...s, busy: null };
   // tired of waiting: heat and darkness use patience up faster
   const step = end - s0.clock;
   s = { ...s, inShop: s.inShop.map((v) => (v.by ? v : { ...v, waited: (v.waited ?? Math.max(0, s0.clock - v.arrived)) + step * drainRate(s, v.c.cls) })) };
@@ -296,6 +309,7 @@ export function skipAhead(s: GameState): GameState {
 /** Divine takes a waiting customer to the mirror. */
 export function startStyling(s: GameState, id: string): GameState {
   if (s.serving && s.serving !== id) return s;
+  if (!s.serving && (exhausted(s) || busyNow(s))) return s;
   const v = visitor(s, id);
   if (!v || (v.by && v.by !== 'divine')) return s;
   return { ...s, serving: id, inShop: s.inShop.map((x) => (x.c.id === id ? { ...x, by: 'divine', forStaff: false } : x)) };
@@ -365,7 +379,8 @@ export function settle(c: Customer, score: ScoreBreakdown, price: number, suppli
 /** Applies a finished look: stock leaves the shop, money and reputation move, the customer walks out. */
 export function applyLook(s0: GameState, c: Customer, choice: StyleChoice, st0: Settlement, score: ScoreBreakdown): GameState {
   let st = st0;
-  const s = s0;
+  // styling wears Divine out: a full look more than a quick hair or makeup job
+  const s = s0.serving === c.id ? spendEnergy(s0, c.service ? ENERGY.service : ENERGY.fullLook) : s0;
   const sold = st.outcome === 'paid' || st.outcome === 'bargained';
   let stock = s.stock;
   const lookOut = sold ? buildLook(c, choice, s.stock) : c.look;
@@ -468,9 +483,7 @@ export function closeShop(s0: GameState): GameState {
   if (sentHome) s = { ...s, today: { ...s.today, lost: s.today.lost + sentHome, closedOn: (s.today.closedOn || 0) + sentHome } };
   s = { ...s, arrivals: [], serving: null, clock: Math.max(s.clock, 0) };
   const t = { ...TIERS[s.tier], rent: s.listing.rent };
-  if (s.today.fuel) s = { ...s, ledger: [{ day: s.day, t: -1, label: 'Generator fuel', amount: -Math.round(s.today.fuel) }, ...(s.ledger || [])].slice(0, 150), power: { ...s.power, gen: false } };
-  s = money(s, -t.running, 'NEPA bill and running costs');
-  s = { ...s, today: { ...s.today, costs: s.today.costs + t.running } };
+  s = { ...s, power: { ...s.power, gen: false }, busy: null };
   const d = s.today;
   const ev: string[] = [];
   if (d.impatient) ev.push(`${d.impatient} customer${d.impatient > 1 ? 's' : ''} got tired of waiting and left.`);
@@ -481,13 +494,14 @@ export function closeShop(s0: GameState): GameState {
     ev.push(`NEPA took light for ${h ? `${h}h ` : ''}${m}m of opening time.`);
   }
   if (d.heatLost) ev.push(`${d.heatLost} walked past a dark, hot shop without coming in.`);
-  if (d.fuel) ev.push(`The generator burnt ${naira(d.fuel)} of fuel.`);
+  if (d.litres) ev.push(`Bought ${Math.round(d.litres * 10) / 10} litres of fuel for ${naira(d.fuel || 0)}.`);
   if (d.closedOn) ev.push(`${d.closedOn} ${d.closedOn > 1 ? 'were' : 'was'} still waiting at closing time and went home.`);
   s = { ...s, today: { ...s.today, events: [...s.today.events, ...ev] } };
 
   // weekly
   if (s.day % 7 === 0) {
     s = weeklyStaff(s);
+    s = payBills(s);
     s = payRent(s);
     s = { ...s, followers: Math.round((s.followers || 0) * 0.98) };
   } else if (daysToRent(s.day) === 2) {
@@ -509,7 +523,7 @@ export function closeShop(s0: GameState): GameState {
 }
 
 export function nextMorning(s: GameState): GameState {
-  return planDrop({ ...s, day: s.day + 1, phase: 'morning', ...freshDay, today: emptyLog(s.day + 1) });
+  return planDrop({ ...s, day: s.day + 1, phase: 'morning', ...freshDay, busy: null, energy: ENERGY.max, today: emptyLog(s.day + 1) });
 }
 
 /** A reply picked in WhatsApp. */
@@ -599,10 +613,15 @@ export function buyFurniture(s: GameState, id: string): GameState {
   const item: Placed = { uid: newUid(), id, x: 0, z: 0, rot: 0, placed: false };
   let furniture = s.furniture;
   let placedItem: Placed = item;
-  if (f.mount === 'roof') {
-    if (furniture.filter((p) => furnitureById(p.id).mount === 'roof').length >= POWER_CFG.maxPanels) return s;
-    const next = money({ ...s, furniture: [...furniture, { ...item, placed: true }] }, -f.price, f.name);
-    return { ...next, power: { gen: next.power?.gen || false, solar: (next.power?.solar || 0) + POWER_CFG.minutesPerPanel } };
+  if (f.mount === 'yard') {
+    if (yardUsed(furniture) >= yardCapacity(s.listing)) return s;
+    if (f.solar && furniture.filter((p) => furnitureById(p.id).solar).length >= POWER_CFG.maxPanels) return s;
+    const hadTank = tankSize(s);
+    const next = money({ ...s, furniture: [...furniture, { ...item, placed: true, x: yardUsed(furniture) }] }, -f.price, f.name);
+    if (f.solar) return { ...next, power: { ...next.power, solar: (next.power?.solar || 0) + POWER_CFG.minutesPerPanel } };
+    // a new generator comes with 5 litres in the tank
+    const fuel = hadTank ? Math.min(tankSize(next), (s.power?.fuel ?? hadTank)) : 5;
+    return { ...next, power: { ...next.power, fuel: Math.max(fuel, 5) } };
   }
   if (f.mount === 'finish') {
     // new paint goes over the old paint; new flooring replaces the old floor
@@ -649,12 +668,18 @@ export function installFurniture(s: GameState, uid: string): GameState {
     if (ceilingUsed(s.furniture) >= ceilingCapacity(s.listing)) return s;
     return { ...s, furniture: s.furniture.map((x) => (x.uid === uid ? { ...x, placed: true } : x)) };
   }
+  if (f.mount === 'yard') {
+    if (yardUsed(s.furniture.filter((x) => x.placed)) >= yardCapacity(s.listing)) return s;
+    return { ...s, furniture: s.furniture.map((x) => (x.uid === uid ? { ...x, placed: true } : x)) };
+  }
   const spot = autoPlace([...s.furniture.filter((x) => x.placed), { ...p }], s.listing).find((x) => x.uid === uid)!;
   if (!spot.placed) return s;
   return { ...s, furniture: s.furniture.map((x) => (x.uid === uid ? spot : x)) };
 }
 
-export function storeFurniture(s: GameState, uid: string): GameState {
+export function storeFurniture(s0: GameState, uid: string): GameState {
+  const p = s0.furniture.find((f) => f.uid === uid);
+  const s = p && furnitureById(p.id).gen ? { ...s0, power: { ...s0.power, gen: false } } : s0;
   return fitDisplay({ ...s, furniture: s.furniture.map((f) => (f.uid === uid ? { ...f, placed: false } : f)) });
 }
 
@@ -1014,3 +1039,20 @@ export function parseSave(text: string): GameState | null {
 }
 
 export { colourName, MARKUP, SERVICE_FEE, SUPPLIES_SHARE };
+
+// ---------------------------------------------------------------------------
+// Build mode helpers
+// ---------------------------------------------------------------------------
+/** Could this floor piece stand here? */
+export const canPlaceAt = (s: GameState, p: Placed) => canPlace(s.furniture, s.listing, p);
+/** The first free spot for a piece that is not out yet. */
+export function spotFor(s: GameState, uid: string): Placed | null {
+  const p = s.furniture.find((x) => x.uid === uid);
+  if (!p) return null;
+  return findSpot(s.furniture.filter((x) => x.uid !== uid), s.listing, { ...p, placed: false }) || null;
+}
+/** "Tidy up" for the busy banner. */
+export function actionLabel(s: GameState, b: { uid: string; action: string }) {
+  const names: Record<string, string> = { tidy: 'tidying up', restock: 'restocking', selfie: 'taking a selfie', sit: 'resting', drink: 'drinking water', genStart: 'starting the gen', refuel5: 'pouring fuel', refuel10: 'pouring fuel', refuelFull: 'filling the tank', tiktok: 'filming a TikTok', practiseMakeup: 'practising makeup', practiseHair: 'practising a style', countMoney: 'counting money' };
+  return names[b.action] || 'busy';
+}

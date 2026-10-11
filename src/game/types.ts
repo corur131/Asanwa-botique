@@ -277,7 +277,29 @@ export interface DayLog {
   closedOn?: number;
   fuel?: number;
   outageMinutes?: number;
+  /** Litres poured into the generator today. */
+  litres?: number;
+  /** Deborah has already told Divine to rest today. */
+  tiredWarned?: boolean;
+  /** Divine's little jobs today (once each per day). */
+  did?: Partial<Record<'tidy' | 'hair' | 'makeup' | 'selfie' | 'tiktok', boolean>>;
   events: string[];
+}
+
+/** What Divine is busy doing in the shop (takes shop time). */
+export interface Busy {
+  uid: string;
+  action: string;
+  pose: Pose;
+  until: number;
+}
+
+export type Pose = 'stand' | 'sit' | 'reach' | 'phone' | 'drink' | 'dance' | 'work' | 'count';
+
+/** Electricity and bills for the running week. */
+export interface WeekMeter {
+  /** kWh drawn from NEPA this week. */
+  kwh: number;
 }
 
 export interface ReplyChoice {
@@ -333,7 +355,16 @@ export interface GameState {
   left: Departure[];
   /** NEPA cuts today, in shop minutes (can start before opening and run past closing). */
   outages: { from: number; to: number }[];
-  power: { gen: boolean; solar: number };
+  /** Generator on, solar battery minutes, litres in the generator's tank. */
+  power: { gen: boolean; solar: number; fuel?: number };
+  /** Divine's energy, 0..100. Full after a night's sleep. */
+  energy?: number;
+  /** Appliances switched off (fans, AC, speaker, TV), by furniture uid. */
+  off?: Record<string, boolean>;
+  busy?: Busy | null;
+  meter?: WeekMeter;
+  /** TV channel index, for fun. */
+  channel?: number;
   /** Things said out loud in the shop: NEPA news and customer complaints. */
   shouts: Shout[];
   shoutSeq: number;

@@ -5,6 +5,7 @@ import { CharacterConfig, Garment } from '../../types/character';
 import { SKIN_TONES } from '../../constants/skinTones';
 import { HAIR_PALETTES } from '../../components/renderer/hair';
 import { itemById } from '../../constants/catalog';
+import type { Pose } from '../types';
 
 /**
  * Low-poly people for the shop floor. Each one wears the colours of their real outfit
@@ -71,21 +72,72 @@ export function lookToFigure(cfg: CharacterConfig): FigureLook {
 const M: React.FC<{ c: string; r?: number }> = ({ c, r = 0.85 }) => <meshStandardMaterial color={c} roughness={r} />;
 
 /** One person, about 1.7 m tall, built from boxes, cylinders and spheres. `walk` swings the limbs. */
-export const Figure: React.FC<{ look: FigureLook; walking: boolean; carryBag?: boolean; highlight?: boolean }> = ({ look: l, walking, carryBag, highlight }) => {
+export const Figure: React.FC<{ look: FigureLook; walking: boolean; carryBag?: boolean; highlight?: boolean; pose?: Pose }> = ({ look: l, walking, carryBag, highlight, pose = 'stand' }) => {
   const legL = useRef<THREE.Group>(null);
   const legR = useRef<THREE.Group>(null);
   const armL = useRef<THREE.Group>(null);
   const armR = useRef<THREE.Group>(null);
   const body = useRef<THREE.Group>(null);
   const t0 = useMemo(() => Math.random() * 10, []);
+  const ps = walking ? 'stand' : pose;
   useFrame(({ clock }) => {
     const t = clock.getElapsedTime() + t0;
     const sw = walking ? Math.sin(t * 8) * 0.55 : Math.sin(t * 1.5) * 0.03;
-    if (legL.current) legL.current.rotation.x = sw;
-    if (legR.current) legR.current.rotation.x = -sw;
-    if (armL.current) armL.current.rotation.x = -sw * 0.8;
-    if (armR.current) armR.current.rotation.x = sw * 0.8;
-    if (body.current) body.current.position.y = walking ? Math.abs(Math.sin(t * 8)) * 0.03 : Math.sin(t * 1.5) * 0.005;
+    const L = legL.current, Rl = legR.current, A = armL.current, B2 = armR.current, Bd = body.current;
+    if (!L || !Rl || !A || !B2 || !Bd) return;
+    // defaults: walking or standing
+    let lx = sw, rx = -sw, ax = -sw * 0.8, bx = sw * 0.8, az = 0, bz = 0, y = walking ? Math.abs(Math.sin(t * 8)) * 0.03 : Math.sin(t * 1.5) * 0.005, ry = 0;
+    switch (ps) {
+      case 'sit':
+        lx = rx = -1.45;
+        ax = bx = -0.5;
+        y = -0.36;
+        break;
+      case 'reach': // tidying a rail or shelf: arms up, hands working
+        ax = -2.3 + Math.sin(t * 4) * 0.35;
+        bx = -2.0 + Math.cos(t * 4) * 0.35;
+        break;
+      case 'phone': // selfie: phone held up in front
+        bx = -2.1;
+        bz = 0.25;
+        ax = -0.2;
+        y += Math.sin(t * 2) * 0.01;
+        break;
+      case 'drink':
+        bx = -1.6 - (Math.sin(t * 1.6) * 0.5 + 0.5) * 0.9;
+        bz = 0.35;
+        break;
+      case 'dance': // filming a TikTok
+        y = Math.abs(Math.sin(t * 5)) * 0.06;
+        az = -0.5 - Math.sin(t * 5) * 0.4;
+        bz = 0.5 + Math.sin(t * 5) * 0.4;
+        ax = -1.2 + Math.sin(t * 5) * 0.4;
+        bx = -1.2 - Math.sin(t * 5) * 0.4;
+        lx = Math.sin(t * 5) * 0.25;
+        rx = -lx;
+        ry = Math.sin(t * 2.5) * 0.35;
+        break;
+      case 'work': // hands busy in front (hair, makeup, pouring fuel)
+        ax = -1.25 + Math.sin(t * 6) * 0.18;
+        bx = -1.35 + Math.cos(t * 6) * 0.18;
+        az = -0.15;
+        bz = 0.15;
+        break;
+      case 'count': // counting money at the counter
+        ax = -1.0;
+        bx = -1.0 + Math.abs(Math.sin(t * 9)) * 0.3;
+        az = -0.2;
+        bz = 0.2;
+        break;
+    }
+    L.rotation.x = lx;
+    Rl.rotation.x = rx;
+    A.rotation.x = ax;
+    A.rotation.z = az;
+    B2.rotation.x = bx;
+    B2.rotation.z = bz;
+    Bd.position.y = y;
+    Bd.rotation.y = ry;
   });
   const W = l.width;
   const hipY = 0.82;
@@ -156,7 +208,19 @@ export const Figure: React.FC<{ look: FigureLook; walking: boolean; carryBag?: b
             <cylinderGeometry args={[0.04 * W, 0.035 * W, 0.26, 8]} />
             <M c={l.skin} />
           </mesh>
-          {i === 1 && (carryBag || l.bag) && (
+          {i === 1 && (ps === 'phone' || ps === 'dance') && (
+            <mesh position={[0, -0.52, 0.03]}>
+              <boxGeometry args={[0.07, 0.13, 0.015]} />
+              <meshStandardMaterial color="#111" emissive="#7AB8FF" emissiveIntensity={0.4} />
+            </mesh>
+          )}
+          {i === 1 && ps === 'drink' && (
+            <mesh position={[0, -0.52, 0.04]}>
+              <cylinderGeometry args={[0.035, 0.03, 0.09, 8]} />
+              <meshStandardMaterial color="#E8F4FF" transparent opacity={0.8} />
+            </mesh>
+          )}
+          {i === 1 && (carryBag || l.bag) && ps !== 'phone' && ps !== 'drink' && (
             <mesh position={[0.04, -0.55, 0]} castShadow>
               <boxGeometry args={[0.18, 0.16, 0.08]} />
               <M c={carryBag ? '#F4E4C8' : l.bag || '#7A2A2A'} />
@@ -264,7 +328,8 @@ export type Cell = [number, number];
 /** A* over the floor grid; outside cells (z >= d) are always walkable. */
 export function findPath(blocked: boolean[][], from: Cell, to: Cell, w: number, d: number): Cell[] {
   const key = (c: Cell) => `${c[0]},${c[1]}`;
-  const free = (x: number, z: number) => x >= -1 && x <= w && z >= 0 && z <= d + 5 && (z >= d ? true : x >= 0 && x < w && !blocked[z]?.[x]);
+  // x == w (z < d) is the strip outside the right wall, by the generator and solar panels
+  const free = (x: number, z: number) => x >= -1 && x <= w && z >= 0 && z <= d + 5 && (z >= d || x === w ? true : x >= 0 && x < w && !blocked[z]?.[x]);
   const door = Math.floor(w / 2);
   const open: { c: Cell; g: number; f: number }[] = [{ c: from, g: 0, f: 0 }];
   const came = new Map<string, Cell>();
@@ -289,8 +354,10 @@ export function findPath(blocked: boolean[][], from: Cell, to: Cell, w: number, 
       const nk = key(n);
       if (!free(n[0], n[1]) && nk !== goal) continue;
       // the front wall: only through the door
-      if (((cur.c[1] === d - 1 && n[1] === d) || (cur.c[1] === d && n[1] === d - 1)) && n[0] !== door) continue;
-      if (n[1] < d && (n[0] < 0 || n[0] >= w)) continue;
+      if (((cur.c[1] === d - 1 && n[1] === d) || (cur.c[1] === d && n[1] === d - 1)) && n[0] !== door && n[0] !== w) continue;
+      if (n[1] < d && (n[0] < 0 || n[0] > w)) continue;
+      // no walking through the right wall: into the yard strip only from the street
+      if (n[1] < d && ((cur.c[0] === w - 1 && n[0] === w) || (cur.c[0] === w && n[0] === w - 1))) continue;
       const g = cur.g + 1;
       if (g < (gs.get(nk) ?? 1e9)) {
         gs.set(nk, g);
@@ -318,16 +385,21 @@ export const Walker: React.FC<{
   carryBag?: boolean;
   highlight?: boolean;
   faceCamera?: boolean;
+  /** What they do once they get there. */
+  pose?: Pose;
+  /** Which way to face once there (radians); default toward the camera. */
+  face?: number;
   onArrive?: () => void;
   onClick?: () => void;
-}> = ({ look, spawn, target, blocked, w, d, delay = 0, speed = 1.4, carryBag, highlight, onArrive, onClick }) => {
+}> = ({ look, spawn, target, blocked, w, d, delay = 0, speed = 1.4, carryBag, highlight, pose, face, onArrive, onClick }) => {
   const group = useRef<THREE.Group>(null);
   const state = useRef({ path: [] as Cell[], i: 0, pos: new THREE.Vector3(spawn[0] + 0.5, 0, spawn[1] + 0.5), wait: delay, arrived: false, key: '', walking: false });
   const [walking, setWalking] = React.useState(false);
   const tKey = `${target[0]},${target[1]}`;
   if (state.current.key !== tKey) {
     const st = state.current;
-    const cur: Cell = [Math.max(0, Math.min(w - 1, Math.floor(st.pos.x))), Math.floor(st.pos.z)];
+    const fz = Math.floor(st.pos.z);
+    const cur: Cell = [Math.max(fz >= d ? -1 : 0, Math.min(w, Math.floor(st.pos.x))), fz];
     st.path = findPath(blocked, cur, target, w, d);
     st.i = 1;
     st.arrived = false;
@@ -361,7 +433,7 @@ export const Walker: React.FC<{
     } else {
       if (st.walking) { st.walking = false; setWalking(false); }
       // face the shop front (toward the camera) while standing
-      g.rotation.y = THREE.MathUtils.lerp(g.rotation.y, 0.6, 0.05);
+      g.rotation.y = THREE.MathUtils.lerp(g.rotation.y, face ?? 0.6, 0.08);
       if (!st.arrived) {
         st.arrived = true;
         onArrive?.();
@@ -381,7 +453,7 @@ export const Walker: React.FC<{
       onPointerOver={() => onClick && (document.body.style.cursor = 'pointer')}
       onPointerOut={() => (document.body.style.cursor = '')}
     >
-      <Figure look={look} walking={walking} carryBag={carryBag} highlight={highlight} />
+      <Figure look={look} walking={walking} carryBag={carryBag} highlight={highlight} pose={pose} />
     </group>
   );
 };

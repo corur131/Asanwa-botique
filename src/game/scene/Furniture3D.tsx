@@ -1,4 +1,7 @@
-import React from 'react';
+import React, { createContext, useContext, useEffect, useMemo, useRef } from 'react';
+import { useFrame } from '@react-three/fiber';
+import * as THREE from 'three';
+import { Reflector } from 'three/examples/jsm/objects/Reflector.js';
 
 /**
  * Low-poly furniture, built from boxes and cylinders.
@@ -29,6 +32,75 @@ const Ball: React.FC<{ p: V3; r: number; c: string; e?: string; ei?: number; m?:
 );
 
 const MIRROR = '#BFD6E2';
+
+/** Whether the mirror glass inside this piece shows a live reflection. */
+export const MirrorLive = createContext(false);
+
+/**
+ * Mirror glass, facing +z. The biggest mirrors in the shop get a live
+ * reflection; the rest get a glassy sheen with a slow light sweep.
+ */
+export function Glass({ p, s }: { p: V3; s: V3 }) {
+  const live = useContext(MirrorLive);
+  return live ? <LiveGlass p={p} w={s[0]} h={s[1]} /> : <FakeGlass p={p} w={s[0]} h={s[1]} />;
+}
+
+function LiveGlass({ p, w, h }: { p: V3; w: number; h: number }) {
+  const mirror = useMemo(() => {
+    const k = 420 / Math.max(w, h);
+    const r = new Reflector(new THREE.PlaneGeometry(w, h), { textureWidth: Math.round(w * k), textureHeight: Math.round(h * k), color: new THREE.Color('#D8E4EA'), clipBias: 0.003 });
+    return r;
+  }, [w, h]);
+  useEffect(() => () => {
+    mirror.geometry.dispose();
+    mirror.dispose();
+  }, [mirror]);
+  return (
+    <group position={[p[0], p[1], p[2] + 0.007]}>
+      <primitive object={mirror} />
+    </group>
+  );
+}
+
+function FakeGlass({ p, w, h }: { p: V3; w: number; h: number }) {
+  const sweep = useRef<THREE.Mesh>(null);
+  const t0 = useMemo(() => Math.random() * 10, []);
+  useFrame(({ clock }) => {
+    const m = sweep.current;
+    if (!m) return;
+    const t = ((clock.getElapsedTime() + t0) % 7) / 7; // one sweep every 7 seconds
+    m.position.x = -w / 2 - 0.2 + t * (w + 0.4);
+    m.visible = m.position.x > -w / 2 + 0.04 && m.position.x < w / 2 - 0.04;
+  });
+  const band = Math.min(0.14, w * 0.18);
+  return (
+    <group position={p}>
+      <mesh>
+        <boxGeometry args={[w, h, 0.01]} />
+        <meshStandardMaterial color={MIRROR} metalness={0.55} roughness={0.08} />
+      </mesh>
+      {/* a soft lighter top, like a reflected ceiling */}
+      <mesh position={[0, h * 0.25, 0.006]}>
+        <planeGeometry args={[w * 0.98, h * 0.48]} />
+        <meshBasicMaterial color="#FFFFFF" transparent opacity={0.12} />
+      </mesh>
+      {/* two fixed streaks */}
+      <mesh position={[-w * 0.22, h * 0.05, 0.007]} rotation={[0, 0, -0.5]}>
+        <planeGeometry args={[band * 0.5, h * 0.9]} />
+        <meshBasicMaterial color="#FFFFFF" transparent opacity={0.16} />
+      </mesh>
+      <mesh position={[-w * 0.1, h * 0.05, 0.007]} rotation={[0, 0, -0.5]}>
+        <planeGeometry args={[band * 0.2, h * 0.9]} />
+        <meshBasicMaterial color="#FFFFFF" transparent opacity={0.12} />
+      </mesh>
+      {/* the moving light sweep */}
+      <mesh ref={sweep} position={[0, 0, 0.008]} rotation={[0, 0, -0.45]}>
+        <planeGeometry args={[band, h * 0.8]} />
+        <meshBasicMaterial color="#FFFFFF" transparent opacity={0.28} />
+      </mesh>
+    </group>
+  );
+}
 const GOLD = '#D4AF37';
 const CHROME = '#C9CED6';
 const pal = (colors: string[], i: number, fb: string) => colors.length ? colors[i % colors.length] : fb;
@@ -136,7 +208,7 @@ export function FloorPiece({ id, colors, selected }: { id: string; colors: strin
         <group rotation={[-0.06, 0, 0]}>
           {glow}
           <B p={[0, 0.95, 0]} s={[0.66, 1.7, 0.06]} c={f} m={id === 'goldMirror' ? 0.9 : 0.2} r={0.3} />
-          <B p={[0, 0.95, 0.035]} s={[0.56, 1.6, 0.01]} c={MIRROR} m={0.9} r={0.05} />
+          <Glass p={[0, 0.95, 0.035]} s={[0.56, 1.6, 0.01]} />
           <B p={[0, 0.5, -0.25]} s={[0.04, 1, 0.04]} c={f} rot={[0.45, 0, 0]} />
         </group>
       );
@@ -190,7 +262,7 @@ export function FloorPiece({ id, colors, selected }: { id: string; colors: strin
           <B p={[0, 0.74, -0.1]} s={[1.6, 0.06, 0.5]} c="#F4EFE6" />
           {[-0.75, 0.75].map((x) => <B key={x} p={[x, 0.37, -0.1]} s={[0.06, 0.74, 0.46]} c="#E6DED2" />)}
           <B p={[0, 1.3, -0.33]} s={[1.2, 0.9, 0.04]} c="#E6DED2" />
-          <B p={[0, 1.3, -0.3]} s={[1.05, 0.75, 0.01]} c={MIRROR} m={0.9} r={0.05} />
+          <Glass p={[0, 1.3, -0.3]} s={[1.05, 0.75, 0.01]} />
           {Array.from({ length: 8 }, (_, i) => <Ball key={i} p={[-0.56 + (i % 4) * 0.37 + (i < 4 ? 0 : 0), i < 4 ? 1.74 : 0.86, -0.29]} r={0.035} c="#FFF" e="#FFF3C8" ei={1.4} />)}
           <Cyl p={[0, 0.25, 0.35]} r1={0.18} h={0.45} c="#E46A9A" />
           {['#C2262E', '#E46A9A', '#1E1E24', GOLD].map((c, i) => <Cyl key={i} p={[-0.5 + i * 0.14, 0.82, 0]} r1={0.025} h={0.1} c={c} />)}
@@ -387,7 +459,7 @@ export function FloorPiece({ id, colors, selected }: { id: string; colors: strin
           {glow}
           <B p={[0, 0.85, 0]} s={[0.7, 1.5, 0.06]} c="#E8D9B0" m={0.4} r={0.3} />
           <Cyl p={[0, 1.6, 0]} r1={0.35} h={0.06} c="#E8D9B0" rot={[Math.PI / 2, 0, 0]} seg={20} m={0.4} />
-          <B p={[0, 0.85, 0.035]} s={[0.6, 1.45, 0.01]} c={MIRROR} m={0.9} r={0.05} />
+          <Glass p={[0, 0.85, 0.035]} s={[0.6, 1.45, 0.01]} />
           <Cyl p={[0, 1.6, 0.035]} r1={0.3} h={0.01} c={MIRROR} rot={[Math.PI / 2, 0, 0]} seg={20} m={0.9} />
         </group>
       );
@@ -409,7 +481,7 @@ export function FloorPiece({ id, colors, selected }: { id: string; colors: strin
           <B p={[0, 0.74, -0.1]} s={[1.7, 0.06, 0.5]} c="#F8F4EE" />
           <B p={[0, 0.37, -0.1]} s={[1.6, 0.7, 0.44]} c="#F2E8DA" />
           <B p={[0, 1.4, -0.33]} s={[1.4, 1.1, 0.05]} c={GOLD} m={0.8} r={0.3} />
-          <B p={[0, 1.4, -0.3]} s={[1.25, 0.95, 0.01]} c={MIRROR} m={0.95} r={0.03} />
+          <Glass p={[0, 1.4, -0.3]} s={[1.25, 0.95, 0.01]} />
           {Array.from({ length: 14 }, (_, i) => {
             const side = i < 4 ? [-0.66, 1.0 + i * 0.27] : i < 8 ? [0.66, 1.0 + (i - 4) * 0.27] : [-0.55 + (i - 8) * 0.22, 1.93];
             return <Ball key={i} p={[side[0], side[1], -0.28]} r={0.04} c="#FFF" e="#FFF3C8" ei={1.6} />;
@@ -598,7 +670,7 @@ export function WallPiece({ id, colors }: { id: string; colors: string[] }) {
       return (
         <group position={[0, 1.4, 0.04]}>
           <B p={[0, 0, 0]} s={[2.9, 2.3, 0.06]} c={GOLD} m={0.9} r={0.3} />
-          <B p={[0, 0, 0.035]} s={[2.75, 2.15, 0.01]} c={MIRROR} m={1} r={0.03} />
+          <Glass p={[0, 0, 0.035]} s={[2.75, 2.15, 0.01]} />
         </group>
       );
     case 'ac':
@@ -675,7 +747,7 @@ export function WallPiece({ id, colors }: { id: string; colors: string[] }) {
       return (
         <group position={[0, 1.15, 0.03]}>
           <B p={[0, 0, 0]} s={[0.5, 1.6, 0.04]} c="#1E1E24" />
-          <B p={[0, 0, 0.025]} s={[0.42, 1.52, 0.01]} c={MIRROR} m={0.9} r={0.05} />
+          <Glass p={[0, 0, 0.025]} s={[0.42, 1.52, 0.01]} />
         </group>
       );
     case 'inverter':

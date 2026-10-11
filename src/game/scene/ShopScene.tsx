@@ -1,22 +1,32 @@
-import React, { useMemo, useRef, useState } from 'react';
-import { Canvas } from '@react-three/fiber';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { OrbitControls } from '@react-three/drei';
-import { GameState } from '../types';
-import { RoomStyle, finishes, room, cellsBlocked, footprint, furnitureById, wallLayout, Placed, canPlace } from '../shop';
-import { CeilingPiece, FloorPiece, WallPiece, B } from './Furniture3D';
+import * as THREE from 'three';
+import { GameState, Pose } from '../types';
+import { RoomStyle, finishes, room, cellsBlocked, footprint, furnitureById, wallLayout, Placed, canPlace, yardCapacity } from '../shop';
+import { solarCap, source } from '../power';
+import { stats } from '../engine';
+import { CeilingPiece, FloorPiece, WallPiece, B, MirrorLive } from './Furniture3D';
 import { Cell, FigureLook, Walker, lookToFigure } from './People';
 
 export interface SceneProps {
   s: GameState;
-  /** uid of a furniture piece being moved, with its rotation. */
-  placing: { uid: string; rot: 0 | 1; drag?: boolean } | null;
-  /** Morning: furniture can be dragged. */
-  editable?: boolean;
-  onPickUp?: (uid: string) => void;
-  onCancel?: () => void;
+  /** A floor piece in Divine's hands in build mode: where it would go. */
+  placing: { uid: string; rot: 0 | 1; x: number; z: number } | null;
+  /** Build mode: grid on, taps select pieces to move. */
+  build?: boolean;
+  view?: View;
   selected: string | null;
-  onPlace: (x: number, z: number) => void;
+  /** The placing cursor moved to a cell. */
+  onHover?: (x: number, z: number) => void;
+  /** Build mode: a piece was tapped (null: the floor). */
   onSelect: (uid: string | null) => void;
+  /** Outside build mode: a piece was tapped. */
+  onItem?: (uid: string) => void;
+  /** Divine is using a piece. */
+  act?: { uid: string; pose: Pose } | null;
+  /** Live mirror reflections. */
+  reflections?: boolean;
   onCustomer: (id: string) => void;
   night?: boolean;
   /** NEPA took light. */
@@ -159,9 +169,186 @@ export function Room({ r, tier, painted }: { r: RoomStyle; tier: number; painted
   );
 }
 
-function Furniture({ s, selected, placing, onSelect, editable, onPickUp, dark }: Pick<SceneProps, 's' | 'selected' | 'placing' | 'onSelect' | 'editable' | 'onPickUp' | 'dark'>) {
+/** Yard pieces in the order they stand: solar at the back, generators nearest the street. */
+const yardOrder = (s: GameState) => s.furniture.filter((p) => p.placed && furnitureById(p.id).mount === 'yard').sort((a, b) => Number(!!furnitureById(a.id).gen) - Number(!!furnitureById(b.id).gen));
+
+/** Which mirrors get a live reflection: the one or two biggest. */
+function liveMirrorUids(s: GameState, on: boolean): Set<string> {
+  if (!on) return new Set();
+  const area = (id: string) => ({ mirrorWall: 6, wallMirror: 2.4, goldMirror: 1.2, archMirror: 1.1, standMirror: 0.9, vanity: 0.8, makeupStation: 0.7, crackedMirror: 0.6 } as Record<string, number>)[id] || 0;
+  const ms = s.furniture.filter((p) => p.placed && area(p.id) > 0).sort((a, b) => area(b.id) - area(a.id));
+  const n = ms[0] && area(ms[0].id) >= 2.4 ? 1 : 2; // one big wall mirror is enough
+  return new Set(ms.slice(0, n).filter((p) => area(p.id) >= 0.9).map((p) => p.uid));
+}
+
+/** Where Divine stands to use a piece, and which way she faces. */
+export function actionSpot(s: GameState, uid: string): { cell: Cell; face: number; onIt?: boolean; stand?: boolean } | null {
+  const p = s.furniture.find((x) => x.uid === uid && x.placed);
+  if (!p) return null;
+  const f = furnitureById(p.id);
+  const r = room(s.listing);
+  const blocked = cellsBlocked(s.furniture, s.listing);
+  const free = (x: number, z: number) => x >= 0 && x < r.w && z >= 0 && z < r.d && !blocked[z][x];
+  const faceTo = (c: Cell, tx: number, tz: number) => Math.atan2(tx - (c[0] + 0.5), tz - (c[1] + 0.5));
+  if (f.mount === 'yard') {
+    const i = yardOrder(s).findIndex((x) => x.uid === uid);
+    const cell: Cell = [r.w, i];
+    return { cell, face: Math.PI / 2 };
+  }
+  if (f.mount === 'wall') {
+    const at = wallLayout(s.furniture, s.listing)[uid];
+    if (!at) return null;
+    const mid = Math.min(Math.floor(at.at + f.w / 2), at.side === 'back' ? r.w - 1 : r.d - 2);
+    const cands: Cell[] = at.side === 'back' ? [[mid, 0], [mid, 1], [mid - 1, 0], [mid + 1, 0], [mid, 2]] : [[0, mid], [1, mid], [0, mid - 1], [0, mid + 1], [2, mid]];
+    const cell = cands.find((c) => free(c[0], c[1])) || cands[0];
+    return { cell, face: at.side === 'back' ? Math.PI : -Math.PI / 2 };
+  }
+  if (f.mount === 'ceiling') {
+    const ceiling = s.furniture.filter((x) => x.placed && furnitureById(x.id).mount === 'ceiling');
+    const i = ceiling.findIndex((x) => x.uid === uid);
+    const cx = Math.floor(((i + 1) * r.w) / (ceiling.length + 1));
+    const cell: Cell = [Math.min(r.w - 1, cx), Math.floor(r.d / 2)];
+    return { cell, face: 0.6 };
+  }
+  const { w, d } = footprint(p);
+  const mx = p.x + w / 2;
+  const mz = p.z + d / 2;
+  // cells Divine can actually get to from the door
+  const seen = new Set<string>();
+  const stack: Cell[] = [[Math.floor(r.w / 2), r.d - 1]];
+  while (stack.length) {
+    const [x, z] = stack.pop()!;
+    const k = `${x},${z}`;
+    if (seen.has(k) || !free(x, z)) continue;
+    seen.add(k);
+    stack.push([x + 1, z], [x - 1, z], [x, z + 1], [x, z - 1]);
+  }
+  const reach = (c: Cell) => seen.has(`${c[0]},${c[1]}`);
+  const touching = (c: Cell) => [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dz]) => reach([c[0] + dx, c[1] + dz]));
+  if (f.group === 'Seating') {
+    const seatCells: Cell[] = [];
+    for (let x = p.x; x < p.x + w; x++) for (let z = p.z; z < p.z + d; z++) seatCells.push([x, z]);
+    const seat = seatCells.find(touching);
+    if (seat) return { cell: seat, face: p.rot ? -Math.PI / 2 : 0, onIt: true };
+  }
+  const ring: Cell[] = [];
+  for (let x = p.x; x < p.x + w; x++) ring.push([x, p.z + d]);
+  for (let z = p.z; z < p.z + d; z++) ring.push([p.x - 1, z], [p.x + w, z]);
+  for (let x = p.x; x < p.x + w; x++) ring.push([x, p.z - 1]);
+  let cell = ring.find(reach);
+  if (!cell) {
+    // boxed in: the nearest cell she can reach
+    const all = [...seen].map((k) => k.split(',').map(Number) as Cell);
+    cell = all.sort((a2, b2) => Math.hypot(a2[0] + 0.5 - mx, a2[1] + 0.5 - mz) - Math.hypot(b2[0] + 0.5 - mx, b2[1] + 0.5 - mz))[0] || ring[0];
+  }
+  return { cell, face: faceTo(cell, mx, mz), stand: f.group === 'Seating' };
+}
+
+function Shaker({ on, children }: { on: boolean; children: React.ReactNode }) {
+  const g = useRef<THREE.Group>(null);
+  useFrame(({ clock }) => {
+    if (!g.current) return;
+    const t = clock.getElapsedTime();
+    g.current.position.x = on ? Math.sin(t * 61) * 0.012 : 0;
+    g.current.position.z = on ? Math.cos(t * 53) * 0.01 : 0;
+    g.current.rotation.z = on ? Math.sin(t * 47) * 0.012 : 0;
+  });
+  return <group ref={g}>{children}</group>;
+}
+
+/** Grey puffs from the exhaust while the generator runs. */
+function Smoke({ at, dense }: { at: [number, number, number]; dense: boolean }) {
+  const puffs = useRef<(THREE.Mesh | null)[]>([]);
+  const n = dense ? 7 : 4;
+  useFrame(({ clock }) => {
+    const t = clock.getElapsedTime();
+    puffs.current.forEach((m, i) => {
+      if (!m) return;
+      const k = ((t * 0.55 + i / n) % 1);
+      m.position.set(at[0] + k * 0.25 + Math.sin(t + i) * 0.04, at[1] + k * 1.3, at[2] + Math.cos(t * 0.7 + i) * 0.05);
+      const sc = (dense ? 0.08 : 0.06) + k * (dense ? 0.3 : 0.22);
+      m.scale.setScalar(sc);
+      ((m.material as THREE.MeshStandardMaterial).opacity = (1 - k) * (dense ? 0.75 : 0.45));
+    });
+  });
+  return (
+    <group>
+      {Array.from({ length: n }, (_, i) => (
+        <mesh key={i} ref={(el) => { puffs.current[i] = el; }}>
+          <sphereGeometry args={[1, 8, 6]} />
+          <meshStandardMaterial color={dense ? '#4A4A4A' : '#8A8A8A'} transparent opacity={0.4} depthWrite={false} />
+        </mesh>
+      ))}
+    </group>
+  );
+}
+
+/** The yard outside the right wall: generators and solar panels. */
+function Yard({ s, selected, onTap }: { s: GameState; selected: string | null; onTap: (uid: string) => void }) {
+  const r = room(s.listing);
+  const items = yardOrder(s);
+  const cap = yardCapacity(s.listing);
+  const src = s.phase === 'shop' ? source(s) : 'grid';
+  const cap2 = solarCap(s);
+  const charge = s.power?.solar || 0;
+  const led = src === 'solar' ? '#22E06A' : charge <= 0.5 ? '#FF3030' : charge < cap2 - 0.5 && s.phase === 'shop' && src === 'grid' && s.clock < 600 ? '#FFB020' : '#22E06A';
+  const ledI = src === 'solar' ? 2.4 : 1.4;
+  const st = stats(s);
+  const running = !!s.power?.gen && src === 'gen';
+  const X = r.w + 1.5;
+  return (
+    <group>
+      {/* concrete strip with a low fence */}
+      <mesh position={[X, -0.045, cap / 2]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
+        <planeGeometry args={[1.9, cap + 0.2]} />
+        <meshStandardMaterial color="#8E8A80" roughness={1} />
+      </mesh>
+      <B p={[X + 0.95, 0.35, cap / 2]} s={[0.06, 0.7, cap + 0.2]} c="#6A5A48" />
+      {items.map((p, i) => {
+        const f = furnitureById(p.id);
+        const z = 0.5 + i;
+        const tap = (e: { stopPropagation: () => void }) => { e.stopPropagation(); onTap(p.uid); };
+        return (
+          <group key={p.uid} position={[X, 0, z]} rotation={[0, -Math.PI / 2, 0]} onClick={tap} onPointerOver={() => (document.body.style.cursor = 'pointer')} onPointerOut={() => (document.body.style.cursor = '')}>
+            {f.gen ? (
+              <>
+                <Shaker on={running && st.gen === f.gen}>
+                  <FloorPiece id={p.id} colors={[]} />
+                </Shaker>
+                {running && st.gen === f.gen && <Smoke at={[0.3, 0.45, 0.1]} dense={f.gen === 'small'} />}
+              </>
+            ) : (
+              <group>
+                {/* panel on a frame, battery box with its light */}
+                <B p={[-0.35, 0.55, -0.2]} s={[0.05, 1.1, 0.05]} c="#888" m={0.6} />
+                <B p={[0.35, 0.75, -0.2]} s={[0.05, 1.5, 0.05]} c="#888" m={0.6} />
+                <B p={[0, 1.2, -0.2]} s={[0.95, 0.04, 0.75]} c="#1B2A4A" m={0.5} r={0.2} rot={[0.5, 0, 0]} />
+                <B p={[0, 1.22, -0.2]} s={[0.9, 0.01, 0.7]} c="#2C4A7A" m={0.7} r={0.15} rot={[0.5, 0, 0]} />
+                <B p={[0, 0.22, 0.25]} s={[0.42, 0.44, 0.26]} c="#E9EEF2" />
+                <mesh position={[0.1, 0.34, 0.385]}>
+                  <sphereGeometry args={[0.03, 10, 8]} />
+                  <meshStandardMaterial color={led} emissive={led} emissiveIntensity={ledI} />
+                </mesh>
+                <B p={[-0.07, 0.34, 0.382]} s={[0.14, 0.06, 0.01]} c="#123" e="#3AA0D0" ei={0.4} />
+                {/* the same light on top, so it shows from the street */}
+                <mesh position={[0, 0.45, 0.25]}>
+                  <sphereGeometry args={[0.035, 10, 8]} />
+                  <meshStandardMaterial color={led} emissive={led} emissiveIntensity={ledI} />
+                </mesh>
+              </group>
+            )}
+            {selected === p.uid && <B p={[0, 0.012, 0]} s={[0.96, 0.02, 0.96]} c="#F59E0B" e="#F59E0B" ei={0.6} o={0.5} />}
+          </group>
+        );
+      })}
+    </group>
+  );
+}
+
+function Furniture({ s, selected, placing, onTap, dark, reflections }: Pick<SceneProps, 's' | 'selected' | 'placing' | 'dark' | 'reflections'> & { onTap: (uid: string) => void }) {
   const r = room(s.listing);
   const wl = wallLayout(s.furniture, s.listing);
+  const live = useMemo(() => liveMirrorUids(s, reflections !== false), [s.furniture, reflections]); // eslint-disable-line react-hooks/exhaustive-deps
   // colours of displayed stock, shared out to display furniture
   const shown = s.stock.filter((d) => d.displayed && d.pieces > 0);
   let cursor = 0;
@@ -171,65 +358,60 @@ function Furniture({ s, selected, placing, onSelect, editable, onPickUp, dark }:
     return out;
   };
   const ceiling = s.furniture.filter((p) => p.placed && furnitureById(p.id).mount === 'ceiling');
+  const hover = { onPointerOver: () => (document.body.style.cursor = 'pointer'), onPointerOut: () => (document.body.style.cursor = '') };
   return (
     <group>
       {s.furniture.filter((p) => p.placed).map((p) => {
         const f = furnitureById(p.id);
-        if (f.mount === 'ceiling' || f.mount === 'finish' || f.mount === 'roof') return null;
+        if (f.mount === 'ceiling' || f.mount === 'finish' || f.mount === 'yard') return null;
         if (placing?.uid === p.uid) return null;
         const colors = f.slots ? take(f.slots) : [];
         const click = (e: { stopPropagation: () => void }) => {
           e.stopPropagation();
-          onSelect(p.uid);
-        };
-        const grab = (e: { stopPropagation: () => void }) => {
-          if (!editable || !onPickUp) return;
-          e.stopPropagation();
-          onPickUp(p.uid);
+          onTap(p.uid);
         };
         if (f.mount === 'wall') {
           const at = wl[p.uid];
           if (!at) return null;
           const pos: [number, number, number] = at.side === 'back' ? [at.at + f.w / 2, 0, 0] : [0, 0, at.at + f.w / 2];
           return (
-            <group key={p.uid} position={pos} rotation={[0, at.side === 'back' ? 0 : Math.PI / 2, 0]} onClick={click}>
-              <WallPiece id={p.id} colors={colors} />
+            <group key={p.uid} position={pos} rotation={[0, at.side === 'back' ? 0 : Math.PI / 2, 0]} onClick={click} {...hover}>
+              <MirrorLive.Provider value={live.has(p.uid)}>
+                <WallPiece id={p.id} colors={colors} />
+              </MirrorLive.Provider>
               {selected === p.uid && <B p={[0, 0.05, 0.3]} s={[f.w, 0.03, 0.5]} c="#F59E0B" e="#F59E0B" ei={0.6} o={0.6} />}
             </group>
           );
         }
         const { w, d } = footprint(p);
         return (
-          <group key={p.uid} position={[p.x + w / 2, 0, p.z + d / 2]} rotation={[0, p.rot ? -Math.PI / 2 : 0, 0]} onClick={editable ? undefined : click} onPointerDown={grab} onPointerOver={() => editable && (document.body.style.cursor = 'grab')} onPointerOut={() => (document.body.style.cursor = '')}>
-            <FloorPiece id={p.id} colors={colors} />
+          <group key={p.uid} position={[p.x + w / 2, 0, p.z + d / 2]} rotation={[0, p.rot ? -Math.PI / 2 : 0, 0]} onClick={click} {...hover}>
+            <MirrorLive.Provider value={live.has(p.uid)}>
+              <FloorPiece id={p.id} colors={colors} />
+            </MirrorLive.Provider>
             {selected === p.uid && <B p={[0, 0.012, 0]} s={[f.w - 0.04, 0.02, f.d - 0.04]} c="#F59E0B" e="#F59E0B" ei={0.6} o={0.5} />}
           </group>
         );
       })}
-      {/* solar panels on a frame beside the shop */}
-      {s.furniture.filter((p) => furnitureById(p.id).mount === 'roof').map((p, i) => (
-        <group key={p.uid} position={[r.w + 0.9, 0, 0.6 + i * 0.95]}>
-          <B p={[0, 0.6, 0]} s={[0.06, 1.2, 0.06]} c="#888" m={0.6} />
-          <B p={[0, 1.25, 0]} s={[1.0, 0.04, 0.8]} c="#1B2A4A" m={0.5} r={0.2} rot={[0, 0, 0.35]} />
-          <B p={[0, 1.27, 0]} s={[0.95, 0.01, 0.75]} c="#2C4A7A" m={0.7} r={0.15} rot={[0, 0, 0.35]} />
-        </group>
-      ))}
+      <Yard s={s} selected={selected} onTap={onTap} />
       {ceiling.map((p, i) => (
-        <CeilingPiece key={p.uid} id={p.id} off={dark} h={r.height} at={[((i + 1) * r.w) / (ceiling.length + 1), 0, r.d / 2 - 0.3]} />
+        <group key={p.uid} onClick={(e) => { e.stopPropagation(); onTap(p.uid); }} {...hover}>
+          <CeilingPiece id={p.id} off={dark || !!s.off?.[p.uid]} h={r.height} at={[((i + 1) * r.w) / (ceiling.length + 1), 0, r.d / 2 - 0.3]} />
+          {selected === p.uid && <B p={[((i + 1) * r.w) / (ceiling.length + 1), r.height - 0.05, r.d / 2 - 0.3]} s={[0.8, 0.04, 0.8]} c="#F59E0B" e="#F59E0B" ei={0.6} o={0.6} />}
+        </group>
       ))}
     </group>
   );
 }
 
-function PlacingGhost({ s, placing, cell }: { s: GameState; placing: NonNullable<SceneProps['placing']>; cell: Cell | null }) {
-  if (!cell) return null;
+function PlacingGhost({ s, placing }: { s: GameState; placing: NonNullable<SceneProps['placing']> }) {
   const p = s.furniture.find((x) => x.uid === placing.uid);
   if (!p) return null;
-  const cand: Placed = { ...p, x: cell[0], z: cell[1], rot: placing.rot, placed: true };
+  const cand: Placed = { ...p, x: placing.x, z: placing.z, rot: placing.rot, placed: true };
   const ok = canPlace(s.furniture, s.listing, cand);
   const { w, d } = footprint(cand);
   return (
-    <group position={[cell[0] + w / 2, 0, cell[1] + d / 2]}>
+    <group position={[placing.x + w / 2, 0, placing.z + d / 2]}>
       <group rotation={[0, placing.rot ? -Math.PI / 2 : 0, 0]}>
         <FloorPiece id={p.id} colors={[]} />
       </group>
@@ -238,29 +420,56 @@ function PlacingGhost({ s, placing, cell }: { s: GameState; placing: NonNullable
   );
 }
 
+/** Build-mode floor grid; the front walkway row is shaded. */
+function BuildGrid({ r }: { r: RoomStyle }) {
+  const lines: React.ReactNode[] = [];
+  for (let x = 0; x <= r.w; x++) lines.push(<mesh key={`x${x}`} position={[x, 0.012, r.d / 2]}><boxGeometry args={[0.05, 0.004, r.d]} /><meshBasicMaterial color="#FFFFFF" transparent opacity={0.55} depthWrite={false} /></mesh>);
+  for (let z = 0; z <= r.d; z++) lines.push(<mesh key={`z${z}`} position={[r.w / 2, 0.012, z]}><boxGeometry args={[r.w, 0.004, 0.05]} /><meshBasicMaterial color="#FFFFFF" transparent opacity={0.55} depthWrite={false} /></mesh>);
+  return (
+    <group>
+      {lines}
+      <B p={[r.w / 2, 0.005, r.d - 0.5]} s={[r.w, 0.003, 1]} c="#F59E0B" o={0.18} />
+    </group>
+  );
+}
+
+export type View = 'angle' | 'top' | 'front' | 'free';
+
+/** Moves the camera when the view changes. */
+function CameraRig({ view, r }: { view: View; r: RoomStyle }) {
+  const { camera } = useThree();
+  const controls = useThree((st) => st.controls) as unknown as { target: THREE.Vector3; update: () => void } | null;
+  const cx = r.w / 2;
+  const cz = r.d / 2;
+  const dist = Math.max(r.w, r.d) * 1.25 + 3;
+  useEffect(() => {
+    const pos: Record<View, [number, number, number]> = {
+      angle: [cx + dist * 0.75, dist * 0.95, cz + dist * 1.05],
+      top: [cx, dist * 1.75, cz + 0.01],
+      front: [cx, 1.9, cz + dist * 1.35],
+      free: [cx - dist * 0.8, dist * 0.7, cz + dist * 1.0],
+    };
+    camera.position.set(...pos[view]);
+    if (controls) {
+      controls.target.set(cx, view === 'front' ? 1.1 : 0.6, cz);
+      controls.update();
+    } else camera.lookAt(cx, 0.6, cz);
+  }, [view, cx, cz, dist, camera, controls]);
+  return null;
+}
+
 export default function ShopScene(p: SceneProps) {
   const { s } = p;
+  const view = p.view || 'angle';
   const r = room(s.listing);
   const fin = finishes(s.furniture);
   const dressed: RoomStyle = { ...r, ...(fin.paint?.paint ? { wall: fin.paint.paint[0], wallLow: fin.paint.paint[1] } : {}), ...(fin.floor?.floorTiles ? { floor: fin.floor.floorTiles[0], floor2: fin.floor.floorTiles[1] } : {}) };
-  const [cell, setCell] = useState<Cell | null>(null);
-  const pickedUid = useRef<string | null>(null);
-  if (p.placing && pickedUid.current !== p.placing.uid) {
-    pickedUid.current = p.placing.uid;
-    const fp = s.furniture.find((x) => x.uid === p.placing!.uid);
-    if (fp && fp.placed && cell?.[0] !== fp.x) setCell([fp.x, fp.z]);
-  }
-  if (!p.placing && pickedUid.current) pickedUid.current = null;
-  const drop = () => {
-    if (!p.placing?.drag) return;
-    if (cell) p.onPlace(cell[0], cell[1]);
-    else p.onCancel?.();
-  };
   const blocked = useMemo(() => cellsBlocked(s.furniture, s.listing), [s.furniture, s.listing]);
   const sp = useMemo(() => spots(s), [s.furniture, s.listing]); // eslint-disable-line react-hooks/exhaustive-deps
   const cx = r.w / 2;
   const cz = r.d / 2;
   const dist = Math.max(r.w, r.d) * 1.25 + 3;
+  const tap = (uid: string) => (p.build ? p.onSelect(uid) : p.onItem ? p.onItem(uid) : p.onSelect(uid));
 
   // people
   const divineLook = useMemo<FigureLook>(() => lookToFigure(s.divine), [s.divine]);
@@ -269,10 +478,14 @@ export default function ShopScene(p: SceneProps) {
   if (gone.current === null) gone.current = new Set((s.left || []).map((l) => l.key));
   const [, rerender] = useState(0);
   const people: React.ReactNode[] = [];
-  people.push(<Walker key="divine" look={divineLook} spawn={sp.divine} target={sp.divine} blocked={blocked} w={r.w} d={r.d} />);
+  // Divine: at work, busy with a piece of furniture, or out of the way in build mode
+  const act = p.act ? actionSpot(s, p.act.uid) : null;
+  const divineAt: Cell = p.build ? [Math.min(r.w, sp.door[0] + 2), r.d + 1] : act ? act.cell : sp.divine;
+  const tired = s.energy !== undefined && s.energy < 30;
+  people.push(<Walker key="divine" look={divineLook} spawn={sp.divine} target={divineAt} blocked={blocked} w={r.w} d={r.d} speed={tired ? 0.85 : 1.4} pose={act && !p.build ? (act.stand ? 'stand' : p.act!.pose) : undefined} face={act && !p.build ? act.face : undefined} />);
   s.staff.forEach((m, i) => {
-    const c = sp.staff[i] || sp.divine;
-    people.push(<Walker key={m.id} look={lookToFigure(m.look)} spawn={c} target={c} blocked={blocked} w={r.w} d={r.d} />);
+    const c = p.build ? ([Math.max(-1, sp.door[0] - 2 - i), r.d + 1] as Cell) : sp.staff[i] || sp.divine;
+    people.push(<Walker key={m.id} look={lookToFigure(m.look)} spawn={sp.staff[i] || sp.divine} target={c} blocked={blocked} w={r.w} d={r.d} />);
   });
   if (s.phase === 'shop') {
     let k = 0;
@@ -306,10 +519,10 @@ export default function ShopScene(p: SceneProps) {
     }
   }
   if (s.phase === 'shop' && s.visit) {
-    const r = s.rivals?.find((x) => x.id === s.visit!.rivalId);
+    const rv = s.rivals?.find((x) => x.id === s.visit!.rivalId);
     const target = s.visit.target ? lastSpot.current[s.visit.target] : undefined;
-    const near: Cell = target ? [Math.min(r ? room(s.listing).w - 1 : 0, target[0] + 1), target[1]] : [sp.door[0], room(s.listing).d - 1];
-    if (r) people.push(<Walker key={`visit-${r.id}-${s.visit.at}`} look={lookToFigure(r.look)} spawn={sp.outside} target={near} blocked={blocked} w={room(s.listing).w} d={room(s.listing).d} highlight />);
+    const near: Cell = target ? [Math.min(rv ? r.w - 1 : 0, target[0] + 1), target[1]] : [sp.door[0], r.d - 1];
+    if (rv) people.push(<Walker key={`visit-${rv.id}-${s.visit.at}`} look={lookToFigure(rv.look)} spawn={sp.outside} target={near} blocked={blocked} w={r.w} d={r.d} highlight />);
   }
   for (const l of s.left || []) {
     if (gone.current.has(l.key)) continue;
@@ -331,37 +544,46 @@ export default function ShopScene(p: SceneProps) {
     );
   }
 
+  const free = view === 'free';
+  const top = view === 'top';
+  const cellAt = (e: { point: THREE.Vector3 }) => {
+    if (!p.placing) return null;
+    const fp = s.furniture.find((x) => x.uid === p.placing!.uid);
+    const { w, d } = fp ? footprint({ id: fp.id, rot: p.placing.rot }) : { w: 1, d: 1 };
+    return [Math.floor(e.point.x - w / 2 + 0.5), Math.floor(e.point.z - d / 2 + 0.5)] as Cell;
+  };
   return (
-    <div style={{ width: '100%', height: '100%', touchAction: 'none' }} onPointerUp={drop}>
-    <Canvas shadows dpr={[1, 1.75]} camera={{ fov: 32, position: [cx + dist * 0.75, dist * 0.95, cz + dist * 1.05], near: 0.1, far: 200 }} style={{ background: p.night ? 'linear-gradient(#0b0d1a,#1a1630)' : 'linear-gradient(#24305a,#3a4a7a)' }}>
-      <ambientLight intensity={p.night ? 0.35 : p.dark ? 0.14 : 0.6} />
-      <hemisphereLight args={['#FFF4E0', '#3A3A50', p.night ? 0.3 : p.dark ? 0.12 : 0.55]} />
-      <directionalLight position={[cx + 6, 12, cz + 8]} intensity={p.night ? 0.4 : p.dark ? 0.35 : 1.2} castShadow shadow-mapSize={[1024, 1024]} shadow-camera-left={-12} shadow-camera-right={12} shadow-camera-top={12} shadow-camera-bottom={-12} />
-      <OrbitControls enabled={!p.placing} target={[cx, 0.6, cz]} enablePan={false} minPolarAngle={0.45} maxPolarAngle={1.2} minDistance={dist * 0.45} maxDistance={dist * 1.8} />
-      <Room r={dressed} tier={s.tier} painted={!!fin.paint} />
-      <Furniture s={s} selected={p.selected} placing={p.placing} onSelect={p.onSelect} editable={p.editable} onPickUp={p.onPickUp} dark={p.dark} />
-      {people}
-      {p.placing && <PlacingGhost s={s} placing={p.placing} cell={cell} />}
-      {/* invisible floor to catch clicks and the placing cursor */}
-      <mesh
-        position={[cx, 0.001, cz]}
-        rotation={[-Math.PI / 2, 0, 0]}
-        onPointerMove={(e) => {
-          if (!p.placing) return;
-          const fp = s.furniture.find((x) => x.uid === p.placing!.uid);
-          const { w, d } = fp ? footprint({ id: fp.id, rot: p.placing.rot }) : { w: 1, d: 1 };
-          setCell([Math.floor(e.point.x - w / 2 + 0.5), Math.floor(e.point.z - d / 2 + 0.5)]);
-        }}
-        onClick={(e) => {
-          e.stopPropagation();
-          if (p.placing && cell) p.onPlace(cell[0], cell[1]);
-          else p.onSelect(null);
-        }}
-      >
-        <planeGeometry args={[r.w, r.d]} />
-        <meshBasicMaterial visible={false} />
-      </mesh>
-    </Canvas>
+    <div style={{ width: '100%', height: '100%', touchAction: 'none' }}>
+      <Canvas shadows dpr={[1, 1.75]} camera={{ fov: 32, position: [cx + dist * 0.75, dist * 0.95, cz + dist * 1.05], near: 0.1, far: 200 }} style={{ background: p.night ? 'linear-gradient(#0b0d1a,#1a1630)' : 'linear-gradient(#24305a,#3a4a7a)' }}>
+        <ambientLight intensity={p.night ? 0.35 : p.dark ? 0.14 : 0.6} />
+        <hemisphereLight args={['#FFF4E0', '#3A3A50', p.night ? 0.3 : p.dark ? 0.12 : 0.55]} />
+        <directionalLight position={[cx + 6, 12, cz + 8]} intensity={p.night ? 0.4 : p.dark ? 0.35 : 1.2} castShadow shadow-mapSize={[1024, 1024]} shadow-camera-left={-12} shadow-camera-right={12} shadow-camera-top={12} shadow-camera-bottom={-12} />
+        <OrbitControls makeDefault target={[cx, 0.6, cz]} enablePan={free} enableRotate={!top} minPolarAngle={top ? 0 : free ? 0.05 : 0.45} maxPolarAngle={top ? 0.02 : free ? 1.52 : view === 'front' ? 1.45 : 1.2} minDistance={dist * 0.35} maxDistance={dist * 2} />
+        <CameraRig view={view} r={r} />
+        <Room r={dressed} tier={s.tier} painted={!!fin.paint} />
+        <Furniture s={s} selected={p.selected} placing={p.placing} onTap={tap} dark={p.dark} reflections={p.reflections} />
+        {p.build && <BuildGrid r={r} />}
+        {people}
+        {p.placing && <PlacingGhost s={s} placing={p.placing} />}
+        {/* invisible floor to catch taps and the placing cursor */}
+        <mesh
+          position={[cx, 0.001, cz]}
+          rotation={[-Math.PI / 2, 0, 0]}
+          onPointerMove={(e) => {
+            const c = cellAt(e);
+            if (c && e.pointerType === 'mouse' && (c[0] !== p.placing!.x || c[1] !== p.placing!.z)) p.onHover?.(c[0], c[1]);
+          }}
+          onClick={(e) => {
+            e.stopPropagation();
+            const c = cellAt(e);
+            if (c) p.onHover?.(c[0], c[1]);
+            else p.onSelect(null);
+          }}
+        >
+          <planeGeometry args={[r.w, r.d]} />
+          <meshBasicMaterial visible={false} />
+        </mesh>
+      </Canvas>
     </div>
   );
 }

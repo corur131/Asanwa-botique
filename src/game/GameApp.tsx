@@ -16,9 +16,13 @@ import { AppId, Phone } from './ui/Phone';
 import { furnitureById } from './shop';
 import type { CloudSession } from '../cloud/AuthGate';
 import { AdminPanel } from '../cloud/AdminPanel';
-import { armSound, pop, useSound } from './sound';
+import { armSound, pop, setGenSound, useSound } from './sound';
+import { ActionMenu, Catalogue, EnergyBar, SoundSettings, ViewPicker } from './ui/Build';
+import type { View } from './scene/ShopScene';
+import type { Pose } from './types';
 
 const ShopScene = lazy(() => import('./scene/ShopScene'));
+const ThumbStudio = lazy(() => import('./scene/Thumbs').then((m) => ({ default: m.ThumbStudio })));
 
 type Step =
   | { kind: 'style' }
@@ -39,7 +43,12 @@ export default function GameApp({ onLab, initial, storageKey, cloud, notice }: {
   const [menu, setMenu] = useState(false);
   const [confirmNew, setConfirmNew] = useState(false);
   const [selected, setSelected] = useState<string | null>(null);
-  const [placing, setPlacing] = useState<{ uid: string; rot: 0 | 1; drag?: boolean } | null>(null);
+  /** A floor piece in Divine's hands (build mode); `fresh` when just bought or taken out of storage. */
+  const [placing, setPlacing] = useState<{ uid: string; rot: 0 | 1; x: number; z: number; fresh?: boolean } | null>(null);
+  const [build, setBuild] = useState(false);
+  const [view, setView] = useState<View>('angle');
+  const [menuFor, setMenuFor] = useState<string | null>(null);
+  const [localAct, setLocalAct] = useState<{ uid: string; pose: Pose } | null>(null);
   const [phone, setPhone] = useState(false);
   const [phoneApp, setPhoneApp] = useState<AppId>('home');
   const [chat, setChat] = useState<string | null>(null);
@@ -62,11 +71,11 @@ export default function GameApp({ onLab, initial, storageKey, cloud, notice }: {
       if (e.key !== 'r' && e.key !== 'R') return;
       if ((e.target as HTMLElement)?.tagName === 'INPUT') return;
       if (placing) setPlacing({ ...placing, rot: placing.rot ? 0 : 1 });
-      else if (selected) setS((g) => (g && g.phase === 'morning' ? E.rotateFurniture(g, selected) : g));
+      else if (selected && build) setS((g) => (g && g.phase !== 'shop' ? E.rotateFurniture(g, selected) : g));
     };
     window.addEventListener('keydown', on);
     return () => window.removeEventListener('keydown', on);
-  }, [placing, selected]);
+  }, [placing, selected, build]);
   const fileRef = useRef<HTMLInputElement>(null);
 
   // every change is saved on this device; signed-in players are also saved to their account
@@ -108,7 +117,7 @@ export default function GameApp({ onLab, initial, storageKey, cloud, notice }: {
     document.addEventListener('visibilitychange', on);
     return () => document.removeEventListener('visibilitychange', on);
   }, []);
-  const running = !!s && s.phase === 'shop' && !paused && !menu && !hidden && !confirmClose;
+  const running = !!s && s.phase === 'shop' && !paused && !menu && !hidden && !confirmClose && !lookEdit;
   useEffect(() => {
     if (!running) return;
     let last = performance.now();
@@ -147,6 +156,25 @@ export default function GameApp({ onLab, initial, storageKey, cloud, notice }: {
     fresh.forEach((x) => window.setTimeout(() => setBubbles((b) => b.filter((y) => y.id !== x.id)), x.tone === 'nepa' ? 6000 : 4500));
   }, [s?.shoutSeq]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // the generator hums while it runs
+  const genKind = s && s.phase === 'shop' && s.power?.gen && E.source(s) === 'gen' ? E.stats(s).gen : null;
+  useEffect(() => setGenSound(touring ? null : genKind), [genKind, touring]);
+  useEffect(() => () => setGenSound(null), []);
+  // a quick job outside opening hours: Divine walks over and does it for a few seconds
+  useEffect(() => {
+    if (!localAct) return;
+    const id = window.setTimeout(() => setLocalAct(null), 4500);
+    return () => window.clearTimeout(id);
+  }, [localAct]);
+  // build mode only before opening or after closing
+  useEffect(() => {
+    if (s?.phase === 'shop' && build) {
+      setBuild(false);
+      setPlacing(null);
+      setSelected(null);
+    }
+  }, [s?.phase]); // eslint-disable-line react-hooks/exhaustive-deps
+
   if (!s) return <NewGame onStart={(cfg) => { const g = E.newGame(cfg); seenMsg.current = g.msgSeq; setS(g); }} onLab={onLab} />;
 
   const up = (f: (g: GameState) => GameState) => setS((g) => (g ? f(g) : g));
@@ -160,8 +188,62 @@ export default function GameApp({ onLab, initial, storageKey, cloud, notice }: {
   const dark = src === 'none';
   const nepaOff = s.phase === 'shop' && E.inBlackout(s);
   const selectedPiece = selected ? (() => { const p = s.furniture.find((x) => x.uid === selected && x.placed); return p ? furnitureById(p.id) : null; })() : null;
-  // on a phone the side panel covers the shop, so no dragging under it
-  const panelCovers = !!panel && typeof window !== 'undefined' && window.innerWidth < 640;
+  const busy = E.busyNow(s);
+  const act = busy ? { uid: busy.uid, pose: busy.pose } : localAct;
+  const say = (who: string, text: string) => {
+    const b: Shout = { id: -Date.now(), who, text, tone: 'warn' };
+    setBubbles((x) => [...x, b].slice(-4));
+    window.setTimeout(() => setBubbles((x) => x.filter((y) => y.id !== b.id)), 4000);
+  };
+  const ghostOk = (() => {
+    if (!placing) return false;
+    const p = s.furniture.find((x) => x.uid === placing.uid);
+    return !!p && E.canPlaceAt(s, { ...p, x: placing.x, z: placing.z, rot: placing.rot, placed: true });
+  })();
+  const enterBuild = () => {
+    setPanel(null);
+    setMenuFor(null);
+    setSelected(null);
+    setBuild(true);
+  };
+  const exitBuild = () => {
+    setBuild(false);
+    setPlacing(null);
+    setSelected(null);
+    setView('angle');
+  };
+  /** Hold a floor piece: starts where it stands (or the first free spot). */
+  const pickUp = (g: GameState, uid: string, fresh: boolean) => {
+    const p = g.furniture.find((x) => x.uid === uid);
+    if (!p || furnitureById(p.id).mount !== 'floor') return;
+    const spot = p.placed ? p : E.spotFor(g, uid) || p;
+    setSelected(uid);
+    setPlacing({ uid, rot: spot.rot || 0, x: spot.x, z: spot.z, fresh });
+  };
+  const buy = (id: string) => {
+    const before = new Set(s.furniture.map((x) => x.uid));
+    const next = E.buyFurniture(s, id);
+    if (next === s) return;
+    setS(next);
+    const fresh = next.furniture.find((x) => !before.has(x.uid));
+    if (fresh) pickUp(next, fresh.uid, true);
+  };
+  const install = (uid: string) => {
+    const p = s.furniture.find((x) => x.uid === uid);
+    if (!p) return;
+    if (furnitureById(p.id).mount === 'floor') return pickUp(s, uid, true);
+    up((g) => E.installFurniture(g, uid));
+  };
+  const doAction = (uid: string, id: E.ActionId) => {
+    const res = E.interact(s, uid, id);
+    if (res.s === s && !res.ui) return;
+    setS(res.s);
+    setMenuFor(null);
+    const a = E.actionsFor(s, uid).find((x) => x.id === id);
+    if (a && !(s.phase === 'shop' && a.minutes > 0)) setLocalAct({ uid, pose: a.pose });
+    if (res.ui === 'fixLook') setLookEdit(s.divine);
+    if (res.ui === 'checkStock' || res.ui === 'restock') setPanel('rail');
+  };
 
   const restore = async (f: File) => {
     const parsed = E.parseSave(await f.text());
@@ -178,6 +260,8 @@ export default function GameApp({ onLab, initial, storageKey, cloud, notice }: {
   };
   const styleCustomer = (id: string) => {
     if (s.phase !== 'shop') return;
+    if (!s.serving && E.exhausted(s)) return say('Deborah', "Divine has no energy left. Sit down or drink water first.");
+    if (!s.serving && busy) return say('Divine', `Give me small time, I'm busy till ${E.clockText(busy.until)}.`);
     if (s.serving && s.serving !== id) {
       setStyling(true);
       return;
@@ -211,6 +295,7 @@ export default function GameApp({ onLab, initial, storageKey, cloud, notice }: {
         <div className="w-32">
           <Bar label="Reputation" value={s.rep} max={100} tone={s.rep > 60 ? 'bg-emerald-400' : s.rep > 30 ? 'bg-amber-400' : 'bg-rose-400'} />
         </div>
+        <EnergyBar s={s} />
         <div className="text-xs text-slate-300 max-sm:hidden">
           Prestige <b className="text-amber-300">{st.prestige}</b> · Followers <b className="text-pink-300">{(s.followers || 0).toLocaleString('en-NG')}</b>
         </div>
@@ -219,6 +304,7 @@ export default function GameApp({ onLab, initial, storageKey, cloud, notice }: {
         </div>
         <div className="ml-auto flex gap-2">
           <Btn size="sm" onClick={sound.toggleMusic} title={sound.music ? 'Music on' : 'Music off'}>{sound.music ? '♫ On' : '♫ Off'}</Btn>
+          {genKind && <Btn size="sm" onClick={() => sound.set({ gen: !sound.gen })} title="Generator sound">{sound.gen ? '⛽🔊' : '⛽🔇'}</Btn>}
           <Btn size="sm" onClick={() => E.exportSave(s)}>Backup</Btn>
           <Btn size="sm" onClick={() => setMenu(true)}>Menu</Btn>
         </div>
@@ -235,28 +321,22 @@ export default function GameApp({ onLab, initial, storageKey, cloud, notice }: {
           <ShopScene
             s={s}
             placing={placing}
-            selected={selected}
-            night={s.phase === 'evening'}
+            selected={build ? selected : menuFor}
+            night={s.phase === 'evening' && !build}
             dark={dark}
-            onPlace={(x, z) => {
-              if (!placing) return;
-              up((g) => E.placeFurniture(g, placing.uid, x, z, placing.rot));
-              setPlacing(null);
-            }}
-            onSelect={(uid) => setSelected(uid)}
-            editable={s.phase === 'morning' && !panelCovers}
-            onPickUp={(uid) => {
-              const p = s.furniture.find((x) => x.uid === uid);
-              setSelected(uid);
-              setPlacing({ uid, rot: p?.rot || 0, drag: true });
-            }}
-            onCancel={() => setPlacing(null)}
+            build={build}
+            view={view}
+            act={build ? null : act}
+            reflections={sound.reflections}
+            onHover={(x, z) => placing && setPlacing({ ...placing, x, z })}
+            onSelect={(uid) => { if (!placing) setSelected(uid); }}
+            onItem={(uid) => { if (!styling) setMenuFor(uid); }}
             onCustomer={styleCustomer}
           />
         </Suspense>
 
         {/* top-left: where we are */}
-        <div className={`absolute top-3 left-3 w-48 sm:w-60 space-y-2 pointer-events-none ${s.phase === 'shop' ? 'max-sm:hidden' : ''}`}>
+        <div className={`absolute top-3 left-3 w-48 sm:w-60 space-y-2 pointer-events-none ${s.phase === 'shop' ? 'max-sm:hidden' : ''} ${build ? 'hidden' : ''}`}>
           <div className="rounded-xl border border-white/15 bg-[#12141c]/85 backdrop-blur p-2 sm:p-3 pointer-events-auto">
             <div className="text-[11px] text-slate-400">{t.name}</div>
             <div className="text-sm font-semibold text-white leading-tight">{s.listing.street}, {s.listing.area}</div>
@@ -282,36 +362,62 @@ export default function GameApp({ onLab, initial, storageKey, cloud, notice }: {
           </button>
         )}
 
-        {placing && !placing.drag && (
-          <div className="absolute top-3 left-1/2 -translate-x-1/2 z-20 rounded-xl border border-amber-500/50 bg-[#12141c]/95 p-2 flex items-center gap-2 text-sm">
-            <span className="text-amber-200 px-1">Tap a free spot to drop it</span>
-            <Btn size="sm" onClick={() => setPlacing({ ...placing, rot: placing.rot ? 0 : 1 })}>Rotate</Btn>
-            <Btn size="sm" onClick={() => setPlacing(null)}>Cancel</Btn>
-          </div>
+        {/* build mode */}
+        {build && (
+          <>
+            <div className="absolute top-3 left-3 right-3 z-20 flex flex-wrap items-start justify-between gap-2 pointer-events-none">
+              <div className="pointer-events-auto"><ViewPicker view={view} setView={setView} /></div>
+              <div className="flex gap-1.5 pointer-events-auto">
+                <Btn size="sm" onClick={() => setPanel(panel === 'furniture' ? null : 'furniture')}>Shop stats</Btn>
+                <Btn size="sm" tone="gold" onClick={exitBuild}>Done</Btn>
+              </div>
+            </div>
+            {placing && (() => {
+              const f = furnitureById(s.furniture.find((x) => x.uid === placing.uid)?.id || '');
+              return (
+                <div className="absolute top-14 left-1/2 -translate-x-1/2 z-20 rounded-xl border border-amber-500/50 bg-[#12141c]/95 p-2 flex flex-wrap items-center justify-center gap-2 text-sm max-w-[94vw]">
+                  <span className={`px-1 text-xs font-semibold ${ghostOk ? 'text-emerald-300' : 'text-rose-300'}`}>{f?.name}: {ghostOk ? 'fits here' : "can't go here"} · tap the floor to move it</span>
+                  <Btn size="sm" onClick={() => setPlacing({ ...placing, rot: placing.rot ? 0 : 1 })}>↻ Rotate</Btn>
+                  <Btn size="sm" tone="green" disabled={!ghostOk} onClick={() => { up((g) => E.placeFurniture(g, placing.uid, placing.x, placing.z, placing.rot)); setPlacing(null); setSelected(null); }}>Place</Btn>
+                  {placing.fresh ? (
+                    <Btn size="sm" onClick={() => { up((g) => E.storeFurniture(g, placing.uid)); setPlacing(null); setSelected(null); }}>Put in storage</Btn>
+                  ) : (
+                    <Btn size="sm" onClick={() => { setPlacing(null); setSelected(null); }}>Cancel</Btn>
+                  )}
+                </div>
+              );
+            })()}
+            {selectedPiece && !placing && (
+              <div className="absolute top-14 left-1/2 -translate-x-1/2 z-20 rounded-xl border border-amber-500/50 bg-[#12141c]/95 p-2 flex flex-wrap items-center justify-center gap-2 text-sm max-w-[94vw]">
+                <span className="text-white font-semibold px-1">{selectedPiece.name}</span>
+                {selectedPiece.mount === 'floor' && <Btn size="sm" onClick={() => pickUp(s, selected!, false)}>Move</Btn>}
+                {selectedPiece.mount === 'floor' && <Btn size="sm" onClick={() => up((g) => E.rotateFurniture(g, selected!))}>↻ Rotate</Btn>}
+                <Btn size="sm" onClick={() => { up((g) => E.storeFurniture(g, selected!)); setSelected(null); }}>Store</Btn>
+                <Btn size="sm" onClick={() => { up((g) => E.sellFurniture(g, selected!)); setSelected(null); }}>Sell · {naira(selectedPiece.price * 0.4)}</Btn>
+                <Btn size="sm" tone="gold" onClick={() => setSelected(null)}>OK</Btn>
+              </div>
+            )}
+            <div className={`absolute bottom-3 left-3 right-3 z-20 ${panel ? 'sm:right-[472px]' : ''}`}>
+              <Catalogue s={s} onBuy={buy} onInstall={install} />
+            </div>
+            <Suspense fallback={null}><ThumbStudio /></Suspense>
+          </>
         )}
-        {placing?.drag && (
-          <div className="absolute top-3 left-1/2 -translate-x-1/2 z-20 rounded-xl border border-amber-500/50 bg-[#12141c]/95 px-3 py-2 text-sm text-amber-200 pointer-events-none">
-            Drag to a green spot and let go · press R to turn it
-          </div>
-        )}
-        {/* the piece you tapped */}
-        {selectedPiece && !placing && s.phase === 'morning' && (
-          <div className="absolute top-3 left-1/2 -translate-x-1/2 z-20 rounded-xl border border-amber-500/50 bg-[#12141c]/95 p-2 flex flex-wrap items-center gap-2 text-sm max-w-[92vw]">
-            <span className="text-white font-semibold px-1">{selectedPiece.name}</span>
-            {selectedPiece.mount === 'floor' && <Btn size="sm" onClick={() => up((g) => E.rotateFurniture(g, selected!))}>↻ Rotate</Btn>}
-            {selectedPiece.mount === 'floor' && <Btn size="sm" onClick={() => { const p = s.furniture.find((x) => x.uid === selected); setPlacing({ uid: selected!, rot: p?.rot || 0 }); }}>Move</Btn>}
-            <Btn size="sm" onClick={() => { up((g) => E.storeFurniture(g, selected!)); setSelected(null); }}>Store</Btn>
-            <Btn size="sm" onClick={() => { up((g) => E.sellFurniture(g, selected!)); setSelected(null); }}>Sell · {naira(selectedPiece.price * 0.4)}</Btn>
-            <Btn size="sm" tone="gold" onClick={() => setSelected(null)}>Done</Btn>
+
+        {/* what Divine can do with the piece you tapped */}
+        {menuFor && !build && !styling && <ActionMenu s={s} uid={menuFor} onPick={(id) => doAction(menuFor, id)} onClose={() => setMenuFor(null)} />}
+        {busy && !styling && (
+          <div className="absolute z-10 left-1/2 -translate-x-1/2 bottom-32 sm:bottom-36 rounded-full bg-[#12141c]/92 border border-white/15 px-3 py-1 text-xs text-amber-200 pointer-events-none">
+            Divine is busy · {E.actionLabel(s, busy)} · till {E.clockText(busy.until)}
           </div>
         )}
 
         {/* morning controls */}
-        {s.phase === 'morning' && !placing && (
+        {s.phase === 'morning' && !build && (
           <div className={`absolute bottom-3 left-0 right-0 flex flex-wrap items-end justify-center gap-2 px-3 pointer-events-none ${panel ? 'max-sm:hidden sm:right-[460px]' : ''}`}>
             <div className="flex flex-wrap gap-1 rounded-2xl border border-white/15 bg-[#12141c]/90 backdrop-blur p-1.5 pointer-events-auto">
               <Btn size="sm" tone={panel === 'rail' ? 'gold' : 'ghost'} onClick={() => setPanel(panel === 'rail' ? null : 'rail')}>Rail</Btn>
-              <Btn size="sm" tone={panel === 'furniture' ? 'gold' : 'ghost'} onClick={() => setPanel(panel === 'furniture' ? null : 'furniture')}>Furniture</Btn>
+              <Btn size="sm" onClick={enterBuild}>🔨 Build</Btn>
               <PhoneButton unread={unread} onClick={() => openPhone()} />
             </div>
             <Btn
@@ -389,10 +495,10 @@ export default function GameApp({ onLab, initial, storageKey, cloud, notice }: {
         )}
 
         {/* side panel */}
-        {panel && (s.phase === 'morning' || (s.phase === 'shop' && panel === 'rail' && !styling)) && (
+        {panel && (s.phase === 'morning' || (s.phase === 'evening' && build) || (s.phase === 'shop' && panel === 'rail' && !styling)) && (
           <aside className="absolute z-20 right-0 top-0 bottom-0 w-full sm:w-[460px] bg-[#12141c]/97 border-l border-white/10 backdrop-blur flex flex-col">
             <div className="flex items-center justify-between px-4 py-3 border-b border-white/10">
-              <h3 className="font-serif text-lg font-bold text-white">{{ rail: 'Your rail', furniture: 'Furniture' }[panel]}</h3>
+              <h3 className="font-serif text-lg font-bold text-white">{{ rail: 'Your rail', furniture: 'Your shop' }[panel]}</h3>
               <Btn size="sm" onClick={() => setPanel(null)}>Close</Btn>
             </div>
             <div className="flex-1 overflow-y-auto p-4">
@@ -407,15 +513,15 @@ export default function GameApp({ onLab, initial, storageKey, cloud, notice }: {
                   s={s}
                   selected={selected}
                   a={{
-                    buy: (id) => up((g) => E.buyFurniture(g, id)),
+                    buy: (id) => { if (!build) setBuild(true); buy(id); setPanel(null); },
                     move: (uid) => {
-                      const p = s.furniture.find((x) => x.uid === uid);
-                      setPlacing({ uid, rot: p?.rot || 0 });
+                      if (!build) setBuild(true);
+                      pickUp(s, uid, false);
                       setPanel(null);
                     },
                     store: (uid) => up((g) => E.storeFurniture(g, uid)),
                     sell: (uid) => up((g) => E.sellFurniture(g, uid)),
-                    install: (uid) => up((g) => E.installFurniture(g, uid)),
+                    install: (uid) => { if (!build) setBuild(true); install(uid); setPanel(null); },
                   }}
                 />
               )}
@@ -423,9 +529,9 @@ export default function GameApp({ onLab, initial, storageKey, cloud, notice }: {
           </aside>
         )}
 
-        {s.phase === 'evening' && !(styling && step.kind === 'reveal') && (
+        {s.phase === 'evening' && !build && !(styling && step.kind === 'reveal') && (
           <div className="absolute inset-0 z-20 overflow-y-auto bg-black/40">
-            <Evening s={s} onPhone={() => openPhone()} unread={unread} onSleep={() => up(E.nextMorning)} />
+            <Evening s={s} onPhone={() => openPhone()} unread={unread} onSleep={() => up(E.nextMorning)} onBuild={enterBuild} />
           </div>
         )}
       </div>
@@ -547,7 +653,7 @@ export default function GameApp({ onLab, initial, storageKey, cloud, notice }: {
             </div>
             <div className="relative flex-1 min-h-0">
               <Suspense fallback={<div className="absolute inset-0 flex items-center justify-center text-slate-400 text-sm">Walking over…</div>}>
-                <ShopScene s={fake} placing={null} selected={null} onPlace={() => undefined} onSelect={() => undefined} onCustomer={() => undefined} />
+                <ShopScene s={fake} placing={null} selected={null} onSelect={() => undefined} onCustomer={() => undefined} reflections={sound.reflections} />
               </Suspense>
               <div className="absolute bottom-3 left-3 right-3 sm:right-auto sm:w-96 rounded-xl border border-white/15 bg-[#12141c]/92 p-3 text-sm text-slate-200 space-y-1">
                 <div className="font-semibold text-white">What you notice</div>
@@ -611,10 +717,7 @@ export default function GameApp({ onLab, initial, storageKey, cloud, notice }: {
             <Btn className="w-full" onClick={() => E.exportSave(s)}>Download a backup of this save</Btn>
             <Btn className="w-full" onClick={() => fileRef.current?.click()}>Restore from a backup file</Btn>
             <input ref={fileRef} type="file" accept="application/json,.json" className="hidden" onChange={(e) => e.target.files?.[0] && restore(e.target.files[0])} />
-            <div className="grid grid-cols-2 gap-2">
-              <Btn onClick={sound.toggleMusic}>Music: {sound.music ? 'on' : 'off'}</Btn>
-              <Btn onClick={sound.toggleSfx}>Message pop: {sound.sfx ? 'on' : 'off'}</Btn>
-            </div>
+            <SoundSettings />
             {s.phase !== 'shop' && <Btn className="w-full" onClick={() => { setMenu(false); setLookEdit(s.divine); }}>Change Divine's look</Btn>}
             <Btn className="w-full" onClick={onLab}>Character Lab</Btn>
             <Btn className="w-full" tone="danger" onClick={() => setConfirmNew(true)}>Start a new game</Btn>
@@ -672,7 +775,9 @@ const PowerChip: React.FC<{ s: GameState; up: (f: (g: GameState) => GameState) =
       {src === 'solar' && <Pill tone="green">☀ Solar {Math.round(s.power.solar)}m</Pill>}
       {src === 'gen' && <Pill tone="gold">⛽ Gen on</Pill>}
       {src === 'none' && <Pill tone="red">No light</Pill>}
-      {st.gen && !s.power.gen && <Btn size="sm" tone="gold" onClick={() => up((g) => E.setGen(g, true))}>Start gen · {naira(E.fuelPerHour(s))}/hr</Btn>}
+      {st.gen && <span className={`text-[11px] font-semibold ${E.fuelOf(s) < 2 ? 'text-rose-300' : 'text-slate-300'}`}>⛽ {Math.round(E.fuelOf(s) * 10) / 10}/{E.tankSize(s)} L</span>}
+      {st.gen && !s.power.gen && E.fuelOf(s) > 0 && <Btn size="sm" tone="gold" onClick={() => up((g) => E.setGen(g, true))}>Start gen</Btn>}
+      {st.gen && E.fuelOf(s) < E.tankSize(s) - 0.5 && <Btn size="sm" onClick={() => up((g) => E.refuel(g, 'full'))}>Fill tank · {naira(Math.round((E.tankSize(s) - E.fuelOf(s)) * E.fuelPrice(s)))}</Btn>}
       {st.gen && s.power.gen && <Btn size="sm" onClick={() => up((g) => E.setGen(g, false))}>Stop gen</Btn>}
     </span>
   );
@@ -702,7 +807,7 @@ const WaitChip: React.FC<{ v: Visitor; clock: number; disabled: boolean; onClick
   );
 };
 
-const Evening: React.FC<{ s: GameState; onSleep: () => void; onPhone: () => void; unread: number }> = ({ s, onSleep, onPhone, unread }) => {
+const Evening: React.FC<{ s: GameState; onSleep: () => void; onPhone: () => void; onBuild: () => void; unread: number }> = ({ s, onSleep, onPhone, onBuild, unread }) => {
   const d = s.today;
   const net = d.income - d.costs;
   const todays = s.messages.filter((m) => m.day === s.day);
@@ -749,6 +854,7 @@ const Evening: React.FC<{ s: GameState; onSleep: () => void; onPhone: () => void
       )}
       <div className="text-center pb-4 flex flex-wrap justify-center gap-2">
         <PhoneButton unread={unread} onClick={onPhone} />
+        <Btn onClick={onBuild}>🔨 Build</Btn>
         <Btn tone="gold" size="lg" onClick={onSleep}>Sleep → Day {s.day + 1}</Btn>
       </div>
       <div className="text-center pb-4 -mt-3">

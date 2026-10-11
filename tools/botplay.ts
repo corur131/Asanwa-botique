@@ -6,7 +6,7 @@ import { MAKEUP_LOOKS } from '../src/constants/catalog';
 import { TIERS, naira } from '../src/game/economy';
 import { MARKET, canBuy, makeDesign } from '../src/game/market';
 import { NAMED_COLOURS } from '../src/game/colours';
-import { applyLook, buyDesign, displayedCount, displayCap, listingsNow, moveTo, buyFurniture, stats, newGame, nextMorning, openShop, settle, canHire, candidates, hire, train, restockAll, tick, startStyling, waiting, staffChoice, inBlackout, setGen, answerVisit, answerMessage } from '../src/game/engine';
+import { interact, energyOf, fuelOf, refuel, tankSize, busyNow, applyLook, buyDesign, displayedCount, displayCap, listingsNow, moveTo, buyFurniture, stats, newGame, nextMorning, openShop, settle, canHire, candidates, hire, train, restockAll, tick, startStyling, waiting, staffChoice, inBlackout, setGen, answerVisit, answerMessage } from '../src/game/engine';
 import { lookCost, scoreLook } from '../src/game/scoring';
 import { SHOP_MINUTES } from '../src/game/economy';
 import { Customer, GameState, StyleChoice } from '../src/game/types';
@@ -81,6 +81,7 @@ let s = newGame(DIVINE_CONFIG);
 const acct = { sales: 0, cogs: 0, n: 0, lostSales: 0, stockSpend: 0 };
 const stockVal = (g: GameState) => g.stock.reduce((a, d) => a + d.cost * d.pieces, 0);
 const scores: number[] = [];
+const energyLog = { rests: 0, minE: 100, bills: 0, fuel: 0 };
 for (let d = 0; d < days; d++) {
   { const c0 = s.cash; s = restockBot(s); acct.stockSpend += c0 - s.cash; }
   const next = s.tier + 1 < TIERS.length ? TIERS[s.tier + 1] : null;
@@ -99,6 +100,12 @@ for (let d = 0; d < days; d++) {
     if (inBlackout(s) && !s.power.gen && stats(s).gen) s = setGen(s, true);
     if (s.visit) s = answerVisit(s, 'welcome');
     if (!w.length || s.clock >= SHOP_MINUTES) { s = tick(s, 1); continue; }
+    if (stats(s).gen && fuelOf(s) < 3) s = refuel(s, 'full');
+    if (busyNow(s)) { s = tick(s, 1); continue; }
+    if (energyOf(s) < 15) {
+      const seat = s.furniture.find((p) => p.placed && ['plasticChair', 'stool', 'bench', 'sofa', 'ottoman', 'velvetSofa'].includes(p.id));
+      if (seat) { s = interact(s, seat.uid, 'sit').s; energyLog.rests++; continue; }
+    }
     const c = w[0].c;
     s = startStyling(s, c.id);
     const ch = bestLook(s, c);
@@ -112,6 +119,7 @@ for (let d = 0; d < days; d++) {
     if (c.contest) console.log(`  style-off day ${s.day}: bot ${score.total} vs ${c.contest.rivalId} ${c.contest.rivalScore} (${c.cls}) notes: ${score.notes.slice(0, 3).join(' | ')}`);
     if (st.outcome === 'paid' || st.outcome === 'bargained') { acct.sales += st.paid + st.tip; acct.cogs += st.cost; acct.n++; } else acct.lostSales++;
     s = applyLook(s, c, ch, st, score);
+    energyLog.minE = Math.min(energyLog.minE, energyOf(s));
     s = tick(s, 0);
   }
   (s as GameState & { _arr?: number })._arr = arrivedToday;
@@ -121,6 +129,7 @@ for (let d = 0; d < days; d++) {
   }
   s = nextMorning(s);
 }
+console.log('energy:', energyLog, 'ledger sample:', s.ledger.filter((l) => /NEPA|LAWMA|Fuel|Data|association/.test(l.label)).slice(0, 6).map((l) => `${l.label} ${l.amount}`).join('; '));
 const { ladder } = await import('../src/game/rivals');
 console.log('ladder:', ladder(s).map((r, i) => `${i + 1}.${r.id}${r.tier}`).join(' '));
 console.log('events:', s.events.map((e) => `${e.title}@${e.day}:${e.status}`).join(', '));

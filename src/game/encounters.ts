@@ -3,6 +3,7 @@
  * market, rivals walking into Divine's shop, Divine looking round theirs,
  * fights over the same shop listing, and Deborah's tips.
  */
+import { zonedLayout } from './layouts';
 import { CharacterConfig } from '../types/character';
 import { generateRandomCustomer } from '../utils/randomizer';
 import { MARKET, canBuy, isClothing, makeDesign, pieceCost } from './market';
@@ -287,22 +288,11 @@ export function answerVisit(s0: GameState, choice: VisitChoice): GameState {
 /** A pretend game state so the shop scene can show a rival's shop. */
 export function rivalShop(s: GameState, r: Rival): GameState {
   const listing: Listing = { id: `rv-${r.id}`, tier: r.tier, area: r.area, street: r.shop, stars: r.stars, rent: 0, moveIn: 0, landlord: '', grace: 0 };
-  // furnish it from what their size can buy, nicer for better shops
+  // furnished in zones to match what they sell; rearranged every few weeks
   const seed = hash(r.id);
-  const can = FURNITURE.filter((f) => (f.minTier || 0) <= r.tier && f.mount !== 'finish' && !f.starter && f.prestige >= (r.tier >= 2 ? 1 : 0));
-  const want = 6 + r.tier * 6;
-  const picks: Placed[] = [];
-  for (let i = 0; i < want; i++) {
-    const f = can[(seed + i * 7) % can.length];
-    picks.push({ uid: newUid(), id: f.id, x: 0, z: 0, rot: 0, placed: true });
-  }
-  const paint = FURNITURE.filter((f) => f.paint && (f.minTier || 0) <= r.tier);
-  const floor = FURNITURE.filter((f) => f.floorTiles && (f.minTier || 0) <= r.tier);
-  if (r.tier > 0) picks.push({ uid: newUid(), id: paint[seed % paint.length].id, x: 0, z: 0, rot: 0, placed: true }, { uid: newUid(), id: floor[seed % floor.length].id, x: 0, z: 0, rot: 0, placed: true });
-  if (r.tier === 0) picks.push({ uid: newUid(), id: 'rustyRail', x: 0, z: 0, rot: 0, placed: true }, { uid: newUid(), id: 'bareBulb', x: 0, z: 0, rot: 0, placed: true });
-  const furniture = autoPlace(picks, listing);
+  const furniture = zonedLayout(r, listing, s.day);
   const stock: Design[] = Array.from({ length: 40 }, (_, i) => ({ uid: `rv${i}`, kind: 'dress', itemId: 'bubu', label: '', fabric: 'plain', color: NAMED_COLOURS[(seed + i * 3) % NAMED_COLOURS.length].color, color2: '#fff', pattern: 0, cost: 0, pieces: 1, displayed: true }));
-  return { ...s, tier: r.tier, listing, furniture, stock, staff: [], phase: 'morning', inShop: [], left: [], divine: r.look, outages: [], shouts: [] };
+  return { ...s, tier: r.tier, listing, furniture, stock, staff: [], phase: 'morning', inShop: [], left: [], divine: r.look, outages: [], shouts: [], off: {}, busy: null, energy: 100, power: { gen: false, solar: 9999, fuel: 10 } };
 }
 
 export function noteVisit(s0: GameState, r: Rival): GameState {

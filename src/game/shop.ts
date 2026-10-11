@@ -134,7 +134,7 @@ export const room = (k: RoomKey): RoomStyle => (typeof k === 'number' ? roomOf({
 // ---------------------------------------------------------------------------
 // Furniture
 // ---------------------------------------------------------------------------
-export type Mount = 'floor' | 'wall' | 'ceiling' | 'finish' | 'roof';
+export type Mount = 'floor' | 'wall' | 'ceiling' | 'finish' | 'yard';
 export type FurnitureGroup = 'Display' | 'Mirrors' | 'Hair & makeup' | 'Seating' | 'Comfort & power' | 'Lighting' | 'Decor' | 'Paint & floor';
 export const FURNITURE_GROUPS: FurnitureGroup[] = ['Display', 'Mirrors', 'Hair & makeup', 'Seating', 'Comfort & power', 'Lighting', 'Decor', 'Paint & floor'];
 export interface FurnitureDef {
@@ -231,9 +231,9 @@ export const FURNITURE: FurnitureDef[] = [
   { id: 'ceilingFan', name: 'Ceiling fan', price: 28_000, w: 1, d: 1, mount: 'ceiling', group: 'Comfort & power', cool: 0.2, prestige: 0, note: 'Cooler, and no floor space. Needs light.' },
   { id: 'ac', name: 'Split AC', price: 220_000, w: 1, d: 1, mount: 'wall', group: 'Comfort & power', cool: 0.4, ac: true, prestige: 2, minTier: 1, note: 'Cold shop: people wait much longer, reputation grows faster. Needs light.' },
   { id: 'standingAc', name: 'Standing AC', price: 380_000, w: 1, d: 1, mount: 'floor', group: 'Comfort & power', cool: 0.55, ac: true, prestige: 2, minTier: 2, note: 'The coldest shop on the street. Needs light.' },
-  { id: 'smallGen', name: '"I better pass my neighbour" generator', price: 70_000, w: 1, d: 1, mount: 'floor', group: 'Comfort & power', gen: 'small', prestige: -1, note: 'Start it when NEPA takes light. Runs lights and fans, not AC. Fuel: ₦1,200 an hour.' },
-  { id: 'generator', name: 'Soundproof generator', price: 260_000, w: 1, d: 1, mount: 'floor', group: 'Comfort & power', gen: 'big', prestige: 1, minTier: 1, note: 'Runs everything, AC included, quietly. Fuel: ₦2,600 an hour.' },
-  { id: 'inverter', name: 'Solar panel and battery', price: 150_000, w: 1, d: 1, mount: 'roof', group: 'Comfort & power', solar: true, prestige: 1, note: 'Comes on by itself when NEPA takes light, free and silent; customers love it. Each panel adds about 1 hour 40 minutes. 3 or more can run AC. Recharges while there is light.' },
+  { id: 'smallGen', name: '"I better pass my neighbour" generator', price: 70_000, w: 1, d: 1, mount: 'yard', group: 'Comfort & power', gen: 'small', prestige: -1, note: 'Stands in the yard outside. Start it when NEPA takes light; runs lights and fans, not AC. 10-litre tank, burns about 1.2 litres an hour. Loud!' },
+  { id: 'generator', name: 'Soundproof generator', price: 260_000, w: 1, d: 1, mount: 'yard', group: 'Comfort & power', gen: 'big', prestige: 1, minTier: 1, note: 'Stands in the yard outside. Runs everything, AC included. 30-litre tank, burns about 2.6 litres an hour.' },
+  { id: 'inverter', name: 'Solar panel and battery', price: 150_000, w: 1, d: 1, mount: 'yard', group: 'Comfort & power', solar: true, prestige: 1, note: 'Sits in the yard outside. Comes on by itself when NEPA takes light, free and silent; customers love it. Each panel adds about 1 hour 40 minutes. 3 or more can run AC. Recharges while there is light.' },
   { id: 'waterDispenser', name: 'Water dispenser', price: 18_000, w: 1, d: 1, mount: 'floor', group: 'Comfort & power', patience: 0.12, prestige: 0, note: 'Cold water for waiting customers: they wait 12% longer.' },
   { id: 'speaker', name: 'Bluetooth speaker', price: 12_000, w: 1, d: 1, mount: 'floor', group: 'Comfort & power', traffic: 0.05, patience: 0.05, prestige: 0, note: 'Afrobeats pulls people in from the street.' },
   { id: 'tv', name: 'Wall TV (fashion channel)', price: 120_000, w: 2, d: 1, mount: 'wall', group: 'Comfort & power', patience: 0.2, prestige: 1, minTier: 1, note: 'Runway shows on loop: people wait 20% longer.' },
@@ -295,6 +295,15 @@ export const footprint = (p: Pick<Placed, 'id' | 'rot'>) => {
 
 /** Wall and ceiling items take a wall position, not floor cells. */
 export const usesFloor = (id: string) => furnitureById(id).mount === 'floor' && !furnitureById(id).walkable;
+
+/** Appliances Divine can switch on and off. */
+export const SWITCHABLE = new Set(['fan', 'ceilingFan', 'ac', 'standingAc', 'speaker', 'tv']);
+/** Furniture with switched-off appliances left out (they stop cooling, playing, drawing power). */
+export const liveItems = (items: Placed[], off?: Record<string, boolean>) => (off && Object.keys(off).length ? items.filter((p) => !off[p.uid]) : items);
+
+/** Spots in the yard outside for generators and solar panels. */
+export const yardCapacity = (k: RoomKey) => Math.max(3, room(k).d + 1);
+export const yardUsed = (items: Placed[]) => items.filter((p) => p.placed && furnitureById(p.id).mount === 'yard').length;
 
 /** How many lights and fans the ceiling can take. */
 export const ceilingCapacity = (k: RoomKey) => Math.max(2, Math.floor(room(k).w / 2.4));
@@ -395,7 +404,7 @@ export function autoPlace(items: Placed[], tier: RoomKey): Placed[] {
   const order = [...items].sort((a, b) => furnitureById(b.id).w * furnitureById(b.id).d - furnitureById(a.id).w * furnitureById(a.id).d);
   for (const it of order) {
     const f = furnitureById(it.id);
-    if (f.mount === 'finish' || f.mount === 'roof') { out.push({ ...it, placed: true }); continue; }
+    if (f.mount === 'finish' || f.mount === 'yard') { out.push({ ...it, placed: true }); continue; }
     if (f.mount === 'ceiling') { const ok = out.filter((o) => o.placed && furnitureById(o.id).mount === 'ceiling').length < ceilingCapacity(tier); out.push({ ...it, placed: ok, x: 0, z: 0 }); continue; }
     if (f.mount === 'wall') {
       const ok = wall + f.w <= cap;
