@@ -244,9 +244,11 @@ export function actionSpot(s: GameState, uid: string): { cell: Cell; face: numbe
   const free = (x: number, z: number) => x >= 0 && x < r.w && z >= 0 && z < r.d && !blocked[z][x];
   const faceTo = (c: Cell, tx: number, tz: number) => Math.atan2(tx - (c[0] + 0.5), tz - (c[1] + 0.5));
   if (f.mount === 'yard') {
-    const i = yardOrder(s).findIndex((x) => x.uid === uid);
-    const cell: Cell = [r.w, i];
-    return { cell, face: Math.PI / 2 };
+    const side = p.yardSide || 'right';
+    const sideItems = yardOrder(s).filter((x) => (x.yardSide || 'right') === side);
+    const i = sideItems.findIndex((x) => x.uid === uid);
+    const cell: Cell = [side === 'left' ? -1 : r.w, i];
+    return { cell, face: side === 'left' ? -Math.PI / 2 : Math.PI / 2 };
   }
   if (f.mount === 'wall') {
     const at = wallLayout(s.furniture, s.listing)[uid];
