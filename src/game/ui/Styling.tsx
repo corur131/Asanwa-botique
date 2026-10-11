@@ -13,7 +13,7 @@ import { Btn, CLASS_LABEL, CLASS_TONE, Chip, ColourDots, Pill, Swatch } from './
 type Tab = 'outfit' | 'feet' | 'extras' | 'hair' | 'face';
 
 const wantLabel = (w: Want) =>
-  ({ color: `Colour: ${(w as { name?: string }).name}`, native: 'Native', english: 'English wear', gele: 'Gele', noHeels: 'No heels', fitted: 'Show her shape', covered: 'Nothing short or open', jacket: 'Jacket', hair: `Hair: ${(w as { group?: string }).group}`, glam: 'Full glam', naturalFace: 'Light makeup' })[w.kind];
+  ({ color: `Colour: ${(w as { name?: string }).name}`, native: 'Native', english: 'English wear', gele: 'Gele', nails: 'Nails', noHeels: 'No heels', fitted: 'Show her shape', covered: 'Nothing short or open', jacket: 'Jacket', hair: `Hair: ${(w as { group?: string }).group}`, glam: 'Full glam', naturalFace: 'Light makeup' })[w.kind];
 
 const SERVICE_LABEL = { hair: 'Hair only', makeup: 'Makeup only', both: 'Hair & makeup only' } as const;
 
