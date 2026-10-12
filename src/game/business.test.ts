@@ -1,8 +1,11 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import type { GameState } from './types';
+import { money } from './engine';
 import {
   financialAssets,
+  totalLiabilities,
+  ensureBusinessState,
   initialBankState,
   processFixedDepositMaturities,
   processBankWeekly,
@@ -141,4 +144,28 @@ test('hardship arrangement changes the schedule but does not erase monetary arre
   assert.equal(after.bank!.loans[0].arrangementUsed, true);
   assert.equal(after.bank!.loans[0].arrearsBalance, 12_000);
   assert.equal(after.bank!.loans[0].missedPayments, 0);
+});
+
+
+test('unfunded operating costs become payables instead of negative cash', () => {
+  const before = state({ cash: 1_000 });
+  const after = money(before, -3_000, 'Unexpected operating bill');
+  assert.equal(after.cash, 0);
+  assert.equal(after.operatingPayables, 2_000);
+  assert.equal(totalLiabilities(after), 2_000);
+});
+
+test('new operating receipts settle payables before increasing spendable cash', () => {
+  const before = state({ cash: 0, operatingPayables: 2_000 });
+  const after = money(before, 5_000, 'Daily sales');
+  assert.equal(after.cash, 3_000);
+  assert.equal(after.operatingPayables, 0);
+  assert.equal(after.ledger?.[0]?.label, 'Operating payables settled');
+});
+
+test('legacy negative cash is migrated into an operating liability', () => {
+  const before = state({ cash: -5_000, operatingPayables: 2_000 });
+  const after = ensureBusinessState(before);
+  assert.equal(after.cash, 0);
+  assert.equal(after.operatingPayables, 7_000);
 });
