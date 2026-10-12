@@ -5,6 +5,9 @@ import {
   financialAssets,
   initialBankState,
   processFixedDepositMaturities,
+  processBankWeekly,
+  repayBusinessLoan,
+  arrangeBusinessLoanRepayment,
   transferBank,
 } from './business';
 
@@ -15,6 +18,9 @@ function state(overrides: Partial<GameState> = {}): GameState {
     clock: 0,
     cash: 50_000,
     ledger: [],
+    today: { income: 0, costs: 0, events: [] },
+    messages: [],
+    msgSeq: 0,
     bank: {
       ...initialBankState(),
       savings: 20_000,
@@ -84,4 +90,55 @@ test('processing a matured deposit twice does not credit it twice', () => {
   const twice = processFixedDepositMaturities(once);
   assert.equal(twice.bank?.savings, once.bank?.savings);
   assert.equal(twice.ledger?.length, once.ledger?.length);
+});
+
+
+test('missed loan payment capitalizes interest, records the instalment as arrears, and logs both charges', () => {
+  const loan = {
+    id: 'loan-test', principal: 100_000, balance: 100_000, weeklyRatePct: 2,
+    weeklyPayment: 12_000, termWeeks: 12, nextPaymentDay: 7, missedPayments: 0,
+  };
+  const before = state({
+    day: 7,
+    cash: 0,
+    bank: { ...initialBankState(), savings: 0, rentVault: 0, loans: [loan] },
+  });
+  const after = processBankWeekly(before);
+  const updated = after.bank!.loans[0];
+  assert.equal(updated.balance, 104_500);
+  assert.equal(updated.arrearsBalance, 12_000);
+  assert.equal(updated.missedPayments, 1);
+  assert.equal(after.today.costs, 4_500);
+  assert.equal(after.ledger?.[0]?.label, 'Missed loan payment fee');
+  assert.equal(after.ledger?.[1]?.label, 'Missed loan interest');
+});
+
+test('partial loan repayment reduces both debt and recorded arrears without erasing missed-payment history', () => {
+  const loan = {
+    id: 'loan-test', principal: 100_000, balance: 100_000, weeklyRatePct: 2,
+    weeklyPayment: 12_000, termWeeks: 12, nextPaymentDay: 14,
+    missedPayments: 1, arrearsBalance: 12_000,
+  };
+  const before = state({
+    cash: 5_000,
+    bank: { ...initialBankState(), loans: [loan] },
+  });
+  const after = repayBusinessLoan(before, 'loan-test', 3_000);
+  assert.equal(after.cash, 2_000);
+  assert.equal(after.bank!.loans[0].balance, 97_000);
+  assert.equal(after.bank!.loans[0].arrearsBalance, 9_000);
+  assert.equal(after.bank!.loans[0].missedPayments, 1);
+});
+
+test('hardship arrangement changes the schedule but does not erase monetary arrears', () => {
+  const loan = {
+    id: 'loan-test', principal: 100_000, balance: 104_500, weeklyRatePct: 2,
+    weeklyPayment: 12_000, termWeeks: 12, nextPaymentDay: 14,
+    missedPayments: 0, arrearsBalance: 12_000,
+  };
+  const before = state({ day: 10, bank: { ...initialBankState(), loans: [loan] } });
+  const after = arrangeBusinessLoanRepayment(before, 'loan-test');
+  assert.equal(after.bank!.loans[0].arrangementUsed, true);
+  assert.equal(after.bank!.loans[0].arrearsBalance, 12_000);
+  assert.equal(after.bank!.loans[0].missedPayments, 0);
 });
