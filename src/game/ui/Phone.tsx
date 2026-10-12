@@ -251,7 +251,6 @@ const Chats: React.FC<PhoneProps> = ({ s, up, chat, setChat, staff }) => {
   const [draft, setDraft] = useState('');
   const [aiSending, setAiSending] = useState(false);
   const [aiError, setAiError] = useState('');
-  const [inputTapStatus, setInputTapStatus] = useState('Test ready: tap the message box once.');
   const sendFreeform = async (event: React.FormEvent) => {
     event.preventDefault();
     const text = draft.trim();
@@ -498,8 +497,6 @@ const Chats: React.FC<PhoneProps> = ({ s, up, chat, setChat, staff }) => {
               onChange={(e) => setDraft(e.target.value)}
               onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); e.currentTarget.form?.requestSubmit(); } }}
               onTouchStart={(e) => { if (!aiSending) e.currentTarget.focus(); }}
-              onPointerDown={() => setInputTapStatus('Tap reached the message box.')}
-              onFocus={() => setInputTapStatus('Input focused. If no keyboard appears, the problem is after focus.')}
               placeholder={aiSending ? 'Waiting for reply…' : `Message ${targetChatLabel(chat)}`}
               aria-label="Write a message"
               inputMode="text"
@@ -519,7 +516,6 @@ const Chats: React.FC<PhoneProps> = ({ s, up, chat, setChat, staff }) => {
             </button>
           </div>
           <div className="text-[10px] text-slate-500 px-2 pt-1">Free-form AI chat · Enter to send, Shift+Enter for a new line</div>
-          <div aria-live="polite" className="text-[10px] text-amber-300 px-2 pt-1">{inputTapStatus}</div>
         </form>
       )}
     </div>
