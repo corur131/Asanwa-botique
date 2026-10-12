@@ -103,12 +103,12 @@ export function stopPromotion(s: GameState): GameState {
   return s.promotion?.active ? { ...s, promotion: { ...s.promotion, active: false } } : s;
 }
 
-function ledger(s: GameState, amount: number, label: string): GameState {
+function ledger(s: GameState, amount: number, label: string, category?: 'transfer' | 'operating' | 'financing' | 'interest'): GameState {
   if (!amount) return s;
   return {
     ...s,
     cash: s.cash + amount,
-    ledger: [{ day: s.day, t: s.phase === 'shop' ? Math.floor(s.clock) : -1, label, amount }, ...(s.ledger || [])].slice(0, 150),
+    ledger: [{ day: s.day, t: s.phase === 'shop' ? Math.floor(s.clock) : -1, label, amount, ...(category ? { category } : {}) }, ...(s.ledger || [])].slice(0, 150),
   };
 }
 
@@ -122,13 +122,13 @@ export function transferBank(s0: GameState, pocket: BankPocket, amount: number, 
     const nextBank = source === 'savings'
       ? { ...bank, savings: bank.savings - value }
       : { ...bank, rentVault: bank.rentVault - value };
-    return ledger({ ...s0, bank: nextBank }, value, 'Transfer from ' + (source === 'savings' ? 'savings' : 'Rent Vault') + ' to current account');
+    return ledger({ ...s0, bank: nextBank }, value, 'Transfer from ' + (source === 'savings' ? 'savings' : 'Rent Vault') + ' to current account', 'transfer');
   }
   if (s0.cash < value) return s0;
   const updatedBank = pocket === 'savings'
     ? { ...bank, savings: bank.savings + value }
     : { ...bank, rentVault: bank.rentVault + value };
-  return ledger({ ...s0, bank: updatedBank }, -value, pocket === 'savings' ? 'Transfer to savings' : 'Transfer to Rent Vault');
+  return ledger({ ...s0, bank: updatedBank }, -value, pocket === 'savings' ? 'Transfer to savings' : 'Transfer to Rent Vault', 'transfer');
 }
 
 export function setRentSaving(s0: GameState, mode: 'manual' | 'automatic', percent?: number): GameState {
@@ -217,9 +217,9 @@ export function processPromotionAtClose(s0: GameState): GameState {
 export function saveRentAtClose(s0: GameState): GameState {
   const bank = s0.bank || initialBankState();
   if (bank.rentMode !== 'automatic' || bank.autoRentPercent <= 0) return s0;
-  // On rent day, reserve rent first; do not sweep the rent money straight back into the vault.
-  const rentDueToday = s0.day % 7 === 0 ? s0.listing.rent : 0;
-  const operatingProfit = Math.max(0, s0.today.income - s0.today.costs - rentDueToday);
+  // Rent has not been charged to today's costs yet; save a percentage of
+  // positive earnings after today's operating costs, without deducting rent twice.
+  const operatingProfit = Math.max(0, s0.today.income - s0.today.costs);
   const requested = roundMoney(operatingProfit * bank.autoRentPercent / 100);
   const amount = Math.min(requested, Math.max(0, s0.cash));
   if (!amount) return s0;
@@ -389,20 +389,32 @@ export function playerWeekTotals(s: GameState): { revenue: number; costs: number
   return { revenue, costs, profit: revenue - costs };
 }
 
-export function netWorthPlayer(s: GameState): number {
+/** Money held in current, savings, Rent Vault and fixed-deposit accounts. */
+export function financialAssets(s: Pick<GameState, 'cash' | 'bank'>): number {
   const bank = s.bank || initialBankState();
+  const fixedDeposits = bank.fixedDeposits.reduce((sum, deposit) => sum + Math.max(0, deposit.amount), 0);
+  return Math.round(s.cash + Math.max(0, bank.savings) + Math.max(0, bank.rentVault) + fixedDeposits);
+}
+
+/** Recorded liabilities: outstanding bank loans and any unpaid rent. */
+export function totalLiabilities(s: Pick<GameState, 'bank' | 'lateRent'>): number {
+  const bank = s.bank || initialBankState();
+  const loans = bank.loans.reduce((sum, loan) => sum + Math.max(0, loan.balance), 0);
+  const rentOwed = Math.max(0, s.lateRent?.amount || 0);
+  return Math.round(loans + rentOwed);
+}
+
+export function netWorthPlayer(s: GameState): number {
   const inventory = (s.stock || []).reduce((sum, d) => sum + Math.max(0, d.cost) * Math.max(0, d.pieces), 0);
   const fixtures = (s.furniture || []).reduce((sum, item) => {
     try { return sum + furnitureById(item.id).price * 0.35; } catch { return sum; }
   }, 0);
-  const deposits = bank.fixedDeposits.reduce((sum, deposit) => sum + deposit.amount, 0);
-  const debt = bank.loans.reduce((sum, loan) => sum + loan.balance, 0);
   const expansion = s.businessExpansion || initialBusinessExpansion();
   const expansionAssets = expansion.branches.reduce((sum, branch) => sum + Math.max(0, branch.assetValue), 0) + (expansion.wholesaleActive ? 4_500_000 : 0) + expansion.departments.length * 650_000 + expansion.designerCollections * 1_250_000;
   const weekly = playerWeekTotals(s);
   const goodwill = Math.max(0, weekly.profit) * 5 + Math.max(0, s.followers || 0) * 5 +
     brandPower(getBrandMetrics(s), s.followers || 0, s.tier) * 100;
-  return Math.round(s.cash + bank.savings + bank.rentVault + deposits + inventory + fixtures + expansionAssets + goodwill - debt);
+  return Math.round(financialAssets(s) + inventory + fixtures + expansionAssets + goodwill - totalLiabilities(s));
 }
 
 export function netWorthRival(r: Rival): number {
