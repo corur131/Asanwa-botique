@@ -15,7 +15,7 @@ import { colourName } from './colours';
 import { FURNITURE, KIOSK_LISTING, Listing, Placed, STARTER_FURNITURE, autoPlace,
   findSpot, canPlace, turn, Rot, ceilingCapacity, ceilingUsed, yardCapacity, yardUsed, cheapestListing, furnitureById, listingsFor, newUid, prestigeRichShift, prestigeTraffic, shopStats, usesFloor, wallCapacity, wallUsed } from './shop';
 import { CharacterMemory, CollaborationEvent, CollaborationReply, Customer, DayLog, Departure, Design, ReplyChoice, GameState, LedgerLine, Message, Regular, ScoreBreakdown, Settlement, StaffMember, StaffProfession, StyleChoice } from './types';
-import { brandFromLegacy, closeBrandDay, ensureBusinessState, getBrandMetrics, initialBankState, maximumLoan, netWorthPlayer, processBankWeekly, processPromotionAtClose, promotionTrafficBoost, recordWeeklyWealth, saveRentAtClose, startPromotion, stopPromotion, transferBank, setRentSaving, setSavingsGoal, createFixedDeposit, takeBusinessLoan, repayBusinessLoan, unlocksForFollowers } from './business';
+import { closeBrandDay, ensureBusinessState, getBrandMetrics, initialBankState, processBankWeekly, processPromotionAtClose, promotionTrafficBoost, recordWeeklyWealth, saveRentAtClose } from './business';
 
 export { brandPower, currentWealthRows, getBrandMetrics, maximumLoan, netWorthPlayer, netWorthRival, playerWeekTotals, unlocksForFollowers, availablePromotionLevels, promotionBudgetBounds, promotionTrafficBoost, startPromotion, stopPromotion, transferBank, setRentSaving, setSavingsGoal, createFixedDeposit, takeBusinessLoan, repayBusinessLoan } from './business';
 
