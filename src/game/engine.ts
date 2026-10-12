@@ -1049,8 +1049,8 @@ export function payRent(s: GameState): GameState {
   return msg(next, 'Landlord', `Rent of ${naira(rent)} received. See you next week.`, 'info');
 }
 
-function demote(s: GameState): GameState {
-  if (s.tier === 0) return msg({ ...s, lateRent: null }, 'Landlord', 'This kiosk is the last stop. I will let the debt run, but pay me soon.', 'danger');
+export function demote(s: GameState): GameState {
+  if (s.tier === 0) return msg({ ...s, lateRent: s.lateRent ? { ...s.lateRent, due: s.day + 7 } : null }, 'Landlord', 'This kiosk is the last stop. I will let the debt run for another week, but pay me soon.', 'danger');
   const tier = s.tier - 1;
   const t = TIERS[tier];
   const listing = cheapestListing(tier, week(s.day));
