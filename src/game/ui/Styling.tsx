@@ -4,10 +4,10 @@ import { BEARDS, BLUSH_SHADES, EYESHADOWS, FEMALE_HAIR, HAIR_COLORS, LASHES, LIN
 import { HAIR_PALETTES } from '../../components/renderer/hair';
 import { CameraView, Makeup } from '../../types/character';
 import { HAIR_COST, MARKUP, naira } from '../economy';
-import { entryFor } from '../market';
+import { entryFor, productKey } from '../market';
+import { colourName } from '../colours';
 import { OCCASION_LABEL } from '../customers';
 import { buildLook, designsOf, hairGroup, lookCost } from '../scoring';
-import { productKey } from '../market';
 import { Customer, Design, GameState, StyleChoice, Want } from '../types';
 import { Btn, CLASS_LABEL, CLASS_TONE, Chip, ColourDots, Pill, Swatch } from './kit';
 
@@ -79,11 +79,16 @@ const ItemList: React.FC<{ title: string; slot: keyof StyleChoice; items: Design
                 {open && (
                   <div className="border-t border-white/10 p-2 bg-black/15">
                     <div className="text-[10px] text-slate-400 mb-1.5">Choose the colour to put on {slot === 'hairpiece' ? 'the hairpiece' : 'the look'}.</div>
-                    <div className="flex flex-wrap gap-2">
+                    <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
                       {variants.map((v) => (
-                        <button key={v.uid} type="button" title={`${v.color} · ${v.pieces} left`} onClick={() => toggle(slot, v.uid)} className={`relative w-9 h-9 rounded-full border-2 ${choice[slot] === v.uid ? 'border-amber-300 ring-2 ring-amber-400/40' : 'border-white/25'} `} style={{ background: v.color }}>
-                          {v.pieces <= 0 && <span className="absolute inset-0 rounded-full bg-black/70 text-[9px] flex items-center justify-center text-rose-200">0</span>}
-                          {choice[slot] === v.uid && <span className="absolute -right-1 -top-1 bg-amber-300 text-black w-4 h-4 rounded-full text-[10px] flex items-center justify-center">✓</span>}
+                        <button key={v.uid} type="button" title={`${colourName(v.color)} · ${v.fabric} · ${v.pieces} left`} aria-label={`Choose ${colourName(v.color)} ${v.fabric} ${v.label}`} onClick={() => toggle(slot, v.uid)} className={`min-w-0 flex flex-col items-center gap-1 rounded-lg p-1 ${choice[slot] === v.uid ? 'bg-amber-400/10' : 'hover:bg-white/5'}`}>
+                          <span className={`relative w-9 h-9 rounded-full border-2 ${choice[slot] === v.uid ? 'border-amber-300 ring-2 ring-amber-400/40' : 'border-white/25'}`} style={{ background: v.color }}>
+                            {v.pieces <= 0 && <span className="absolute inset-0 rounded-full bg-black/70 text-[9px] flex items-center justify-center text-rose-200">0</span>}
+                            {choice[slot] === v.uid && <span className="absolute -right-1 -top-1 bg-amber-300 text-black w-4 h-4 rounded-full text-[10px] flex items-center justify-center">✓</span>}
+                          </span>
+                          <span className="text-[9px] text-slate-300 leading-tight">{colourName(v.color)}</span>
+                          {v.fabric !== 'plain' && <span className="text-[8px] text-slate-500 leading-tight">{v.fabric}</span>}
+                          {v.pieces > 0 && <span className="text-[8px] text-slate-500">{v.pieces} left</span>}
                         </button>
                       ))}
                     </div>
