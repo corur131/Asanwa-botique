@@ -437,12 +437,20 @@ const Chats: React.FC<PhoneProps> = ({ s, up, chat, setChat, staff }) => {
               value={draft}
               onChange={(e) => setDraft(e.target.value)}
               onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); e.currentTarget.form?.requestSubmit(); } }}
+              onTouchStart={(e) => { if (!aiSending) e.currentTarget.focus(); }}
               placeholder={aiSending ? 'Waiting for reply…' : `Message ${targetChatLabel(chat)}`}
               aria-label="Write a message"
+              inputMode="text"
+              enterKeyHint="send"
+              autoCapitalize="sentences"
+              autoCorrect="on"
+              spellCheck
+              autoComplete="off"
               rows={1}
               maxLength={1000}
               disabled={aiSending}
-              className="min-w-0 flex-1 resize-none rounded-2xl bg-[#2A3942] text-white placeholder:text-slate-400 text-sm px-4 py-2.5 outline-none focus:ring-1 focus:ring-emerald-500 disabled:opacity-60"
+              style={{ fontSize: 16, touchAction: 'manipulation' }}
+              className="relative z-10 pointer-events-auto min-w-0 flex-1 resize-none rounded-2xl bg-[#2A3942] text-white placeholder:text-slate-400 text-base px-4 py-2.5 outline-none focus:ring-1 focus:ring-emerald-500 disabled:opacity-60"
             />
             <button type="submit" disabled={aiSending || !draft.trim()} className="rounded-full w-10 h-10 shrink-0 bg-[#00A884] text-white font-bold disabled:opacity-40" aria-label="Send message">
               {aiSending ? '…' : '➤'}
