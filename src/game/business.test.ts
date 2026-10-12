@@ -256,6 +256,43 @@ test('legacy negative cash is migrated into an operating liability', () => {
 });
 
 
+test('branch performance accumulates sales, costs, profit, and weekly rent exactly once', () => {
+  const before = state({
+    day: 14,
+    cash: 100_000_000,
+    businessExpansion: {
+      branches: [{
+        id: 'branch-performance',
+        name: 'Performance Branch',
+        area: 'Ikeja',
+        tier: 0,
+        openedDay: 1,
+        weeklyRent: 10_000,
+        assetValue: 2_200_000,
+      }],
+      departments: [],
+      wholesaleActive: false,
+      designerCollections: 0,
+    },
+  });
+  const after = processExpansionAtClose(before);
+  const branch = after.businessExpansion!.branches[0];
+  assert.ok((branch.lastDayRevenue || 0) > 0);
+  assert.equal(branch.cumulativeRevenue, branch.lastDayRevenue);
+  assert.equal(branch.cumulativeCosts, branch.lastDayCosts);
+  assert.equal(branch.lastDayCosts, Math.round((branch.lastDayRevenue || 0) * 0.5) + Math.round(1_500 * 0.65) + 10_000);
+  assert.equal(branch.lastDayProfit, (branch.lastDayRevenue || 0) - (branch.lastDayCosts || 0));
+  assert.equal(branch.daysTrading, 1);
+  assert.equal(branch.lastDay, 14);
+  assert.equal(after.businessExpansion!.lastProcessedDay, 14);
+
+  const repeated = processExpansionAtClose(after);
+  assert.equal(repeated, after, 'same-day repeat must not post another sale, cost, or rent');
+  assert.equal(repeated.cash, after.cash);
+  assert.equal(repeated.businessExpansion!.branches[0].cumulativeRevenue, branch.cumulativeRevenue);
+  assert.equal(repeated.businessExpansion!.branches[0].cumulativeCosts, branch.cumulativeCosts);
+});
+
 test('branch operating costs create a payable rather than negative cash when funds run short', () => {
   const before = state({
     day: 7,
