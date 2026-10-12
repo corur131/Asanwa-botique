@@ -209,7 +209,12 @@ export function scoreLook(c: Customer, choice: StyleChoice, stock: Design[]): Sc
       case 'fitted': ok = main.length && main.every((x) => FITTED.has(x.itemId)) ? 1 : main.some((x) => FITTED.has(x.itemId)) ? 0.5 : 0; break;
       case 'covered': ok = main.length && !main.some((x) => REVEALING.has(x.itemId)) ? 1 : 0; break;
       case 'jacket': ok = d.outer ? 1 : 0; break;
-      case 'hair': ok = choice.hair && (w.group === 'male' || hairGroup(choice.hair) === w.group) ? 1 : 0; break;
+      case 'hair': {
+        const stockedHair = designsOf(choice, stock).hair;
+        const selectedHair = stockedHair ? entryFor(stockedHair.kind, stockedHair.itemId)?.renderId || stockedHair.itemId : choice.hair;
+        ok = selectedHair && (w.group === 'male' || hairGroup(selectedHair) === w.group) ? 1 : 0;
+        break;
+      }
       case 'glam': ok = glam >= 0.7 ? 1 : glam >= 0.5 ? 0.5 : 0; break;
       case 'naturalFace': ok = glam > 0.05 && glam <= 0.4 ? 1 : glam <= 0.55 ? 0.5 : 0; break;
     }
