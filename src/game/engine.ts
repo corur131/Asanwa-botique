@@ -15,7 +15,7 @@ import { colourName } from './colours';
 import { FURNITURE, KIOSK_LISTING, Listing, Placed, STARTER_FURNITURE, autoPlace,
   findSpot, canPlace, turn, Rot, ceilingCapacity, ceilingUsed, yardCapacity, yardUsed, cheapestListing, furnitureById, listingsFor, newUid, prestigeRichShift, prestigeTraffic, shopStats, usesFloor, wallCapacity, wallUsed } from './shop';
 import { CharacterMemory, CollaborationEvent, CollaborationReply, Customer, DayLog, Departure, Design, ReplyChoice, GameState, LedgerLine, Message, Regular, ScoreBreakdown, Settlement, SponsorshipOffer, StaffMember, StaffProfession, StyleChoice } from './types';
-import { closeBrandDay, ensureBusinessState, getBrandMetrics, initialBankState, processBankWeekly, processPromotionAtClose, processExpansionAtClose, promotionTrafficBoost, recordWeeklyWealth, saveRentAtClose } from './business';
+import { closeBrandDay, ensureBusinessState, getBrandMetrics, initialBankState, processBankWeekly, processFixedDepositMaturities, processPromotionAtClose, processExpansionAtClose, promotionTrafficBoost, recordWeeklyWealth, saveRentAtClose } from './business';
 
 export { brandPower, currentWealthRows, financialAssets, getBrandMetrics, creditProfile, creditRating, creditHistoryReport, premiumLoanEligible, takePremiumBusinessLoan, renegotiateBusinessLoan, loanRateForScore, maximumLoan, netWorthPlayer, netWorthRival, playerWeekTotals, totalLiabilities, unlocksForFollowers, availablePromotionLevels, promotionBudgetBounds, promotionTrafficBoost, startPromotion, stopPromotion, transferBank, setRentSaving, setSavingsGoal, createFixedDeposit, takeBusinessLoan, repayBusinessLoan, arrangeBusinessLoanRepayment, expansionOptions, investInExpansion } from './business';
 
@@ -681,6 +681,9 @@ export function closeShop(s0: GameState): GameState {
     s = payBills(s);
     s = processBankWeekly(s);
   }
+
+  // Fixed deposits mature on their exact due day, not only on weekly banking days.
+  s = processFixedDepositMaturities(s);
 
   // Clear any old rent arrears from the Rent Vault and available cash before
   // saving for the next bill or creating a new rent liability.
