@@ -172,6 +172,60 @@ export function creditRating(score: number): string {
   return 'Very poor';
 }
 
+/** A plain-language credit report for the in-game player. */
+export function creditHistoryReport(s: GameState) {
+  const bank = s.bank || initialBankState();
+  const profile = creditProfile(s);
+  const activeDebt = bank.loans.reduce((sum, loan) => sum + Math.max(0, loan.balance), 0);
+  const arrears = bank.loans.reduce((sum, loan) => sum + Math.max(0, loan.missedPayments || 0), 0);
+  const defaults = Math.max(profile.defaults, bank.loans.filter((loan) => loan.defaulted || (loan.missedPayments || 0) >= 3).length);
+  return {
+    score: profile.score, rating: creditRating(profile.score), onTimePayments: profile.onTimePayments,
+    latePayments: profile.latePayments, defaults, loansTaken: profile.loansTaken,
+    activeLoans: bank.loans.length, activeDebt, arrears,
+    standing: bank.loans.some((loan) => loan.collectionsStarted || (loan.missedPayments || 0) >= 5) ? 'Collections' : defaults > 0 ? 'Default recorded' : arrears > 0 ? 'In arrears' : 'Current',
+  };
+}
+
+export function premiumLoanEligible(s: GameState): boolean {
+  const bank = s.bank || initialBankState();
+  const profile = creditProfile(s);
+  return profile.score >= 750 && profile.onTimePayments >= 3 && netWorthPlayer(s) >= 1_000_000
+    && !bank.loans.some((loan) => loan.defaulted || (loan.missedPayments || 0) > 0 || loan.collectionsStarted)
+    && maximumLoan(s) >= 10_000;
+}
+
+/** A preferred-customer growth loan: a small rate discount, with the same affordability safeguards. */
+export function takePremiumBusinessLoan(s0: GameState, requested: number, termWeeks: number): GameState {
+  if (!premiumLoanEligible(s0)) return s0;
+  const beforeIds = new Set((s0.bank || initialBankState()).loans.map((loan) => loan.id));
+  const next = takeBusinessLoan(s0, requested, termWeeks);
+  if (next === s0) return s0;
+  const bank = next.bank || initialBankState();
+  const newLoan = bank.loans.find((loan) => !beforeIds.has(loan.id));
+  if (!newLoan) return next;
+  const rate = Math.max(1.5, Math.round((newLoan.weeklyRatePct - 0.4) * 10) / 10);
+  const r = rate / 100;
+  const weeklyPayment = Math.round(newLoan.principal * r * Math.pow(1 + r, termWeeks) / (Math.pow(1 + r, termWeeks) - 1));
+  const loans = bank.loans.map((loan) => loan.id === newLoan.id ? { ...loan, loanType: 'premium' as const, weeklyRatePct: rate, weeklyPayment } : loan);
+  const result = { ...next, bank: { ...bank, loans } };
+  return { ...result, messages: [{ id: (result.msgSeq || 0) + 1, day: result.day, from: 'KoboBank', text: 'Preferred-customer growth financing approved at a 0.4 percentage-point weekly-rate discount. Keep all payments on time to retain access to preferred offers.', tone: 'good' as const, t: -1 }, ...(result.messages || [])].slice(0, 160), msgSeq: (result.msgSeq || 0) + 1 };
+}
+
+/** One optional renegotiation for a loan that is still current. */
+export function renegotiateBusinessLoan(s0: GameState, loanId: string): GameState {
+  const bank = s0.bank || initialBankState();
+  const loan = bank.loans.find((item) => item.id === loanId);
+  if (!loan || loan.balance <= 0 || loan.renegotiationUsed || loan.arrangementUsed || loan.defaulted || loan.collectionsStarted || (loan.missedPayments || 0) > 0) return s0;
+  const termWeeks = Math.min(32, loan.termWeeks + 4);
+  const rate = Math.min(5, Math.round((loan.weeklyRatePct + 0.3) * 10) / 10);
+  const r = rate / 100;
+  const weeklyPayment = Math.round(loan.balance * r * Math.pow(1 + r, termWeeks) / (Math.pow(1 + r, termWeeks) - 1));
+  const loans = bank.loans.map((item) => item.id === loanId ? { ...item, termWeeks, weeklyRatePct: rate, weeklyPayment, nextPaymentDay: Math.max(item.nextPaymentDay, (Math.floor(s0.day / 7) + 1) * 7), renegotiationUsed: true } : item);
+  const next = { ...s0, bank: { ...bank, loans } };
+  return { ...next, messages: [{ id: (next.msgSeq || 0) + 1, day: next.day, from: 'KoboBank', text: 'Your one-time loan renegotiation is approved: the term is four weeks longer and the scheduled weekly payment has been recalculated. The weekly rate rose by 0.3 percentage points, so review the total cost before accepting similar offers.', tone: 'warn' as const, t: -1 }, ...(next.messages || [])].slice(0, 160), msgSeq: (next.msgSeq || 0) + 1, today: { ...next.today, events: [...next.today.events, 'KoboBank approved a one-time loan renegotiation.'] } };
+}
+
 export function loanRateForScore(score: number): number {
   if (score >= 800) return 2.2;
   if (score >= 750) return 2.5;
@@ -347,7 +401,7 @@ export function processBankWeekly(s0: GameState): GameState {
         const collection = Math.min(availableForCollection, currentLoan ? currentLoan.balance : 0, Math.max(5_000, roundMoney(((currentLoan?.balance || 0) * 0.03))));
         if (collection > 0 && currentLoan) {
           const afterCollectionLoans = (s.bank || bank).loans.map((item) => item.id === loan.id ? { ...item, balance: Math.max(0, item.balance - collection), collectionsStarted: true } : item).filter((item) => item.balance > 0);
-          s = { ...s, cash: s.cash - collection, bank: { ...(s.bank || bank), loans: afterCollectionLoans }, ledger: [{ day: s.day, t: -1, label: 'KoboBank debt recovery', amount: -collection }, ...(s.ledger || [])].slice(0, 150), messages: [{ id: (s.msgSeq || 0) + 1, day: s.day, from: 'KoboBank', text: 'Your loan has been referred to collections after repeated missed payments. ' + collection.toLocaleString('en-NG') + ' naira was recovered from available business cash; a small operating buffer was protected.', tone: 'danger' as const, t: -1 }, ...(s.messages || [])].slice(0, 160), msgSeq: (s.msgSeq || 0) + 1, today: { ...s.today, events: [...s.today.events, 'Debt recovery collected ' + collection.toLocaleString('en-NG') + ' naira while protecting a 25,000 naira operating buffer.'] } };
+          s = { ...s, cash: s.cash - collection, bank: { ...(s.bank || bank), loans: afterCollectionLoans }, ledger: [{ day: s.day, t: -1, label: 'KoboBank debt recovery', amount: -collection }, ...(s.ledger || [])].slice(0, 150), messages: [{ id: (s.msgSeq || 0) + 1, day: s.day, from: 'KoboBank', text: 'FORMAL COLLECTIONS NOTICE: Your loan has been referred to KoboBank collections after five or more consecutive missed payments. ' + collection.toLocaleString('en-NG') + ' naira was recovered from available business cash; the ₦25,000 operating buffer was protected. Contact the in-game bank options to clear the arrears or request an eligible plan.', tone: 'danger' as const, t: -1 }, ...(s.messages || [])].slice(0, 160), msgSeq: (s.msgSeq || 0) + 1, today: { ...s.today, events: [...s.today.events, 'Debt recovery collected ' + collection.toLocaleString('en-NG') + ' naira while protecting a 25,000 naira operating buffer.'] } };
           bank = s.bank || bank;
         }
       }
