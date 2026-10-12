@@ -67,6 +67,31 @@ test('weekly bank interest is not credited before a scheduled banking day', () =
   assert.equal(after.ledger!.length, before.ledger!.length);
 });
 
+test('maximum loan rounds down and never authorizes more than the remaining cap', () => {
+  const existingLoan = {
+    id: 'existing-small-loan',
+    principal: 82_875,
+    balance: 82_875,
+    weeklyRatePct: 0,
+    weeklyPayment: 1_000,
+    termWeeks: 8,
+    nextPaymentDay: 14,
+    missedPayments: 0,
+    arrearsBalance: 0,
+  };
+  const before = state({
+    day: 10,
+    tier: 0,
+    cash: 2_000_000,
+    bank: { ...initialBankState(), loans: [existingLoan] },
+  });
+  assert.equal(maximumLoan(before), 100_000);
+  assert.equal(takeBusinessLoan(before, 110_000, 8), before, 'a request above the rounded-down cap must be rejected');
+  const approved = takeBusinessLoan(before, 100_000, 8);
+  assert.notEqual(approved, before);
+  assert.equal(approved.bank!.loans.reduce((sum, loan) => sum + loan.balance, 0), 182_875);
+});
+
 test('loan disbursement and principal repayment preserve net worth apart from interest', () => {
   const before = state();
   const beforeWorth = netWorthPlayer(before);
@@ -80,6 +105,27 @@ test('loan disbursement and principal repayment preserve net worth apart from in
   assert.equal(repaid.cash, borrowed.cash - 10_000);
   assert.equal(repaid.bank!.loans[0].balance, loan.balance - 10_000);
   assert.equal(netWorthPlayer(repaid), netWorthPlayer(borrowed), 'paying principal reduces cash and liability equally');
+});
+
+test('repeated weekly banking on the same day does not credit interest twice', () => {
+  const before = state({
+    day: 14,
+    bank: {
+      ...initialBankState(),
+      savings: 100_000,
+      rentVault: 50_000,
+      savingsRatePct: 1,
+      rentVaultRatePct: 1,
+      loans: [],
+    },
+  });
+  const first = processBankWeekly(before);
+  assert.equal(first.bank!.savings, 101_000);
+  assert.equal(first.bank!.rentVault, 50_500);
+  const repeated = processBankWeekly(first);
+  assert.equal(repeated, first, 'same-day duplicate processing should be a no-op');
+  assert.equal(repeated.bank!.savings, 101_000);
+  assert.equal(repeated.bank!.rentVault, 50_500);
 });
 
 test('fixed deposit stays locked before its maturity day', () => {
