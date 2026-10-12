@@ -444,6 +444,11 @@ export interface BusinessLoan {
   collectionsStarted?: boolean;
   /** One hardship repayment arrangement is allowed per loan. */
   arrangementUsed?: boolean;
+  /** One standard-loan renegotiation offer per loan. */
+  renegotiationUsed?: boolean;
+  loanType?: 'standard' | 'premium';
+  /** Formal collections notice has been issued. */
+  collectionsNoticeIssued?: boolean;
 }
 
 export interface FixedDeposit {
