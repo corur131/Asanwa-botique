@@ -5,9 +5,10 @@ import { CharacterConfig } from '../types/character';
 import { ControlsPanel } from '../components/ControlsPanel';
 import { generateRandomCustomer } from '../utils/randomizer';
 import { SHOP_MINUTES, TIERS, naira } from './economy';
+import { brandPower, getBrandMetrics } from './business';
 import * as E from './engine';
 import { lookCost, buildLook } from './scoring';
-import { Customer, GameState, ScoreBreakdown, Settlement, Shout, StyleChoice, Visitor } from './types';
+import { Customer, GameState, Rival, ScoreBreakdown, Settlement, Shout, StyleChoice, Visitor } from './types';
 import { Bar, Btn, Card, Chip, Modal, Pill } from './ui/kit';
 import { Styling } from './ui/Styling';
 import { PriceModal, Reveal } from './ui/Checkout';
@@ -31,6 +32,54 @@ type Step =
 type Panel = null | 'rail' | 'furniture';
 
 const CLS_DOT = { poor: 'bg-slate-400', middle: 'bg-sky-400', rich: 'bg-amber-400' } as const;
+
+/** A lightweight animated shop-floor layer makes a rival visit feel occupied while the existing 3D shop scene remains interactive-looking beneath it. */
+const RivalShopActivity: React.FC<{ r: Rival }> = ({ r }) => {
+  const [actors] = useState(() => {
+    const count = Math.max(3, Math.min(7, 2 + r.tier + Math.floor((r.followers || 0) / 15000)));
+    return Array.from({ length: count }, (_, i) => ({
+      id: r.id + '-actor-' + i,
+      role: i === 0 ? 'Owner' : i <= Math.max(1, Math.floor((r.tier + 1) / 2)) ? 'Staff' : 'Customer',
+      activity: i === 0 ? 'Greeting a client' : i <= Math.max(1, Math.floor((r.tier + 1) / 2)) ? (i % 2 ? 'Arranging stock' : 'Assisting a shopper') : (i % 2 ? 'Browsing the rails' : 'Checking a look'),
+      look: i === 0 ? r.look : generateRandomCustomer('styled'),
+      delay: (i % 5) * -1.25,
+      duration: 4.5 + (i % 4) * 1.2,
+    }));
+  });
+  return (
+    <>
+      <style>{`
+        @keyframes rival-shop-walk { 0%,100% { transform: translateX(-5px) translateY(0); } 25% { transform: translateX(10px) translateY(-3px); } 55% { transform: translateX(25px) translateY(0); } 78% { transform: translateX(4px) translateY(-2px); } }
+        @keyframes rival-shop-bob { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-4px); } }
+        .rival-shop-actor { animation-name: rival-shop-walk; animation-timing-function: ease-in-out; animation-iteration-count: infinite; }
+        .rival-shop-portrait { animation: rival-shop-bob 1.7s ease-in-out infinite; }
+      `}</style>
+      <div className="absolute bottom-3 left-3 right-3 z-10 pointer-events-none">
+        <div className="mx-auto max-w-4xl rounded-2xl border border-white/15 bg-[#11131c]/90 backdrop-blur-md p-2 sm:p-3 shadow-2xl">
+          <div className="flex items-center justify-between gap-2 mb-2 px-1">
+            <div className="text-xs font-semibold text-white">Shop floor · live activity</div>
+            <div className="text-[10px] text-slate-400">{Math.max(1, Math.floor((r.tier + 1) / 2))} staff · customer flow {r.followers > 25000 ? 'busy' : r.followers > 5000 ? 'steady' : 'building'}</div>
+          </div>
+          <div className="flex items-end justify-around gap-1 sm:gap-4 min-h-[116px] overflow-hidden">
+            {actors.map((actor, i) => (
+              <div key={actor.id} className="relative flex flex-col items-center w-[18%] min-w-0">
+                <div className="rival-shop-actor w-full flex justify-center" style={{ animationDuration: actor.duration + 's', animationDelay: actor.delay + 's' }}>
+                  <div className="rival-shop-portrait h-[82px] w-[62px] sm:h-[96px] sm:w-[74px] overflow-hidden rounded-t-xl bg-gradient-to-b from-[#31283e] to-[#14131b] border border-white/10">
+                    <CharacterSvg config={actor.look} idPrefix={'rival-floor-' + actor.id} camera="full" className="h-full w-full" />
+                  </div>
+                </div>
+                <div className="text-[9px] sm:text-[10px] text-pink-200 font-semibold mt-1 truncate max-w-full">{actor.role}</div>
+                <div className="text-[8px] sm:text-[9px] text-slate-400 truncate max-w-full">{actor.activity}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </>
+  );
+};
+
+
 
 export default function GameApp({ onLab, initial, storageKey, cloud, notice }: { onLab: () => void; initial?: GameState | null; storageKey?: string; cloud?: CloudSession; notice?: string }) {
   const [s, setS] = useState<GameState | null>(() => (initial !== undefined ? initial : E.load(storageKey)));
@@ -321,9 +370,7 @@ export default function GameApp({ onLab, initial, storageKey, cloud, notice }: {
           {s.weather === 'sunny' ? '☀️ Sunny · hot' : s.weather === 'rainy' ? '🌧️ Rainy · fewer walk-ins' : s.weather === 'harmattan' ? '🌫️ Harmattan · dusty' : '☁️ Cloudy · mild'}
         </div>}
         <div className={`text-lg font-bold ${s.cash < 0 ? 'text-rose-300' : 'text-emerald-300'}`}>{naira(s.cash)}</div>
-        <div className="w-32">
-          <Bar label="Reputation" value={s.rep} max={100} tone={s.rep > 60 ? 'bg-emerald-400' : s.rep > 30 ? 'bg-amber-400' : 'bg-rose-400'} />
-        </div>
+        <div className="rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-xs"><div className="text-[10px] text-slate-400">Brand Power</div><div className="font-bold text-fuchsia-200">{brandPower(getBrandMetrics(s), s.followers || 0, s.tier).toLocaleString("en-NG")}</div></div>
         <EnergyBar s={s} />
         <div className="text-xs text-slate-300 max-sm:hidden">
           Prestige <b className="text-amber-300">{st.prestige}</b> · Followers <b className="text-pink-300">{(s.followers || 0).toLocaleString('en-NG')}</b>
@@ -705,18 +752,19 @@ export default function GameApp({ onLab, initial, storageKey, cloud, notice }: {
             <div className="flex flex-wrap items-center gap-3 px-4 py-2 border-b border-white/10 bg-[#101219]">
               <div className="leading-tight min-w-0 flex-1">
                 <div className="text-white font-semibold">{r.shop} <Stars n={r.stars} /></div>
-                <div className="text-[11px] text-slate-400">{r.owner} · {TIERS[r.tier].name} in {r.area} · rep {Math.round(r.rep)} · {r.followers.toLocaleString('en-NG')} followers</div>
+                <div className="text-[11px] text-slate-400">{r.owner} · {TIERS[r.tier].name} in {r.area} · Brand Power {brandPower(r.brand || E.getBrandMetrics(s), r.followers, r.tier).toLocaleString('en-NG')} · {r.followers.toLocaleString('en-NG')} followers</div>
               </div>
               <Btn size="sm" tone="gold" onClick={() => setTouring(null)}>Leave the shop</Btn>
             </div>
             <div className="relative flex-1 min-h-0">
               <Suspense fallback={<div className="absolute inset-0 flex items-center justify-center text-slate-400 text-sm">Walking over…</div>}>
                 <ShopScene s={fake} placing={null} selected={null} onSelect={() => undefined} onCustomer={() => undefined} reflections={sound.reflections} />
+                <RivalShopActivity key={r.id} r={r} />
               </Suspense>
               <div className="absolute bottom-3 left-3 right-3 sm:right-auto sm:w-96 rounded-xl border border-white/15 bg-[#12141c]/92 p-3 text-sm text-slate-200 space-y-1">
                 <div className="font-semibold text-white">What you notice</div>
                 <div>• A full look here costs about <b>{naira([15_000, 45_000, 110_000, 220_000, 400_000][r.tier] * (r.speciality === 'cheap' ? 0.6 : r.speciality === 'luxury' || r.speciality === 'bridal' ? 1.4 : 1))}</b>.</div>
-                <div>• {r.rep > s.rep ? 'Customers here look happier than yours. ' : 'Honestly, your shop gets better reviews. '}{r.tier > s.tier ? 'The shop is much bigger than yours.' : r.tier < s.tier ? "It's smaller than your shop." : "It's about your size."}</div>
+                <div>• {brandPower(r.brand || getBrandMetrics(s), r.followers, r.tier) > brandPower(getBrandMetrics(s), s.followers || 0, s.tier) ? 'This brand has stronger market pull than yours. ' : 'Your brand currently has stronger market pull. '}{r.tier > s.tier ? 'The shop is much bigger than yours.' : r.tier < s.tier ? "It's smaller than your shop." : "It's about your size."}</div>
                 <div>• {r.owner.split(' ')[0]} is known for <b>{({ bridal: 'bridal looks', genz: 'Gen Z wear', native: 'native and aso-ebi', cheap: 'low prices', wigs: 'wigs and glam', menswear: 'menswear', luxury: 'luxury pieces', thrift: 'thrift finds', everyday: 'everyday wear' } as const)[r.speciality]}</b>.</div>
               </div>
             </div>
@@ -982,7 +1030,7 @@ const Evening: React.FC<{ s: GameState; onSleep: () => void; onPhone: () => void
           {d.tips > 0 && <li>Tips: {naira(d.tips)}</li>}
           {d.staffServed > 0 && <li>Your staff styled {d.staffServed} customer{d.staffServed > 1 ? 's' : ''}.</li>}
           {d.walkedOut > 0 && <li className="text-rose-300">{d.walkedOut} customer{d.walkedOut > 1 ? 's' : ''} didn't buy.</li>}
-          <li>Reputation {d.repChange >= 0 ? 'up' : 'down'} {Math.abs(d.repChange).toFixed(1)} → {Math.round(s.rep)}</li>
+          <li>Brand Power {brandPower(getBrandMetrics(s), s.followers || 0, s.tier).toLocaleString("en-NG")} · {Math.round(s.followers || 0).toLocaleString("en-NG")} social followers</li>
           {d.events.map((e, i) => <li key={i}>{e}</li>)}
         </ul>
       </Card>

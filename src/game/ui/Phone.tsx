@@ -11,7 +11,7 @@ import type { CartLine } from '../engine';
 import { GROUP, ladder } from '../rivals';
 import { TIERS } from '../economy';
 
-export type AppId = 'home' | 'chats' | 'market' | 'bank' | 'property' | 'gidigram' | 'staff' | 'top20' | 'gist' | 'weather';
+export type AppId = 'home' | 'chats' | 'market' | 'bank' | 'property' | 'gidigram' | 'staff' | 'top20' | 'forbes' | 'promotion' | 'empire' | 'gist' | 'weather';
 
 const APPS: { id: Exclude<AppId, 'home'>; name: string; bg: string; glyph: string }[] = [
   { id: 'chats', name: 'WhatsApp', bg: 'bg-[#25D366]', glyph: '✆' },
@@ -21,9 +21,31 @@ const APPS: { id: Exclude<AppId, 'home'>; name: string; bg: string; glyph: strin
   { id: 'property', name: 'Lagos Lets', bg: 'bg-gradient-to-br from-sky-500 to-indigo-700', glyph: '⌂' },
   { id: 'staff', name: 'Staff', bg: 'bg-gradient-to-br from-slate-500 to-slate-800', glyph: '☺' },
   { id: 'top20', name: 'Top 20', bg: 'bg-gradient-to-br from-amber-400 to-yellow-700', glyph: '🏆' },
+  { id: 'forbes', name: 'Forbes', bg: 'bg-gradient-to-br from-zinc-700 to-zinc-950', glyph: '₦' },
+  { id: 'promotion', name: 'Promotion', bg: 'bg-gradient-to-br from-fuchsia-600 to-purple-800', glyph: '📣' },
+  { id: 'empire', name: 'Expansion', bg: 'bg-gradient-to-br from-indigo-600 to-blue-900', glyph: '🏬' },
   { id: 'gist', name: 'GistLagos', bg: 'bg-gradient-to-br from-red-500 to-rose-800', glyph: '☕' },
   { id: 'weather', name: 'Lagos Weather', bg: 'bg-gradient-to-br from-sky-400 to-blue-700', glyph: '🌦️' },
 ];
+
+const AppLogo: React.FC<{ id: Exclude<AppId, 'home'> }> = ({ id }) => {
+  const common = { fill: 'none', stroke: 'currentColor', strokeWidth: 2.5, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const };
+  const marks: Record<Exclude<AppId, 'home'>, React.ReactNode> = {
+    chats: <><path d="M8 10.5A5.5 5.5 0 0 1 13.5 5h21A5.5 5.5 0 0 1 40 10.5v14a5.5 5.5 0 0 1-5.5 5.5H21l-9 7v-7.7a5.5 5.5 0 0 1-4-5.3z" fill="currentColor" opacity=".18" stroke="none"/><path d="M17 15h14M17 21h10" {...common}/><path d="M22 10.5c-1.2 4.7 3.2 10.5 8 11.5" {...common}/></>,
+    market: <><path d="M10 18h28l-2 21H12z" fill="currentColor" opacity=".18" stroke="none"/><path d="M10 18h28l-2 21H12zM17 18v-4a7 7 0 0 1 14 0v4" {...common}/><path d="M18 25h12" {...common}/></>,
+    gidigram: <><rect x="7" y="10" width="34" height="28" rx="7" fill="currentColor" opacity=".18" stroke="none"/><rect x="7" y="10" width="34" height="28" rx="7" {...common}/><circle cx="24" cy="24" r="8" {...common}/><circle cx="34" cy="16.5" r="2" fill="currentColor" stroke="none"/></>,
+    bank: <><path d="M5 17 24 7l19 10z" fill="currentColor" opacity=".22" stroke="none"/><path d="M5 17 24 7l19 10M7 40h34M10 20v16M19 20v16M29 20v16M38 20v16M5 40h38" {...common}/></>,
+    property: <><path d="m5 23 19-16 19 16v17H5z" fill="currentColor" opacity=".2" stroke="none"/><path d="m5 23 19-16 19 16M9 21v19h30V21M19 40V27h10v13" {...common}/><path d="M32 13V8h5v9" {...common}/></>,
+    staff: <><circle cx="18" cy="17" r="7" fill="currentColor" opacity=".22" stroke="none"/><circle cx="31" cy="19" r="5" fill="currentColor" opacity=".22" stroke="none"/><path d="M5 39c0-8 5-13 13-13s13 5 13 13M27 28c7-1 13 3 14 10" {...common}/><circle cx="18" cy="17" r="7" {...common}/><circle cx="31" cy="19" r="5" {...common}/></>,
+    top20: <><path d="M24 5 29 16l12 1.5-9 8.5 2.5 12L24 32l-10.5 6 2.5-12L7 17.5 19 16z" fill="currentColor" opacity=".25" stroke="none"/><path d="m24 5 5 11 12 1.5-9 8.5 2.5 12L24 32l-10.5 6 2.5-12L7 17.5 19 16z" {...common}/></>,
+    forbes: <><path d="M10 38V25h7v13M21 38V17h7v21M32 38V10h7v28" fill="currentColor" opacity=".24" stroke="none"/><path d="M7 40h34M10 38V25h7v13M21 38V17h7v21M32 38V10h7v28" {...common}/></>,
+    promotion: <><path d="M7 20 35 9v25L7 25z" fill="currentColor" opacity=".24" stroke="none"/><path d="M7 20 35 9v25L7 25zM7 20v5M13 27l4 12h8l-5-10M35 16l6-4M35 27l6 4" {...common}/></>,
+    empire: <><path d="M6 40V22h11v18M18 40V9h12v31M31 40V17h11v23" fill="currentColor" opacity=".2" stroke="none"/><path d="M6 40V22h11v18M18 40V9h12v31M31 40V17h11v23M22 15h4M22 21h4M22 27h4M10 28h3M35 23h3M35 29h3" {...common}/></>,
+    gist: <><path d="M7 10h27a5 5 0 0 1 5 5v13a5 5 0 0 1-5 5H20l-8 6v-6H7a5 5 0 0 1-5-5V15a5 5 0 0 1 5-5z" fill="currentColor" opacity=".2" stroke="none"/><path d="M7 10h27a5 5 0 0 1 5 5v13a5 5 0 0 1-5 5H20l-8 6v-6H7a5 5 0 0 1-5-5V15a5 5 0 0 1 5-5zM12 19h19M12 25h13" {...common}/><path d="m35 4 1.5 4.5L41 10l-4.5 1.5L35 16l-1.5-4.5L29 10l4.5-1.5z" fill="currentColor" stroke="none"/></>,
+    weather: <><circle cx="32" cy="14" r="7" fill="currentColor" opacity=".35" stroke="none"/><path d="M32 4v3M42 14h-3M39 7l-2 2M10 31a8 8 0 0 1 8-8 10 10 0 0 1 19 3 6.5 6.5 0 0 1 0 13H12a6 6 0 0 1-2-8z" fill="currentColor" opacity=".2" stroke="none"/><path d="M10 31a8 8 0 0 1 8-8 10 10 0 0 1 19 3 6.5 6.5 0 0 1 0 13H12a6 6 0 0 1-2-8z" {...common}/></>,
+  };
+  return <svg viewBox="0 0 48 48" className="h-[72%] w-[72%] drop-shadow-sm" aria-hidden="true" {...common}>{marks[id]}</svg>;
+};
 
 export interface PhoneProps {
   s: GameState;
@@ -57,23 +79,27 @@ export const Phone: React.FC<PhoneProps> = (p) => {
   return (
     <div className="fixed inset-0 z-[80] sm:inset-auto sm:right-6 sm:bottom-4 sm:top-auto flex sm:block items-stretch">
       <div className="absolute inset-0 bg-black/50 sm:hidden" onClick={p.onClose} />
-      <div className="relative w-full sm:w-[390px] h-full sm:h-[min(800px,calc(100vh-90px))] sm:rounded-[44px] sm:border-[10px] border-[#0b0b0d] bg-[#0b0b0d] shadow-2xl overflow-hidden flex flex-col">
-        {/* status bar */}
-        <div className="relative flex items-center justify-between px-6 pt-2 pb-1 text-[12px] font-semibold text-white bg-black shrink-0">
-          <span>{timeText(s)}</span>
-          <span className="hidden sm:block absolute left-1/2 -translate-x-1/2 top-1.5 w-24 h-6 rounded-full bg-[#0b0b0d] border border-white/5" />
-          <span className="flex items-center gap-1.5 text-[11px]">
-            <span>{E.inBlackout(s) ? 'MTN' : 'MTN 4G'}</span>
-            <span className="inline-block w-6 h-3 rounded-sm border border-white/70 relative">
-              <span className="absolute inset-[1px] right-[35%] bg-white rounded-[1px]" />
-            </span>
+      <div className="relative w-full sm:w-[390px] h-full sm:h-[min(844px,calc(100vh-56px))] sm:rounded-[48px] sm:border-[7px] border-[#a7a9ad] bg-[#08090c] shadow-[0_28px_90px_rgba(0,0,0,.65)] overflow-hidden flex flex-col ring-1 ring-white/20">
+        {/* iPhone-inspired status bar and Dynamic Island */}
+        <div className="relative flex items-center justify-between px-7 pt-3 pb-2 text-[12px] font-semibold text-white bg-[#08090c] shrink-0">
+          <span className="tabular-nums">{timeText(s)}</span>
+          <span className="absolute left-1/2 -translate-x-1/2 top-2 h-[25px] w-[104px] rounded-full bg-black border border-white/[0.07] shadow-inner" aria-hidden="true">
+            <span className="absolute right-3 top-[7px] h-2.5 w-2.5 rounded-full bg-[#17242b] ring-1 ring-[#28363d]" />
+          </span>
+          <span className="flex items-center gap-1.5 text-[10px]">
+            <span className="font-semibold">{E.inBlackout(s) ? 'MTN' : '4G'}</span>
+            <svg viewBox="0 0 18 14" className="h-3 w-4" aria-label="Mobile signal"><path d="M1 13V10M5 13V7M9 13V4M13 13V1" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>
+            <svg viewBox="0 0 26 14" className="h-3.5 w-6" aria-label="Battery"><rect x="1" y="1.5" width="21" height="11" rx="3" fill="none" stroke="currentColor" strokeWidth="1.4"/><rect x="3.5" y="4" width="14" height="6" rx="1.5" fill="currentColor"/><path d="M23 5v4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
           </span>
         </div>
         <div className="flex-1 min-h-0 flex flex-col bg-[#111]">
           {app === 'home' && <Home s={s} unread={unread} open={setApp} />}
           {app === 'chats' && <Chats {...p} />}
           {app === 'market' && <MarketApp s={s} cart={p.cart} setCart={p.setCart} onPay={() => { p.up((g) => E.buyCart(g, p.cart)); p.setCart(() => []); }} onBuyDrop={(n) => p.up((g) => E.buyDrop(g, n))} />}
-          {app === 'bank' && <Bank s={s} />}
+          {app === 'bank' && <Bank s={s} up={p.up} />}
+          {app === 'forbes' && <Forbes s={s} />}
+          {app === 'promotion' && <PromotionApp s={s} up={p.up} />}
+          {app === 'empire' && <BusinessExpansionApp s={s} up={p.up} />}
           {app === 'property' && (
             <AppFrame title="Lagos Lets" sub="Shops for rent this week" tone="bg-gradient-to-r from-sky-600 to-indigo-700">
               <div className="p-3">
@@ -104,33 +130,54 @@ export const Phone: React.FC<PhoneProps> = (p) => {
   );
 };
 
-const Home: React.FC<{ s: GameState; unread: number; open: (a: AppId) => void }> = ({ s, unread, open }) => (
-  <div className="flex-1 bg-gradient-to-b from-[#3b1d4a] via-[#6b2d5c] to-[#c2563e] p-5 flex flex-col">
-    <div className="text-center text-white mt-6 mb-8">
-      <div className="text-5xl font-light tracking-tight">{timeText(s)}</div>
-      <div className="text-sm opacity-80 mt-1">Day {s.day} · {s.phase === 'shop' ? 'Shop open' : s.phase === 'morning' ? 'Before opening' : 'Evening'}</div>
+const Home: React.FC<{ s: GameState; unread: number; open: (a: AppId) => void }> = ({ s, unread, open }) => {
+  const dockApps = APPS.filter(a => ['chats', 'market', 'gidigram', 'bank'].includes(a.id));
+  return (
+    <div className="relative flex-1 overflow-y-auto bg-gradient-to-b from-[#151a37] via-[#3a275b] to-[#b35b68] px-5 pb-4 pt-5 flex flex-col">
+      <div className="pointer-events-none absolute -right-16 top-20 h-52 w-52 rounded-full bg-fuchsia-300/20 blur-3xl" />
+      <div className="pointer-events-none absolute -left-20 top-64 h-48 w-48 rounded-full bg-cyan-300/15 blur-3xl" />
+      <div className="relative mt-4 mb-6 text-center text-white">
+        <div className="text-[48px] leading-none font-light tracking-[-0.055em] drop-shadow-lg tabular-nums">{timeText(s)}</div>
+        <div className="mt-2 text-[12px] font-medium text-white/75">Day {s.day} <span className="mx-1.5 text-white/40">•</span> {s.phase === 'shop' ? 'Shop open' : s.phase === 'morning' ? 'Before opening' : 'Evening'}</div>
+      </div>
+      <div className="relative grid grid-cols-4 gap-x-2 gap-y-5">
+        {APPS.map((a) => {
+          const badge = a.id === 'chats' ? unread : 0;
+          return (
+            <button key={a.id} onClick={() => open(a.id)} className="group flex min-w-0 flex-col items-center gap-1.5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-white/80 rounded-xl">
+              <span className={`relative flex h-[58px] w-[58px] items-center justify-center rounded-[18px] border border-white/20 text-white shadow-[0_8px_18px_rgba(0,0,0,.28)] ring-1 ring-black/10 transition duration-150 group-active:scale-90 ${a.bg}`}>
+                <span className="absolute inset-x-2 top-0 h-px bg-white/40" />
+                <AppLogo id={a.id} />
+                {badge > 0 && <span className="absolute -right-1.5 -top-1.5 flex h-5 min-w-5 items-center justify-center rounded-full border-2 border-[#35244f] bg-[#ff375f] px-1 text-[10px] font-bold text-white shadow">{badge}</span>}
+              </span>
+              <span className="max-w-full truncate text-[10px] font-medium tracking-[-.01em] text-white [text-shadow:0_1px_4px_rgba(0,0,0,.65)]">{a.name}</span>
+            </button>
+          );
+        })}
+      </div>
+      <div className="relative mt-auto pt-6">
+        <button onClick={() => open('bank')} className="w-full rounded-[22px] border border-white/20 bg-white/[0.13] p-4 text-left text-white shadow-xl backdrop-blur-2xl transition hover:bg-white/[0.17] active:scale-[.99]">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2.5">
+              <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-400 to-teal-700 shadow-lg"><AppLogo id="bank" /></span>
+              <div><div className="text-[11px] font-semibold text-white/70">KoboBank · Current account</div><div className="mt-0.5 text-xl font-bold tracking-tight tabular-nums">{naira(s.cash)}</div></div>
+            </div>
+            <span className="text-xl text-white/70">›</span>
+          </div>
+          <div className="mt-3 flex items-center justify-between border-t border-white/15 pt-2.5 text-[10px] text-white/75">
+            <span>Rent {naira(s.listing.rent)}</span>
+            <span>{E.daysToRent(s.day) === 0 ? 'Due tonight' : `Due in ${E.daysToRent(s.day)} day${E.daysToRent(s.day) > 1 ? 's' : ''}`}</span>
+          </div>
+        </button>
+        <div className="mt-4 rounded-[25px] border border-white/20 bg-white/[0.16] p-2.5 shadow-2xl backdrop-blur-2xl">
+          <div className="grid grid-cols-4 gap-1">
+            {dockApps.map(a => <button key={a.id} onClick={() => open(a.id)} aria-label={a.name} className={`flex h-[50px] items-center justify-center rounded-[16px] border border-white/20 shadow-md transition active:scale-90 ${a.bg}`}><AppLogo id={a.id}/></button>)}
+          </div>
+        </div>
+      </div>
     </div>
-    <div className="grid grid-cols-4 gap-y-6 gap-x-3">
-      {APPS.map((a) => {
-        const badge = a.id === 'chats' ? unread : 0;
-        return (
-          <button key={a.id} onClick={() => open(a.id)} className="flex flex-col items-center gap-1.5 group">
-            <span className={`relative w-14 h-14 rounded-[18px] ${a.bg} flex items-center justify-center text-2xl text-white shadow-lg group-active:scale-95 transition-transform`}>
-              {a.glyph}
-              {badge > 0 && <span className="absolute -top-1.5 -right-1.5 min-w-5 h-5 px-1 rounded-full bg-rose-500 text-[11px] font-bold flex items-center justify-center border-2 border-[#6b2d5c]">{badge}</span>}
-            </span>
-            <span className="text-[11px] text-white font-medium drop-shadow">{a.name}</span>
-          </button>
-        );
-      })}
-    </div>
-    <div className="mt-auto rounded-2xl bg-black/25 backdrop-blur p-3 text-white text-xs">
-      <div className="opacity-70">KoboBank</div>
-      <div className="text-lg font-bold">{naira(s.cash)}</div>
-      <div className="opacity-70">Rent {naira(s.listing.rent)} {E.daysToRent(s.day) === 0 ? 'tonight' : `in ${E.daysToRent(s.day)} day${E.daysToRent(s.day) > 1 ? 's' : ''}`}</div>
-    </div>
-  </div>
-);
+  );
+};
 
 const AppFrame: React.FC<{ title: string; sub?: string; tone: string; right?: React.ReactNode; children: React.ReactNode }> = ({ title, sub, tone, right, children }) => (
   <div className="flex-1 min-h-0 flex flex-col">
@@ -262,7 +309,7 @@ const rivalProfile = (r: Rival, s: GameState) => {
       : r.aggression >= 0.4
         ? 'competitive and capable of a sharp response, but not automatically looking for a fight.'
         : 'usually measured and professional; competes more through the business than personal attacks.'),
-    'Current position: ' + (TIERS[r.tier]?.name || 'fashion') + ' tier, reputation ' + Math.round(r.rep) + '/100, ' + r.followers.toLocaleString('en-NG') + ' followers.',
+    'Current position: ' + (TIERS[r.tier]?.name || 'fashion') + ' tier, Brand Power ' + E.brandPower(r.brand || E.getBrandMetrics(s), r.followers, r.tier).toLocaleString('en-NG') + ', awareness ' + Math.round(r.brand?.awareness || 0) + ', ' + r.followers.toLocaleString('en-NG') + ' followers.',
     'Available business cash for feasibility checks only: ' + naira(Math.max(0, r.cash)) + '. Do not mention this figure unless discussing a collaboration budget.',
     rankContext,
     r.main
@@ -353,7 +400,7 @@ const Chats: React.FC<PhoneProps> = ({ s, up, chat, setChat, staff }) => {
       const timeoutId = window.setTimeout(() => controller.abort(), 60000);
       let response: Response;
       try {
-        response = await fetch('/api/ai-chat', {
+        response = await fetch(`${import.meta.env.VITE_AI_API_BASE_URL || ''}/api/ai-chat`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           signal: controller.signal,
@@ -363,7 +410,7 @@ const Chats: React.FC<PhoneProps> = ({ s, up, chat, setChat, staff }) => {
             participants,
             history: prior,
             message: text,
-            gameContext: { day: s.day, reputation: s.rep, followers: s.followers, cash: s.cash, shopName: 'Asanwa Boutique' },
+            gameContext: { day: s.day, brandPower: E.brandPower(E.getBrandMetrics(s), s.followers || 0, s.tier), tier: s.tier, followers: s.followers, cash: s.cash, netWorth: E.netWorthPlayer(s), shopName: 'Asanwa Boutique', partnerTier: targetRival?.tier, partnerCash: targetRival?.cash },
             canDiscussCollaboration: Boolean(targetRival?.main && targetChat !== GROUP),
           }),
         });
@@ -395,7 +442,7 @@ const Chats: React.FC<PhoneProps> = ({ s, up, chat, setChat, staff }) => {
             decision,
             eventName: typeof rawCollaboration.eventName === 'string' ? rawCollaboration.eventName.trim().slice(0, 80) : 'Asanwa Boutique x ' + targetRival.shop + ' Fashion Pop-up',
             dayOffset: Math.round(Math.max(3, Math.min(14, typeof rawCollaboration.dayOffset === 'number' && Number.isFinite(rawCollaboration.dayOffset) ? rawCollaboration.dayOffset : 7))),
-            totalCost: Math.round(Math.max(15000, Math.min(80000, typeof rawCollaboration.totalCost === 'number' && Number.isFinite(rawCollaboration.totalCost) ? rawCollaboration.totalCost : 20000)) / 2500) * 2500,
+            totalCost: Math.round(Math.max(15000, Math.min(Math.max(15000, Math.min([250000, 2000000, 10000000, 50000000, 150000000][Math.max(0, Math.min(4, Math.min(s.tier, targetRival.tier)))], Math.max(0, s.cash) * 2 + Math.max(0, targetRival.cash) * 2)), typeof rawCollaboration.totalCost === 'number' && Number.isFinite(rawCollaboration.totalCost) ? rawCollaboration.totalCost : 20000)) / 2500) * 2500,
             playerCostSharePct: Math.round(Math.max(10, Math.min(90, typeof rawCollaboration.playerCostSharePct === 'number' && Number.isFinite(rawCollaboration.playerCostSharePct) ? rawCollaboration.playerCostSharePct : 50))),
             playerProfitSharePct: Math.round(Math.max(10, Math.min(90, typeof rawCollaboration.playerProfitSharePct === 'number' && Number.isFinite(rawCollaboration.playerProfitSharePct) ? rawCollaboration.playerProfitSharePct : 50))),
           }
@@ -654,38 +701,260 @@ const Chats: React.FC<PhoneProps> = ({ s, up, chat, setChat, staff }) => {
 // ---------------------------------------------------------------------------
 // Bank
 // ---------------------------------------------------------------------------
-const Bank: React.FC<{ s: GameState }> = ({ s }) => {
-  const lines = s.ledger || [];
-  const weekIn = lines.filter((l) => E.week(l.day) === E.week(s.day) && l.amount > 0).reduce((a, l) => a + l.amount, 0);
-  const weekOut = lines.filter((l) => E.week(l.day) === E.week(s.day) && l.amount < 0).reduce((a, l) => a + l.amount, 0);
-  const d = E.daysToRent(s.day);
+
+const BusinessExpansionApp: React.FC<{ s: GameState; up: PhoneProps['up'] }> = ({ s, up }) => {
+  const expansion = s.businessExpansion || { branches: [], departments: [], wholesaleActive: false, designerCollections: 0 };
+  const options = E.expansionOptions(s);
+  const formatInvestment = (id: string) => id === 'branch' ? 'Branches' : id === 'wholesale' ? 'Wholesale' : id === 'designer' ? 'Collections' : 'Departments';
   return (
-    <AppFrame title="KoboBank" sub="Divine Styles · Current account" tone="bg-gradient-to-r from-emerald-700 to-teal-800">
-      <div className="p-4 bg-gradient-to-b from-teal-900/60 to-transparent">
-        <div className="text-xs text-emerald-200/80">Available balance</div>
-        <div className={`text-3xl font-bold ${s.cash < 0 ? 'text-rose-300' : 'text-white'}`}>{naira(s.cash)}</div>
-        <div className="grid grid-cols-2 gap-2 mt-3 text-xs">
-          <div className="rounded-xl bg-white/5 p-2.5"><div className="text-slate-400">In this week</div><div className="text-emerald-300 font-semibold">{naira(weekIn)}</div></div>
-          <div className="rounded-xl bg-white/5 p-2.5"><div className="text-slate-400">Out this week</div><div className="text-rose-300 font-semibold">{naira(weekOut)}</div></div>
+    <AppFrame title="Business Expansion" sub="Build beyond your current store" tone="bg-gradient-to-r from-indigo-700 to-blue-900">
+      <div className="p-3 space-y-3">
+        <div className="rounded-xl border border-white/10 bg-white/5 p-3">
+          <div className="text-xs uppercase tracking-wide text-indigo-200">Asanwa Boutique portfolio</div>
+          <div className="text-xl font-bold text-white mt-1">{TIERS[s.tier]?.name || 'Current shop'} · Brand Power {E.brandPower(E.getBrandMetrics(s), s.followers || 0, s.tier).toLocaleString('en-NG')}</div>
+          <div className="grid grid-cols-2 gap-2 mt-3">
+            <div className="rounded-lg bg-black/15 p-2"><div className="text-[11px] text-slate-400">Branches</div><div className="text-lg font-bold text-white">{expansion.branches.length}</div></div>
+            <div className="rounded-lg bg-black/15 p-2"><div className="text-[11px] text-slate-400">Departments</div><div className="text-lg font-bold text-white">{expansion.departments.length}</div></div>
+            <div className="rounded-lg bg-black/15 p-2"><div className="text-[11px] text-slate-400">Wholesale</div><div className="text-sm font-semibold text-white">{expansion.wholesaleActive ? 'Active' : 'Not unlocked'}</div></div>
+            <div className="rounded-lg bg-black/15 p-2"><div className="text-[11px] text-slate-400">Designer collections</div><div className="text-lg font-bold text-white">{expansion.designerCollections}</div></div>
+          </div>
         </div>
-        <div className={`mt-2 rounded-xl p-2.5 text-xs ${s.lateRent ? 'bg-rose-900/50 text-rose-200' : 'bg-white/5 text-slate-300'}`}>
-          {s.lateRent ? `Rent is late. Clear it by the end of day ${s.lateRent.due}.` : `Rent ${naira(s.listing.rent)} goes out ${d === 0 ? 'tonight' : `in ${d} day${d > 1 ? 's' : ''}`} to ${s.listing.landlord}.`}
-        </div>
+        {expansion.branches.length > 0 && <section className="rounded-xl border border-white/10 p-3 space-y-2"><h3 className="text-white font-semibold">Your branches</h3>{expansion.branches.map(branch => <div key={branch.id} className="rounded-lg bg-white/5 p-3"><div className="text-sm text-white font-semibold">{branch.name}</div><div className="text-xs text-slate-400">{branch.area} · {TIERS[branch.tier]?.name || 'Boutique'} · opened Day {branch.openedDay}</div><div className="text-xs text-slate-300 mt-1">Weekly rent {naira(branch.weeklyRent)} · modeled shop assets {naira(branch.assetValue)}</div></div>)}</section>}
+        {expansion.departments.length > 0 && <section className="rounded-xl border border-white/10 p-3"><h3 className="text-white font-semibold mb-2">Departments</h3><div className="flex flex-wrap gap-2">{expansion.departments.map(name => <span key={name} className="text-xs rounded-full border border-indigo-400/30 bg-indigo-500/10 px-2 py-1 text-indigo-100">{name}</span>)}</div></section>}
+        <section className="space-y-2"><h3 className="text-white font-semibold px-1">Invest in your next stage</h3>
+          {options.map(option => <div key={option.id} className="rounded-xl border border-white/10 p-3 space-y-2">
+            <div className="flex items-start justify-between gap-2"><div className="flex-1"><div className="font-semibold text-white">{option.title}</div><p className="text-xs text-slate-400 mt-1">{option.description}</p></div><div className="text-sm font-bold text-indigo-200 whitespace-nowrap">{naira(option.cost)}</div></div>
+            <div className="text-[11px] text-slate-500">Unlocks at {TIERS[option.minimumTier]?.name || 'Flagship'} tier.</div>
+            {option.available ? <button onClick={() => up(g => E.investInExpansion(g, option.id))} className="w-full rounded-lg bg-indigo-700 py-2 text-sm font-semibold text-white">Invest {naira(option.cost)}</button> : <div className="rounded-lg bg-white/5 p-2 text-xs text-slate-500">{option.reason || 'Not currently available'}</div>}
+          </div>)}
+        </section>
+        <p className="text-[11px] text-slate-500">Expansion takes cash up front. Branches create their own daily sales, stock/running costs and weekly rent. Wholesale operations generate extra daily orders and costs. These investments are capital assets rather than being counted as ordinary daily operating expenses.</p>
       </div>
-      <div className="px-4 pb-4">
-        <div className="text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1">Transactions</div>
-        {lines.length === 0 && <p className="text-sm text-slate-500">Nothing yet.</p>}
-        <div className="divide-y divide-white/5">
-          {lines.slice(0, 80).map((l, i) => (
-            <div key={i} className="flex items-center justify-between gap-2 py-2">
-              <div className="min-w-0">
-                <div className="text-sm text-white truncate">{l.label}</div>
-                <div className="text-[10px] text-slate-500">Day {l.day}{l.t >= 0 ? ` · ${E.clockText(l.t)}` : ''}</div>
-              </div>
-              <div className={`text-sm font-semibold shrink-0 ${l.amount >= 0 ? 'text-emerald-300' : 'text-slate-200'}`}>{l.amount >= 0 ? '+' : ''}{naira(l.amount)}</div>
-            </div>
+    </AppFrame>
+  );
+};
+
+const Bank: React.FC<{ s: GameState; up: PhoneProps['up'] }> = ({ s, up }) => {
+  const lines = s.ledger || [];
+  const bank = s.bank || { savings: 0, rentVault: 0, rentMode: 'manual' as const, autoRentPercent: 20, savingsRatePct: 0.65, rentVaultRatePct: 0.25, fixedDeposits: [], loans: [], savingsGoalName: 'Next shop upgrade', savingsGoalAmount: 1000000 };
+  const [tab, setTab] = useState<'overview' | 'transfer' | 'savings' | 'loans' | 'activity'>('overview');
+  const [activityFilter, setActivityFilter] = useState<'all' | 'in' | 'out'>('all');
+  const [transferAmount, setTransferAmount] = useState('25000');
+  const [loanAmount, setLoanAmount] = useState('100000');
+  const [loanTerm, setLoanTerm] = useState(8);
+  const [repaymentAmounts, setRepaymentAmounts] = useState<Record<string, string>>({});
+  const [depositAmount, setDepositAmount] = useState('25000');
+  const [depositTerm, setDepositTerm] = useState(28);
+  const [goalName, setGoalName] = useState(bank.savingsGoalName);
+  const [goalAmount, setGoalAmount] = useState(String(bank.savingsGoalAmount));
+  const weekIn = lines.filter(l => l.category !== 'transfer' && E.week(l.day) === E.week(s.day) && l.amount > 0).reduce((a, l) => a + l.amount, 0);
+  const weekOut = lines.filter(l => l.category !== 'transfer' && E.week(l.day) === E.week(s.day) && l.amount < 0).reduce((a, l) => a + l.amount, 0);
+  const dueDays = E.daysToRent(s.day);
+  const amount = (v: string) => Math.max(0, Math.round(Number(v) || 0));
+  const reserved = Math.max(0, bank.savings) + Math.max(0, bank.rentVault);
+  const goalProgress = bank.savingsGoalAmount > 0 ? Math.min(100, Math.round(reserved / bank.savingsGoalAmount * 100)) : 100;
+  const filteredLines = lines.slice(0, 100).filter(l => activityFilter === 'all' || (activityFilter === 'in' ? l.amount > 0 : l.amount < 0));
+  const tabs: { id: typeof tab; label: string; icon: string }[] = [
+    { id: 'overview', label: 'Home', icon: '⌂' },
+    { id: 'transfer', label: 'Transfer', icon: '⇄' },
+    { id: 'savings', label: 'Savings', icon: '◈' },
+    { id: 'loans', label: 'Loans', icon: '₦' },
+    { id: 'activity', label: 'Activity', icon: '↕' },
+  ];
+  const inputClass = 'mt-1 w-full rounded-xl bg-[#0d1b19] border border-white/10 p-3 text-white text-sm outline-none focus:border-emerald-500';
+  const sectionClass = 'rounded-2xl border border-white/10 bg-[#101c1b] p-4 space-y-3';
+  const headingClass = 'text-sm font-semibold text-white';
+  const moneyText = (value: number) => naira(value);
+  const transactionRows = (rows: typeof lines, limit?: number) => (
+    <div className="divide-y divide-white/[0.06]">
+      {(typeof limit === 'number' ? rows.slice(0, limit) : rows).map((line, i) => (
+        <div key={line.day + '-' + line.t + '-' + line.label + '-' + i} className="flex items-center gap-3 py-3">
+          <div className={'w-9 h-9 rounded-full flex items-center justify-center shrink-0 ' + (line.amount >= 0 ? 'bg-emerald-500/10 text-emerald-300' : 'bg-white/[0.06] text-slate-300')}>{line.amount >= 0 ? '↓' : '↑'}</div>
+          <div className="min-w-0 flex-1">
+            <div className="text-sm text-white truncate">{line.label}</div>
+            <div className="text-[11px] text-slate-500">Day {line.day}{line.t >= 0 ? ' · ' + E.clockText(line.t) : ' · Account activity'}</div>
+          </div>
+          <div className={'text-sm font-semibold tabular-nums shrink-0 ' + (line.amount >= 0 ? 'text-emerald-300' : 'text-slate-200')}>{line.amount >= 0 ? '+' : '−'}{moneyText(Math.abs(line.amount))}</div>
+        </div>
+      ))}
+    </div>
+  );
+
+  return (
+    <AppFrame title="KoboBank" sub="Your business banking, in one place" tone="bg-gradient-to-r from-emerald-800 via-teal-800 to-slate-900">
+      <div className="p-3 sm:p-4 space-y-4 bg-[#071310]">
+        <div className="relative overflow-hidden rounded-2xl border border-emerald-300/15 bg-gradient-to-br from-[#126b50] via-[#0b5142] to-[#102b31] p-4 shadow-lg">
+          <div className="absolute -right-8 -top-10 h-36 w-36 rounded-full border-[24px] border-white/[0.04]" />
+          <div className="absolute -right-2 -bottom-12 h-28 w-28 rounded-full border-[18px] border-white/[0.04]" />
+          <div className="relative flex items-start justify-between gap-3">
+            <div><div className="text-[10px] font-bold uppercase tracking-[0.18em] text-emerald-100/70">KoboBank Business</div><div className="mt-1 text-sm font-semibold text-white">Asanwa Boutique</div></div>
+            <div className="rounded-full border border-white/15 bg-black/10 px-2.5 py-1 text-[10px] font-medium text-emerald-50">Day {s.day}</div>
+          </div>
+          <div className="relative mt-5"><div className="text-xs text-emerald-100/75">Current account · available balance</div><div className={'mt-1 text-3xl font-bold tracking-tight tabular-nums ' + (s.cash < 0 ? 'text-rose-200' : 'text-white')}>{moneyText(s.cash)}</div></div>
+          <div className="relative mt-4 flex flex-wrap gap-x-5 gap-y-2 border-t border-white/10 pt-3 text-xs">
+            <div><span className="text-emerald-100/65">Money in</span><div className="mt-0.5 font-semibold text-white">{moneyText(weekIn)}</div></div>
+            <div><span className="text-emerald-100/65">Money out</span><div className="mt-0.5 font-semibold text-white">{moneyText(Math.abs(weekOut))}</div></div>
+            <div><span className="text-emerald-100/65">Cash + accounts</span><div className="mt-0.5 font-semibold text-white">{moneyText(E.financialAssets(s))}</div></div>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          <button onClick={() => setTab('savings')} className="rounded-2xl border border-white/10 bg-[#111f1c] p-3 text-left transition hover:border-emerald-400/40">
+            <div className="flex items-center justify-between gap-2"><span className="text-xs text-slate-400">Savings account</span><span className="text-emerald-300">◈</span></div>
+            <div className="mt-2 text-lg font-bold text-white tabular-nums">{moneyText(bank.savings)}</div><div className="mt-1 text-[10px] text-emerald-300">{bank.savingsRatePct}% weekly interest</div>
+          </button>
+          <button onClick={() => setTab('savings')} className="rounded-2xl border border-white/10 bg-[#111f1c] p-3 text-left transition hover:border-emerald-400/40">
+            <div className="flex items-center justify-between gap-2"><span className="text-xs text-slate-400">Rent Vault</span><span className="text-teal-300">⌂</span></div>
+            <div className="mt-2 text-lg font-bold text-white tabular-nums">{moneyText(bank.rentVault)}</div><div className="mt-1 text-[10px] text-teal-300">{bank.rentVaultRatePct}% weekly interest</div>
+          </button>
+        </div>
+
+        <div className={'rounded-2xl border p-3 ' + (s.lateRent ? 'border-rose-500/30 bg-rose-950/30' : 'border-amber-300/15 bg-[#1b2016]')}>
+          <div className="flex items-start gap-3">
+            <div className={'w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ' + (s.lateRent ? 'bg-rose-500/15 text-rose-200' : 'bg-amber-400/10 text-amber-200')}>{s.lateRent ? '!' : '⌂'}</div>
+            <div className="min-w-0 flex-1"><div className="text-sm font-semibold text-white">{s.lateRent ? 'Rent payment needs attention' : 'Upcoming rent'}</div><div className="mt-1 text-xs leading-relaxed text-slate-300">{s.lateRent ? 'You owe ' + moneyText(s.lateRent.amount) + '. Clear the balance by the end of Day ' + s.lateRent.due + '.' : moneyText(s.listing.rent) + ' due ' + (dueDays === 0 ? 'tonight' : 'in ' + dueDays + ' days') + ' to ' + s.listing.landlord + '. Rent Vault is used first.'}</div></div>
+            <button onClick={() => setTab('savings')} className="shrink-0 rounded-lg bg-white/[0.06] px-2.5 py-1.5 text-[11px] font-semibold text-emerald-200">Manage</button>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-4 gap-2">
+          {([
+            { id: 'transfer', label: 'Transfer', icon: '⇄' },
+            { id: 'savings', label: 'Save', icon: '◈' },
+            { id: 'loans', label: 'Borrow', icon: '₦' },
+            { id: 'activity', label: 'Statement', icon: '↕' },
+          ] as const).map(action => (
+            <button key={action.id} onClick={() => setTab(action.id)} className="flex flex-col items-center gap-2 rounded-xl border border-white/10 bg-[#111f1c] px-1 py-3 text-center hover:bg-[#172a25]">
+              <span className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-500/15 text-lg text-emerald-200">{action.icon}</span><span className="text-[10px] font-semibold text-slate-200">{action.label}</span>
+            </button>
           ))}
         </div>
+
+        <div className="flex gap-1.5 overflow-x-auto rounded-xl border border-white/[0.06] bg-[#0c1916] p-1.5">
+          {tabs.map(item => <button key={item.id} onClick={() => setTab(item.id)} className={'flex min-w-0 flex-1 items-center justify-center gap-1.5 whitespace-nowrap rounded-lg px-2 py-2.5 text-[11px] font-semibold transition ' + (tab === item.id ? 'bg-emerald-600 text-white shadow' : 'text-slate-400 hover:bg-white/[0.05] hover:text-white')}><span>{item.icon}</span><span>{item.label}</span></button>)}
+        </div>
+
+        {tab === 'overview' && (
+          <div className="space-y-3">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="rounded-2xl border border-white/10 bg-[#111f1c] p-3"><div className="text-xs text-slate-400">Outstanding liabilities</div><div className={'mt-2 text-lg font-bold tabular-nums ' + (E.totalLiabilities(s) > 0 ? 'text-rose-200' : 'text-white')}>{moneyText(E.totalLiabilities(s))}</div><div className="mt-1 text-[10px] text-slate-500">Loans + unpaid rent</div></div>
+              <div className="rounded-2xl border border-white/10 bg-[#111f1c] p-3"><div className="text-xs text-slate-400">Savings goal</div><div className="mt-2 truncate text-sm font-semibold text-white">{bank.savingsGoalName || 'Business goal'}</div><div className="mt-1 text-xs text-emerald-300">{goalProgress}% funded</div><div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/10"><div className="h-full rounded-full bg-emerald-400" style={{ width: goalProgress + '%' }} /></div><div className="mt-1 text-[10px] text-slate-500">{moneyText(reserved)} of {moneyText(bank.savingsGoalAmount)}</div></div>
+            </div>
+            <section className={sectionClass}><div className="flex items-center justify-between gap-2"><h3 className={headingClass}>Recent transactions</h3><button onClick={() => setTab('activity')} className="text-xs font-semibold text-emerald-300">View statement →</button></div>{lines.length ? transactionRows(lines, 4) : <div className="rounded-xl bg-white/[0.03] p-4 text-center text-sm text-slate-500">Your transactions will appear here.</div>}</section>
+          </div>
+        )}
+
+        {tab === 'transfer' && (
+          <div className="space-y-3">
+            <section className={sectionClass}><div><h3 className={headingClass}>Move money</h3><p className="mt-1 text-xs text-slate-400">Transfer between your own business accounts. These movements do not count as income or expenses.</p></div>
+              <label className="block text-xs text-slate-400">Transfer amount (₦)<input type="number" min="500" step="500" value={transferAmount} onChange={e => setTransferAmount(e.target.value)} className={inputClass} /></label>
+              <div className="grid grid-cols-2 gap-2">
+                <button onClick={() => up(g => E.transferBank(g, 'savings', amount(transferAmount)))} disabled={amount(transferAmount) <= 0 || s.cash < amount(transferAmount)} className="rounded-xl bg-emerald-700 px-3 py-3 text-xs font-semibold text-white disabled:opacity-35">Deposit to savings</button>
+                <button onClick={() => up(g => E.transferBank(g, 'rentVault', amount(transferAmount)))} disabled={amount(transferAmount) <= 0 || s.cash < amount(transferAmount)} className="rounded-xl bg-teal-700 px-3 py-3 text-xs font-semibold text-white disabled:opacity-35">Deposit to Rent Vault</button>
+                <button onClick={() => up(g => E.transferBank(g, 'current', amount(transferAmount), 'rentVault'))} disabled={amount(transferAmount) <= 0 || bank.rentVault < amount(transferAmount)} className="rounded-xl bg-white/[0.07] px-3 py-3 text-xs font-semibold text-white disabled:opacity-35">Withdraw from Rent Vault</button>
+                <button onClick={() => up(g => E.transferBank(g, 'current', amount(transferAmount), 'savings'))} disabled={amount(transferAmount) <= 0 || bank.savings < amount(transferAmount)} className="rounded-xl bg-white/[0.07] px-3 py-3 text-xs font-semibold text-white disabled:opacity-35">Withdraw from savings</button>
+              </div>
+            </section>
+            <div className="rounded-xl border border-white/[0.08] p-3 text-xs text-slate-400">Available current balance: <b className="text-white">{moneyText(s.cash)}</b></div>
+          </div>
+        )}
+
+        {tab === 'savings' && (
+          <div className="space-y-3">
+            <section className={sectionClass}>
+              <div className="flex items-start justify-between gap-3"><div><h3 className={headingClass}>Rent Vault</h3><p className="mt-1 text-xs text-slate-400">Keep next week's rent separate from spending money.</p></div><div className="text-right"><div className="text-lg font-bold text-white tabular-nums">{moneyText(bank.rentVault)}</div><div className="text-[10px] text-emerald-300">{bank.rentVaultRatePct}% weekly interest</div></div></div>
+              <div className="rounded-xl bg-[#0a1513] p-3"><div className="flex items-center justify-between gap-2 text-xs"><span className="text-slate-400">Next rent bill</span><b className="text-white">{moneyText(s.listing.rent)}</b></div><div className="mt-2 flex items-center justify-between gap-2 text-xs"><span className="text-slate-400">Currently covered</span><b className={bank.rentVault >= s.listing.rent ? 'text-emerald-300' : 'text-amber-200'}>{Math.min(100, Math.round(bank.rentVault / Math.max(1, s.listing.rent) * 100))}%</b></div><div className="mt-2 h-2 overflow-hidden rounded-full bg-white/10"><div className={'h-full rounded-full ' + (bank.rentVault >= s.listing.rent ? 'bg-emerald-400' : 'bg-amber-300')} style={{ width: Math.min(100, bank.rentVault / Math.max(1, s.listing.rent) * 100) + '%' }} /></div></div>
+              <label className="block text-xs text-slate-400">Rent saving mode<select value={bank.rentMode} onChange={e => up(g => E.setRentSaving(g, e.target.value as 'manual' | 'automatic'))} className={inputClass}><option value="manual">Manual — I choose when to save</option><option value="automatic">Automatic — save from eligible earnings</option></select></label>
+              {bank.rentMode === 'automatic' && <div className="rounded-xl bg-[#0a1513] p-3"><div className="flex items-center justify-between text-xs"><span className="text-slate-300">Daily eligible earnings</span><b className="text-emerald-300">{bank.autoRentPercent}%</b></div><input aria-label="Automatic rent savings percentage" type="range" min="0" max="80" step="5" value={bank.autoRentPercent} onChange={e => up(g => E.setRentSaving(g, 'automatic', Number(e.target.value)))} className="mt-3 w-full accent-emerald-400" /><p className="mt-2 text-[11px] leading-relaxed text-slate-500">This saves a percentage of positive earnings after recorded operating costs. Money in the vault still belongs to you.</p></div>}
+              {s.lateRent && <div className="rounded-xl border border-rose-400/20 bg-rose-950/25 p-3 text-xs text-rose-100">Rent arrears: {moneyText(s.lateRent.amount)} · deadline Day {s.lateRent.due}</div>}
+            </section>
+            <section className={sectionClass}><div><h3 className={headingClass}>Fixed deposits</h3><p className="mt-1 text-xs text-slate-400">Lock part of general savings until maturity for a higher return.</p></div>
+              <div className="grid grid-cols-2 gap-3"><label className="block text-xs text-slate-400">Amount (₦)<input type="number" min="1000" step="1000" value={depositAmount} onChange={e => setDepositAmount(e.target.value)} className={inputClass} /></label><label className="block text-xs text-slate-400">Term<select value={depositTerm} onChange={e => setDepositTerm(Number(e.target.value))} className={inputClass}>{[7,14,28,56].map(n => <option key={n} value={n}>{n} days</option>)}</select></label></div>
+              <button onClick={() => up(g => E.createFixedDeposit(g, amount(depositAmount), depositTerm))} disabled={amount(depositAmount) <= 0 || amount(depositAmount) > bank.savings} className="w-full rounded-xl bg-teal-700 py-3 text-sm font-semibold text-white disabled:opacity-35">Open fixed deposit</button>
+              {bank.fixedDeposits.length ? <div className="space-y-2">{bank.fixedDeposits.map(fd => <div key={fd.id} className="flex items-center justify-between gap-3 rounded-xl bg-[#0a1513] p-3"><div><div className="text-sm font-semibold text-white">{moneyText(fd.amount)}</div><div className="mt-1 text-[11px] text-slate-400">Matures Day {fd.maturityDay}</div></div><div className="text-right"><div className="text-xs text-emerald-300">{fd.ratePct}% return</div><div className="text-[10px] text-slate-500">{fd.maturityDay <= s.day ? 'Matured' : (fd.maturityDay - s.day) + ' days left'}</div></div></div>)}</div> : <div className="rounded-xl bg-white/[0.03] p-3 text-xs text-slate-500">No fixed deposits yet.</div>}
+            </section>
+            <section className={sectionClass}><div><h3 className={headingClass}>Savings goal</h3><p className="mt-1 text-xs text-slate-400">Give your next business milestone a target.</p></div>
+              <label className="block text-xs text-slate-400">Goal name<input value={goalName} onChange={e => setGoalName(e.target.value)} maxLength={60} className={inputClass} /></label>
+              <label className="block text-xs text-slate-400">Target amount (₦)<input type="number" min="0" step="10000" value={goalAmount} onChange={e => setGoalAmount(e.target.value)} className={inputClass} /></label>
+              <button onClick={() => up(g => E.setSavingsGoal(g, goalName, amount(goalAmount)))} className="w-full rounded-xl bg-white/[0.07] py-3 text-sm font-semibold text-white hover:bg-white/10">Save goal</button>
+              <div className="rounded-xl bg-[#0a1513] p-3"><div className="flex items-center justify-between text-xs"><span className="text-slate-400">{moneyText(reserved)} saved across savings and Rent Vault</span><b className="text-emerald-300">{goalProgress}%</b></div><div className="mt-2 h-2 overflow-hidden rounded-full bg-white/10"><div className="h-full rounded-full bg-emerald-400" style={{ width: goalProgress + '%' }} /></div><div className="mt-2 text-[10px] text-slate-500">Fixed deposits are separate until maturity.</div></div>
+            </section>
+          </div>
+        )}
+
+        {tab === 'loans' && (
+          <div className="space-y-3">
+            <section className={sectionClass}><div><h3 className={headingClass}>Business financing</h3><p className="mt-1 text-xs text-slate-400">Borrow for the business, then repay from future cash flow.</p></div>
+              {(() => { const credit = E.creditProfile(s); const score = credit.score; const rating = E.creditRating(score); const defaulted = bank.loans.some(loan => loan.defaulted || (loan.missedPayments || 0) >= 3); const scoreTone = score >= 750 ? 'text-emerald-300' : score >= 550 ? 'text-amber-200' : 'text-rose-300'; return <div className="space-y-3">
+                <div className="rounded-xl border border-white/10 bg-[#0a1513] p-3"><div className="flex items-start justify-between gap-3"><div><div className="text-[10px] font-bold uppercase tracking-[0.16em] text-emerald-100/70">Your credit score</div><div className={'mt-1 text-3xl font-bold tabular-nums ' + scoreTone}>{score}<span className="text-sm font-medium text-slate-500"> / 850</span></div><div className={'mt-0.5 text-xs font-semibold ' + scoreTone}>{rating}</div></div><div className="rounded-xl bg-white/[0.05] px-3 py-2 text-right"><div className="text-[10px] text-slate-400">On-time payments</div><div className="text-lg font-bold text-white">{credit.onTimePayments}</div><div className="text-[10px] text-slate-500">{credit.latePayments} late · {credit.defaults} default(s)</div></div></div><div className="mt-3 h-2 overflow-hidden rounded-full bg-white/10"><div className="h-full rounded-full bg-gradient-to-r from-rose-500 via-amber-400 to-emerald-400" style={{width: Math.max(0, Math.min(100, (score - 300) / 550 * 100)) + '%'}} /></div><div className="mt-2 text-[10px] text-slate-500">Pay on time, keep debt manageable, and build a reliable borrowing history to improve your score.</div></div>
+                <div className="rounded-xl border border-sky-400/20 bg-sky-950/20 p-3"><div className="flex items-center justify-between"><div className="text-xs font-semibold text-sky-100">KoboBank credit-history report</div><span className="rounded-full bg-white/10 px-2 py-1 text-[10px] text-slate-300">{E.creditHistoryReport(s).standing}</span></div><div className="mt-2 grid grid-cols-2 gap-2 text-xs"><div className="rounded-lg bg-black/15 p-2"><div className="text-slate-400">Loans taken</div><b className="text-white">{E.creditHistoryReport(s).loansTaken}</b></div><div className="rounded-lg bg-black/15 p-2"><div className="text-slate-400">Current debt</div><b className="text-white">{moneyText(E.creditHistoryReport(s).activeDebt)}</b></div><div className="rounded-lg bg-black/15 p-2"><div className="text-slate-400">Late payments recorded</div><b className="text-white">{E.creditHistoryReport(s).latePayments}</b></div><div className="rounded-lg bg-black/15 p-2"><div className="text-slate-400">Missed instalments now</div><b className="text-white">{E.creditHistoryReport(s).arrears}</b></div></div><div className="mt-2 text-[10px] leading-relaxed text-slate-400">This in-game report updates with your repayments, arrears and defaults. Clearing a loan improves standing over time; it does not erase recorded past defaults.</div></div>
+                <div className="rounded-xl border border-emerald-400/15 bg-emerald-950/25 p-3"><div className="text-xs text-emerald-100/70">Available borrowing limit</div><div className="mt-1 text-2xl font-bold text-white tabular-nums">{moneyText(E.maximumLoan(s))}</div><div className="mt-1 text-[11px] text-amber-200">Your rate: {E.loanRateForScore(score).toFixed(1)}% per week</div><div className="mt-1 text-[10px] text-slate-400">Based on credit score, cash flow, net worth, shop tier and existing debt.</div></div>
+                {defaulted && <div className="rounded-xl border border-rose-400/30 bg-rose-950/30 p-3 text-xs leading-relaxed text-rose-100"><b>Borrowing suspended.</b> A loan enters default after three consecutive missed payments. Clear every defaulted loan to restore eligibility; the default remains on your credit record even after you arrange a payment plan.</div>}
+                {bank.loans.some(loan => loan.collectionsStarted || (loan.missedPayments || 0) >= 5) && <div className="rounded-xl border border-orange-400/25 bg-orange-950/25 p-3 text-xs leading-relaxed text-orange-100"><b>Collections active.</b> After five consecutive missed payments, KoboBank may recover a limited amount from available business cash each week while protecting ₦25,000 for basic operating needs.</div>}
+                {score < 450 && !defaulted && <div className="rounded-xl border border-amber-400/25 bg-amber-950/20 p-3 text-xs leading-relaxed text-amber-100"><b>Credit rebuilding mode.</b> New loans are unavailable while your score is below 450. Keep any remaining payments current and your score will gradually recover over time.</div>}
+              </div>; })()}
+              <label className="block text-xs text-slate-400">Loan amount (₦)<input type="number" min="10000" step="10000" value={loanAmount} onChange={e => setLoanAmount(e.target.value)} className={inputClass} /></label>
+              <label className="block text-xs text-slate-400">Repayment term<select value={loanTerm} onChange={e => setLoanTerm(Number(e.target.value))} className={inputClass}>{[4,8,12,24].map(n => <option key={n} value={n}>{n} weeks</option>)}</select></label>
+              <button onClick={() => up(g => E.takeBusinessLoan(g, amount(loanAmount), loanTerm))} disabled={amount(loanAmount) <= 0 || amount(loanAmount) > E.maximumLoan(s)} className="w-full rounded-xl bg-emerald-700 py-3 text-sm font-semibold text-white disabled:opacity-35">Apply for business loan</button>
+              {E.premiumLoanEligible(s) && <button onClick={() => up(g => E.takePremiumBusinessLoan(g, amount(loanAmount), loanTerm))} disabled={amount(loanAmount) <= 0 || amount(loanAmount) > E.maximumLoan(s)} className="mt-2 w-full rounded-xl border border-amber-300/30 bg-amber-950/30 py-3 text-sm font-semibold text-amber-100 disabled:opacity-35">Apply for preferred growth loan · 0.4% lower weekly rate</button>}
+              {!E.premiumLoanEligible(s) && <div className="text-[10px] text-slate-500">Preferred growth loan unlocks at score 750+, three on-time payments, ₦1m+ net worth and no current arrears.</div>}
+            </section>
+            <section className={sectionClass}><div className="flex items-center justify-between"><h3 className={headingClass}>Outstanding loans</h3><span className="rounded-full bg-white/[0.06] px-2 py-1 text-[10px] text-slate-400">{bank.loans.length} active</span></div>
+              {bank.loans.length ? <div className="space-y-2">{bank.loans.map(loan => <div key={loan.id} className="rounded-xl border border-white/[0.06] bg-[#0a1513] p-3"><div className="flex items-start justify-between gap-3"><div><div className="text-sm font-semibold text-white">{moneyText(loan.balance)} remaining</div><div className="mt-1 text-[10px] uppercase tracking-wide text-emerald-300">{loan.loanType === 'premium' ? 'Preferred growth loan' : 'Standard business loan'}</div><div className="mt-1 text-[11px] text-slate-400">{moneyText(loan.weeklyPayment)} scheduled weekly payment</div></div><span className={'rounded-full px-2 py-1 text-[10px] ' + ((loan.collectionsStarted || (loan.missedPayments || 0) >= 5) ? 'bg-orange-500/20 text-orange-200' : (loan.defaulted || (loan.missedPayments || 0) >= 3) ? 'bg-rose-500/20 text-rose-200' : loan.missedPayments ? 'bg-amber-500/15 text-amber-200' : 'bg-emerald-500/10 text-emerald-200')}>{(loan.collectionsStarted || (loan.missedPayments || 0) >= 5) ? 'Collections' : (loan.defaulted || (loan.missedPayments || 0) >= 3) ? 'Default' : loan.missedPayments ? loan.missedPayments + ' missed' : 'On track'}</span></div><div className="mt-2 text-[11px] text-slate-500">Next payment: Day {loan.nextPaymentDay} · {loan.termWeeks}-week term · {loan.weeklyRatePct.toFixed(1)}% weekly interest</div>{((loan.missedPayments || 0) > 0 || loan.defaulted || loan.collectionsStarted) && <div className="mt-2 rounded-lg bg-rose-500/10 p-2 text-[10px] leading-relaxed text-rose-200">{loan.collectionsStarted || (loan.missedPayments || 0) >= 5 ? 'Collections: limited cash recovery may occur on future missed-payment dates, while protecting a ₦25,000 operating buffer.' : loan.defaulted || (loan.missedPayments || 0) >= 3 ? 'Default: new borrowing stays suspended until this loan is cleared, even if you arrange a payment plan.' : loan.missedPayments === 2 ? 'Serious arrears: one more consecutive missed payment will trigger default restrictions.' : 'Overdue: another missed payment will lower your score further.'}</div>}
+                <div className="mt-3 grid grid-cols-[1fr_auto] gap-2"><input aria-label={'Partial repayment amount for ' + loan.id} type="number" min="1000" step="1000" max={Math.min(s.cash, loan.balance)} value={repaymentAmounts[loan.id] ?? String(Math.min(loan.balance, 10000))} onChange={e => setRepaymentAmounts(prev => ({...prev, [loan.id]: e.target.value}))} className={inputClass + ' min-w-0'} placeholder="Amount to repay" /><button disabled={amount(repaymentAmounts[loan.id] ?? String(Math.min(loan.balance, 10000))) <= 0 || amount(repaymentAmounts[loan.id] ?? String(Math.min(loan.balance, 10000))) > s.cash || s.cash <= 0} onClick={() => up(g => E.repayBusinessLoan(g, loan.id, amount(repaymentAmounts[loan.id] ?? String(Math.min(loan.balance, 10000)))))} className="rounded-lg bg-emerald-700 px-3 py-2 text-xs font-semibold text-white disabled:opacity-35">Pay amount</button></div>
+                <button disabled={s.cash < loan.balance} onClick={() => up(g => E.repayBusinessLoan(g, loan.id, loan.balance))} className="mt-2 w-full rounded-lg bg-white/[0.07] px-3 py-2 text-xs font-semibold text-white disabled:opacity-35">Repay full balance · {moneyText(loan.balance)}</button>
+                {!loan.renegotiationUsed && !loan.arrangementUsed && !loan.defaulted && !loan.collectionsStarted && (loan.missedPayments || 0) === 0 && <button onClick={() => up(g => E.renegotiateBusinessLoan(g, loan.id))} className="mt-2 w-full rounded-lg border border-sky-400/25 bg-sky-950/20 px-3 py-2 text-xs font-semibold text-sky-100">Request one-time loan renegotiation</button>}
+                {(loan.missedPayments || 0) > 0 && !loan.arrangementUsed && <button onClick={() => up(g => E.arrangeBusinessLoanRepayment(g, loan.id))} className="mt-2 w-full rounded-lg border border-amber-400/25 bg-amber-950/20 px-3 py-2 text-xs font-semibold text-amber-100">Request one-time hardship repayment plan</button>}
+                {loan.arrangementUsed && <div className="mt-2 text-[10px] text-slate-500">Hardship plan used · extended term, lower weekly payment, slightly higher interest.</div>}</div>)}</div> : <div className="rounded-xl bg-white/[0.03] p-4 text-center"><div className="text-sm text-slate-300">No outstanding business loans</div><div className="mt-1 text-xs text-slate-500">Your borrowing and repayment history will show here.</div></div>}
+            </section>
+          </div>
+        )}
+
+        {tab === 'activity' && (
+          <section className={sectionClass}><div className="flex items-start justify-between gap-2"><div><h3 className={headingClass}>Account statement</h3><p className="mt-1 text-xs text-slate-400">Money moving in and out of your business accounts.</p></div><span className="rounded-full bg-white/[0.06] px-2 py-1 text-[10px] text-slate-400">{filteredLines.length} shown</span></div>
+            <div className="flex gap-1.5 rounded-xl bg-[#0a1513] p-1">{([{id:'all',label:'All'},{id:'in',label:'Money in'},{id:'out',label:'Money out'}] as const).map(f => <button key={f.id} onClick={() => setActivityFilter(f.id)} className={'flex-1 rounded-lg px-2 py-2 text-xs font-semibold ' + (activityFilter === f.id ? 'bg-emerald-700 text-white' : 'text-slate-400 hover:text-white')}>{f.label}</button>)}</div>
+            {filteredLines.length ? transactionRows(filteredLines) : <div className="rounded-xl bg-white/[0.03] p-4 text-center text-sm text-slate-500">No transactions in this view yet.</div>}
+          </section>
+        )}
+      </div>
+    </AppFrame>
+  );
+};
+const Forbes: React.FC<{ s: GameState }> = ({ s }) => {
+  const rows = E.currentWealthRows(s).sort((a, b) => b.netWorth - a.netWorth);
+  const history = s.wealthHistory || [];
+  return (
+    <AppFrame title="Lagos Fashion Rich List" sub="In-game wealth estimates · weekly changes" tone="bg-gradient-to-r from-zinc-700 to-zinc-950">
+      <div className="p-3 space-y-3">
+        <div className="rounded-xl border border-white/10 bg-white/5 p-3"><div className="text-xs uppercase tracking-wider text-amber-200">Your estimated net worth</div><div className="text-2xl font-bold text-white mt-1">{naira(E.netWorthPlayer(s))}</div><div className="text-xs text-slate-400 mt-1">Cash, accounts, inventory, fixtures and modeled goodwill, minus outstanding loans.</div></div>
+        {rows.map((row, index) => {
+          const latest = [...history].reverse().find(item => item.ownerId === row.ownerId && item.day <= s.day);
+          const change = latest ? latest.wealthChange : 0;
+          const previousRank = latest?.previousRank || 0;
+          const movement = previousRank > 0 ? previousRank - (latest?.rank || index + 1) : 0;
+          return <div key={row.ownerId} className="rounded-xl border border-white/10 p-3 flex gap-3 items-start"><div className="w-8 text-center text-lg font-bold text-amber-300">#{latest?.rank || index + 1}</div><div className="flex-1 min-w-0"><div className="font-semibold text-white">{row.owner}</div><div className="text-xs text-slate-400">{row.shop} · {TIERS[row.tier]?.name || 'Fashion business'}</div><div className="text-base font-bold text-white mt-1">{naira(row.netWorth)}</div><div className={change > 0 ? 'text-xs mt-1 text-emerald-300' : change < 0 ? 'text-xs mt-1 text-rose-300' : 'text-xs mt-1 text-slate-400'}>{latest ? (change >= 0 ? '+' : '') + naira(change) + ' since last snapshot' : 'First recorded estimate'}{movement ? ' · ' + (movement > 0 ? 'up ' : 'down ') + Math.abs(movement) + ' place(s)' : ''}</div><div className="grid grid-cols-2 gap-2 mt-2 text-[11px]"><div className="rounded-lg bg-white/5 p-2"><div className="text-slate-400">Weekly revenue</div><div className="text-white font-semibold">{naira(row.revenue)}</div></div><div className="rounded-lg bg-white/5 p-2"><div className="text-slate-400">Profit / loss</div><div className={row.profit >= 0 ? 'text-emerald-300' : 'text-rose-300'}>{naira(row.profit)}</div></div></div><div className="text-[11px] text-slate-400 mt-2">{row.followers.toLocaleString('en-NG')} followers · Brand Power {row.brandPower.toLocaleString('en-NG')}</div></div></div>;
+        })}
+        <div className="rounded-xl border border-amber-400/20 bg-amber-400/5 p-3"><div className="font-semibold text-amber-100">Deborah's fashion empire</div><div className="text-xs text-slate-300 mt-1">Her exact business name and private financial figures are not yet modeled, so the game does not invent a precise fortune.</div></div>
+        <div className="text-[10px] text-slate-500">Estimates are in-game values, not real-world valuations. Snapshots are saved weekly.</div>
+      </div>
+    </AppFrame>
+  );
+};
+
+const PromotionApp: React.FC<{ s: GameState; up: PhoneProps['up'] }> = ({ s, up }) => {
+  const [mode, setMode] = useState<'period' | 'always'>(s.promotion?.mode || 'period');
+  const levels = E.availablePromotionLevels(s.tier);
+  const [level, setLevel] = useState<NonNullable<GameState['promotion']>['level']>(s.promotion?.level || 'local');
+  const chosen = levels.includes(level) ? level : (levels[0] || 'local');
+  const bounds = E.promotionBudgetBounds(s.tier, chosen);
+  const [budget, setBudget] = useState(String(bounds.min));
+  const [duration, setDuration] = useState(48);
+  const active = s.promotion?.active ? s.promotion : null;
+  return (
+    <AppFrame title="Promotion Centre" sub="Paid campaigns · simulated business hours" tone="bg-gradient-to-r from-fuchsia-700 to-purple-900">
+      <div className="p-3 space-y-3">
+        <div className="rounded-xl border border-white/10 bg-white/5 p-3"><div className="flex items-center justify-between gap-2"><span className="text-white font-semibold">Campaign status</span><span className={active ? 'text-emerald-300 text-xs font-bold' : 'text-slate-400 text-xs'}>{active ? 'ACTIVE' : 'OFF'}</span></div>{active && <div className="grid grid-cols-2 gap-2 mt-2 text-xs"><div className="rounded-lg bg-black/15 p-2"><div className="text-slate-400">Level / spend</div><div className="text-white font-semibold">{active.level} · {naira(active.hourlyBudget)}/hour</div></div><div className="rounded-lg bg-black/15 p-2"><div className="text-slate-400">Campaign spend</div><div className="text-white font-semibold">{naira(active.totalSpent)}</div></div><div className="rounded-lg bg-black/15 p-2"><div className="text-slate-400">Estimated reach</div><div className="text-white font-semibold">{active.estimatedReach.toLocaleString('en-NG')}</div></div><div className="rounded-lg bg-black/15 p-2"><div className="text-slate-400">Remaining time</div><div className="text-white font-semibold">{active.mode === 'always' ? 'Until stopped' : (active.hoursRemaining || 0) + ' hours'}</div></div></div>}{active && <button onClick={() => up(g => E.stopPromotion(g))} className="mt-3 w-full rounded-lg bg-rose-800 py-2 font-semibold text-white">Stop promotion</button>}</div>
+        <div className="rounded-xl border border-white/10 p-3 space-y-3"><h3 className="font-semibold text-white">Create a campaign</h3><label className="block text-xs text-slate-400">Campaign duration<select value={mode} onChange={e => setMode(e.target.value as 'period' | 'always')} className="mt-1 w-full rounded-lg bg-[#181b24] border border-white/10 p-2 text-white text-sm"><option value="period">Fixed period — stop automatically</option><option value="always">Always-on — until stopped</option></select></label><label className="block text-xs text-slate-400">Promotion level<select value={chosen} onChange={e => { const next = e.target.value as NonNullable<GameState['promotion']>['level']; setLevel(next); setBudget(String(E.promotionBudgetBounds(s.tier, next).min)); }} className="mt-1 w-full rounded-lg bg-[#181b24] border border-white/10 p-2 text-white text-sm">{levels.map(l => <option key={l} value={l}>{({local:'Local Buzz',citywide:'Citywide Campaign',premium:'Premium Campaign',luxury:'Luxury Spotlight'} as Record<string,string>)[l]}</option>)}</select></label><label className="block text-xs text-slate-400">Budget per business hour (₦)<input type="number" value={budget} min={bounds.min} max={bounds.max} step="500" onChange={e => setBudget(e.target.value)} className="mt-1 w-full rounded-lg bg-white/5 border border-white/10 p-2 text-white text-sm"/><span className="block text-[10px] text-slate-500 mt-1">This tier allows {naira(bounds.min)}–{naira(bounds.max)} per hour. The shop runs 12 business hours per in-game day.</span></label>{mode === 'period' && <label className="block text-xs text-slate-400">Duration<select value={duration} onChange={e => setDuration(Number(e.target.value))} className="mt-1 w-full rounded-lg bg-[#181b24] border border-white/10 p-2 text-white text-sm">{[8,24,48,72,120,168].map(n => <option key={n} value={n}>{n} simulated hours</option>)}</select></label>}<button disabled={!!active || s.cash < bounds.min} onClick={() => up(g => E.startPromotion(g, mode, chosen, Math.max(0,Number(budget)||0), duration))} className="w-full rounded-lg bg-fuchsia-700 disabled:opacity-40 py-2 font-semibold text-white">Start promotion</button><p className="text-[11px] text-slate-500">Reach estimates are not guaranteed sales. Promotion is charged at closing and stops if the account cannot cover it.</p></div>
       </div>
     </AppFrame>
   );
@@ -762,7 +1031,7 @@ const Gidigram: React.FC<{ s: GameState; profile: string | null; setProfile: (id
       <div className="px-4 pb-3 text-sm text-white">
         <div className="font-semibold">Divine Styles · Asanwa Boutique</div>
         <div className="text-slate-300 text-[13px]">Stylist 💇🏾‍♀️ Native & English wear 👗 {s.listing.area}, Lagos 📍</div>
-        <div className="text-[11px] text-slate-500 mt-1">More followers bring more customers to the shop (+{Math.round((E.followerTraffic(s.followers || 0) - 1) * 100)}% now). Post your best looks after a sale, up to 3 a day.</div>
+        <div className="text-[11px] text-slate-500 mt-1">Your audience brings more potential customers (+{Math.round((E.followerTraffic(s.followers || 0) - 1) * 100)}% traffic now). Engagement and audience fit improve the value of your followers.</div><div className="mt-2 rounded-xl border border-pink-400/20 bg-pink-500/5 p-2"><div className="text-[10px] uppercase tracking-wide text-pink-200">Unlocked by your audience</div><div className="text-[11px] text-slate-300 mt-1">{E.unlocksForFollowers(s.followers || 0).length ? E.unlocksForFollowers(s.followers || 0).join(" · ") : "Reach 1,000 followers to attract your first micro-influencer sponsorships."}</div></div>
       </div>
       {posts.length === 0 ? (
         <p className="px-4 py-8 text-center text-sm text-slate-500">No posts yet. After a look scores 70 or more, tap "Post to Gidigram".</p>
@@ -839,7 +1108,7 @@ const Top20: React.FC<{ s: GameState; open: (id: string) => void }> = ({ s, open
   const last = recentDays.length > 1 ? recentDays[0] : (s.ranking || []).slice(-1)[0];
   return (
     <AppFrame title="Top 20 Boutiques" sub={`Lagos · live now · next list on day ${s.day + ((7 - (s.day % 7)) % 7 || 7)}`} tone="bg-gradient-to-r from-amber-600 to-yellow-700">
-      <div className="px-3 py-2 text-[11px] text-slate-400">Recent takings, reputation, followers and shop size decide the race. ▲/▼ shows movement since the previous in-game day; the official list is published weekly.</div>
+      <div className="px-3 py-2 text-[11px] text-slate-400">Weekly takings, Brand Power, followers, shop scale and market momentum decide this race. Forbes separately ranks estimated net worth.</div>
       <div className="divide-y divide-white/5">
         {rows.map((r, i) => {
           const before = last ? last.order.indexOf(r.id) + 1 : 0;
@@ -852,7 +1121,7 @@ const Top20: React.FC<{ s: GameState; open: (id: string) => void }> = ({ s, open
                 <span className="block text-sm text-white font-semibold truncate">{r.name}{r.you ? ' (you)' : ''}{r.main ? ' ●' : ''}</span>
                 <span className="block text-[11px] text-slate-400 truncate">{r.owner} · {TIERS[r.tier].name}, {r.area}</span>
               </span>
-              <span className="text-[11px] text-slate-400 shrink-0">rep {Math.round(r.rep)}</span>
+              <span className="text-[11px] text-slate-400 shrink-0">Power {r.brandPower.toLocaleString("en-NG")}</span>
             </button>
           );
         })}

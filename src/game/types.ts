@@ -86,6 +86,18 @@ export interface Rival {
   aggression: number;
   /** Takings over the last 7 days. */
   week: number[];
+  /** Modeled operating costs for each matching day in week. */
+  weekCosts?: number[];
+  /** Business assets, retained earnings and debt are modeled separately from shop takings. */
+  savings?: number;
+  debt?: number;
+  assetValue?: number;
+  brand?: BrandMetrics;
+  promotion?: PromotionCampaign;
+  /** Extra operating units beyond the original shop. */
+  branches?: number;
+  departments?: string[];
+  wholesaleActive?: boolean;
   /** How they feel about Divine, -100 (enemy) … 100 (friend). */
   feeling: number;
   look: CharacterConfig;
@@ -190,6 +202,8 @@ export interface LedgerLine {
   t: number;
   label: string;
   amount: number;
+  /** Internal account transfers change the pocket, not total wealth or operating profit. */
+  category?: 'transfer' | 'operating' | 'financing' | 'interest';
 }
 
 export interface Post {
@@ -361,7 +375,7 @@ export interface Message {
   /** The back-and-forth conversation this message belongs to. */
   convo?: string;
   /** What the message is about, for the reply's effect. */
-  ctx?: { kind: 'shade' | 'brag' | 'bait' | 'invite'; rivalId?: string; eventId?: string };
+  ctx?: { kind: 'shade' | 'brag' | 'bait' | 'invite' | 'sponsorship'; rivalId?: string; eventId?: string; offerId?: string };
   /** Structured business proposal returned by the AI; only explicit player confirmation makes it real. */
   collaboration?: CollaborationReply;
   /** Result of the player's action on a collaboration proposal. */
@@ -387,8 +401,138 @@ export interface CharacterMemory {
   updatedDay: number;
 }
 
+export type PromotionLevel = 'local' | 'citywide' | 'premium' | 'luxury';
+export type PromotionMode = 'period' | 'always';
+export type BankPocket = 'savings' | 'rentVault' | 'current';
+
+/** Brand indicators evolve over time; the combined Brand Power score is intentionally uncapped. */
+export interface BrandMetrics {
+  awareness: number;
+  prestige: number;
+  trendInfluence: number;
+  loyalty: number;
+  reliability: number;
+}
+
+export interface PromotionCampaign {
+  active: boolean;
+  mode: PromotionMode;
+  level: PromotionLevel;
+  hourlyBudget: number;
+  startedDay: number;
+  /** Remaining simulated business hours for a fixed-period campaign. */
+  hoursRemaining?: number;
+  hoursRun: number;
+  totalSpent: number;
+  estimatedReach: number;
+}
+
+export interface BusinessLoan {
+  id: string;
+  principal: number;
+  balance: number;
+  weeklyRatePct: number;
+  weeklyPayment: number;
+  termWeeks: number;
+  nextPaymentDay: number;
+  missedPayments: number;
+  /** Cumulative late fees, capped so missed payments cannot create runaway debt. */
+  lateFees?: number;
+  /** Once defaulted, this remains on the account until the loan is fully cleared. */
+  defaulted?: boolean;
+  /** Collections begin after five consecutive missed payments. */
+  collectionsStarted?: boolean;
+  /** One hardship repayment arrangement is allowed per loan. */
+  arrangementUsed?: boolean;
+  /** One standard-loan renegotiation offer per loan. */
+  renegotiationUsed?: boolean;
+  loanType?: 'standard' | 'premium';
+  /** Formal collections notice has been issued. */
+  collectionsNoticeIssued?: boolean;
+}
+
+export interface FixedDeposit {
+  id: string;
+  amount: number;
+  ratePct: number;
+  openedDay: number;
+  maturityDay: number;
+}
+
+export interface BusinessBranch {
+  id: string;
+  name: string;
+  area: string;
+  tier: number;
+  openedDay: number;
+  weeklyRent: number;
+  assetValue: number;
+}
+
+export type ExpansionInvestment = 'branch' | 'wholesale' | 'bridal' | 'accessories' | 'menswear' | 'designer';
+
+export interface BusinessExpansionState {
+  branches: BusinessBranch[];
+  departments: string[];
+  wholesaleActive: boolean;
+  designerCollections: number;
+}
+
+export interface CreditProfile {
+  score: number;
+  onTimePayments: number;
+  latePayments: number;
+  defaults: number;
+  loansTaken: number;
+  lastApplicationDay: number;
+}
+
+export interface BankState {
+  savings: number;
+  rentVault: number;
+  rentMode: 'manual' | 'automatic';
+  autoRentPercent: number;
+  savingsRatePct: number;
+  rentVaultRatePct: number;
+  fixedDeposits: FixedDeposit[];
+  loans: BusinessLoan[];
+  /** Persisted in-game credit record; optional for older save compatibility. */
+  creditProfile?: CreditProfile;
+  savingsGoalName: string;
+  savingsGoalAmount: number;
+}
+
+/** Weekly public wealth snapshot; figures are game estimates, not real-world valuations. */
+export interface WeeklyWealthSnapshot {
+  day: number;
+  ownerId: string;
+  owner: string;
+  shop: string;
+  netWorth: number;
+  revenue: number;
+  costs: number;
+  profit: number;
+  rank: number;
+  previousRank: number;
+  wealthChange: number;
+  tier: number;
+  followers: number;
+  brandPower: number;
+}
+
+export interface SponsorshipOffer {
+  id: string;
+  sponsor: string;
+  day: number;
+  expiresDay: number;
+  followersRequired: number;
+  payout: number;
+  bonusFollowers: number;
+  status: 'offered' | 'accepted' | 'declined' | 'expired';
+}
+
 export interface GameState {
-  version: 4;
+  version: 5;
   /** Lagos-season weather, optional so older saves continue loading. */
   weather?: LagosWeather;
   /** The shop she rents now. */
@@ -454,6 +598,16 @@ export interface GameState {
   characterMemories?: Record<string, CharacterMemory>;
   /** Confirmed joint business pop-ups; absent in legacy saves. */
   collaborations?: CollaborationEvent[];
+  /** New financial systems are optional in the type so versioned saves can be migrated safely. */
+  bank?: BankState;
+  businessExpansion?: BusinessExpansionState;
+  brand?: BrandMetrics;
+  promotion?: PromotionCampaign;
+  /** Historical weekly wealth snapshots for every modeled business owner. */
+  wealthHistory?: WeeklyWealthSnapshot[];
+  /** Sponsored-content opportunities unlocked by social audience growth. */
+  sponsorshipOffers?: SponsorshipOffer[];
+  lastSponsorshipDay?: number;
   rivals: Rival[];
   /** Official weekly ladder: ids in order ('you' is Divine). */
   ranking: { week: number; order: string[] }[];

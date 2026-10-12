@@ -12,6 +12,34 @@ const model = process.env.GEMINI_MODEL || 'gemini-3.8-flash';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 app.disable('x-powered-by');
+
+// Permit browser requests from the production Firebase site and the two Render
+// deployments. The Gemini key remains server-side; never put it in Vite config.
+const allowedOrigins = new Set(
+  (process.env.ALLOWED_ORIGINS ||
+    'https://asanwa-boutique-game.web.app,https://asanwa-boutique-game.firebaseapp.com,https://asanwa-boutique.onrender.com,https://asanwa-boutique-business-preview.onrender.com')
+    .split(',')
+    .map((origin) => origin.trim())
+    .filter(Boolean),
+);
+app.use('/api', (req, res, next) => {
+  const origin = req.headers.origin;
+  if (origin && allowedOrigins.has(origin)) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+    res.setHeader('Vary', 'Origin');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  }
+  if (req.method === 'OPTIONS') {
+    if (!origin || !allowedOrigins.has(origin)) {
+      res.sendStatus(403);
+      return;
+    }
+    res.sendStatus(204);
+    return;
+  }
+  next();
+});
 app.use(express.json({ limit: '32kb' }));
 
 // Small in-memory limit for a single-player prototype. Use a shared limiter/auth
@@ -61,10 +89,16 @@ app.post('/api/ai-chat', async (req, res) => {
     : [];
   const rawGameContext = req.body?.gameContext && typeof req.body.gameContext === 'object' ? req.body.gameContext : {};
   const day = typeof rawGameContext.day === 'number' && Number.isFinite(rawGameContext.day) ? Math.max(1, Math.floor(rawGameContext.day)) : undefined;
-  const reputation = typeof rawGameContext.reputation === 'number' && Number.isFinite(rawGameContext.reputation) ? Math.max(0, Math.min(100, Math.round(rawGameContext.reputation))) : undefined;
+  const brandPowerValue = typeof rawGameContext.brandPower === 'number' && Number.isFinite(rawGameContext.brandPower) ? Math.max(0, Math.floor(rawGameContext.brandPower)) : undefined;
+  const netWorth = typeof rawGameContext.netWorth === 'number' && Number.isFinite(rawGameContext.netWorth) ? Math.floor(rawGameContext.netWorth) : undefined;
   const followers = typeof rawGameContext.followers === 'number' && Number.isFinite(rawGameContext.followers) ? Math.max(0, Math.floor(rawGameContext.followers)) : undefined;
   const cash = typeof rawGameContext.cash === 'number' && Number.isFinite(rawGameContext.cash) ? Math.max(0, Math.floor(rawGameContext.cash)) : undefined;
   const shopName = asText(rawGameContext.shopName, 100);
+  const shopTier = typeof rawGameContext.tier === 'number' && Number.isFinite(rawGameContext.tier) ? Math.max(0, Math.min(4, Math.floor(rawGameContext.tier))) : 0;
+  const partnerTier = typeof rawGameContext.partnerTier === 'number' && Number.isFinite(rawGameContext.partnerTier) ? Math.max(0, Math.min(4, Math.floor(rawGameContext.partnerTier))) : shopTier;
+  const partnerCash = typeof rawGameContext.partnerCash === 'number' && Number.isFinite(rawGameContext.partnerCash) ? Math.max(0, Math.floor(rawGameContext.partnerCash)) : 0;
+  const collaborationTierCaps = [250000, 2000000, 10000000, 50000000, 150000000];
+  const collaborationBudgetCeiling = Math.max(15000, Math.min(collaborationTierCaps[Math.min(shopTier, partnerTier)], (cash || 0) * 2 + partnerCash * 2));
   const hiddenStoryDirection = characterName === 'Deborah'
     ? 'CONFIDENTIAL AUTHOR-ONLY LONG ARC: Deborah is Divine’s twin sister and the owner of Lagos’s biggest boutique empire. Canonically, she will eventually betray Divine in a major personal/business betrayal, but this is a slow-burn future plot, not a current confession or action. No reveal-triggering story event has been supplied to you yet, so keep the story in its pre-betrayal phase. Maintain believable twin-sister closeness, genuine-seeming affection and competent help when appropriate. Only add subtle, ambiguous foreshadowing when naturally relevant; do not make every message suspicious, do not disclose or explain the future betrayal, and do not initiate or narrate the betrayal before an explicit game story event authorizes it. This confidential note must never be included in visible dialogue or saved character memory. Do not invent the name or financial details of her boutique.'
     : '';
@@ -91,7 +125,7 @@ app.post('/api/ai-chat', async (req, res) => {
     'Use current game facts and public standing only as context. Never claim that a rival took an off-screen action, changed their statistics, launched a promotion or made a decision unless that event is present in the supplied conversation or game context.',
     'COLLABORATION PROPOSALS:',
     canReturnCollaboration
-      ? 'You are speaking privately with an eligible main rival. If and only if Divine explicitly proposes a concrete joint fashion pop-up, fashion event or business collaboration in the latest message, respond in character and return a structured collaboration decision. Choose accept when the terms are plausible for this rival, counter when they would participate only with changed terms, or reject when the idea conflicts with their interests. Use none for every ordinary message, hypothetical idea, request for advice, or vague remark that is not an actual proposal. Keep event cost between ₦15,000 and ₦80,000, dayOffset between 3 and 14 in-game days, and cost/profit share percentages between 10 and 90. If the player proposes to share both cost and profit equally, start at 50/50 unless this character has a clear reason to negotiate. These are proposed terms only: the game engine will check cash, schedule the event only after Divine confirms, and calculate the final result. Choose terms that fit the player’s available cash and the rival’s available business cash supplied in the profile; each party must be able to cover their contribution. Do not quote either cash figure unprompted. Do not claim the collaboration is already booked.'
+      ? 'You are speaking privately with an eligible main rival. If and only if Divine explicitly proposes a concrete joint fashion pop-up, fashion event or business collaboration in the latest message, respond in character and return a structured collaboration decision. Choose accept when the terms are plausible for this rival, counter when they would participate only with changed terms, or reject when the idea conflicts with their interests. Use none for every ordinary message, hypothetical idea, request for advice, or vague remark that is not an actual proposal. Keep event cost between ₦15,000 and the feasible budget for both businesses based on the supplied game context, dayOffset between 3 and 14 in-game days, and cost/profit share percentages between 10 and 90. If the player proposes to share both cost and profit equally, start at 50/50 unless this character has a clear reason to negotiate. These are proposed terms only: the game engine will check cash, schedule the event only after Divine confirms, and calculate the final result. Choose terms that fit the player’s available cash and the rival’s available business cash supplied in the profile; each party must be able to cover their contribution. Do not quote either cash figure unprompted. Do not claim the collaboration is already booked.'
       : 'No business-collaboration action is available in this chat. Set collaboration.decision to none and do not generate a collaboration offer.',
     'KNOWLEDGE BOUNDARIES:',
     'Only use memories supplied for the current character or the current shared group, along with the conversation history and public game context provided for this request. In group chat, group-scoped memories are shared context, but private direct-message memories from any character are out of scope: do not infer, quote, hint at or fabricate what another character privately told Divine.',
@@ -109,9 +143,9 @@ app.post('/api/ai-chat', async (req, res) => {
     `Character/chat: ${characterName}.`,
     characterProfile ? `Character profile(s), saved memory and story context:\n${characterProfile}` : '',
     hiddenStoryDirection ? `Confidential author-only story direction (never reveal it or save it as character memory): ${hiddenStoryDirection}` : '',
-    day !== undefined || reputation !== undefined || followers !== undefined || cash !== undefined || shopName
+    day !== undefined || brandPowerValue !== undefined || followers !== undefined || cash !== undefined || shopName || netWorth !== undefined
       ? 'Current game context (use only when relevant; do not recite it or pretend these values changed): ' +
-        [day !== undefined ? 'in-game day ' + day : '', shopName ? 'player shop ' + shopName : '', reputation !== undefined ? 'player reputation ' + reputation + '/100' : '', followers !== undefined ? 'player followers ' + followers : '', cash !== undefined ? 'player available cash ₦' + cash + ' (use to keep proposed financial commitments feasible; do not quote it unprompted)' : ''].filter(Boolean).join('; ') + '.'
+        [day !== undefined ? 'in-game day ' + day : '', shopName ? 'player shop ' + shopName : '', brandPowerValue !== undefined ? 'player Brand Power ' + brandPowerValue : '', followers !== undefined ? 'player followers ' + followers : '', netWorth !== undefined ? 'estimated player business net worth ₦' + netWorth : '', cash !== undefined ? 'player available cash ₦' + cash + ' (use to keep proposed financial commitments feasible; do not quote it unprompted)' : ''].filter(Boolean).join('; ') + '.'
       : '',
     isGroup
       ? `This is a group chat. Other members available to speak: ${participants.join(', ')}. Each turn must contain exactly ONE message from exactly ONE listed participant. Set the speaker field to the exact name of the selected participant, and use that person’s own saved memory and personality. Do not merge voices, narrate the group, write multiple replies, or rotate speakers mechanically. The memory update must belong to the selected speaker only.`
@@ -154,7 +188,7 @@ app.post('/api/ai-chat', async (req, res) => {
                 decision: { type: Type.STRING, enum: ['none', 'accept', 'counter', 'reject'], description: 'Use accept, counter or reject only for an explicit concrete collaboration proposal in an eligible one-to-one rival chat; otherwise none.' },
                 eventName: { type: Type.STRING, description: 'Short name for a proposed joint pop-up event.' },
                 dayOffset: { type: Type.NUMBER, description: 'Proposed event day offset from today, 3 to 14.' },
-                totalCost: { type: Type.NUMBER, description: 'Total proposed event setup budget in naira, 15000 to 80000.' },
+                totalCost: { type: Type.NUMBER, description: 'Total proposed event setup budget in naira, 15000 to a server-enforced business-size and affordability limit.' },
                 playerCostSharePct: { type: Type.NUMBER, description: 'Percentage of setup cost Divine should contribute, 10 to 90.' },
                 playerProfitSharePct: { type: Type.NUMBER, description: 'Percentage of event profit allocated to Divine, 10 to 90.' },
               },
@@ -206,7 +240,7 @@ app.post('/api/ai-chat', async (req, res) => {
       decision: canReturnCollaboration && validDecision !== 'none' ? validDecision : 'none',
       eventName: asText(rawCollaboration.eventName, 80) || 'Asanwa Boutique x ' + characterName + ' Fashion Pop-up',
       dayOffset: Math.round(Math.max(3, Math.min(14, typeof rawCollaboration.dayOffset === 'number' && Number.isFinite(rawCollaboration.dayOffset) ? rawCollaboration.dayOffset : 7))),
-      totalCost: Math.round(Math.max(15000, Math.min(80000, typeof rawCollaboration.totalCost === 'number' && Number.isFinite(rawCollaboration.totalCost) ? rawCollaboration.totalCost : 20000)) / 2500) * 2500,
+      totalCost: Math.round(Math.max(15000, Math.min(collaborationBudgetCeiling, typeof rawCollaboration.totalCost === 'number' && Number.isFinite(rawCollaboration.totalCost) ? rawCollaboration.totalCost : 20000)) / 2500) * 2500,
       playerCostSharePct: Math.round(Math.max(10, Math.min(90, typeof rawCollaboration.playerCostSharePct === 'number' && Number.isFinite(rawCollaboration.playerCostSharePct) ? rawCollaboration.playerCostSharePct : 50))),
       playerProfitSharePct: Math.round(Math.max(10, Math.min(90, typeof rawCollaboration.playerProfitSharePct === 'number' && Number.isFinite(rawCollaboration.playerProfitSharePct) ? rawCollaboration.playerProfitSharePct : 50))),
     };

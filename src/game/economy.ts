@@ -29,8 +29,11 @@ export const TIERS: ShopTier[] = [
 export const SHOP_MINUTES = 720;
 /** How busy each hour is, 8am first. Lunch and after work are the rush. */
 export const HOUR_WEIGHTS = [0.45, 0.7, 0.9, 1, 1.35, 1.25, 0.9, 0.85, 1.1, 1.45, 1.5, 0.75];
-/** Minutes a customer waits before walking out. */
-export const PATIENCE: Record<CustomerClass, number> = { poor: 80, middle: 65, rich: 45 };
+/** Base minutes a customer waits before walking out. One game minute is roughly one real second.
+ * Longer windows give the player a fair chance to finish a look; heat and darkness can still
+ * wear down patience, while seats, cooling, signature shops and regular-customer loyalty add more.
+ */
+export const PATIENCE: Record<CustomerClass, number> = { poor: 150, middle: 120, rich: 90 };
 /** Minutes a staff member takes for one customer at a level. */
 export const staffMinutes = (level: number) => Math.max(30, 90 - 6 * level);
 
