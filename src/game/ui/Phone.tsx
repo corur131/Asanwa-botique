@@ -28,6 +28,25 @@ const APPS: { id: Exclude<AppId, 'home'>; name: string; bg: string; glyph: strin
   { id: 'weather', name: 'Lagos Weather', bg: 'bg-gradient-to-br from-sky-400 to-blue-700', glyph: '🌦️' },
 ];
 
+const AppLogo: React.FC<{ id: Exclude<AppId, 'home'> }> = ({ id }) => {
+  const common = { fill: 'none', stroke: 'currentColor', strokeWidth: 2.5, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const };
+  const marks: Record<Exclude<AppId, 'home'>, React.ReactNode> = {
+    chats: <><path d="M8 10.5A5.5 5.5 0 0 1 13.5 5h21A5.5 5.5 0 0 1 40 10.5v14a5.5 5.5 0 0 1-5.5 5.5H21l-9 7v-7.7a5.5 5.5 0 0 1-4-5.3z" fill="currentColor" opacity=".18" stroke="none"/><path d="M17 15h14M17 21h10" {...common}/><path d="M22 10.5c-1.2 4.7 3.2 10.5 8 11.5" {...common}/></>,
+    market: <><path d="M10 18h28l-2 21H12z" fill="currentColor" opacity=".18" stroke="none"/><path d="M10 18h28l-2 21H12zM17 18v-4a7 7 0 0 1 14 0v4" {...common}/><path d="M18 25h12" {...common}/></>,
+    gidigram: <><rect x="7" y="10" width="34" height="28" rx="7" fill="currentColor" opacity=".18" stroke="none"/><rect x="7" y="10" width="34" height="28" rx="7" {...common}/><circle cx="24" cy="24" r="8" {...common}/><circle cx="34" cy="16.5" r="2" fill="currentColor" stroke="none"/></>,
+    bank: <><path d="M5 17 24 7l19 10z" fill="currentColor" opacity=".22" stroke="none"/><path d="M5 17 24 7l19 10M7 40h34M10 20v16M19 20v16M29 20v16M38 20v16M5 40h38" {...common}/></>,
+    property: <><path d="m5 23 19-16 19 16v17H5z" fill="currentColor" opacity=".2" stroke="none"/><path d="m5 23 19-16 19 16M9 21v19h30V21M19 40V27h10v13" {...common}/><path d="M32 13V8h5v9" {...common}/></>,
+    staff: <><circle cx="18" cy="17" r="7" fill="currentColor" opacity=".22" stroke="none"/><circle cx="31" cy="19" r="5" fill="currentColor" opacity=".22" stroke="none"/><path d="M5 39c0-8 5-13 13-13s13 5 13 13M27 28c7-1 13 3 14 10" {...common}/><circle cx="18" cy="17" r="7" {...common}/><circle cx="31" cy="19" r="5" {...common}/></>,
+    top20: <><path d="M24 5 29 16l12 1.5-9 8.5 2.5 12L24 32l-10.5 6 2.5-12L7 17.5 19 16z" fill="currentColor" opacity=".25" stroke="none"/><path d="m24 5 5 11 12 1.5-9 8.5 2.5 12L24 32l-10.5 6 2.5-12L7 17.5 19 16z" {...common}/></>,
+    forbes: <><path d="M10 38V25h7v13M21 38V17h7v21M32 38V10h7v28" fill="currentColor" opacity=".24" stroke="none"/><path d="M7 40h34M10 38V25h7v13M21 38V17h7v21M32 38V10h7v28" {...common}/></>,
+    promotion: <><path d="M7 20 35 9v25L7 25z" fill="currentColor" opacity=".24" stroke="none"/><path d="M7 20 35 9v25L7 25zM7 20v5M13 27l4 12h8l-5-10M35 16l6-4M35 27l6 4" {...common}/></>,
+    empire: <><path d="M6 40V22h11v18M18 40V9h12v31M31 40V17h11v23" fill="currentColor" opacity=".2" stroke="none"/><path d="M6 40V22h11v18M18 40V9h12v31M31 40V17h11v23M22 15h4M22 21h4M22 27h4M10 28h3M35 23h3M35 29h3" {...common}/></>,
+    gist: <><path d="M7 10h27a5 5 0 0 1 5 5v13a5 5 0 0 1-5 5H20l-8 6v-6H7a5 5 0 0 1-5-5V15a5 5 0 0 1 5-5z" fill="currentColor" opacity=".2" stroke="none"/><path d="M7 10h27a5 5 0 0 1 5 5v13a5 5 0 0 1-5 5H20l-8 6v-6H7a5 5 0 0 1-5-5V15a5 5 0 0 1 5-5zM12 19h19M12 25h13" {...common}/><path d="m35 4 1.5 4.5L41 10l-4.5 1.5L35 16l-1.5-4.5L29 10l4.5-1.5z" fill="currentColor" stroke="none"/></>,
+    weather: <><circle cx="32" cy="14" r="7" fill="currentColor" opacity=".35" stroke="none"/><path d="M32 4v3M42 14h-3M39 7l-2 2M10 31a8 8 0 0 1 8-8 10 10 0 0 1 19 3 6.5 6.5 0 0 1 0 13H12a6 6 0 0 1-2-8z" fill="currentColor" opacity=".2" stroke="none"/><path d="M10 31a8 8 0 0 1 8-8 10 10 0 0 1 19 3 6.5 6.5 0 0 1 0 13H12a6 6 0 0 1-2-8z" {...common}/></>,
+  };
+  return <svg viewBox="0 0 48 48" className="h-[72%] w-[72%] drop-shadow-sm" aria-hidden="true" {...common}>{marks[id]}</svg>;
+};
+
 export interface PhoneProps {
   s: GameState;
   up: (f: (g: GameState) => GameState) => void;
@@ -60,16 +79,17 @@ export const Phone: React.FC<PhoneProps> = (p) => {
   return (
     <div className="fixed inset-0 z-[80] sm:inset-auto sm:right-6 sm:bottom-4 sm:top-auto flex sm:block items-stretch">
       <div className="absolute inset-0 bg-black/50 sm:hidden" onClick={p.onClose} />
-      <div className="relative w-full sm:w-[390px] h-full sm:h-[min(800px,calc(100vh-90px))] sm:rounded-[44px] sm:border-[10px] border-[#0b0b0d] bg-[#0b0b0d] shadow-2xl overflow-hidden flex flex-col">
-        {/* status bar */}
-        <div className="relative flex items-center justify-between px-6 pt-2 pb-1 text-[12px] font-semibold text-white bg-black shrink-0">
-          <span>{timeText(s)}</span>
-          <span className="hidden sm:block absolute left-1/2 -translate-x-1/2 top-1.5 w-24 h-6 rounded-full bg-[#0b0b0d] border border-white/5" />
-          <span className="flex items-center gap-1.5 text-[11px]">
-            <span>{E.inBlackout(s) ? 'MTN' : 'MTN 4G'}</span>
-            <span className="inline-block w-6 h-3 rounded-sm border border-white/70 relative">
-              <span className="absolute inset-[1px] right-[35%] bg-white rounded-[1px]" />
-            </span>
+      <div className="relative w-full sm:w-[390px] h-full sm:h-[min(844px,calc(100vh-56px))] sm:rounded-[48px] sm:border-[7px] border-[#a7a9ad] bg-[#08090c] shadow-[0_28px_90px_rgba(0,0,0,.65)] overflow-hidden flex flex-col ring-1 ring-white/20">
+        {/* iPhone-inspired status bar and Dynamic Island */}
+        <div className="relative flex items-center justify-between px-7 pt-3 pb-2 text-[12px] font-semibold text-white bg-[#08090c] shrink-0">
+          <span className="tabular-nums">{timeText(s)}</span>
+          <span className="absolute left-1/2 -translate-x-1/2 top-2 h-[25px] w-[104px] rounded-full bg-black border border-white/[0.07] shadow-inner" aria-hidden="true">
+            <span className="absolute right-3 top-[7px] h-2.5 w-2.5 rounded-full bg-[#17242b] ring-1 ring-[#28363d]" />
+          </span>
+          <span className="flex items-center gap-1.5 text-[10px]">
+            <span className="font-semibold">{E.inBlackout(s) ? 'MTN' : '4G'}</span>
+            <svg viewBox="0 0 18 14" className="h-3 w-4" aria-label="Mobile signal"><path d="M1 13V10M5 13V7M9 13V4M13 13V1" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>
+            <svg viewBox="0 0 26 14" className="h-3.5 w-6" aria-label="Battery"><rect x="1" y="1.5" width="21" height="11" rx="3" fill="none" stroke="currentColor" strokeWidth="1.4"/><rect x="3.5" y="4" width="14" height="6" rx="1.5" fill="currentColor"/><path d="M23 5v4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
           </span>
         </div>
         <div className="flex-1 min-h-0 flex flex-col bg-[#111]">
@@ -110,33 +130,54 @@ export const Phone: React.FC<PhoneProps> = (p) => {
   );
 };
 
-const Home: React.FC<{ s: GameState; unread: number; open: (a: AppId) => void }> = ({ s, unread, open }) => (
-  <div className="flex-1 bg-gradient-to-b from-[#3b1d4a] via-[#6b2d5c] to-[#c2563e] p-5 flex flex-col">
-    <div className="text-center text-white mt-6 mb-8">
-      <div className="text-5xl font-light tracking-tight">{timeText(s)}</div>
-      <div className="text-sm opacity-80 mt-1">Day {s.day} · {s.phase === 'shop' ? 'Shop open' : s.phase === 'morning' ? 'Before opening' : 'Evening'}</div>
+const Home: React.FC<{ s: GameState; unread: number; open: (a: AppId) => void }> = ({ s, unread, open }) => {
+  const dockApps = APPS.filter(a => ['chats', 'market', 'gidigram', 'bank'].includes(a.id));
+  return (
+    <div className="relative flex-1 overflow-y-auto bg-gradient-to-b from-[#151a37] via-[#3a275b] to-[#b35b68] px-5 pb-4 pt-5 flex flex-col">
+      <div className="pointer-events-none absolute -right-16 top-20 h-52 w-52 rounded-full bg-fuchsia-300/20 blur-3xl" />
+      <div className="pointer-events-none absolute -left-20 top-64 h-48 w-48 rounded-full bg-cyan-300/15 blur-3xl" />
+      <div className="relative mt-4 mb-6 text-center text-white">
+        <div className="text-[48px] leading-none font-light tracking-[-0.055em] drop-shadow-lg tabular-nums">{timeText(s)}</div>
+        <div className="mt-2 text-[12px] font-medium text-white/75">Day {s.day} <span className="mx-1.5 text-white/40">•</span> {s.phase === 'shop' ? 'Shop open' : s.phase === 'morning' ? 'Before opening' : 'Evening'}</div>
+      </div>
+      <div className="relative grid grid-cols-4 gap-x-2 gap-y-5">
+        {APPS.map((a) => {
+          const badge = a.id === 'chats' ? unread : 0;
+          return (
+            <button key={a.id} onClick={() => open(a.id)} className="group flex min-w-0 flex-col items-center gap-1.5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-white/80 rounded-xl">
+              <span className={`relative flex h-[58px] w-[58px] items-center justify-center rounded-[18px] border border-white/20 text-white shadow-[0_8px_18px_rgba(0,0,0,.28)] ring-1 ring-black/10 transition duration-150 group-active:scale-90 ${a.bg}`}>
+                <span className="absolute inset-x-2 top-0 h-px bg-white/40" />
+                <AppLogo id={a.id} />
+                {badge > 0 && <span className="absolute -right-1.5 -top-1.5 flex h-5 min-w-5 items-center justify-center rounded-full border-2 border-[#35244f] bg-[#ff375f] px-1 text-[10px] font-bold text-white shadow">{badge}</span>}
+              </span>
+              <span className="max-w-full truncate text-[10px] font-medium tracking-[-.01em] text-white [text-shadow:0_1px_4px_rgba(0,0,0,.65)]">{a.name}</span>
+            </button>
+          );
+        })}
+      </div>
+      <div className="relative mt-auto pt-6">
+        <button onClick={() => open('bank')} className="w-full rounded-[22px] border border-white/20 bg-white/[0.13] p-4 text-left text-white shadow-xl backdrop-blur-2xl transition hover:bg-white/[0.17] active:scale-[.99]">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2.5">
+              <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-400 to-teal-700 shadow-lg"><AppLogo id="bank" /></span>
+              <div><div className="text-[11px] font-semibold text-white/70">KoboBank · Current account</div><div className="mt-0.5 text-xl font-bold tracking-tight tabular-nums">{naira(s.cash)}</div></div>
+            </div>
+            <span className="text-xl text-white/70">›</span>
+          </div>
+          <div className="mt-3 flex items-center justify-between border-t border-white/15 pt-2.5 text-[10px] text-white/75">
+            <span>Rent {naira(s.listing.rent)}</span>
+            <span>{E.daysToRent(s.day) === 0 ? 'Due tonight' : `Due in ${E.daysToRent(s.day)} day${E.daysToRent(s.day) > 1 ? 's' : ''}`}</span>
+          </div>
+        </button>
+        <div className="mt-4 rounded-[25px] border border-white/20 bg-white/[0.16] p-2.5 shadow-2xl backdrop-blur-2xl">
+          <div className="grid grid-cols-4 gap-1">
+            {dockApps.map(a => <button key={a.id} onClick={() => open(a.id)} aria-label={a.name} className={`flex h-[50px] items-center justify-center rounded-[16px] border border-white/20 shadow-md transition active:scale-90 ${a.bg}`}><AppLogo id={a.id}/></button>)}
+          </div>
+        </div>
+      </div>
     </div>
-    <div className="grid grid-cols-4 gap-y-6 gap-x-3">
-      {APPS.map((a) => {
-        const badge = a.id === 'chats' ? unread : 0;
-        return (
-          <button key={a.id} onClick={() => open(a.id)} className="flex flex-col items-center gap-1.5 group">
-            <span className={`relative w-14 h-14 rounded-[18px] ${a.bg} flex items-center justify-center text-2xl text-white shadow-lg group-active:scale-95 transition-transform`}>
-              {a.glyph}
-              {badge > 0 && <span className="absolute -top-1.5 -right-1.5 min-w-5 h-5 px-1 rounded-full bg-rose-500 text-[11px] font-bold flex items-center justify-center border-2 border-[#6b2d5c]">{badge}</span>}
-            </span>
-            <span className="text-[11px] text-white font-medium drop-shadow">{a.name}</span>
-          </button>
-        );
-      })}
-    </div>
-    <div className="mt-auto rounded-2xl bg-black/25 backdrop-blur p-3 text-white text-xs">
-      <div className="opacity-70">KoboBank</div>
-      <div className="text-lg font-bold">{naira(s.cash)}</div>
-      <div className="opacity-70">Rent {naira(s.listing.rent)} {E.daysToRent(s.day) === 0 ? 'tonight' : `in ${E.daysToRent(s.day)} day${E.daysToRent(s.day) > 1 ? 's' : ''}`}</div>
-    </div>
-  </div>
-);
+  );
+};
 
 const AppFrame: React.FC<{ title: string; sub?: string; tone: string; right?: React.ReactNode; children: React.ReactNode }> = ({ title, sub, tone, right, children }) => (
   <div className="flex-1 min-h-0 flex flex-col">
