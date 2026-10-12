@@ -719,7 +719,22 @@ const BusinessExpansionApp: React.FC<{ s: GameState; up: PhoneProps['up'] }> = (
             <div className="rounded-lg bg-black/15 p-2"><div className="text-[11px] text-slate-400">Designer collections</div><div className="text-lg font-bold text-white">{expansion.designerCollections}</div></div>
           </div>
         </div>
-        {expansion.branches.length > 0 && <section className="rounded-xl border border-white/10 p-3 space-y-2"><h3 className="text-white font-semibold">Your branches</h3>{expansion.branches.map(branch => <div key={branch.id} className="rounded-lg bg-white/5 p-3"><div className="text-sm text-white font-semibold">{branch.name}</div><div className="text-xs text-slate-400">{branch.area} · {TIERS[branch.tier]?.name || 'Boutique'} · opened Day {branch.openedDay}</div><div className="text-xs text-slate-300 mt-1">Weekly rent {naira(branch.weeklyRent)} · modeled shop assets {naira(branch.assetValue)}</div></div>)}</section>}
+        {expansion.branches.length > 0 && <section className="rounded-xl border border-white/10 p-3 space-y-2"><h3 className="text-white font-semibold">Branch performance</h3>{expansion.branches.map(branch => {
+          const totalRevenue = Math.max(0, branch.cumulativeRevenue || 0);
+          const totalCosts = Math.max(0, branch.cumulativeCosts || 0);
+          const totalProfit = totalRevenue - totalCosts;
+          const profitClass = (branch.lastDayProfit || 0) >= 0 ? 'text-emerald-300' : 'text-rose-300';
+          return <div key={branch.id} className="rounded-lg bg-white/5 p-3 space-y-2">
+            <div className="flex items-start justify-between gap-2"><div><div className="text-sm text-white font-semibold">{branch.name}</div><div className="text-xs text-slate-400">{branch.area} · {TIERS[branch.tier]?.name || 'Boutique'} · opened Day {branch.openedDay}</div></div><div className="text-right"><div className="text-[10px] text-slate-500">Estimated assets</div><div className="text-xs font-semibold text-indigo-200">{naira(branch.assetValue)}</div></div></div>
+            <div className="grid grid-cols-2 gap-2">
+              <div className="rounded-md bg-black/15 p-2"><div className="text-[10px] text-slate-400">Latest day sales</div><div className="text-xs font-semibold text-white">{naira(branch.lastDayRevenue || 0)}</div></div>
+              <div className="rounded-md bg-black/15 p-2"><div className="text-[10px] text-slate-400">Latest day profit/loss</div><div className={'text-xs font-semibold ' + profitClass}>{naira(branch.lastDayProfit || 0)}</div></div>
+              <div className="rounded-md bg-black/15 p-2"><div className="text-[10px] text-slate-400">Lifetime sales</div><div className="text-xs font-semibold text-white">{naira(totalRevenue)}</div></div>
+              <div className="rounded-md bg-black/15 p-2"><div className="text-[10px] text-slate-400">Lifetime operating result</div><div className={'text-xs font-semibold ' + (totalProfit >= 0 ? 'text-emerald-300' : 'text-rose-300')}>{naira(totalProfit)}</div></div>
+            </div>
+            <div className="text-[11px] text-slate-400">{branch.daysTrading || 0} trading days · weekly rent {naira(branch.weeklyRent)} · lifetime modeled costs {naira(totalCosts)}{branch.lastDay ? ' · last updated Day ' + branch.lastDay : ' · performance tracking starts at next close'}</div>
+          </div>;
+        })}</section>}
         {expansion.departments.length > 0 && <section className="rounded-xl border border-white/10 p-3"><h3 className="text-white font-semibold mb-2">Departments</h3><div className="flex flex-wrap gap-2">{expansion.departments.map(name => <span key={name} className="text-xs rounded-full border border-indigo-400/30 bg-indigo-500/10 px-2 py-1 text-indigo-100">{name}</span>)}</div></section>}
         <section className="space-y-2"><h3 className="text-white font-semibold px-1">Invest in your next stage</h3>
           {options.map(option => <div key={option.id} className="rounded-xl border border-white/10 p-3 space-y-2">
