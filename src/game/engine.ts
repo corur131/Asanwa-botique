@@ -15,7 +15,7 @@ import { colourName } from './colours';
 import { FURNITURE, KIOSK_LISTING, Listing, Placed, STARTER_FURNITURE, autoPlace,
   findSpot, canPlace, turn, Rot, ceilingCapacity, ceilingUsed, yardCapacity, yardUsed, cheapestListing, furnitureById, listingsFor, newUid, prestigeRichShift, prestigeTraffic, shopStats, usesFloor, wallCapacity, wallUsed } from './shop';
 import { CharacterMemory, CollaborationEvent, CollaborationReply, Customer, DayLog, Departure, Design, ReplyChoice, GameState, LedgerLine, Message, Regular, ScoreBreakdown, Settlement, SponsorshipOffer, StaffMember, StaffProfession, StyleChoice } from './types';
-import { closeBrandDay, ensureBusinessState, getBrandMetrics, initialBankState, processBankWeekly, processPromotionAtClose, processExpansionAtClose, promotionTrafficBoost, recordWeeklyWealth, saveRentAtClose } from './business';
+import { closeBrandDay, ensureBusinessState, getBrandMetrics, initialBankState, processBankWeekly, processFixedDepositMaturities, processPromotionAtClose, processExpansionAtClose, promotionTrafficBoost, recordWeeklyWealth, saveRentAtClose } from './business';
 
 export { brandPower, currentWealthRows, financialAssets, getBrandMetrics, creditProfile, creditRating, creditHistoryReport, premiumLoanEligible, takePremiumBusinessLoan, renegotiateBusinessLoan, loanRateForScore, maximumLoan, netWorthPlayer, netWorthRival, playerWeekTotals, totalLiabilities, unlocksForFollowers, availablePromotionLevels, promotionBudgetBounds, promotionTrafficBoost, startPromotion, stopPromotion, transferBank, setRentSaving, setSavingsGoal, createFixedDeposit, takeBusinessLoan, repayBusinessLoan, arrangeBusinessLoanRepayment, expansionOptions, investInExpansion } from './business';
 
@@ -46,11 +46,35 @@ export function msg(s: GameState, from: string, text: string, tone: Message['ton
   return { ...s, msgSeq: id, messages: [m, ...s.messages].slice(0, 120) };
 }
 
-/** Money in or out, written to the bank statement. */
+/** Money in or out, written to the bank statement. Unfunded operating costs become payables, never unexplained negative cash. */
 export function money(s: GameState, amount: number, label: string): GameState {
-  if (!amount) return s;
-  const line: LedgerLine = { day: s.day, t: s.phase === 'shop' ? Math.floor(s.clock) : -1, label, amount: Math.round(amount) };
-  return { ...s, cash: s.cash + Math.round(amount), ledger: [line, ...(s.ledger || [])].slice(0, 150) };
+  if (!Number.isFinite(amount) || !Math.round(amount)) return s;
+  const value = Math.round(amount);
+  const inheritedDeficit = Math.max(0, -s.cash);
+  let cash = Math.max(0, s.cash);
+  let operatingPayables = Math.max(0, s.operatingPayables || 0) + inheritedDeficit;
+  const t = s.phase === 'shop' ? Math.floor(s.clock) : -1;
+  const entries: LedgerLine[] = [];
+  if (value < 0) {
+    const requested = Math.abs(value);
+    const paid = Math.min(cash, requested);
+    const shortfall = requested - paid;
+    cash -= paid;
+    operatingPayables += shortfall;
+    entries.push({ day: s.day, t, label, amount: -paid, category: 'operating' });
+    if (shortfall > 0) entries.unshift({ day: s.day, t, label: 'Unpaid operating cost: ' + label + ' (' + shortfall.toLocaleString('en-NG') + ' naira)', amount: 0, category: 'operating' });
+  } else {
+    cash += value;
+    entries.push({ day: s.day, t, label, amount: value, category: 'operating' });
+    // Incoming business receipts first settle bills that could not be paid earlier.
+    const settlement = Math.min(cash, operatingPayables);
+    if (settlement > 0) {
+      cash -= settlement;
+      operatingPayables -= settlement;
+      entries.unshift({ day: s.day, t, label: 'Operating payables settled', amount: -settlement, category: 'operating' });
+    }
+  }
+  return { ...s, cash, operatingPayables, ledger: [...entries, ...(s.ledger || [])].slice(0, 150) };
 }
 
 // ---------------------------------------------------------------------------
@@ -646,6 +670,9 @@ function staffFinish(s: GameState, c: Customer, m: StaffMember): GameState {
 // End of day: running costs, weekly wages, staff drama, rent
 // ---------------------------------------------------------------------------
 export function closeShop(s0: GameState): GameState {
+  // Closing is a once-per-day transaction: a duplicate close must not charge
+  // wages, rent, branch costs, or banking a second time.
+  if (s0.phase === 'evening') return s0;
   let s = s0;
   // anyone still here goes home
   const sentHome = s.inShop.length;
@@ -681,6 +708,9 @@ export function closeShop(s0: GameState): GameState {
     s = payBills(s);
     s = processBankWeekly(s);
   }
+
+  // Fixed deposits mature on their exact due day, not only on weekly banking days.
+  s = processFixedDepositMaturities(s);
 
   // Clear any old rent arrears from the Rent Vault and available cash before
   // saving for the next bill or creating a new rent liability.
@@ -954,7 +984,7 @@ export function answerMessage(s: GameState, msgId: number, choice: ReplyChoice['
 
 export { answerVisit, buyDrop, contestFor, noteVisit, rivalShop, VISIT_CHOICES } from './encounters';
 
-function settleLateRent(s0: GameState): GameState {
+export function settleLateRent(s0: GameState): GameState {
   const late = s0.lateRent;
   if (!late || late.amount <= 0) return late ? { ...s0, lateRent: null } : s0;
 
@@ -984,7 +1014,7 @@ function settleLateRent(s0: GameState): GameState {
   return next;
 }
 
-function payRent(s: GameState): GameState {
+export function payRent(s: GameState): GameState {
   const rent = Math.max(0, s.listing.rent);
   const bank = s.bank || initialBankState();
   const vaultPaid = Math.min(Math.max(0, bank.rentVault), rent);
@@ -1022,15 +1052,16 @@ function payRent(s: GameState): GameState {
   return msg(next, 'Landlord', `Rent of ${naira(rent)} received. See you next week.`, 'info');
 }
 
-function demote(s: GameState): GameState {
-  if (s.tier === 0) return msg({ ...s, lateRent: null }, 'Landlord', 'This kiosk is the last stop. I will let the debt run, but pay me soon.', 'danger');
+export function demote(s: GameState): GameState {
+  if (s.tier === 0) return msg({ ...s, lateRent: s.lateRent ? { ...s.lateRent, due: s.day + 7 } : null }, 'Landlord', 'This kiosk is the last stop. I will let the debt run for another week, but pay me soon.', 'danger');
   const tier = s.tier - 1;
   const t = TIERS[tier];
   const listing = cheapestListing(tier, week(s.day));
   const furniture = autoPlace(s.furniture.filter((f) => furnitureById(f.id).mount !== 'finish').map((f) => ({ ...f, placed: true })), listing);
   const staff = s.staff.slice(0, t.staff);
   const left = s.staff.slice(t.staff);
-  let next: GameState = money({ ...s, tier, listing, furniture, staff, lateRent: null, movedDay: s.day, grace: listing.grace, stats: { ...s.stats, demotions: s.stats.demotions + 1 } }, (s.lateRent?.amount || 0) * 0.5, 'Half the rent debt waived');
+  const remainingRentDebt = Math.max(0, Math.ceil((s.lateRent?.amount || 0) * 0.5));
+  let next: GameState = { ...s, tier, listing, furniture, staff, lateRent: remainingRentDebt > 0 ? { amount: remainingRentDebt, due: s.day + Math.max(1, listing.grace) } : null, movedDay: s.day, grace: listing.grace, stats: { ...s.stats, demotions: s.stats.demotions + 1 } };
   next = fitDisplay(next);
   next = msg(next, 'Landlord', `Time is up. Pack your things. You have been moved down to a ${t.name} on ${listing.street}, ${listing.area}. I've kept the deposit and waived half the debt.`, 'danger');
   next = reactToMove(next, false);

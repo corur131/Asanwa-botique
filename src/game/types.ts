@@ -436,6 +436,8 @@ export interface BusinessLoan {
   termWeeks: number;
   nextPaymentDay: number;
   missedPayments: number;
+  /** Monetary value of unpaid scheduled instalments; memo balance included in balance, not an extra liability. */
+  arrearsBalance?: number;
   /** Cumulative late fees, capped so missed payments cannot create runaway debt. */
   lateFees?: number;
   /** Once defaulted, this remains on the account until the loan is fully cleared. */
@@ -496,6 +498,8 @@ export interface BankState {
   rentVaultRatePct: number;
   fixedDeposits: FixedDeposit[];
   loans: BusinessLoan[];
+  /** Last in-game day on which weekly banking was processed; optional for old saves. */
+  lastProcessedDay?: number;
   /** Persisted in-game credit record; optional for older save compatibility. */
   creditProfile?: CreditProfile;
   savingsGoalName: string;
@@ -547,6 +551,8 @@ export interface GameState {
   grace: number;
   /** Rent owed and the day it must be cleared by. */
   lateRent: { amount: number; due: number } | null;
+  /** Unpaid operating costs when a recurring bill exceeds available cash; included in liabilities. */
+  operatingPayables?: number;
   stock: Design[];
   regulars: Regular[];
   staff: StaffMember[];
