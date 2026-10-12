@@ -1068,11 +1068,11 @@ export function listingsNow(s: GameState): Listing[] {
 export function moveTo(s0: GameState, l0: Listing, equipmentPlan: 'arrange' | 'store' | 'sell' = 'arrange'): GameState {
   const fight = contestFor(s0, l0);
   const l = fight ? { ...l0, moveIn: l0.moveIn + fight.extra } : l0;
-  if ((l.tier !== s0.tier + 1 && !(l.signature && l.tier === s0.tier && !s0.listing.signature)) || s0.cash < l.moveIn) return s0;
+  const move = prepareFurnitureForMove(s0.furniture, l, equipmentPlan);
+  if ((l.tier !== s0.tier + 1 && !(l.signature && l.tier === s0.tier && !s0.listing.signature)) || s0.cash + move.saleProceeds < l.moveIn) return s0;
   const s = fight ? wonListing(s0, l0) : s0;
   const tier = l.tier;
   const t = TIERS[tier];
-  const move = prepareFurnitureForMove(s.furniture, l, equipmentPlan);
   let next: GameState = money({ ...s, tier, listing: l, furniture: move.furniture, movedDay: s.day, grace: l.grace }, -l.moveIn, `Move-in: ${l.street}`);
   if (move.saleProceeds > 0) next = money(next, move.saleProceeds, 'Sold shop equipment during move');
   const equipmentMessage = equipmentPlan === 'store'
