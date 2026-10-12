@@ -55,7 +55,7 @@ export const Phone: React.FC<PhoneProps> = (p) => {
     else setApp('home');
   };
   return (
-    <div className="fixed inset-0 z-50 sm:inset-auto sm:right-6 sm:bottom-4 sm:top-auto flex sm:block items-stretch">
+    <div className="fixed inset-0 z-[80] sm:inset-auto sm:right-6 sm:bottom-4 sm:top-auto flex sm:block items-stretch">
       <div className="absolute inset-0 bg-black/50 sm:hidden" onClick={p.onClose} />
       <div className="relative w-full sm:w-[390px] h-full sm:h-[min(800px,calc(100vh-90px))] sm:rounded-[44px] sm:border-[10px] border-[#0b0b0d] bg-[#0b0b0d] shadow-2xl overflow-hidden flex flex-col">
         {/* status bar */}
