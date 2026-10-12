@@ -73,7 +73,7 @@ export function ensureBusinessState(s: GameState): GameState {
   return {
     ...s,
     cash: Math.max(0, Number.isFinite(s.cash) ? s.cash : 0),
-    operatingPayables: Math.max(0, bank0 ? (s.operatingPayables || 0) : 0) + inheritedCashDeficit,
+    operatingPayables: Math.max(0, s.operatingPayables || 0) + inheritedCashDeficit,
     bank, businessExpansion, brand, rivals,
     wealthHistory: Array.isArray(s.wealthHistory) ? s.wealthHistory : [],
     sponsorshipOffers: Array.isArray(s.sponsorshipOffers) ? s.sponsorshipOffers : [],
