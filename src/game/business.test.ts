@@ -55,6 +55,17 @@ test('moving money from savings back to current account does not change total fi
   assert.equal(financialAssets(after), financialAssets(before));
 });
 
+test('weekly bank interest is not credited before a scheduled banking day', () => {
+  const before = state({
+    day: 8,
+    bank: { ...initialBankState(), savings: 20_000, rentVault: 10_000, savingsRatePct: 1, rentVaultRatePct: 1 },
+  });
+  const after = processBankWeekly(before);
+  assert.equal(after.bank!.savings, 20_000);
+  assert.equal(after.bank!.rentVault, 10_000);
+  assert.equal(after.ledger!.length, before.ledger!.length);
+});
+
 test('fixed deposit stays locked before its maturity day', () => {
   const before = state({
     day: 9,
