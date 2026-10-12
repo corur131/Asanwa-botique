@@ -106,9 +106,26 @@ app.post('/api/ai-chat', async (req, res) => {
     }
     res.json({ reply: reply.slice(0, 1200), ...(isGroup ? { speaker } : {}) });
   } catch (error) {
-    // Do not send provider details or secrets to the browser.
-    console.error('Gemini chat request failed:', error instanceof Error ? error.message : 'unknown error');
-    res.status(502).json({ error: 'Gemini could not reply right now. Check the API key, model availability, and usage limits.' });
+    // Log diagnostic details on the server, never the API key.
+    const providerError = error as { status?: unknown; code?: unknown; message?: unknown };
+    const status = typeof providerError?.status === 'number' ? providerError.status : undefined;
+    const rawMessage = typeof providerError?.message === 'string' ? providerError.message : 'unknown error';
+    const safeMessage = apiKey ? rawMessage.split(apiKey).join('[redacted API key]').slice(0, 400) : rawMessage.slice(0, 400);
+    console.error(`Gemini chat request failed${status ? ` (HTTP ${status})` : ''}${providerError?.code ? ` [${String(providerError.code).slice(0, 80)}]` : ''}: ${safeMessage}`);
+
+    let publicError = 'Gemini request failed for an unknown reason. Check the Render runtime logs for the diagnostic message.';
+    if (status === 400) {
+      publicError = 'Gemini rejected the request (400). Check the model name and request format; see Render runtime logs.';
+    } else if (status === 401 || status === 403) {
+      publicError = 'Gemini rejected the API key or its permissions (401/403). Check that the key is valid and authorized for this project.';
+    } else if (status === 404) {
+      publicError = 'Gemini could not find the configured model (404). Check GEMINI_MODEL and the models available to your key.';
+    } else if (status === 429) {
+      publicError = 'Gemini rate limit or quota reached (429). Check your API usage limits or try again after the limit resets.';
+    } else if (status === 500 || status === 502 || status === 503 || status === 504) {
+      publicError = `Gemini service error (${status}). Please retry shortly; check Render runtime logs if it continues.`;
+    }
+    res.status(502).json({ error: publicError });
   }
 });
 
