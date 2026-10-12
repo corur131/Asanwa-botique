@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { CharacterSvg } from '../../components/renderer/renderCharacter';
+import { getDeborahConfig, MALE_CONFIG } from '../../constants/presets';
 import { naira } from '../economy';
 import * as E from '../engine';
 import { Listing } from '../shop';
@@ -147,8 +148,51 @@ const AppFrame: React.FC<{ title: string; sub?: string; tone: string; right?: Re
 // ---------------------------------------------------------------------------
 // WhatsApp
 // ---------------------------------------------------------------------------
-const AVATAR_TONE: Record<string, string> = { Deborah: 'bg-pink-500', Landlord: 'bg-amber-700', [GROUP]: 'bg-gradient-to-br from-fuchsia-500 to-amber-500', GistLagos: 'bg-red-600' };
-const avatarTone = (name: string) => AVATAR_TONE[name] || ['bg-sky-600', 'bg-violet-600', 'bg-emerald-600', 'bg-orange-500', 'bg-teal-600'][name.length % 5];
+type AvatarSize = 'list' | 'header' | 'message';
+
+/** A small branded mark for the fashion-industry group, rather than a contact initial. */
+const FashionGroupAvatar: React.FC<{ sizeClass: string }> = ({ sizeClass }) => (
+  <span role="img" aria-label="Lagos Fashion Babes group profile picture" className={`relative ${sizeClass} rounded-full overflow-hidden shrink-0 flex items-center justify-center bg-gradient-to-br from-[#3d1738] via-[#6e254e] to-[#172d32] ring-1 ring-[#d9b66c]/70`}>
+    <svg viewBox="0 0 48 48" className="w-full h-full p-[3px]" aria-hidden="true">
+      <circle cx="24" cy="24" r="21" fill="none" stroke="#e5cb8b" strokeWidth="1.25" opacity="0.9" />
+      <path d="M24 15 C24 10 18.5 10 18.5 14" fill="none" stroke="#f7e9c3" strokeWidth="2" strokeLinecap="round" />
+      <path d="M24 16.5 L8.5 27 L39.5 27 Z" fill="#f0d99d" stroke="#fff2d3" strokeWidth="1.1" strokeLinejoin="round" />
+      <path d="M17.5 27 L14.5 37.2 L33.5 37.2 L30.5 27 L27 31 L24 27.5 L21 31 Z" fill="#bb729b" stroke="#f8e9c8" strokeWidth="1.15" strokeLinejoin="round" />
+      <path d="M11.5 25.5 L16.5 29 M36.5 25.5 L31.5 29" fill="none" stroke="#e4bd71" strokeWidth="1.2" strokeLinecap="round" />
+      <path d="M32.5 10.5 L37.5 7.5 M35 13 L40 10" fill="none" stroke="#f4dfac" strokeWidth="1.1" strokeLinecap="round" />
+      <circle cx="11" cy="12" r="1.2" fill="#f4dfac" />
+      <circle cx="37.5" cy="34" r="1.1" fill="#f4dfac" />
+    </svg>
+  </span>
+);
+
+const GistAvatar: React.FC<{ sizeClass: string }> = ({ sizeClass }) => (
+  <span role="img" aria-label="GistLagos profile picture" className={`relative ${sizeClass} rounded-full overflow-hidden shrink-0 flex items-center justify-center bg-gradient-to-br from-[#8f2639] to-[#391522] ring-1 ring-rose-300/50`}>
+    <svg viewBox="0 0 48 48" className="w-full h-full p-2" aria-hidden="true">
+      <path d="M10 13.5 H31.5 A3.5 3.5 0 0 1 35 17 V29.5 A3.5 3.5 0 0 1 31.5 33 H20 L12 38 V33 H10 A3.5 3.5 0 0 1 6.5 29.5 V17 A3.5 3.5 0 0 1 10 13.5 Z" fill="#fff2e8" />
+      <path d="M13 20 H28 M13 24 H25 M13 28 H29" stroke="#9c3045" strokeWidth="2" strokeLinecap="round" />
+      <path d="M34.5 9.5 L39 14 L34.5 18.5" fill="none" stroke="#f4c77d" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  </span>
+);
+
+/** Every chat participant gets a portrait or branded avatar, reused in list, header and group messages. */
+const ContactAvatar: React.FC<{ name: string; s: GameState; size?: AvatarSize }> = ({ name, s, size = 'list' }) => {
+  const sizeClass = size === 'header' ? 'w-10 h-10' : size === 'message' ? 'w-6 h-6' : 'w-12 h-12';
+  if (name === GROUP) return <FashionGroupAvatar sizeClass={sizeClass} />;
+  if (name === 'GistLagos') return <GistAvatar sizeClass={sizeClass} />;
+
+  const staff = (s.staff || []).find((m) => m.name === name);
+  const rival = (s.rivals || []).find((r) => r.owner === name);
+  const look = staff?.look || rival?.look || (name === 'Landlord' ? MALE_CONFIG : getDeborahConfig(s.divine));
+  const safeName = name.replace(/[^a-zA-Z0-9_-]/g, '-');
+  return (
+    <span role="img" aria-label={`${name} profile picture`} title={name} className={`${sizeClass} rounded-full overflow-hidden shrink-0 ring-1 ring-white/15 bg-gradient-to-br from-[#32263d] to-[#162d30]`}>
+      <CharacterSvg config={look} idPrefix={`wa-${safeName}-${size}`} camera="portrait" className="w-full h-full" />
+    </span>
+  );
+};
+
 const stamp = (m: Message) => (m.t !== undefined ? `Day ${m.day} · ${E.clockText(m.t)}` : `Day ${m.day}`);
 
 const Chats: React.FC<PhoneProps> = ({ s, up, chat, setChat, staff }) => {
@@ -182,7 +226,7 @@ const Chats: React.FC<PhoneProps> = ({ s, up, chat, setChat, staff }) => {
           {list.length === 0 && <p className="p-4 text-sm text-slate-400">No chats yet.</p>}
           {list.map((c) => (
             <button key={c.from} onClick={() => setChat(c.from)} className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-white/5 bg-[#111B21]">
-              <span className={`w-11 h-11 rounded-full ${avatarTone(c.from)} flex items-center justify-center font-bold text-white shrink-0`}>{c.from[0]}</span>
+              <ContactAvatar name={c.from} s={s} size="list" />
               <span className="min-w-0 flex-1">
                 <span className="flex items-baseline justify-between gap-2">
                   <span className="text-white font-medium truncate">{c.from}</span>
@@ -222,7 +266,7 @@ const Chats: React.FC<PhoneProps> = ({ s, up, chat, setChat, staff }) => {
     <div className="flex-1 min-h-0 flex flex-col">
       <div className="bg-[#202C33] px-3 py-2.5 text-white flex items-center gap-3 shrink-0">
         <button onClick={() => setChat(null)} className="text-xl px-1" aria-label="Back to chats">‹</button>
-        <span className={`w-9 h-9 rounded-full ${avatarTone(chat)} flex items-center justify-center font-bold`}>{chat[0]}</span>
+        <ContactAvatar name={chat} s={s} size="header" />
         <div className="leading-tight">
           <div className="font-medium">{chat}</div>
           <div className="text-[11px] text-slate-400 truncate max-w-[230px]">{isGroup ? `${(s.rivals || []).filter((r) => r.main).map((r) => (/^(Iya|Mrs|Mummy|Mama)\b/.test(r.owner) ? r.owner : r.owner.split(' ')[0])).join(', ')}, You` : rival ? rival.shop : chat === 'Landlord' ? s.listing.landlord : member ? `Level ${member.level} stylist` : chat === 'Deborah' ? 'Twin sis · manages the books' : 'online'}</div>
@@ -234,7 +278,8 @@ const Chats: React.FC<PhoneProps> = ({ s, up, chat, setChat, staff }) => {
           return (
             <React.Fragment key={m.id}>
               {newDay && <div className="text-center my-2"><span className="text-[10px] uppercase tracking-wider bg-[#182229] text-slate-400 rounded-md px-2 py-1">Day {m.day}</span></div>}
-              <div className={`flex ${m.from === 'You' ? 'justify-end' : ''}`}>
+              <div className={`flex items-end gap-1.5 ${m.from === 'You' ? 'justify-end' : ''}`}>
+                {isGroup && m.from !== 'You' && <ContactAvatar name={m.from} s={s} size="message" />}
                 <div className={`max-w-[85%] rounded-lg px-2.5 py-1.5 text-[13.5px] leading-snug text-[#E9EDEF] shadow ${m.from === 'You' ? 'bg-[#005C4B] rounded-tr-none' : m.tone === 'danger' ? 'bg-[#3a1d22] rounded-tl-none' : 'bg-[#202C33] rounded-tl-none'}`}>
                   {isGroup && m.from !== 'You' && <div className={`text-[11px] font-semibold ${authorTone(m.from)}`}>{m.from}</div>}
                   {m.text}
