@@ -188,7 +188,6 @@ test('branch operating costs create a payable rather than negative cash when fun
       wholesaleActive: false,
       designerCollections: 0,
     },
-    today: { income: 0, costs: 0, events: [] },
   });
   const after = processExpansionAtClose(before);
   assert.ok(after.cash >= 0);
