@@ -469,7 +469,17 @@ export interface BusinessBranch {
   openedDay: number;
   weeklyRent: number;
   assetValue: number;
+  /** Lifetime modeled performance; optional to keep older saved games compatible. */
+  cumulativeRevenue?: number;
+  cumulativeCosts?: number;
+  daysTrading?: number;
+  /** Most recent completed trading day, used for the branch dashboard. */
+  lastDay?: number;
+  lastDayRevenue?: number;
+  lastDayCosts?: number;
+  lastDayProfit?: number;
 }
+
 
 export type ExpansionInvestment = 'branch' | 'wholesale' | 'bridal' | 'accessories' | 'menswear' | 'designer';
 
@@ -478,6 +488,8 @@ export interface BusinessExpansionState {
   departments: string[];
   wholesaleActive: boolean;
   designerCollections: number;
+  /** Prevents branch and wholesale transactions being posted twice for one in-game day. */
+  lastProcessedDay?: number;
 }
 
 export interface CreditProfile {
