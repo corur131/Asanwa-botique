@@ -591,6 +591,9 @@ export const HEADWEAR: AccessoryItem[] = [
 
 /** Premium hairpieces are merchandise colourways; the renderer reuses its detailed hair silhouettes. */
 export const HAIR_PRODUCTS: AccessoryItem[] = [
+  A('syntheticBobWig', 'Everyday Synthetic Bob Wig', 'f', 6_500, false, { renderId: 'bluntBob', minTier: 0 }),
+  A('braidedPonytailExtension', 'Braided Ponytail Extension', 'f', 4_500, false, { renderId: 'longBraids', minTier: 0 }),
+  A('classicMensHairpiece', 'Classic Men’s Hairpiece', 'm', 8_500, false, { renderId: 'lowCut', minTier: 0 }),
   A('silkyStraightBundle', 'Silky Straight Wig Bundle', 'f', 18_000, false, { renderId: 'boneStraight', minTier: 1 }),
   A('waterWaveFrontal', 'Water-Wave Frontal Wig', 'f', 38_000, false, { renderId: 'waterWave', minTier: 1 }),
   A('kinkyCoilyWig', 'Kinky-Coily Natural Wig', 'f', 28_000, false, { renderId: 'kinkyStraight', minTier: 1 }),
