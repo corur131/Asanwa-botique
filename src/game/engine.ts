@@ -14,7 +14,7 @@ import { FEMALE_HAIR, MAKEUP_LOOKS } from '../constants/catalog';
 import { colourName } from './colours';
 import { FURNITURE, KIOSK_LISTING, Listing, Placed, STARTER_FURNITURE, autoPlace,
   findSpot, canPlace, turn, Rot, ceilingCapacity, ceilingUsed, yardCapacity, yardUsed, cheapestListing, furnitureById, listingsFor, newUid, prestigeRichShift, prestigeTraffic, shopStats, usesFloor, wallCapacity, wallUsed } from './shop';
-import { CharacterMemory, CollaborationEvent, CollaborationReply, Customer, DayLog, Departure, Design, ReplyChoice, GameState, LedgerLine, Message, Regular, ScoreBreakdown, Settlement, StaffMember, StaffProfession, StyleChoice } from './types';
+import { CharacterMemory, CollaborationEvent, CollaborationReply, Customer, DayLog, Departure, Design, ReplyChoice, GameState, LedgerLine, Message, Regular, ScoreBreakdown, Settlement, SponsorshipOffer, StaffMember, StaffProfession, StyleChoice } from './types';
 import { closeBrandDay, ensureBusinessState, getBrandMetrics, initialBankState, processBankWeekly, processPromotionAtClose, promotionTrafficBoost, recordWeeklyWealth, saveRentAtClose } from './business';
 
 export { brandPower, currentWealthRows, getBrandMetrics, maximumLoan, netWorthPlayer, netWorthRival, playerWeekTotals, unlocksForFollowers, availablePromotionLevels, promotionBudgetBounds, promotionTrafficBoost, startPromotion, stopPromotion, transferBank, setRentSaving, setSavingsGoal, createFixedDeposit, takeBusinessLoan, repayBusinessLoan } from './business';
@@ -699,6 +699,7 @@ export function closeShop(s0: GameState): GameState {
   if (s.day > 2 && Math.random() < 0.25 && !(s.convos || []).some((c) => c.with === 'Deborah' && !c.done)) s = startGist(s);
   s = planEvents(s);
   s = planTips(s);
+  s = planSponsorshipOffer(s);
   s = resolveDueCollaborations(s);
   // closeShop records today's history before resolving due events; refresh that log
   // so collaboration payouts count in weekly performance and end-of-day summaries.
@@ -862,11 +863,77 @@ function eventNameForLog(event: CollaborationEvent, grossRevenue: number, profit
   return event.eventName + ': sales ' + naira(grossRevenue) + ', event profit ' + naira(profit) + ', Divine payout ' + naira(payout) + '.';
 }
 
+function planSponsorshipOffer(s0: GameState): GameState {
+  if (s0.day % 7 !== 4 || (s0.lastSponsorshipDay !== undefined && s0.day - s0.lastSponsorshipDay < 14)) return s0;
+  const followers = Math.max(0, s0.followers || 0);
+  const tier = followers >= 500_000 ? 4 : followers >= 100_000 ? 3 : followers >= 25_000 ? 2 : followers >= 5_000 ? 1 : followers >= 1_000 ? 0 : -1;
+  if (tier < 0 || Math.random() > 0.68) return s0;
+  const offers = [
+    { threshold: 1_000, sponsor: 'Lagos Style Collective', min: 15_000, max: 60_000, followers: 40 },
+    { threshold: 5_000, sponsor: 'Naija Fashion Market', min: 50_000, max: 200_000, followers: 120 },
+    { threshold: 25_000, sponsor: 'StyleHouse Media', min: 250_000, max: 900_000, followers: 350 },
+    { threshold: 100_000, sponsor: 'Luxe Africa Campaigns', min: 1_000_000, max: 4_000_000, followers: 1_200 },
+    { threshold: 500_000, sponsor: 'National Fashion Awards', min: 8_000_000, max: 25_000_000, followers: 8_000 },
+  ];
+  const band = offers[tier];
+  const power = getBrandMetrics(s0);
+  const engagement = clamp((power.awareness * 0.25 + power.loyalty * 0.5 + power.reliability * 0.25) / 75, 0.65, 1.35);
+  const offer: SponsorshipOffer = {
+    id: 'sponsor-' + s0.day + '-' + Math.random().toString(36).slice(2, 8),
+    sponsor: band.sponsor,
+    day: s0.day,
+    expiresDay: s0.day + 3,
+    followersRequired: band.threshold,
+    payout: Math.round((band.min + Math.random() * (band.max - band.min)) * engagement / 5000) * 5000,
+    bonusFollowers: Math.round(band.followers * engagement),
+    status: 'offered',
+  };
+  const id = (s0.msgSeq || 0) + 1;
+  const message: Message = {
+    id, day: s0.day, from: offer.sponsor,
+    text: 'Your audience is growing. We would like to sponsor a Gidigram campaign for Asanwa Boutique. We can pay ' + naira(offer.payout) + ' for a branded fashion post, with an extra audience boost if you accept. This offer expires after Day ' + offer.expiresDay + '.',
+    tone: 'good', t: -1,
+    choices: [{ id: 'accept', label: 'Accept sponsorship' }, { id: 'decline', label: 'Decline offer' }],
+    ctx: { kind: 'sponsorship', offerId: offer.id },
+  };
+  return {
+    ...s0, msgSeq: id, messages: [message, ...(s0.messages || [])].slice(0, 160),
+    sponsorshipOffers: [...(s0.sponsorshipOffers || []), offer].slice(-40), lastSponsorshipDay: s0.day,
+  };
+}
+
+function answerSponsorship(s0: GameState, message: Message, choice: ReplyChoice['id']): GameState {
+  const offerId = message.ctx?.offerId;
+  const offer = (s0.sponsorshipOffers || []).find((item) => item.id === offerId);
+  if (!offer || offer.status !== 'offered') return s0;
+  let s: GameState = { ...s0, messages: s0.messages.map((item) => item.id === message.id ? { ...item, answered: choice } : item) };
+  if (s.day > offer.expiresDay) {
+    s = { ...s, sponsorshipOffers: (s.sponsorshipOffers || []).map((item) => item.id === offer.id ? { ...item, status: 'expired' as const } : item) };
+    return msg(s, offer.sponsor, 'That campaign offer has expired. We may contact you again when your audience grows.', 'warn');
+  }
+  if (choice !== 'accept') {
+    s = { ...s, sponsorshipOffers: (s.sponsorshipOffers || []).map((item) => item.id === offer.id ? { ...item, status: 'declined' as const } : item) };
+    return msg(s, offer.sponsor, 'No worries. Thank you for considering the offer; we will keep Asanwa Boutique on our list for future campaigns.', 'info');
+  }
+  s = money(s, offer.payout, 'Sponsored campaign: ' + offer.sponsor);
+  const brand = getBrandMetrics(s);
+  s = {
+    ...s,
+    followers: (s.followers || 0) + offer.bonusFollowers,
+    brand: { ...brand, awareness: clamp(brand.awareness + 1.2, 5, 100), trendInfluence: clamp(brand.trendInfluence + 0.8, 5, 100) },
+    today: { ...s.today, income: s.today.income + offer.payout, events: [...s.today.events, 'Sponsored campaign from ' + offer.sponsor + ' earned ' + naira(offer.payout) + '.'] },
+    sponsorshipOffers: (s.sponsorshipOffers || []).map((item) => item.id === offer.id ? { ...item, status: 'accepted' as const } : item),
+  };
+  s = gist(s, 'Asanwa Boutique lands a sponsored campaign', offer.sponsor + ' paid ' + naira(offer.payout) + ' for a Gidigram campaign. Divine gained ' + offer.bonusFollowers + ' followers.', 'you', true);
+  return msg(s, offer.sponsor, 'The partnership is confirmed. Your payment is on its way, and we have shared your campaign with our fashion audience.', 'good');
+}
+
 /** A reply picked in WhatsApp. */
 export function answerMessage(s: GameState, msgId: number, choice: ReplyChoice['id']): GameState {
   const m = s.messages.find((x) => x.id === msgId);
   if (!m) return s;
   if (m.ctx?.kind === 'invite') return answerInvite(s, m, choice);
+  if (m.ctx?.kind === 'sponsorship') return answerSponsorship(s, m, choice);
   if (m.convo) return answerConvo(s, msgId, choice);
   return answerRival(s, msgId, choice);
 }
