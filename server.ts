@@ -89,7 +89,6 @@ app.post('/api/ai-chat', async (req, res) => {
       contents,
       config: {
         systemInstruction,
-        temperature: 0.95,
         maxOutputTokens: 180,
       },
     });
