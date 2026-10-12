@@ -485,7 +485,7 @@ export const WARDROBE: WardrobeItem[] = [
   W('premiumCottonShirt', 'Premium Cotton Dress Shirt', 'top', 'Premium Menswear', false, ['office', 'church', 'dateNight'], 'middle', 22_000, 'plain', 'm', { renderId: 'shirt', minTier: 1 }),
   W('silkDinnerShirt', 'Silk Dinner Shirt', 'top', 'Designer Menswear', false, ['wedding', 'dateNight', 'redCarpet'], 'middle', 72_000, 'satin', 'm', { renderId: 'shirt', minTier: 2 }),
   W('embroideredDamaskDanshiki', 'Embroidered Damask Danshiki', 'top', 'Designer Native Menswear', true, ['owambe', 'wedding'], 'rich', 150_000, 'george', 'm', { renderId: 'dashiki', minTier: 2 }),
-  W('luxuryVelvetIsiagu', 'Luxury Velvet Isiagu', 'top', 'Couture Native Menswear', true, ['owambe', 'wedding', 'redCarpet'], 'rich', 330_000, 'velvet', 'm', { renderId: 'isiagu', minTier: 3 }),
+  W('luxuryVelvetIsiagu', 'Luxury Velvet Isiagu', 'top', 'Couture Native Menswear', true, ['owambe', 'wedding', 'redCarpet'], 'rich', 330_000, 'velvet', 'm', { renderId: 'dashiki', minTier: 3 }),
   W('heirloomAsoOkeMensTop', 'Heirloom Aso-Oke Ceremony Top', 'top', 'Couture Native Menswear', true, ['owambe', 'wedding'], 'rich', 720_000, 'asoOke', 'm', { renderId: 'mensBuba', minTier: 4 }),
   W('premiumTailoredTrousers', 'Premium Tailored Trousers', 'bottom', 'Premium Menswear', false, ['office', 'church', 'dateNight'], 'middle', 28_000, 'plain', 'm', { renderId: 'trousers', minTier: 1 }),
   W('italianWoolSuitTrousers', 'Italian-Wool Suit Trousers', 'bottom', 'Designer Menswear', false, ['office', 'wedding', 'redCarpet'], 'middle', 68_000, 'plain', 'm', { renderId: 'trousers', minTier: 2 }),
