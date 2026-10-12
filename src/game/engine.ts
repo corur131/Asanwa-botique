@@ -14,7 +14,7 @@ import { FEMALE_HAIR, MAKEUP_LOOKS } from '../constants/catalog';
 import { colourName } from './colours';
 import { FURNITURE, KIOSK_LISTING, Listing, Placed, STARTER_FURNITURE, autoPlace,
   findSpot, canPlace, turn, Rot, ceilingCapacity, ceilingUsed, yardCapacity, yardUsed, cheapestListing, furnitureById, listingsFor, newUid, prestigeRichShift, prestigeTraffic, shopStats, usesFloor, wallCapacity, wallUsed } from './shop';
-import { Customer, DayLog, Departure, Design, ReplyChoice, GameState, LedgerLine, Message, Regular, ScoreBreakdown, Settlement, StaffMember, StaffProfession, StyleChoice } from './types';
+import { CharacterMemory, Customer, DayLog, Departure, Design, ReplyChoice, GameState, LedgerLine, Message, Regular, ScoreBreakdown, Settlement, StaffMember, StaffProfession, StyleChoice } from './types';
 
 const pick = <T,>(a: readonly T[]): T => a[Math.floor(Math.random() * a.length)];
 const chance = (p: number) => Math.random() < p;
@@ -111,6 +111,7 @@ export function newGame(divine: CharacterConfig): GameState {
     posts: [],
     msgSeq: 0,
     read: {},
+    characterMemories: {},
     ...rivalDefaults(),
     today: emptyLog(1),
     history: [],
@@ -1183,10 +1184,33 @@ function weeklyStaff(s0: GameState): GameState {
 const KEY = 'asanwa-boutique-save-v1';
 
 /** Older saves: v1 gets a listing and furniture; v2 gets the clock, chats, bank and Gidigram. */
+function normaliseCharacterMemories(value: unknown, day: number): NonNullable<GameState['characterMemories']> {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
+  const clean: NonNullable<GameState['characterMemories']> = {};
+  for (const [name, rawMemory] of Object.entries(value as Record<string, unknown>).slice(0, 40)) {
+    if (!name.trim() || !rawMemory || typeof rawMemory !== 'object' || Array.isArray(rawMemory)) continue;
+    const candidate = rawMemory as Partial<CharacterMemory>;
+    const summary = typeof candidate.summary === 'string' ? candidate.summary.trim().slice(0, 500) : '';
+    const notes = Array.isArray(candidate.notes)
+      ? candidate.notes.filter((note): note is string => typeof note === 'string').map((note) => note.trim().slice(0, 160)).filter(Boolean).slice(-6)
+      : [];
+    if (!summary && notes.length === 0) continue;
+    const updatedDay = typeof candidate.updatedDay === 'number' && Number.isFinite(candidate.updatedDay)
+      ? Math.max(1, Math.floor(candidate.updatedDay))
+      : Math.max(1, Math.floor(day || 1));
+    clean[name.slice(0, 80)] = { summary, notes, updatedDay };
+  }
+  return clean;
+}
+
 function migrate(raw: GameState): GameState | null {
   type Old = Omit<GameState, 'version'> & { version: number; queue?: unknown; queueIndex?: unknown };
   let s = raw as unknown as Old;
-  if (s.version === 4) return (s as GameState).rivals ? (s as GameState) : { ...(s as GameState), ...rivalDefaults() };
+  if (s.version === 4) {
+    const current = s as GameState;
+    const characterMemories = normaliseCharacterMemories(current.characterMemories, current.day);
+    return current.rivals ? { ...current, characterMemories } : { ...current, characterMemories, ...rivalDefaults() };
+  }
   if (s.version === 3) {
     const o = s as unknown as GameState & { blackout?: unknown };
     delete o.blackout;
@@ -1194,6 +1218,7 @@ function migrate(raw: GameState): GameState | null {
     return {
       ...o,
       version: 4,
+      characterMemories: {},
       outages: [],
       power: { gen: false, solar: 0 },
       shouts: [],
@@ -1216,6 +1241,7 @@ function migrate(raw: GameState): GameState | null {
   return {
     ...(rest as unknown as GameState),
     version: 4,
+    characterMemories: {},
     ...freshDay,
     ...rivalDefaults(),
     power: { gen: false, solar: 0 },
