@@ -1,4 +1,4 @@
-import type { BankPocket, BankState, BrandMetrics, BusinessLoan, GameState, PromotionCampaign, PromotionLevel, PromotionMode, Rival, WeeklyWealthSnapshot } from './types';
+import type { BankPocket, BankState, BrandMetrics, BusinessBranch, BusinessExpansionState, BusinessLoan, ExpansionInvestment, GameState, PromotionCampaign, PromotionLevel, PromotionMode, Rival, WeeklyWealthSnapshot } from './types';
 import { TIERS } from './economy';
 import { furnitureById } from './shop';
 
@@ -10,6 +10,10 @@ const PROMOTION_LEVELS: PromotionLevel[] = ['local', 'citywide', 'premium', 'lux
 const PROMOTION_MIN: Record<PromotionLevel, number> = { local: 500, citywide: 2_000, premium: 7_500, luxury: 20_000 };
 const PROMOTION_MAX: Record<PromotionLevel, number> = { local: 3_000, citywide: 12_000, premium: 45_000, luxury: 150_000 };
 const TIER_BUDGET_CAP = [2_000, 8_000, 30_000, 70_000, 150_000];
+
+export function initialBusinessExpansion(): BusinessExpansionState {
+  return { branches: [], departments: [], wholesaleActive: false, designerCollections: 0 };
+}
 
 export function initialBankState(): BankState {
   return {
@@ -44,6 +48,7 @@ export function brandPower(metrics: BrandMetrics, followers: number, tier: numbe
 
 export function ensureBusinessState(s: GameState): GameState {
   const bank = s.bank || initialBankState();
+  const businessExpansion = s.businessExpansion || initialBusinessExpansion();
   const brand = getBrandMetrics(s);
   const rivals = (s.rivals || []).map((r) => ({
     ...r,
@@ -57,8 +62,9 @@ export function ensureBusinessState(s: GameState): GameState {
     }),
   }));
   return {
-    ...s, bank, brand, rivals,
+    ...s, bank, businessExpansion, brand, rivals,
     wealthHistory: Array.isArray(s.wealthHistory) ? s.wealthHistory : [],
+    sponsorshipOffers: Array.isArray(s.sponsorshipOffers) ? s.sponsorshipOffers : [],
   };
 }
 
@@ -262,6 +268,117 @@ export function processBankWeekly(s0: GameState): GameState {
     }
   }
   s = { ...s, bank };
+  return s;
+}
+
+export interface ExpansionOption {
+  id: ExpansionInvestment;
+  title: string;
+  description: string;
+  cost: number;
+  minimumTier: number;
+  available: boolean;
+  reason?: string;
+}
+
+export function expansionOptions(s: GameState): ExpansionOption[] {
+  const expansion = s.businessExpansion || initialBusinessExpansion();
+  const branchCost = [0, 0, 0, 0, 18_000_000][Math.max(0, Math.min(4, s.tier))] || 18_000_000;
+  const options: ExpansionOption[] = [
+    { id: 'branch', title: 'Open a new branch', description: 'Add a second shop with its own customers, stock costs, rent and daily profit or loss.', cost: branchCost, minimumTier: 4, available: s.tier >= 4 && expansion.branches.length < 4 && s.cash >= branchCost, reason: s.tier < 4 ? 'Reach Flagship tier first' : expansion.branches.length >= 4 ? 'Maximum of four branches reached' : s.cash < branchCost ? 'Not enough current-account cash' : undefined },
+    { id: 'wholesale', title: 'Wholesale operations', description: 'Sell in bulk to other boutiques. More revenue potential, but higher stock costs and cash-flow pressure.', cost: 7_500_000, minimumTier: 3, available: s.tier >= 3 && !expansion.wholesaleActive && s.cash >= 7_500_000, reason: s.tier < 3 ? 'Reach Big Boutique tier first' : expansion.wholesaleActive ? 'Already operating wholesale' : s.cash < 7_500_000 ? 'Not enough current-account cash' : undefined },
+    { id: 'bridal', title: 'Bridal & occasionwear department', description: 'Add a dedicated premium department that increases prestige and high-value demand.', cost: 2_500_000, minimumTier: 2, available: s.tier >= 2 && !expansion.departments.includes('Bridal & Occasionwear') && s.cash >= 2_500_000, reason: s.tier < 2 ? 'Reach Boutique tier first' : expansion.departments.includes('Bridal & Occasionwear') ? 'Department already open' : s.cash < 2_500_000 ? 'Not enough current-account cash' : undefined },
+    { id: 'accessories', title: 'Accessories department', description: 'Add bags, shoes, jewellery and accessories to create more complete looks and extra sales.', cost: 1_250_000, minimumTier: 1, available: s.tier >= 1 && !expansion.departments.includes('Accessories') && s.cash >= 1_250_000, reason: s.tier < 1 ? 'Reach Small Shop tier first' : expansion.departments.includes('Accessories') ? 'Department already open' : s.cash < 1_250_000 ? 'Not enough current-account cash' : undefined },
+    { id: 'menswear', title: 'Menswear department', description: 'Introduce a dedicated menswear range to diversify customers and sales.', cost: 1_800_000, minimumTier: 2, available: s.tier >= 2 && !expansion.departments.includes('Menswear') && s.cash >= 1_800_000, reason: s.tier < 2 ? 'Reach Boutique tier first' : expansion.departments.includes('Menswear') ? 'Department already open' : s.cash < 1_800_000 ? 'Not enough current-account cash' : undefined },
+    { id: 'designer', title: 'Launch a designer collection', description: 'Invest in an exclusive collection that boosts trend influence and brand prestige.', cost: 3_500_000, minimumTier: 2, available: s.tier >= 2 && s.cash >= 3_500_000, reason: s.tier < 2 ? 'Reach Boutique tier first' : s.cash < 3_500_000 ? 'Not enough current-account cash' : undefined },
+  ];
+  return options;
+}
+
+export function investInExpansion(s0: GameState, investment: ExpansionInvestment): GameState {
+  const option = expansionOptions(s0).find((item) => item.id === investment);
+  if (!option || !option.available) return s0;
+  const current = s0.businessExpansion || initialBusinessExpansion();
+  let expansion: BusinessExpansionState = current;
+  let brand = getBrandMetrics(s0);
+  switch (investment) {
+    case 'branch': {
+      const index = current.branches.length + 1;
+      const areas = ['Lekki Phase 1', 'Ikeja', 'Surulere', 'Victoria Island'];
+      const branch: BusinessBranch = {
+        id: 'branch-' + s0.day + '-' + index,
+        name: 'Asanwa Boutique ' + (index === 1 ? 'Lekki Outlet' : 'Branch ' + (index + 1)),
+        area: areas[current.branches.length % areas.length],
+        tier: 2,
+        openedDay: s0.day,
+        weeklyRent: 330_000,
+        assetValue: 2_200_000,
+      };
+      expansion = { ...current, branches: [...current.branches, branch] };
+      break;
+    }
+    case 'wholesale':
+      expansion = { ...current, wholesaleActive: true };
+      brand = { ...brand, awareness: clamp(brand.awareness + 2, 5, 100), reliability: clamp(brand.reliability + 1, 5, 100) };
+      break;
+    case 'bridal':
+      expansion = { ...current, departments: [...current.departments, 'Bridal & Occasionwear'] };
+      brand = { ...brand, prestige: clamp(brand.prestige + 7, 5, 100), loyalty: clamp(brand.loyalty + 1.5, 5, 100) };
+      break;
+    case 'accessories':
+      expansion = { ...current, departments: [...current.departments, 'Accessories'] };
+      brand = { ...brand, awareness: clamp(brand.awareness + 2.5, 5, 100), loyalty: clamp(brand.loyalty + 1.5, 5, 100) };
+      break;
+    case 'menswear':
+      expansion = { ...current, departments: [...current.departments, 'Menswear'] };
+      brand = { ...brand, awareness: clamp(brand.awareness + 2, 5, 100), loyalty: clamp(brand.loyalty + 1, 5, 100) };
+      break;
+    case 'designer':
+      expansion = { ...current, designerCollections: current.designerCollections + 1 };
+      brand = { ...brand, prestige: clamp(brand.prestige + 3.5, 5, 100), trendInfluence: clamp(brand.trendInfluence + 5, 5, 100) };
+      break;
+  }
+  const charged = ledger({ ...s0, businessExpansion: expansion, brand }, -option.cost, 'Business expansion: ' + option.title);
+  return {
+    ...charged,
+    today: { ...charged.today, costs: charged.today.costs + option.cost, events: [...charged.today.events, option.title + ' funded for ' + option.cost.toLocaleString('en-NG') + ' naira.'] },
+    gist: [{ id: 'expansion-' + investment + '-' + s0.day, day: s0.day, title: option.title + ' at Asanwa Boutique', body: 'Divine invested ' + option.cost.toLocaleString('en-NG') + ' naira in business expansion. The move can improve long-term revenue, but the business must still cover its running costs.', about: 'you', hot: true }, ...(s0.gist || [])].slice(0, 40),
+  };
+}
+
+/** Run branch stores through the same simulated day as the main shop. */
+export function processExpansionAtClose(s0: GameState): GameState {
+  const expansion = s0.businessExpansion || initialBusinessExpansion();
+  if (!expansion.branches.length && !expansion.wholesaleActive) return s0;
+  let s = s0;
+  for (const branch of expansion.branches) {
+    const tier = clamp(branch.tier, 0, 4);
+    const base = [24_000, 75_000, 165_000, 340_000, 600_000][tier];
+    const brand = getBrandMetrics(s);
+    const audienceLift = Math.min(0.3, Math.log10(Math.max(1, s.followers || 0) + 1) / 35);
+    const demand = clamp((brand.awareness / 100) * 0.35 + (brand.loyalty / 100) * 0.25 + audienceLift, 0.3, 1.2);
+    const revenue = roundMoney(base * demand * (0.75 + Math.random() * 0.5));
+    const stockCost = roundMoney(revenue * 0.5);
+    const runningCost = roundMoney(TIERS[tier].running * 0.65);
+    s = ledger(s, revenue, branch.name + ' sales');
+    s = ledger(s, -(stockCost + runningCost), branch.name + ' stock and running costs');
+    s = {
+      ...s,
+      today: { ...s.today, income: s.today.income + revenue, costs: s.today.costs + stockCost + runningCost, events: [...s.today.events, branch.name + ' made ' + revenue.toLocaleString('en-NG') + ' naira in sales.'] },
+    };
+    if (s.day % 7 === 0) {
+      s = ledger(s, -branch.weeklyRent, branch.name + ' weekly rent');
+      s = { ...s, today: { ...s.today, costs: s.today.costs + branch.weeklyRent, events: [...s.today.events, branch.name + ' paid ' + branch.weeklyRent.toLocaleString('en-NG') + ' naira in weekly rent.'] } };
+    }
+  }
+  if (expansion.wholesaleActive) {
+    const brand = getBrandMetrics(s);
+    const revenue = roundMoney(85_000 * (0.7 + brand.awareness / 160) * (0.8 + Math.random() * 0.4));
+    const cost = roundMoney(revenue * 0.72);
+    s = ledger(s, revenue, 'Wholesale orders');
+    s = ledger(s, -cost, 'Wholesale stock and fulfilment');
+    s = { ...s, today: { ...s.today, income: s.today.income + revenue, costs: s.today.costs + cost, events: [...s.today.events, 'Wholesale orders recorded ' + revenue.toLocaleString('en-NG') + ' naira in sales.'] } };
+  }
   return s;
 }
 
