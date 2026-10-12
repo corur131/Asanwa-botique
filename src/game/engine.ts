@@ -14,7 +14,7 @@ import { FEMALE_HAIR, MAKEUP_LOOKS } from '../constants/catalog';
 import { colourName } from './colours';
 import { FURNITURE, KIOSK_LISTING, Listing, Placed, STARTER_FURNITURE, autoPlace,
   findSpot, canPlace, turn, Rot, ceilingCapacity, ceilingUsed, yardCapacity, yardUsed, cheapestListing, furnitureById, listingsFor, newUid, prestigeRichShift, prestigeTraffic, shopStats, usesFloor, wallCapacity, wallUsed } from './shop';
-import { CharacterMemory, Customer, DayLog, Departure, Design, ReplyChoice, GameState, LedgerLine, Message, Regular, ScoreBreakdown, Settlement, StaffMember, StaffProfession, StyleChoice } from './types';
+import { CharacterMemory, CollaborationEvent, CollaborationReply, Customer, DayLog, Departure, Design, ReplyChoice, GameState, LedgerLine, Message, Regular, ScoreBreakdown, Settlement, StaffMember, StaffProfession, StyleChoice } from './types';
 
 const pick = <T,>(a: readonly T[]): T => a[Math.floor(Math.random() * a.length)];
 const chance = (p: number) => Math.random() < p;
@@ -112,6 +112,7 @@ export function newGame(divine: CharacterConfig): GameState {
     msgSeq: 0,
     read: {},
     characterMemories: {},
+    collaborations: [],
     ...rivalDefaults(),
     today: emptyLog(1),
     history: [],
@@ -687,11 +688,153 @@ export function closeShop(s0: GameState): GameState {
   if (s.day > 2 && Math.random() < 0.25 && !(s.convos || []).some((c) => c.with === 'Deborah' && !c.done)) s = startGist(s);
   s = planEvents(s);
   s = planTips(s);
+  s = resolveDueCollaborations(s);
   return { ...s, phase: 'evening', visit: null };
 }
 
 export function nextMorning(s: GameState): GameState {
   return planDrop({ ...s, day: s.day + 1, weather: weatherForDay(s.day + 1, s.seed), phase: 'morning', ...freshDay, busy: null, energy: ENERGY.max, today: emptyLog(s.day + 1) });
+}
+
+/** Add a message to a specific WhatsApp thread without invoking a model call. */
+function collaborationChatMessage(s: GameState, chat: string, from: string, text: string, tone: Message['tone'] = 'info'): GameState {
+  const id = (s.msgSeq || 0) + 1;
+  const message: Message = {
+    id, day: s.day, from, chat, text, tone,
+    t: s.phase === 'shop' ? Math.floor(s.clock) : undefined,
+  };
+  return { ...s, msgSeq: id, messages: [message, ...(s.messages || [])].slice(0, 160) };
+}
+
+function collaborationOutcome(s0: GameState, messageId: number, outcome: NonNullable<Message['collaborationOutcome']>, text: string): GameState {
+  const message = s0.messages.find((m) => m.id === messageId);
+  if (!message) return s0;
+  const chat = message.from;
+  const messages = s0.messages.map((m) => m.id === messageId ? { ...m, collaborationOutcome: outcome } : m);
+  return collaborationChatMessage({ ...s0, messages }, chat, 'You', text);
+}
+
+/** Commit to an AI-negotiated pop-up only after Divine explicitly accepts the offer. */
+export function confirmCollaboration(s0: GameState, messageId: number): GameState {
+  const message = s0.messages.find((m) => m.id === messageId);
+  const offer = message?.collaboration;
+  if (!message || message.from === 'You' || message.chat === 'Lagos Fashion Babes' ||
+      message.collaborationOutcome || !offer || (offer.decision !== 'accept' && offer.decision !== 'counter')) return s0;
+
+  const partner = (s0.rivals || []).find((r) => r.owner === message.from && r.main);
+  if (!partner) return s0;
+  const active = (s0.collaborations || []).some((event) => event.partnerId === partner.id && event.status === 'scheduled');
+  if (active) {
+    return collaborationOutcome(s0, messageId, 'already_booked', 'I already have a pop-up scheduled with you. Let’s finish that one before booking another.');
+  }
+
+  const totalCost = Math.round(Math.max(15000, Math.min(80000, Number.isFinite(offer.totalCost) ? offer.totalCost : 20000)) / 2500) * 2500;
+  const playerCostSharePct = Math.round(Math.max(10, Math.min(90, Number.isFinite(offer.playerCostSharePct) ? offer.playerCostSharePct : 50)));
+  const playerProfitSharePct = Math.round(Math.max(10, Math.min(90, Number.isFinite(offer.playerProfitSharePct) ? offer.playerProfitSharePct : 50)));
+  const dayOffset = Math.round(Math.max(3, Math.min(14, Number.isFinite(offer.dayOffset) ? offer.dayOffset : 7)));
+  const eventName = typeof offer.eventName === 'string' && offer.eventName.trim()
+    ? offer.eventName.trim().slice(0, 80)
+    : 'Asanwa Boutique x ' + partner.shop + ' Fashion Pop-up';
+  const playerContribution = Math.round(totalCost * playerCostSharePct / 100);
+  const partnerContribution = totalCost - playerContribution;
+
+  if (s0.cash < playerContribution) {
+    return collaborationOutcome(s0, messageId, 'unaffordable', 'I can’t commit to the pop-up yet — my share is ' + naira(playerContribution) + ', and I don’t have enough cash available. Let’s discuss a smaller budget.');
+  }
+  if (partner.cash < partnerContribution) {
+    return collaborationOutcome(s0, messageId, 'partner_unable', 'The plan sounds good, but you can’t currently cover your ' + naira(partnerContribution) + ' share from the boutique’s available funds. We need to agree on a smaller budget first.');
+  }
+
+  const event: CollaborationEvent = {
+    id: 'collab-' + s0.day + '-' + partner.id + '-' + messageId,
+    partnerId: partner.id,
+    partnerName: partner.owner,
+    eventName,
+    day: s0.day + dayOffset,
+    createdDay: s0.day,
+    totalCost,
+    playerCostSharePct,
+    playerProfitSharePct,
+    status: 'scheduled',
+  };
+  let s = money(s0, -playerContribution, 'Pop-up setup share with ' + partner.owner);
+  s = {
+    ...s,
+    rivals: s.rivals.map((r) => r.id === partner.id ? { ...r, cash: r.cash - partnerContribution } : r),
+    collaborations: [...(s.collaborations || []), event].slice(-30),
+    today: {
+      ...s.today,
+      costs: s.today.costs + playerContribution,
+      events: [...s.today.events, 'Committed ' + naira(playerContribution) + ' to ' + eventName + ', scheduled for Day ' + event.day + '.'],
+    },
+    messages: s.messages.map((m) => m.id === messageId ? { ...m, collaborationOutcome: 'scheduled' } : m),
+  };
+  return collaborationChatMessage(s, partner.owner, 'You',
+    'Deal confirmed: ' + eventName + ' on Day ' + event.day + '. Total setup budget ' + naira(totalCost) +
+    '; my contribution is ' + naira(playerContribution) + ' and my agreed profit share is ' + playerProfitSharePct + '%. Let’s make it work.');
+}
+
+/** Decline an offer without spending money or changing the rival relationship score. */
+export function declineCollaboration(s0: GameState, messageId: number): GameState {
+  const message = s0.messages.find((m) => m.id === messageId);
+  const offer = message?.collaboration;
+  if (!message || message.from === 'You' || message.chat === 'Lagos Fashion Babes' ||
+      message.collaborationOutcome || !offer || (offer.decision !== 'accept' && offer.decision !== 'counter')) return s0;
+  return collaborationOutcome(s0, messageId, 'declined', 'I’ll pass on this pop-up proposal for now. We can discuss another idea later.');
+}
+
+/** Resolve scheduled pop-ups at closing time on their event day. All payouts are engine-calculated. */
+function resolveDueCollaborations(s0: GameState): GameState {
+  let s = s0;
+  for (const event0 of [...(s.collaborations || [])].filter((item) => item.status === 'scheduled' && item.day <= s.day)) {
+    const event = (s.collaborations || []).find((item) => item.id === event0.id);
+    const partner = (s.rivals || []).find((r) => r.id === event0.partnerId);
+    if (!event || !partner) continue;
+    const totalCost = Math.max(1, event.totalCost);
+    const playerCostSharePct = Math.max(10, Math.min(90, event.playerCostSharePct));
+    const playerProfitSharePct = Math.max(10, Math.min(90, event.playerProfitSharePct));
+    const playerContribution = Math.round(totalCost * playerCostSharePct / 100);
+    const partnerContribution = totalCost - playerContribution;
+
+    // Sales vary with both businesses' reputations and audience, then random market conditions.
+    const reputationFactor = 0.82 + (Math.max(0, Math.min(100, s.rep)) / 100) * 0.22 + (Math.max(0, Math.min(100, partner.rep)) / 100) * 0.13;
+    const audienceFactor = 0.9 + Math.min(0.3, Math.sqrt(Math.max(0, (s.followers || 0) + partner.followers)) / 2500);
+    const salesFactor = (0.4 + Math.random() * 1.8) * reputationFactor * audienceFactor;
+    const grossRevenue = Math.max(0, Math.round(totalCost * salesFactor));
+    const profit = grossRevenue - totalCost;
+    // Profits use the negotiated profit split. If the event loses money, the loss follows each side's capital contribution.
+    const playerRate = (profit >= 0 ? playerProfitSharePct : playerCostSharePct) / 100;
+    const partnerRate = 1 - playerRate;
+    const playerPayout = Math.max(0, Math.round(playerContribution + profit * playerRate));
+    const partnerPayout = Math.max(0, Math.round(partnerContribution + profit * partnerRate));
+
+    s = money(s, playerPayout, 'Pop-up payout from ' + event.eventName);
+    s = {
+      ...s,
+      rivals: s.rivals.map((r) => r.id === partner.id ? { ...r, cash: r.cash + partnerPayout, rep: clamp(r.rep + (profit >= 0 ? 0.5 : -0.3), 0, 100), followers: r.followers + (profit > 0 ? Math.min(150, Math.max(10, Math.round(profit / 1500))) : 0) } : r),
+      rep: clamp(s.rep + (profit > 0 ? Math.min(2, Math.max(0.3, profit / 60000)) : profit < 0 ? -0.8 : 0), 0, 100),
+      followers: (s.followers || 0) + (profit > 0 ? Math.min(250, Math.max(15, Math.round(profit / 1000))) : 0),
+      today: {
+        ...s.today,
+        income: s.today.income + playerPayout,
+        events: [...s.today.events, eventNameForLog(event, grossRevenue, profit, playerPayout)],
+      },
+      collaborations: (s.collaborations || []).map((item) => item.id === event.id
+        ? { ...item, status: 'completed', grossRevenue, profit, playerPayout, partnerPayout }
+        : item),
+    };
+    const note = profit >= 0
+      ? event.eventName + ' with ' + partner.owner + ' brought in ' + naira(grossRevenue) + '. After the costs, the event profit was ' + naira(profit) + '; your payout was ' + naira(playerPayout) + '.'
+      : event.eventName + ' with ' + partner.owner + ' brought in ' + naira(grossRevenue) + ', below the setup cost of ' + naira(totalCost) + '. The event lost ' + naira(Math.abs(profit)) + '; your payout was ' + naira(playerPayout) + '.';
+    const gistItem = { id: 'collab-gist-' + event.id, day: s.day, title: 'Pop-up results: ' + event.eventName, body: note, about: 'you', hot: profit < 0 };
+    s = { ...s, gist: [gistItem, ...(s.gist || [])].slice(0, 40) };
+    s = collaborationChatMessage(s, partner.owner, partner.owner, note, profit < 0 ? 'warn' : 'good');
+  }
+  return s;
+}
+
+function eventNameForLog(event: CollaborationEvent, grossRevenue: number, profit: number, payout: number): string {
+  return event.eventName + ': sales ' + naira(grossRevenue) + ', event profit ' + naira(profit) + ', Divine payout ' + naira(payout) + '.';
 }
 
 /** A reply picked in WhatsApp. */
@@ -1209,7 +1352,7 @@ function migrate(raw: GameState): GameState | null {
   if (s.version === 4) {
     const current = s as GameState;
     const characterMemories = normaliseCharacterMemories(current.characterMemories, current.day);
-    return current.rivals ? { ...current, characterMemories } : { ...current, characterMemories, ...rivalDefaults() };
+    return current.rivals ? { ...current, characterMemories, collaborations: Array.isArray(current.collaborations) ? current.collaborations : [] } : { ...current, characterMemories, collaborations: Array.isArray(current.collaborations) ? current.collaborations : [], ...rivalDefaults() };
   }
   if (s.version === 3) {
     const o = s as unknown as GameState & { blackout?: unknown };
@@ -1219,6 +1362,7 @@ function migrate(raw: GameState): GameState | null {
       ...o,
       version: 4,
       characterMemories: {},
+      collaborations: [],
       outages: [],
       power: { gen: false, solar: 0 },
       shouts: [],
@@ -1242,6 +1386,7 @@ function migrate(raw: GameState): GameState | null {
     ...(rest as unknown as GameState),
     version: 4,
     characterMemories: {},
+    collaborations: [],
     ...freshDay,
     ...rivalDefaults(),
     power: { gen: false, solar: 0 },
