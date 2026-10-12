@@ -4,7 +4,7 @@ import { getDeborahConfig, MALE_CONFIG } from '../../constants/presets';
 import { naira } from '../economy';
 import * as E from '../engine';
 import { Listing } from '../shop';
-import { GameState, Message, Post, Rival } from '../types';
+import { CharacterMemory, GameState, Message, Post, Rival } from '../types';
 import { MarketApp } from './MarketApp';
 import { MovePanel, StaffActions, StaffPanel } from './Panels';
 import type { CartLine } from '../engine';
@@ -244,7 +244,17 @@ const rivalProfile = (r: Rival) => [
     : 'This is a supporting rival. Use their specific shop, speciality, position and relationship to distinguish them without inventing a personal backstory.'
 ].join(' ');
 
-
+const memoryBrief = (name: string, memory?: CharacterMemory) => {
+  if (!memory || (!memory.summary.trim() && memory.notes.length === 0)) {
+    return 'Persistent memory for ' + name + ': no established long-term memories yet. Build continuity from the actual conversation; do not invent a shared past.';
+  }
+  return [
+    'Persistent memory for ' + name + ' (saved from prior chats; use for continuity, not as a script):',
+    memory.summary ? 'Current summary: ' + memory.summary : '',
+    memory.notes.length ? 'Established memory notes: ' + memory.notes.map((note) => '- ' + note).join(' ') : '',
+    'These notes are a compact record, not permission to invent details beyond them.'
+  ].filter(Boolean).join(' ');
+};
 
 const Chats: React.FC<PhoneProps> = ({ s, up, chat, setChat, staff }) => {
   const list = E.chats(s);
@@ -270,7 +280,7 @@ const Chats: React.FC<PhoneProps> = ({ s, up, chat, setChat, staff }) => {
       ? (s.rivals || []).filter((r) => r.main).map((r) => r.owner)
       : [];
     const characterProfile = targetChat === GROUP
-      ? 'Group setting: Lagos fashion-business rivals who already know one another and Divine. Each listed participant has a separate personality profile below. Choose the person whose viewpoint most naturally fits the latest message and recent group history. Do not blend their voices or make everyone speak in one turn. Do not rotate speakers mechanically.\n\n' + (s.rivals || []).filter((r) => r.main).map(rivalProfile).join('\n\n')
+      ? 'Group setting: Lagos fashion-business rivals who already know one another and Divine. Each listed participant has a separate personality profile and saved memory below. Choose the person whose viewpoint most naturally fits the latest message and recent group history. Do not blend their voices or make everyone speak in one turn. Do not rotate speakers mechanically.\n\n' + (s.rivals || []).filter((r) => r.main).map((r) => rivalProfile(r) + '\n' + memoryBrief(r.owner, s.characterMemories?.[r.owner])).join('\n\n')
       : targetRival
         ? rivalProfile(targetRival)
         : targetStaff
@@ -284,10 +294,17 @@ const Chats: React.FC<PhoneProps> = ({ s, up, chat, setChat, staff }) => {
               'Give this staff member a recognisable conversational rhythm, but do not invent family history or personal facts that are not in the game.'
             ].filter(Boolean).join(' ')
           : targetChat === 'Deborah'
-            ? 'Deborah is Divine’s twin sister, close confidante, and helps manage the boutique books. She is warm, candid, playful and protective of Divine. She knows the boutique’s practical pressures and can tease Divine like a real sister, but she is not a rival or a generic cheerleader; she can disagree honestly and talk about money or business clearly.'
+            ? [
+                'Deborah is Divine’s twin sister and owns the biggest boutique in Lagos. She is successful, intelligent, socially influential, and intimately familiar with Divine’s business and personal life. She can offer genuine help and affection like a real sister, but she has her own major fashion empire and must not be portrayed as merely Divine’s employee or bookkeeper.',
+                'SECRET AUTHOR-ONLY STORY CANON — do not reveal to Divine or the player: Deborah will eventually betray Divine in a major personal/business betrayal. This is a slow-burn long arc, not a current confession or an immediate action. For now preserve believable twin-sister closeness, real affection where it fits, competent advice, and nuanced motives. Use only subtle, ambiguous foreshadowing when natural. Do not announce the betrayal, confess it, make every message suspicious or cruel, or cause the betrayal before the game story reaches that point. This secret is not a memory Deborah has consciously disclosed.',
+                'The name and exact finances of Deborah’s boutique are not established in the current game data. Do not invent a boutique name, revenue, staff size, or specific betrayal event.'
+              ].join(' ')
             : targetChat === 'Landlord'
               ? 'The landlord of Divine’s current shop at ' + s.listing.street + ', ' + s.listing.area + '. Practical, business-minded and focused on rent, premises and payment. Can be strict or impatient when money is overdue, but should not be hostile without a reason. Keep the tone concise and negotiation-focused.'
               : 'A character in Asanwa Boutique, a contemporary Lagos fashion-business drama. Use the name and actual conversation history to stay consistent. Do not invent major game facts or a backstory that the game has not established.';
+    const profileWithMemory = targetChat === GROUP
+      ? characterProfile
+      : characterProfile + '\n\n' + memoryBrief(targetChat, s.characterMemories?.[targetChat]);
     setDraft('');
     setAiError('');
     setAiSending(true);
@@ -312,7 +329,7 @@ const Chats: React.FC<PhoneProps> = ({ s, up, chat, setChat, staff }) => {
           signal: controller.signal,
           body: JSON.stringify({
             characterName: targetChat,
-            characterProfile,
+            characterProfile: profileWithMemory,
             participants,
             history: prior,
             message: text,
@@ -330,20 +347,46 @@ const Chats: React.FC<PhoneProps> = ({ s, up, chat, setChat, staff }) => {
       const data = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(data.error || `Gemini request failed (${response.status}).`);
       if (typeof data.reply !== 'string' || !data.reply.trim()) throw new Error('Gemini returned an empty reply.');
+      const requestedSpeaker = typeof data.speaker === 'string' ? data.speaker.trim() : '';
+      const replyFrom = targetChat === GROUP
+        ? participants.find((name) => name.toLowerCase() === requestedSpeaker.toLowerCase()) || participants[0] || targetChat
+        : targetChat;
+      const memoryUpdate = data.memory && typeof data.memory === 'object'
+        ? data.memory as { summary?: unknown; add?: unknown }
+        : {};
+      const proposedSummary = typeof memoryUpdate.summary === 'string' ? memoryUpdate.summary.trim().slice(0, 500) : '';
+      const proposedNotes = Array.isArray(memoryUpdate.add)
+        ? memoryUpdate.add.filter((note): note is string => typeof note === 'string').slice(0, 2).map((note) => note.trim().slice(0, 160)).filter(Boolean)
+        : [];
       up((g) => {
         const id = (g.msgSeq || 0) + 1;
         const replyMessage: Message = {
-          id, day: g.day, from: targetChat === GROUP && typeof data.speaker === 'string' ? data.speaker : targetChat,
+          id, day: g.day, from: replyFrom,
           ...(targetChat === GROUP ? { chat: targetChat } : {}),
           text: data.reply.trim().slice(0, 1200), tone: 'info',
           t: g.phase === 'shop' ? Math.floor(g.clock) : undefined,
         };
+        const previous = g.characterMemories?.[replyFrom];
+        const notes = [...(previous?.notes || [])];
+        for (const note of proposedNotes) {
+          if (!notes.some((old) => old.toLocaleLowerCase() === note.toLocaleLowerCase())) notes.push(note);
+        }
+        const trimmedNotes = notes.slice(-6);
+        const nextSummary = proposedSummary || previous?.summary || '';
+        const memoryChanged = nextSummary !== (previous?.summary || '') || trimmedNotes.length !== (previous?.notes.length || 0);
+        const characterMemories = memoryChanged
+          ? {
+              ...(g.characterMemories || {}),
+              [replyFrom]: { summary: nextSummary, notes: trimmedNotes, updatedDay: g.day },
+            }
+          : g.characterMemories;
         return {
           ...g,
           msgSeq: id,
           messages: [replyMessage, ...g.messages.map((m) =>
             E.thread(m) === targetChat && m.choices && !m.answered ? { ...m, answered: 'freeform' } : m,
           )].slice(0, 160),
+          ...(memoryChanged ? { characterMemories } : {}),
         };
       });
     } catch (error) {
