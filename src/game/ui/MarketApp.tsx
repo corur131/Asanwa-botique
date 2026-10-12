@@ -171,7 +171,7 @@ export const MarketApp: React.FC<{ s: GameState; cart: CartLine[]; setCart: (f: 
         {header(sel.label, () => setView('list'))}
         <div className="flex-1 overflow-y-auto">
           <div className="h-72 bg-gradient-to-b from-[#2a2320] to-[#141210] flex justify-center overflow-hidden py-1">
-            <CharacterSvg config={mannequin(sel, fabric, picks.length ? preview : takesColour(sel.kind) ? preview : '#C9A163', color2, previewPattern)} idPrefix="mkapp" camera={clothing || sel.kind === 'shoes' ? 'full' : 'bust'} className="h-full w-auto" />
+            <CharacterSvg config={mannequin(sel, fabric, picks.length ? preview : takesColour(sel.kind) ? preview : '#C9A163', color2, previewPattern)} idPrefix="mkapp" camera={clothing ? 'full' : sel.kind === 'shoes' ? 'feet' : sel.kind === 'bag' || sel.kind === 'wrist' ? 'accessory' : 'bust'} className="h-full w-auto" />
           </div>
           <div className="p-3 space-y-3">
             <div className="flex items-baseline justify-between">
@@ -254,8 +254,14 @@ export const MarketApp: React.FC<{ s: GameState; cart: CartLine[]; setCart: (f: 
         {list.map((e) => {
           const lock = !canBuy(e, s.tier);
           const inCart = cart.filter((l) => l.kind === e.kind && l.itemId === e.id).reduce((a, l) => a + l.pieces, 0);
+          const thumbCamera = isClothing(e.kind) ? 'full' : e.kind === 'shoes' ? 'feet' : e.kind === 'bag' || e.kind === 'wrist' ? 'accessory' : 'bust';
+          const thumbColor = e.kind === 'hair' ? HAIR_SWATCHES[0].color : '#9A344D';
+          const thumbColor2 = '#D9B25A';
           return (
             <button key={e.kind + e.id} onClick={() => open(e)} className={`text-left rounded-xl border border-white/10 bg-white/5 p-2.5 hover:border-orange-400/50 ${lock ? 'opacity-50' : ''}`}>
+              <div className="h-28 rounded-lg bg-gradient-to-b from-[#29221f] to-[#151211] flex items-center justify-center overflow-hidden mb-2 border border-white/5">
+                <CharacterSvg config={mannequin(e, e.fabric || 'plain', thumbColor, thumbColor2, 0)} idPrefix={`catalog-${e.kind}-${e.id}`} camera={thumbCamera} className="h-full w-auto max-w-full" />
+              </div>
               <div className="text-[13px] font-semibold text-white leading-tight">{e.label}</div>
               <div className="text-[11px] text-slate-400 mt-0.5">{naira(e.price)} · sells ~{naira(e.price * MARKUP)}</div>
               <div className="flex flex-wrap gap-1 mt-1.5">

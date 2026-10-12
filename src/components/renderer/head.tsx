@@ -315,6 +315,51 @@ export const Ears: React.FC<{ id: (n: string) => string; look: HeadLook; earring
             <circle cx={x - 2.4} cy="395.6" r="1.8" fill="#FFFFFF" opacity="0.9" />
           </g>
         ))}
+      {earrings === 'pearlCascadeDrops' && both((x) => (
+        <g key={x}>
+          <circle cx={x} cy="388" r="3" fill={`url(#${id('gold')})`} />
+          {[0, 1, 2, 3].map((i) => <circle key={i} cx={x + (i % 2 ? 2 : -2)} cy={399 + i * 8} r={4.6 - i * 0.35} fill={`url(#${id('pearl')})`} stroke="#C8BFB0" strokeWidth="0.7" />)}
+        </g>
+      ))}
+      {earrings === 'goldFiligreeDrops' && both((x) => (
+        <g key={x}>
+          <path d={`M ${x} 389 C ${x + 18} 400 ${x + 12} 425 ${x} 432 C ${x - 12} 425 ${x - 18} 400 ${x} 389 Z`} fill="none" stroke={`url(#${id('gold')})`} strokeWidth="2.8" />
+          <path d={`M ${x} 395 L ${x + 6} 408 L ${x} 422 L ${x - 6} 408 Z`} fill="none" stroke="#FFF0B7" strokeWidth="1.3" />
+        </g>
+      ))}
+      {earrings === 'diamondHaloStuds' && both((x) => (
+        <g key={x}>
+          <circle cx={x} cy="388" r="8" fill="none" stroke={`url(#${id('gold')})`} strokeWidth="2" />
+          <circle cx={x} cy="388" r="4.5" fill="#F8F7F3" stroke="#AEB9C7" strokeWidth="1" />
+          {[0, 1, 2, 3, 4, 5].map((i) => <circle key={i} cx={x + Math.cos(i * Math.PI / 3) * 7} cy={388 + Math.sin(i * Math.PI / 3) * 7} r="1.5" fill="#FFFFFF" />)}
+        </g>
+      ))}
+      {earrings === 'crystalBridalChandeliers' && both((x) => (
+        <g key={x}>
+          <circle cx={x} cy="388" r="3.2" fill={`url(#${id('gold')})`} />
+          <path d={`M ${x} 392 L ${x} 400 M ${x - 14} 403 Q ${x} 397 ${x + 14} 403 L ${x + 7} 420 L ${x} 431 L ${x - 7} 420 Z`} fill="none" stroke={`url(#${id('gold')})`} strokeWidth="1.6" />
+          {[0, 1, 2, 3, 4].map((i) => <path key={i} d={`M ${x - 8 + i * 4} 407 l 3 6 l -3 6 l -3 -6 Z`} fill="#E9F4FF" stroke="#B6C8D9" strokeWidth="0.7" />)}
+        </g>
+      ))}
+      {earrings === 'heirloomCoralDrops' && both((x) => (
+        <g key={x}>
+          <circle cx={x} cy="388" r="3" fill={`url(#${id('gold')})`} />
+          {[0, 1, 2, 3, 4].map((i) => <ellipse key={i} cx={x} cy={398 + i * 6.5} rx={3.4 + i * 0.4} ry="3.7" fill={i % 2 ? '#C2452D' : `url(#${id('gold')})`} stroke="#8A2A1A" strokeWidth="0.5" />)}
+        </g>
+      ))}
+      {earrings === 'diamondStatementHoops' && both((x, side) => (
+        <g key={x}>
+          <ellipse cx={x + side * 4} cy="424" rx="23" ry="36" fill="none" stroke={`url(#${id('gold')})`} strokeWidth="4.2" />
+          {[-12, -4, 4, 12].map((dx) => <rect key={dx} x={x + dx - 1.7} y={411 + Math.abs(dx) * 0.3} width="3.4" height="3.4" transform={`rotate(45 ${x + dx} ${411 + Math.abs(dx) * 0.3})`} fill="#F8FBFF" stroke="#BBC7D5" strokeWidth="0.6" />)}
+        </g>
+      ))}
+      {earrings === 'royalPearlChandeliers' && both((x) => (
+        <g key={x}>
+          <circle cx={x} cy="388" r="3" fill={`url(#${id('gold')})`} />
+          <path d={`M ${x} 391 L ${x} 402 M ${x - 15} 402 Q ${x} 392 ${x + 15} 402`} fill="none" stroke={`url(#${id('gold')})`} strokeWidth="2" />
+          {[0, 1, 2].map((row) => [-1, 0, 1].map((col) => <circle key={row + '-' + col} cx={x + col * (6 + row * 3)} cy={407 + row * 9 + Math.abs(col) * 2} r={3.8 - row * 0.4} fill={`url(#${id('pearl')})`} stroke="#C8BFB0" strokeWidth="0.5" />))}
+        </g>
+      ))}
     </g>
   );
 };

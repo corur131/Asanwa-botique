@@ -23,12 +23,16 @@ const VIEWBOX: Record<CameraView, string> = {
   full: '0 -30 600 1530',
   portrait: '195 36 210 252',
   bust: '120 24 360 440',
+  feet: '80 1120 440 410',
+  accessory: '80 390 440 820',
 };
 /** Tall looks (afro puff, high bun, gele) need extra headroom in the close-up cameras. */
 const VIEWBOX_TALL: Record<CameraView, string> = {
   full: '0 -30 600 1530',
   portrait: '170 -20 260 300',
   bust: '100 -20 400 486',
+  feet: '80 1120 440 410',
+  accessory: '80 390 440 820',
 };
 const TALL = new Set(['afroPuff', 'highBun', 'highTopFade', 'afro', 'deepCurly', 'afroWig', 'goddessLocs']);
 const COVERS_EARS = new Set(['boneStraight', 'bodyWave', 'bluntBob', 'sidePartFrontal', 'kinkyStraight', 'waterWave', 'butterflyLayers']);

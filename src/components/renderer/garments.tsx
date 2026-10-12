@@ -924,6 +924,224 @@ export const GARMENTS: Record<string, Build> = {
   mensDenimJacket: jacket({ hem: (s) => s.waist[0] + 40, collar: 'shirt', pockets: true, ease: 12 }),
   mensLeatherJacket: jacket({ hem: (s) => s.waist[0] + 40, collar: 'shirt', zip: true, ease: 10, opening: 40 }),
   bomberJacket,
+
+  // ---- newly drawn designer silhouettes (each added clothing SKU has its own renderer) ----
+  silkAtelierBlouse: top('collar', H.long, {
+    sleeve: 'long', ease: 4,
+    extra: (c, y) => <>{buttons(c, c.s.neck[0] + 38, y - 6, 8)}
+      <path d={"M " + (300 - c.s.waist[1] * 0.72) + " " + (c.s.bust[0] + 16) + " Q 300 " + (c.s.waist[0] + 6) + " " + (300 + c.s.waist[1] * 0.72) + " " + (c.s.bust[0] + 16)} fill="none" stroke={lighten(c.p.base, 0.35)} strokeWidth="2.1" />
+    </>,
+  }),
+  handBeadedCorset: top('sweetheart', (s) => s.waist[0] + 24, {
+    ease: 1,
+    extra: (c, y) => <>{corsetBones(c, y - 4)}
+      {Array.from({ length: 9 }, (_, i) => <circle key={i} cx={270 + i * 7.5} cy={c.s.bust[0] + 20} r="3.1" fill={gold(c)} stroke={lighten(c.p.base, 0.5)} strokeWidth="0.8" />)}
+      {Array.from({ length: 7 }, (_, i) => <circle key={i} cx={276 + i * 8} cy={y - 4} r="2.5" fill="#F8E7C0" />)}
+    </>,
+  }),
+  asoOkeSculptedBodice: top('square', H.long, {
+    sleeve: 'puff', ease: 12,
+    extra: (c, y) => <>{peplum(c, y)}{embroidery(c, c.s.bust[0] - 4, 28)}
+      <path d={"M " + (300 - c.s.bust[1] + 14) + " " + (c.s.bust[0] + 30) + " L 300 " + (y - 12) + " L " + (300 + c.s.bust[1] - 14) + " " + (c.s.bust[0] + 30)} fill="none" stroke={gold(c)} strokeWidth="2.2" />
+    </>,
+  }),
+  coutureFeatherBlouse: top('offShoulder', H.waist, {
+    sleeve: 'bell', flare: 42, ease: 5,
+    extra: (c, y) => <>{embroidery(c, c.s.bust[0] + 8, 24)}
+      {Array.from({ length: 7 }, (_, i) => <path key={i} d={"M " + (230 + i * 20) + " " + (c.s.shoulder[0] + 46) + " q 15 -22 26 3 q -12 -5 -26 -3"} fill={lighten(c.p.base, 0.18)} stroke={darken(c.p.base, 0.22)} strokeWidth="0.9" />)}
+    </>,
+  }),
+  heirloomAsoOkeBodice: top('square', H.long, {
+    sleeve: 'threeQuarter', flare: 18, ease: 15,
+    extra: (c, y) => <>{peplum(c, y)}{embroidery(c, c.s.bust[0] + 2, 34)}
+      {Array.from({ length: 5 }, (_, i) => <path key={i} d={"M " + (272 + i * 14) + " " + (c.s.bust[0] + 42) + " l 5 7 l -5 7 l -5 -7 Z"} fill="none" stroke={gold(c)} strokeWidth="1.5" />)}
+    </>,
+  }),
+  tailoredWoolTrousers: { under: (c) => <>{trouserSet(c, 'tailored-wool-' + c.k, c.s.waist[0] + 10, c.s.ankle[1] + 14, { ease: 6, easeIn: 2, flare: 2, pleat: true })}
+    <path d={"M " + (300 - c.s.hip[1] * 0.22) + " " + (c.s.waist[0] + 32) + " L " + (300 - 4) + " " + (c.s.ankle[1] - 20)} stroke={lighten(c.p.base, 0.42)} strokeWidth="2" opacity="0.7" />
+    <path d={"M " + (300 + c.s.hip[1] * 0.22) + " " + (c.s.waist[0] + 32) + " L " + (300 + 4) + " " + (c.s.ankle[1] - 20)} stroke={lighten(c.p.base, 0.42)} strokeWidth="2" opacity="0.7" />
+  </> },
+  silkPalazzoTrousers: { under: (c) => <>{trouserSet(c, 'palazzo-silk-' + c.k, c.s.waist[0] + 4, c.s.ankle[1] + 40, { ease: 24, easeIn: 12, flare: 58, pleat: true })}
+    <path d={"M " + (300 - c.s.hip[1] * 0.35) + " " + (c.s.hip[0] + 20) + " Q 270 " + (c.s.knee[1]) + " 266 " + (c.s.ankle[1] + 22)} stroke={lighten(c.p.base, 0.42)} strokeWidth="2.4" opacity="0.7" fill="none" />
+    <path d={"M " + (300 + c.s.hip[1] * 0.35) + " " + (c.s.hip[0] + 20) + " Q 330 " + (c.s.knee[1]) + " 334 " + (c.s.ankle[1] + 22)} stroke={lighten(c.p.base, 0.42)} strokeWidth="2.4" opacity="0.7" fill="none" />
+  </> },
+  coutureEveningSkirt: { under: (c) => <>{skirtPiece(c, 'couture-evening-' + c.k, c.s.waist[0] + 6, D.floor(c.s), 126, { pow: 0.65, pleats: 12 })}
+    {waistband(c, c.s.waist[0] + 6, 18)}
+    <path d={"M 300 " + (c.s.waist[0] + 30) + " L 300 " + (D.floor(c.s) - 36)} stroke={lighten(c.p.base, 0.36)} strokeWidth="2.2" opacity="0.7" />
+    {Array.from({ length: 7 }, (_, i) => <circle key={i} cx={270 + i * 10} cy={c.s.waist[0] + 15} r="2.2" fill={gold(c)} />)}
+  </> },
+  embroideredGeorgeWrapper: { under: (c) => <>{iroPiece(c, true)}
+    <path d={"M " + (300 - c.s.hip[1] - 18) + " " + (c.s.hip[0] + 40) + " L " + (300 + c.s.hip[1] + 18) + " " + (c.s.hip[0] + 40)} stroke={gold(c)} strokeWidth="4" />
+    {Array.from({ length: 8 }, (_, i) => <path key={i} d={"M " + (260 + i * 11) + " " + (c.s.hip[0] + 46) + " l 5 7 l -5 7 l -5 -7 Z"} fill="none" stroke={gold(c)} strokeWidth="1.5" />)}
+  </> },
+  royalLoomWrapper: { under: (c) => <>{iroPiece(c, true)}
+    {Array.from({ length: 7 }, (_, i) => <path key={i} d={"M " + (300 - c.s.hip[1] - 14) + " " + (c.s.hip[0] + 60 + i * 45) + " L " + (300 + c.s.hip[1] + 14) + " " + (c.s.hip[0] + 60 + i * 45)} stroke={i % 2 ? gold(c) : lighten(c.p.base, 0.36)} strokeWidth={i % 2 ? 3 : 1.7} opacity="0.8" />)}
+    <path d={"M " + (300 - c.s.hip[1] - 8) + " " + (c.s.ankle[1] - 30) + " L " + (300 + c.s.hip[1] + 8) + " " + (c.s.ankle[1] - 30)} stroke={gold(c)} strokeWidth="7" />
+  </> },
+  designerSatinSlip: dress('straight', {
+    hem: D.midi, flare: 18, pow: 2.1, fitted: true,
+    extra: (c) => <>{straps(cut(c), c.p.base, 2.6)}
+      <path d={"M " + (300 - c.s.waist[1] + 8) + " " + (c.s.waist[0] + 28) + " Q 300 " + (c.s.hip[0] + 30) + " " + (300 + c.s.waist[1] - 8) + " " + (c.s.waist[0] + 28)} fill="none" stroke={lighten(c.p.base, 0.38)} strokeWidth="2.3" />
+    </>,
+  }),
+  atelierWrapDress: dress('vneck', {
+    hem: D.knee, flare: 78, pow: 0.92, sleeve: 'threeQuarter', sleeveFlare: 14,
+    extra: (c) => <>{wrapLine(c, 0)}{belt(c, c.s.waist[0] + 3)}
+      <path d={"M 300 " + (c.s.waist[0] + 4) + " L " + (300 + c.s.waist[1] + 18) + " " + (c.s.hip[0] + 10)} fill="none" stroke={lighten(c.p.base, 0.3)} strokeWidth="2" />
+    </>,
+  }),
+  lagosRedCarpetGown: dress('oneShoulder', {
+    hem: D.floor, flare: 90, pow: 1.25, fitted: true, slit: true,
+    extra: (c) => <>{corsetBones(c, c.s.waist[0] + 24)}
+      <path d={"M " + (300 - c.s.shoulder[1] - 8) + " " + (c.s.shoulder[0] + 14) + " Q 300 " + (c.s.bust[0] - 6) + " " + (300 + c.s.shoulder[1] + 24) + " " + (c.s.shoulder[0] + 28)} fill="none" stroke={gold(c)} strokeWidth="5" />
+      <path d={"M " + (300 + c.s.shoulder[1] - 4) + " " + (c.s.shoulder[0] + 30) + " C 390 " + (c.s.bust[0] + 50) + " 372 " + (c.s.hip[0] + 80) + " 398 " + (D.floor(c.s) - 18)} fill="none" stroke={lighten(c.p.base, 0.28)} strokeWidth="12" opacity="0.65" />
+    </>,
+  }),
+  crystalMermaidGown: dress('sweetheart', {
+    hem: D.floor, flare: 160, pow: 3.1, fitted: true,
+    extra: (c) => <>{corsetBones(c, c.s.waist[0] + 24)}
+      {Array.from({ length: 5 }, (_, row) => Array.from({ length: 9 }, (_, col) =>
+        <circle key={row + '-' + col} cx={264 + col * 9} cy={c.s.bust[0] + 18 + row * 24} r={row % 2 ? 2.2 : 2.8} fill={row % 2 ? '#F9F3E6' : gold(c)} />
+      ))}
+    </>,
+  }),
+  atelierBridalBallGown: dress('offShoulder', {
+    hem: D.floor, flare: 230, pow: 0.55, sleeve: 'puff', sleeveFlare: 34, pleats: 12,
+    extra: (c) => <>{laceYoke(c)}{corsetBones(c, c.s.waist[0] + 22)}
+      {Array.from({ length: 11 }, (_, i) => <circle key={i} cx={250 + i * 10} cy={c.s.bust[0] - 1} r="2.8" fill="#F5E7C5" stroke={gold(c)} strokeWidth="0.9" />)}
+    </>,
+  }),
+  heirloomLaceAsoEbi: dress('square', {
+    hem: D.floor, flare: 104, pow: 0.88, sleeve: 'threeQuarter', sleeveFlare: 22, pleats: 7,
+    extra: (c) => <>{laceYoke(c)}{embroidery(c, c.s.bust[0] + 14, 32)}
+      {Array.from({ length: 6 }, (_, i) => <path key={i} d={"M " + (276 + i * 10) + " " + (c.s.waist[0] + 8) + " l 4 6 l -4 6 l -4 -6 Z"} fill="none" stroke={gold(c)} strokeWidth="1.35" />)}
+    </>,
+  }),
+  goldThreadAdireGown: dress('vneck', {
+    hem: D.maxi, flare: 58, pow: 1.05, from: 'waist', sleeve: 'short', sleeveFlare: 18, pleats: 5,
+    extra: (c) => <>{wrapLine(c, 0)}
+      {Array.from({ length: 8 }, (_, i) => <path key={i} d={"M " + (265 + i * 10) + " " + (c.s.hip[0] + 44) + " l 5 9 l -5 9 l -5 -9 Z"} fill="none" stroke={gold(c)} strokeWidth="1.5" />)}
+      <path d={"M " + (300 - c.s.hip[1] - 10) + " " + (c.s.hip[0] + 30) + " L " + (300 + c.s.hip[1] + 10) + " " + (c.s.hip[0] + 30)} stroke={gold(c)} strokeWidth="3.5" />
+    </>,
+  }),
+  royalBridalCapeGown: (() => {
+    const base = dress('sweetheart', { hem: D.floor, flare: 205, pow: 0.58, pleats: 11, extra: (c) => <>{corsetBones(c, c.s.waist[0] + 22)}{laceYoke(c)}</> });
+    return {
+      under: base.under,
+      over: (c) => <>{base.over?.(c)}
+        <Piece id={c.id} name={'royal-cape-' + c.k} d={symmetric([[300 - c.s.shoulder[1] - 10, c.s.shoulder[0] + 2], [300 - c.s.shoulder[1] - 42, c.s.shoulder[0] + 110], [300 - c.s.hip[1] - 34, c.s.knee[1]], [300 - c.s.hip[1] - 74, c.s.ankle[1] + 25]])} paint={c.p} folds={['M 230 400 Q 260 650 242 990', 'M 370 400 Q 340 650 358 990']} plain={c.plain} box={box(c.s, c.s.shoulder[0], c.s.ankle[1] + 30, 80)} />
+        <path d={"M " + (300 - c.s.shoulder[1]) + " " + (c.s.shoulder[0] + 12) + " Q 300 " + (c.s.shoulder[0] + 42) + " " + (300 + c.s.shoulder[1]) + " " + (c.s.shoulder[0] + 12)} stroke={gold(c)} strokeWidth="5" fill="none" />
+      </>,
+    };
+  })(),
+  beadedOwambeMermaid: dress('sweetheart', {
+    hem: D.floor, flare: 142, pow: 2.8, fitted: true,
+    extra: (c) => <>{corsetBones(c, c.s.waist[0] + 18)}{embroidery(c, c.s.bust[0] + 16, 30)}
+      {Array.from({ length: 6 }, (_, i) => <circle key={i} cx={270 + i * 12} cy={c.s.waist[0] + 24} r="3.2" fill={gold(c)} stroke="#F7E2B7" strokeWidth="0.8" />)}
+    </>,
+  }),
+  tailoredWomensTuxedo: jacket({ hem: (s) => s.hip[0] + 28, lapels: true, ease: 5, opening: 18, pockets: true, flare: 3 }),
+  atelierTrench: jacket({ hem: (s) => s.knee[1] + 76, lapels: true, collar: 'shirt', belt: true, ease: 12, opening: 22, flare: 45 }),
+  embroideredCapeJacket: jacket({ hem: (s) => s.knee[1] + 8, lapels: false, ease: 24, sleeve: 'bell', sleeveFlare: 64, opening: 116, flare: 45, sheer: true }),
+  runwayLeatherTrench: jacket({ hem: (s) => s.waist[0] + 36, lapels: true, collar: 'shirt', ease: 8, opening: 38, zip: true, pockets: true, flare: 9 }),
+  coutureVelvetCape: jacket({ hem: (s) => s.ankle[1] + 18, lapels: false, ease: 34, sleeve: 'bell', sleeveFlare: 92, opening: 138, flare: 96, sheer: true }),
+  premiumCottonShirt: (() => {
+    const base = mensTop('shirt');
+    return { ...base, under: (c) => <>{base.under?.(c)}{buttons(c, c.s.neck[0] + 38, c.s.hip[0] + 8, 7)}
+      <rect x={300 - c.s.bust[1] * 0.78} y={c.s.bust[0] + 4} width="34" height="24" rx="2" fill="none" stroke={darken(c.p.base, 0.35)} strokeWidth="1.2" />
+      <path d={"M " + (300 - c.s.bust[1] * 0.78) + " " + (c.s.bust[0] + 13) + " h 34"} stroke={darken(c.p.base, 0.35)} strokeWidth="1.1" />
+    </> };
+  })(),
+  silkDinnerShirt: (() => {
+    const base = mensTop('shirt');
+    return { ...base, under: (c) => <>{base.under?.(c)}
+      <path d={"M " + (300 - c.s.neck[1] + 4) + " " + (c.s.neck[0] + 22) + " L 300 " + (c.s.bust[0] + 80) + " L " + (300 + c.s.neck[1] - 4) + " " + (c.s.neck[0] + 22)} fill="none" stroke={lighten(c.p.base, 0.5)} strokeWidth="3.2" />
+      <path d={"M 288 " + (c.s.neck[0] + 18) + " L 300 " + (c.s.neck[0] + 30) + " L 288 " + (c.s.neck[0] + 42) + " L 276 " + (c.s.neck[0] + 30) + " Z M 312 " + (c.s.neck[0] + 18) + " L 300 " + (c.s.neck[0] + 30) + " L 312 " + (c.s.neck[0] + 42) + " L 324 " + (c.s.neck[0] + 30) + " Z"} fill={c.p2.base} stroke={gold(c)} strokeWidth="1.6" />
+    </> };
+  })(),
+  embroideredDamaskDanshiki: (() => {
+    const base = mensTop('dashiki');
+    return { ...base, under: (c) => <>{base.under?.(c)}
+      {Array.from({ length: 5 }, (_, i) => <path key={i} d={"M " + (274 + i * 13) + " " + (c.s.bust[0] + 54) + " l 6 8 l -6 8 l -6 -8 Z"} fill="none" stroke={gold(c)} strokeWidth="1.5" />)}
+      <path d={"M " + (300 - c.s.waist[1] - 12) + " " + (c.s.hip[0] + 8) + " L " + (300 + c.s.waist[1] + 12) + " " + (c.s.hip[0] + 8)} stroke={gold(c)} strokeWidth="2.5" />
+    </> };
+  })(),
+  luxuryVelvetIsiagu: (() => {
+    const base = isiagu;
+    return { ...base, under: (c) => <>{base.under?.(c)}{embroidery(c, c.s.bust[0] + 10, 34)}
+      <path d={"M " + (300 - c.s.bust[1] * 0.46) + " " + (c.s.bust[0] + 20) + " L 300 " + (c.s.hip[0] - 20) + " L " + (300 + c.s.bust[1] * 0.46) + " " + (c.s.bust[0] + 20)} fill="none" stroke={gold(c)} strokeWidth="3.5" />
+    </> };
+  })(),
+  heirloomAsoOkeMensTop: (() => {
+    const base = bubaBuild((s) => s.hip[0] + 34, 'long', 24, 17);
+    return { ...base, under: (c) => <>{base.under?.(c)}
+      {Array.from({ length: 6 }, (_, i) => <path key={i} d={"M " + (276 + i * 10) + " " + (c.s.bust[0] + 30) + " l 5 7 l -5 7 l -5 -7 Z"} fill="none" stroke={gold(c)} strokeWidth="1.5" />)}
+      <path d={"M " + (300 - c.s.waist[1] - 20) + " " + (c.s.hip[0] + 18) + " L " + (300 + c.s.waist[1] + 20) + " " + (c.s.hip[0] + 18)} stroke={gold(c)} strokeWidth="4" />
+    </> };
+  })(),
+  premiumTailoredTrousers: { under: (c) => <>{trouserSet(c, 'premium-tailored-' + c.k, c.s.waist[0] + 8, c.s.ankle[1] + 6, { ease: 5, easeIn: 1, flare: 0, pleat: true })}
+    <path d={"M " + (300 - c.s.hip[1] * 0.18) + " " + (c.s.waist[0] + 28) + " L " + (300 - 3) + " " + (c.s.ankle[1] - 22)} stroke={lighten(c.p.base, 0.38)} strokeWidth="2" opacity="0.8" />
+    <path d={"M " + (300 + c.s.hip[1] * 0.18) + " " + (c.s.waist[0] + 28) + " L " + (300 + 3) + " " + (c.s.ankle[1] - 22)} stroke={lighten(c.p.base, 0.38)} strokeWidth="2" opacity="0.8" />
+  </> },
+  italianWoolSuitTrousers: { under: (c) => <>{trouserSet(c, 'italian-wool-' + c.k, c.s.waist[0] + 9, c.s.ankle[1] + 8, { ease: 9, easeIn: 4, flare: 5, pleat: true })}
+    <path d={"M " + (300 - c.s.hip[1] * 0.28) + " " + (c.s.waist[0] + 27) + " L " + (300 - 7) + " " + (c.s.ankle[1] - 18)} stroke={lighten(c.p.base, 0.42)} strokeWidth="2.1" opacity="0.7" />
+    <path d={"M " + (300 + c.s.hip[1] * 0.28) + " " + (c.s.waist[0] + 27) + " L " + (300 + 7) + " " + (c.s.ankle[1] - 18)} stroke={lighten(c.p.base, 0.42)} strokeWidth="2.1" opacity="0.7" />
+  </> },
+  tailoredTuxedoTrousers: { under: (c) => <>{trouserSet(c, 'tuxedo-trousers-' + c.k, c.s.waist[0] + 8, c.s.ankle[1] + 10, { ease: 7, easeIn: 3, flare: 3, pleat: true })}
+    <path d={"M " + (300 - c.s.hip[1] * 0.55) + " " + (c.s.hip[0] + 10) + " L " + (300 - c.s.hip[1] * 0.18) + " " + (c.s.ankle[1] + 3)} stroke="#201B24" strokeWidth="5" opacity="0.75" />
+    <path d={"M " + (300 + c.s.hip[1] * 0.55) + " " + (c.s.hip[0] + 10) + " L " + (300 + c.s.hip[1] * 0.18) + " " + (c.s.ankle[1] + 3)} stroke="#201B24" strokeWidth="5" opacity="0.75" />
+  </> },
+  embroideredSenatorSokoto: { under: (c) => <>{trouserSet(c, 'senator-sokoto-' + c.k, c.s.waist[0] + 12, c.s.ankle[1] + 6, { ease: 14, easeIn: 8, flare: 8, pleat: true })}
+    <path d={"M " + (300 - c.s.hip[1] - 10) + " " + (c.s.ankle[1] - 28) + " L " + (300 + c.s.hip[1] + 10) + " " + (c.s.ankle[1] - 28)} stroke={gold(c)} strokeWidth="4" />
+    {Array.from({ length: 7 }, (_, i) => <circle key={i} cx={276 + i * 8} cy={c.s.ankle[1] - 18} r="2.2" fill={gold(c)} />)}
+  </> },
+  royalHandwovenSokoto: { under: (c) => <>{trouserSet(c, 'royal-sokoto-' + c.k, c.s.waist[0] + 10, c.s.ankle[1] + 16, { ease: 20, easeIn: 12, flare: 18, pleat: true })}
+    {Array.from({ length: 5 }, (_, i) => <path key={i} d={"M " + (300 - c.s.hip[1] - 10) + " " + (c.s.ankle[1] - 46 + i * 5) + " L " + (300 + c.s.hip[1] + 10) + " " + (c.s.ankle[1] - 46 + i * 5)} stroke={i % 2 ? gold(c) : lighten(c.p.base, 0.4)} strokeWidth={i % 2 ? 2 : 1.2} />)}
+  </> },
+  designerSenatorSet: (() => {
+    const base = cutBuild('senator');
+    return { ...base, under: (c) => <>{base.under?.(c)}{embroidery(c, c.s.bust[0] + 8, 32)}
+      {Array.from({ length: 4 }, (_, i) => <circle key={i} cx={304} cy={c.s.bust[0] + 32 + i * 14} r="2.4" fill={gold(c)} />)}
+    </> };
+  })(),
+  coutureVelvetAgbada: (() => {
+    const base = cutBuild('agbada');
+    return { ...base, under: (c) => <>{base.under?.(c)}{embroidery(c, c.s.bust[0] + 14, 38)}
+      <path d={"M " + (300 - c.s.shoulder[1] - 22) + " " + (c.s.shoulder[0] + 32) + " L 300 " + (c.s.ankle[1] + 8) + " L " + (300 + c.s.shoulder[1] + 22) + " " + (c.s.shoulder[0] + 32)} fill="none" stroke={gold(c)} strokeWidth="4" />
+    </> };
+  })(),
+  royalAsoOkeAgbada: (() => {
+    const base = cutBuild('agbada');
+    return { ...base, under: (c) => <>{base.under?.(c)}{embroidery(c, c.s.bust[0] + 4, 42)}
+      {Array.from({ length: 5 }, (_, i) => <path key={i} d={"M " + (300 - c.s.shoulder[1] - 30 + i * 12) + " " + (c.s.shoulder[0] + 72) + " L " + (300 - c.s.shoulder[1] + i * 7) + " " + (c.s.hip[0] + 60)} stroke={gold(c)} strokeWidth="2.4" opacity="0.8" />)}
+      <path d={"M " + (300 - c.s.hip[1] - 30) + " " + (c.s.ankle[1] + 4) + " L " + (300 + c.s.hip[1] + 30) + " " + (c.s.ankle[1] + 4)} stroke={gold(c)} strokeWidth="6" />
+    </> };
+  })(),
+  atelierSenatorKaftan: (() => {
+    const base = cutBuild('senator');
+    return { ...base, under: (c) => <>{base.under?.(c)}{buttons(c, c.s.neck[0] + 45, c.s.hip[0] + 4, 5)}
+      <path d={"M " + (300 - c.s.bust[1] * 0.55) + " " + (c.s.bust[0] + 28) + " L " + (300 + c.s.bust[1] * 0.55) + " " + (c.s.bust[0] + 28)} stroke={lighten(c.p.base, 0.42)} strokeWidth="2.2" />
+    </> };
+  })(),
+  silkMensKaftan: {
+    under: (c) => <>{trouserPiece(cut(c), c.p, 'silk-kaftan-trousers-' + c.k)}
+      {tunicPiece(cut(c), c.p, c.s.ankle[1] - 80, 'silk-kaftan-tunic-' + c.k)}
+      <path d={"M " + (300 - c.s.neck[1] - 5) + " " + (c.s.neck[0] + 8) + " L 300 " + (c.s.neck[0] + 72) + " L " + (300 + c.s.neck[1] + 5) + " " + (c.s.neck[0] + 8)} fill="none" stroke={gold(c)} strokeWidth="3.2" />
+      <path d={"M " + (300 - c.s.waist[1] - 12) + " " + (c.s.hip[0] - 5) + " L " + (300 + c.s.waist[1] + 12) + " " + (c.s.hip[0] - 5)} stroke={lighten(c.p.base, 0.35)} strokeWidth="2" />
+    </>,
+    over: (c) => sleeveSet(c, 'long', { flare: 12, ease: 8 }),
+  },
+  bespokeMensBlazer: jacket({ hem: (s) => s.hip[0] + 34, lapels: true, ease: 8, opening: 20, pockets: true, flare: 5 }),
+  italianWoolOvercoat: jacket({ hem: (s) => s.ankle[1] - 70, lapels: true, collar: 'notch', belt: false, ease: 14, opening: 30, flare: 24 }),
+  luxuryLeatherBiker: jacket({ hem: (s) => s.waist[0] + 38, lapels: true, collar: 'shirt', ease: 8, opening: 40, zip: true, pockets: true }),
+  monogramVelvetDinnerJacket: (() => {
+    const base = jacket({ hem: (s) => s.hip[0] + 30, lapels: true, ease: 8, opening: 24, flare: 7 });
+    return { ...base, under: (c) => <>{base.under?.(c)}
+      <path d={"M " + (300 - c.s.neck[1] - 3) + " " + (c.s.neck[0] + 10) + " L " + (300 - 10) + " " + (c.s.bust[0] + 38) + " L " + (300 - 4) + " " + (c.s.waist[0] + 22)} fill="none" stroke={lighten(c.p.base, 0.5)} strokeWidth="4" />
+      {Array.from({ length: 3 }, (_, i) => <circle key={i} cx={324} cy={c.s.bust[0] + 36 + i * 24} r="3.2" fill={gold(c)} />)}
+    </> };
+  })(),
+
 };
 
 function iroPiece(c: Ctx, george: boolean) {
