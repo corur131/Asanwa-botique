@@ -11,7 +11,7 @@ import type { CartLine } from '../engine';
 import { GROUP, ladder } from '../rivals';
 import { TIERS } from '../economy';
 
-export type AppId = 'home' | 'chats' | 'market' | 'bank' | 'property' | 'gidigram' | 'staff' | 'top20' | 'forbes' | 'promotion' | 'gist' | 'weather';
+export type AppId = 'home' | 'chats' | 'market' | 'bank' | 'property' | 'gidigram' | 'staff' | 'top20' | 'forbes' | 'promotion' | 'empire' | 'gist' | 'weather';
 
 const APPS: { id: Exclude<AppId, 'home'>; name: string; bg: string; glyph: string }[] = [
   { id: 'chats', name: 'WhatsApp', bg: 'bg-[#25D366]', glyph: '✆' },
@@ -23,6 +23,7 @@ const APPS: { id: Exclude<AppId, 'home'>; name: string; bg: string; glyph: strin
   { id: 'top20', name: 'Top 20', bg: 'bg-gradient-to-br from-amber-400 to-yellow-700', glyph: '🏆' },
   { id: 'forbes', name: 'Forbes', bg: 'bg-gradient-to-br from-zinc-700 to-zinc-950', glyph: '₦' },
   { id: 'promotion', name: 'Promotion', bg: 'bg-gradient-to-br from-fuchsia-600 to-purple-800', glyph: '📣' },
+  { id: 'empire', name: 'Expansion', bg: 'bg-gradient-to-br from-indigo-600 to-blue-900', glyph: '🏬' },
   { id: 'gist', name: 'GistLagos', bg: 'bg-gradient-to-br from-red-500 to-rose-800', glyph: '☕' },
   { id: 'weather', name: 'Lagos Weather', bg: 'bg-gradient-to-br from-sky-400 to-blue-700', glyph: '🌦️' },
 ];
@@ -78,6 +79,7 @@ export const Phone: React.FC<PhoneProps> = (p) => {
           {app === 'bank' && <Bank s={s} up={p.up} />}
           {app === 'forbes' && <Forbes s={s} />}
           {app === 'promotion' && <PromotionApp s={s} up={p.up} />}
+          {app === 'empire' && <BusinessExpansionApp s={s} up={p.up} />}
           {app === 'property' && (
             <AppFrame title="Lagos Lets" sub="Shops for rent this week" tone="bg-gradient-to-r from-sky-600 to-indigo-700">
               <div className="p-3">
@@ -658,6 +660,38 @@ const Chats: React.FC<PhoneProps> = ({ s, up, chat, setChat, staff }) => {
 // ---------------------------------------------------------------------------
 // Bank
 // ---------------------------------------------------------------------------
+
+const BusinessExpansionApp: React.FC<{ s: GameState; up: PhoneProps['up'] }> = ({ s, up }) => {
+  const expansion = s.businessExpansion || { branches: [], departments: [], wholesaleActive: false, designerCollections: 0 };
+  const options = E.expansionOptions(s);
+  const formatInvestment = (id: string) => id === 'branch' ? 'Branches' : id === 'wholesale' ? 'Wholesale' : id === 'designer' ? 'Collections' : 'Departments';
+  return (
+    <AppFrame title="Business Expansion" sub="Build beyond your current store" tone="bg-gradient-to-r from-indigo-700 to-blue-900">
+      <div className="p-3 space-y-3">
+        <div className="rounded-xl border border-white/10 bg-white/5 p-3">
+          <div className="text-xs uppercase tracking-wide text-indigo-200">Asanwa Boutique portfolio</div>
+          <div className="text-xl font-bold text-white mt-1">{TIERS[s.tier]?.name || 'Current shop'} · Brand Power {E.brandPower(E.getBrandMetrics(s), s.followers || 0, s.tier).toLocaleString('en-NG')}</div>
+          <div className="grid grid-cols-2 gap-2 mt-3">
+            <div className="rounded-lg bg-black/15 p-2"><div className="text-[11px] text-slate-400">Branches</div><div className="text-lg font-bold text-white">{expansion.branches.length}</div></div>
+            <div className="rounded-lg bg-black/15 p-2"><div className="text-[11px] text-slate-400">Departments</div><div className="text-lg font-bold text-white">{expansion.departments.length}</div></div>
+            <div className="rounded-lg bg-black/15 p-2"><div className="text-[11px] text-slate-400">Wholesale</div><div className="text-sm font-semibold text-white">{expansion.wholesaleActive ? 'Active' : 'Not unlocked'}</div></div>
+            <div className="rounded-lg bg-black/15 p-2"><div className="text-[11px] text-slate-400">Designer collections</div><div className="text-lg font-bold text-white">{expansion.designerCollections}</div></div>
+          </div>
+        </div>
+        {expansion.branches.length > 0 && <section className="rounded-xl border border-white/10 p-3 space-y-2"><h3 className="text-white font-semibold">Your branches</h3>{expansion.branches.map(branch => <div key={branch.id} className="rounded-lg bg-white/5 p-3"><div className="text-sm text-white font-semibold">{branch.name}</div><div className="text-xs text-slate-400">{branch.area} · {TIERS[branch.tier]?.name || 'Boutique'} · opened Day {branch.openedDay}</div><div className="text-xs text-slate-300 mt-1">Weekly rent {naira(branch.weeklyRent)} · modeled shop assets {naira(branch.assetValue)}</div></div>)}</section>}
+        {expansion.departments.length > 0 && <section className="rounded-xl border border-white/10 p-3"><h3 className="text-white font-semibold mb-2">Departments</h3><div className="flex flex-wrap gap-2">{expansion.departments.map(name => <span key={name} className="text-xs rounded-full border border-indigo-400/30 bg-indigo-500/10 px-2 py-1 text-indigo-100">{name}</span>)}</div></section>}
+        <section className="space-y-2"><h3 className="text-white font-semibold px-1">Invest in your next stage</h3>
+          {options.map(option => <div key={option.id} className="rounded-xl border border-white/10 p-3 space-y-2">
+            <div className="flex items-start justify-between gap-2"><div className="flex-1"><div className="font-semibold text-white">{option.title}</div><p className="text-xs text-slate-400 mt-1">{option.description}</p></div><div className="text-sm font-bold text-indigo-200 whitespace-nowrap">{naira(option.cost)}</div></div>
+            <div className="text-[11px] text-slate-500">Unlocks at {TIERS[option.minimumTier]?.name || 'Flagship'} tier.</div>
+            {option.available ? <button onClick={() => up(g => E.investInExpansion(g, option.id))} className="w-full rounded-lg bg-indigo-700 py-2 text-sm font-semibold text-white">Invest {naira(option.cost)}</button> : <div className="rounded-lg bg-white/5 p-2 text-xs text-slate-500">{option.reason || 'Not currently available'}</div>}
+          </div>)}
+        </section>
+        <p className="text-[11px] text-slate-500">Expansion takes cash up front. Branches create their own daily sales, stock/running costs and weekly rent. Wholesale operations generate extra daily orders and costs. These investments are capital assets rather than being counted as ordinary daily operating expenses.</p>
+      </div>
+    </AppFrame>
+  );
+};
 
 const Bank: React.FC<{ s: GameState; up: PhoneProps['up'] }> = ({ s, up }) => {
   const lines = s.ledger || [];
