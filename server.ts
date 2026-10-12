@@ -3,7 +3,7 @@ import express from 'express';
 import path from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
-import { GoogleGenAI, Type } from '@google/genai';
+import { GoogleGenAI, ThinkingLevel, Type } from '@google/genai';
 
 const app = express();
 const port = Number(process.env.PORT || 8787);
@@ -51,7 +51,7 @@ app.post('/api/ai-chat', async (req, res) => {
   const characterProfile = asText(req.body?.characterProfile, 10000);
   const message = asText(req.body?.message, 1000);
   const isGroup = characterName === 'Lagos Fashion Babes';
-  const participants = Array.isArray(req.body?.participants)
+  const participants: string[] = Array.isArray(req.body?.participants)
     ? req.body.participants.filter((x: unknown): x is string => typeof x === 'string').slice(0, 8).map((x: string) => x.slice(0, 80))
     : [];
   const rawGameContext = req.body?.gameContext && typeof req.body.gameContext === 'object' ? req.body.gameContext : {};
@@ -63,7 +63,7 @@ app.post('/api/ai-chat', async (req, res) => {
     ? 'CONFIDENTIAL AUTHOR-ONLY LONG ARC: Deborah is Divine’s twin sister and the owner of Lagos’s biggest boutique empire. Canonically, she will eventually betray Divine in a major personal/business betrayal, but this is a slow-burn future plot, not a current confession or action. No reveal-triggering story event has been supplied to you yet, so keep the story in its pre-betrayal phase. Maintain believable twin-sister closeness, genuine-seeming affection and competent help when appropriate. Only add subtle, ambiguous foreshadowing when naturally relevant; do not make every message suspicious, do not disclose or explain the future betrayal, and do not initiate or narrate the betrayal before an explicit game story event authorizes it. This confidential note must never be included in visible dialogue or saved character memory. Do not invent the name or financial details of her boutique.'
     : '';
   const rawHistory = Array.isArray(req.body?.history) ? req.body.history.slice(-12) : [];
-  const history = rawHistory.flatMap((item: any) => {
+  const history: { role: 'user' | 'model'; text: string }[] = rawHistory.flatMap((item: any) => {
     if (!item || !['user', 'model'].includes(item.role)) return [];
     const text = asText(item.text, 1000);
     return text ? [{ role: item.role as 'user' | 'model', text }] : [];
@@ -115,7 +115,7 @@ app.post('/api/ai-chat', async (req, res) => {
       config: {
         systemInstruction,
         // Low thinking and a compact JSON result keep normal chat light.
-        thinkingConfig: { thinkingLevel: 'low' },
+        thinkingConfig: { thinkingLevel: ThinkingLevel.LOW },
         maxOutputTokens: 768,
         responseMimeType: 'application/json',
         responseJsonSchema: {
