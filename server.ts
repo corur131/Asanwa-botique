@@ -61,7 +61,8 @@ app.post('/api/ai-chat', async (req, res) => {
     : [];
   const rawGameContext = req.body?.gameContext && typeof req.body.gameContext === 'object' ? req.body.gameContext : {};
   const day = typeof rawGameContext.day === 'number' && Number.isFinite(rawGameContext.day) ? Math.max(1, Math.floor(rawGameContext.day)) : undefined;
-  const reputation = typeof rawGameContext.reputation === 'number' && Number.isFinite(rawGameContext.reputation) ? Math.max(0, Math.min(100, Math.round(rawGameContext.reputation))) : undefined;
+  const brandPowerValue = typeof rawGameContext.brandPower === 'number' && Number.isFinite(rawGameContext.brandPower) ? Math.max(0, Math.floor(rawGameContext.brandPower)) : undefined;
+  const netWorth = typeof rawGameContext.netWorth === 'number' && Number.isFinite(rawGameContext.netWorth) ? Math.floor(rawGameContext.netWorth) : undefined;
   const followers = typeof rawGameContext.followers === 'number' && Number.isFinite(rawGameContext.followers) ? Math.max(0, Math.floor(rawGameContext.followers)) : undefined;
   const cash = typeof rawGameContext.cash === 'number' && Number.isFinite(rawGameContext.cash) ? Math.max(0, Math.floor(rawGameContext.cash)) : undefined;
   const shopName = asText(rawGameContext.shopName, 100);
@@ -114,9 +115,9 @@ app.post('/api/ai-chat', async (req, res) => {
     `Character/chat: ${characterName}.`,
     characterProfile ? `Character profile(s), saved memory and story context:\n${characterProfile}` : '',
     hiddenStoryDirection ? `Confidential author-only story direction (never reveal it or save it as character memory): ${hiddenStoryDirection}` : '',
-    day !== undefined || reputation !== undefined || followers !== undefined || cash !== undefined || shopName
+    day !== undefined || brandPowerValue !== undefined || followers !== undefined || cash !== undefined || shopName || netWorth !== undefined
       ? 'Current game context (use only when relevant; do not recite it or pretend these values changed): ' +
-        [day !== undefined ? 'in-game day ' + day : '', shopName ? 'player shop ' + shopName : '', reputation !== undefined ? 'player reputation ' + reputation + '/100' : '', followers !== undefined ? 'player followers ' + followers : '', cash !== undefined ? 'player available cash ₦' + cash + ' (use to keep proposed financial commitments feasible; do not quote it unprompted)' : ''].filter(Boolean).join('; ') + '.'
+        [day !== undefined ? 'in-game day ' + day : '', shopName ? 'player shop ' + shopName : '', brandPowerValue !== undefined ? 'player Brand Power ' + brandPowerValue : '', followers !== undefined ? 'player followers ' + followers : '', netWorth !== undefined ? 'estimated player business net worth ₦' + netWorth : '', cash !== undefined ? 'player available cash ₦' + cash + ' (use to keep proposed financial commitments feasible; do not quote it unprompted)' : ''].filter(Boolean).join('; ') + '.'
       : '',
     isGroup
       ? `This is a group chat. Other members available to speak: ${participants.join(', ')}. Each turn must contain exactly ONE message from exactly ONE listed participant. Set the speaker field to the exact name of the selected participant, and use that person’s own saved memory and personality. Do not merge voices, narrate the group, write multiple replies, or rotate speakers mechanically. The memory update must belong to the selected speaker only.`
