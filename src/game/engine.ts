@@ -46,11 +46,30 @@ export function msg(s: GameState, from: string, text: string, tone: Message['ton
   return { ...s, msgSeq: id, messages: [m, ...s.messages].slice(0, 120) };
 }
 
-/** Money in or out, written to the bank statement. */
+/** Money in or out, written to the bank statement. Unfunded operating costs become payables, never unexplained negative cash. */
 export function money(s: GameState, amount: number, label: string): GameState {
-  if (!amount) return s;
-  const line: LedgerLine = { day: s.day, t: s.phase === 'shop' ? Math.floor(s.clock) : -1, label, amount: Math.round(amount) };
-  return { ...s, cash: s.cash + Math.round(amount), ledger: [line, ...(s.ledger || [])].slice(0, 150) };
+  if (!Number.isFinite(amount) || !Math.round(amount)) return s;
+  const value = Math.round(amount);
+  const inheritedDeficit = Math.max(0, -s.cash);
+  let cash = Math.max(0, s.cash);
+  let operatingPayables = Math.max(0, s.operatingPayables || 0) + inheritedDeficit;
+  const entries: LedgerLine[] = [{ day: s.day, t: s.phase === 'shop' ? Math.floor(s.clock) : -1, label, amount: value, category: 'operating' }];
+  if (value < 0) {
+    const requested = Math.abs(value);
+    const paid = Math.min(cash, requested);
+    cash -= paid;
+    operatingPayables += requested - paid;
+  } else {
+    cash += value;
+    // Incoming business receipts first settle bills that could not be paid earlier.
+    const settlement = Math.min(cash, operatingPayables);
+    if (settlement > 0) {
+      cash -= settlement;
+      operatingPayables -= settlement;
+      entries.unshift({ day: s.day, t: s.phase === 'shop' ? Math.floor(s.clock) : -1, label: 'Operating payables settled', amount: -settlement, category: 'operating' });
+    }
+  }
+  return { ...s, cash, operatingPayables, ledger: [...entries, ...(s.ledger || [])].slice(0, 150) };
 }
 
 // ---------------------------------------------------------------------------
