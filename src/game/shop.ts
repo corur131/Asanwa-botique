@@ -147,11 +147,16 @@ export function roomOf(l: Pick<Listing, 'tier' | 'stars'> & Partial<Pick<Listing
   const bright = finish === 4 ? 0.12 : 0;
   const tone = (c: string) => (bright ? shade(c, '#FFFFFF', base.kind === 'flagship' ? 0.02 : bright) : shade(c, '#6E6A62', dull));
   const signaturePalette = [
-    { wall: '#FFF7EE', wallLow: '#D9B3A4', floor: '#EADFCC', floor2: '#F8F3E9', trim: '#C99A58' },
-    { wall: '#F7F0E6', wallLow: '#A98A72', floor: '#DED0BF', floor2: '#F4E8D6', trim: '#D4AF37' },
-    { wall: '#F9F5EF', wallLow: '#B88D92', floor: '#E8E0D5', floor2: '#FAF8F5', trim: '#D7B66A' },
-    { wall: '#EFE8E0', wallLow: '#516456', floor: '#D8CCB8', floor2: '#F1E8DA', trim: '#D5B46A' },
-    { wall: '#241824', wallLow: '#111017', floor: '#E8E3DD', floor2: '#F7F3EB', trim: '#E9C96B' },
+    // Level 0: an airy glasshouse with cool daylight and pale glass-stone flooring.
+    { wall: '#D6EEF2', wallLow: '#90C0CB', floor: '#CFE3E6', floor2: '#F3FBFC', trim: '#75B5C4' },
+    // Level 1: an astonishing sky pavilion, with luminous periwinkle and pearl.
+    { wall: '#E9EEFF', wallLow: '#7887B6', floor: '#C9D3F0', floor2: '#F8FAFF', trim: '#A9BDF7' },
+    // Level 2: an unapologetically golden salon with warm reflective stone.
+    { wall: '#FFF3C2', wallLow: '#B47A16', floor: '#E4BD3F', floor2: '#FFF2A9', trim: '#FFD54A' },
+    // Level 3: emerald and champagne artisan couture.
+    { wall: '#173F34', wallLow: '#0A2924', floor: '#C7B995', floor2: '#F0E6D0', trim: '#D9B965' },
+    // Level 4: the flagship—deep aubergine, pale marble, and heirloom gold.
+    { wall: '#241824', wallLow: '#111017', floor: '#E8E3DD', floor2: '#F7F3EB', trim: '#F0CF78' },
   ][l.tier];
   return {
     ...base,
