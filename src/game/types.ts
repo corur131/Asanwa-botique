@@ -341,6 +341,16 @@ export interface Message {
 
 export type LagosWeather = 'sunny' | 'rainy' | 'harmattan' | 'cloudy';
 
+/** Compact memory the AI can use across chat sessions without another API call. */
+export interface CharacterMemory {
+  /** A short, current summary of the character's relationship and ongoing context with Divine. */
+  summary: string;
+  /** A few durable, grounded events or facts this character should remember. */
+  notes: string[];
+  /** In-game day on which this memory was last updated. */
+  updatedDay: number;
+}
+
 export interface GameState {
   version: 4;
   /** Lagos-season weather, optional so older saves continue loading. */
@@ -404,6 +414,8 @@ export interface GameState {
   msgSeq: number;
   /** Last message id read, per chat. */
   read: Record<string, number>;
+  /** Persistent, compact AI memories keyed by the character's chat name. */
+  characterMemories?: Record<string, CharacterMemory>;
   rivals: Rival[];
   /** Official weekly ladder: ids in order ('you' is Divine). */
   ranking: { week: number; order: string[] }[];
