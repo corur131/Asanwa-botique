@@ -566,9 +566,13 @@ export function investInExpansion(s0: GameState, investment: ExpansionInvestment
 /** Run branch stores through the same simulated day as the main shop. */
 export function processExpansionAtClose(s0: GameState): GameState {
   const expansion = s0.businessExpansion || initialBusinessExpansion();
+  // A repeated call must not double-post branch sales, wholesale orders, or rent.
+  if (expansion.lastProcessedDay === s0.day) return s0;
   if (!expansion.branches.length && !expansion.wholesaleActive) return s0;
   let s = s0;
-  for (const branch of expansion.branches) {
+  const branches = [...expansion.branches];
+  for (let index = 0; index < branches.length; index += 1) {
+    const branch = branches[index];
     const tier = clamp(branch.tier, 0, 4);
     const base = [24_000, 75_000, 165_000, 340_000, 600_000][tier];
     const brand = getBrandMetrics(s);
@@ -577,16 +581,28 @@ export function processExpansionAtClose(s0: GameState): GameState {
     const revenue = roundMoney(base * demand * (0.75 + Math.random() * 0.5));
     const stockCost = roundMoney(revenue * 0.5);
     const runningCost = roundMoney(TIERS[tier].running * 0.65);
+    const rentCost = s.day % 7 === 0 ? Math.max(0, branch.weeklyRent) : 0;
+    const dayCosts = stockCost + runningCost + rentCost;
     s = ledger(s, revenue, branch.name + ' sales');
     s = ledger(s, -(stockCost + runningCost), branch.name + ' stock and running costs');
     s = {
       ...s,
       today: { ...s.today, income: s.today.income + revenue, costs: s.today.costs + stockCost + runningCost, events: [...s.today.events, branch.name + ' made ' + revenue.toLocaleString('en-NG') + ' naira in sales.'] },
     };
-    if (s.day % 7 === 0) {
-      s = ledger(s, -branch.weeklyRent, branch.name + ' weekly rent');
-      s = { ...s, today: { ...s.today, costs: s.today.costs + branch.weeklyRent, events: [...s.today.events, branch.name + ' paid ' + branch.weeklyRent.toLocaleString('en-NG') + ' naira in weekly rent.'] } };
+    if (rentCost > 0) {
+      s = ledger(s, -rentCost, branch.name + ' weekly rent');
+      s = { ...s, today: { ...s.today, costs: s.today.costs + rentCost, events: [...s.today.events, branch.name + ' paid ' + rentCost.toLocaleString('en-NG') + ' naira in weekly rent.'] } };
     }
+    branches[index] = {
+      ...branch,
+      cumulativeRevenue: Math.max(0, branch.cumulativeRevenue || 0) + revenue,
+      cumulativeCosts: Math.max(0, branch.cumulativeCosts || 0) + dayCosts,
+      daysTrading: Math.max(0, branch.daysTrading || 0) + 1,
+      lastDay: s.day,
+      lastDayRevenue: revenue,
+      lastDayCosts: dayCosts,
+      lastDayProfit: revenue - dayCosts,
+    };
   }
   if (expansion.wholesaleActive) {
     const brand = getBrandMetrics(s);
@@ -596,7 +612,10 @@ export function processExpansionAtClose(s0: GameState): GameState {
     s = ledger(s, -cost, 'Wholesale stock and fulfilment');
     s = { ...s, today: { ...s.today, income: s.today.income + revenue, costs: s.today.costs + cost, events: [...s.today.events, 'Wholesale orders recorded ' + revenue.toLocaleString('en-NG') + ' naira in sales.'] } };
   }
-  return s;
+  return {
+    ...s,
+    businessExpansion: { ...expansion, branches, lastProcessedDay: s.day },
+  };
 }
 
 export function playerWeekTotals(s: GameState): { revenue: number; costs: number; profit: number } {
