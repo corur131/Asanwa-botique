@@ -51,6 +51,8 @@ app.post('/api/ai-chat', async (req, res) => {
   const characterProfile = asText(req.body?.characterProfile, 10000);
   const message = asText(req.body?.message, 1000);
   const isGroup = characterName === 'Lagos Fashion Babes';
+  const eligibleCollaborationPartners = new Set(['Tolani Adebayo', 'Amaka Obi', 'Iya Bisi', 'Chioma Eze', 'Zainab Bello']);
+  const canDiscussCollaboration = !isGroup && eligibleCollaborationPartners.has(characterName) && req.body?.canDiscussCollaboration === true;
   const participants: string[] = Array.isArray(req.body?.participants)
     ? req.body.participants.filter((x: unknown): x is string => typeof x === 'string').slice(0, 8).map((x: string) => x.slice(0, 80))
     : [];
@@ -83,6 +85,10 @@ app.post('/api/ai-chat', async (req, res) => {
     'When the supplied character profile gives a personal ambition, business pressure or current public competitive standing, let it shape what the character notices, values, celebrates, resents, negotiates over or worries about. Keep this subtle and relevant; do not turn every reply into a monologue about the goal.',
     'Characters are not merely agreeable assistants to Divine. They can disagree, set boundaries, bargain, protect their business, offer help for their own reasons, refuse requests or update an opinion when the conversation or game context justifies it. Preserve nuance rather than making rivals cartoon villains.',
     'Use current game facts and public standing only as context. Never claim that a rival took an off-screen action, changed their statistics, launched a promotion or made a decision unless that event is present in the supplied conversation or game context.',
+    'COLLABORATION PROPOSALS:',
+    canDiscussCollaboration
+      ? 'You are speaking privately with an eligible main rival. If and only if Divine explicitly proposes a concrete joint fashion pop-up, fashion event or business collaboration in the latest message, respond in character and return a structured collaboration decision. Choose accept when the terms are plausible for this rival, counter when they would participate only with changed terms, or reject when the idea conflicts with their interests. Use none for every ordinary message, hypothetical idea, request for advice, or vague remark that is not an actual proposal. Keep event cost between ₦15,000 and ₦80,000, dayOffset between 3 and 14 in-game days, and cost/profit share percentages between 10 and 90. If the player proposes to share both cost and profit equally, start at 50/50 unless this character has a clear reason to negotiate. These are proposed terms only: the game engine will check cash, schedule the event only after Divine confirms, and calculate the final result. Do not claim the collaboration is already booked.'
+      : 'No business-collaboration action is available in this chat. Set collaboration.decision to none and do not generate a collaboration offer.',
     'KNOWLEDGE BOUNDARIES:',
     'Only use memories supplied for the current character or the current shared group, along with the conversation history and public game context provided for this request. In group chat, group-scoped memories are shared context, but private direct-message memories from any character are out of scope: do not infer, quote, hint at or fabricate what another character privately told Divine.',
     'Preserve the core personality while allowing realistic mood changes. Do not make a character constantly rude, cheerful, jealous or agreeable. Use Nigerian English, Pidgin, slang and emojis only where they fit that individual.',
@@ -138,13 +144,38 @@ app.post('/api/ai-chat', async (req, res) => {
               required: ['summary', 'add'],
               propertyOrdering: ['summary', 'add'],
             },
+            collaboration: {
+              type: Type.OBJECT,
+              properties: {
+                decision: { type: Type.STRING, enum: ['none', 'accept', 'counter', 'reject'], description: 'Use accept, counter or reject only for an explicit concrete collaboration proposal in an eligible one-to-one rival chat; otherwise none.' },
+                eventName: { type: Type.STRING, description: 'Short name for a proposed joint pop-up event.' },
+                dayOffset: { type: Type.NUMBER, description: 'Proposed event day offset from today, 3 to 14.' },
+                totalCost: { type: Type.NUMBER, description: 'Total proposed event setup budget in naira, 15000 to 80000.' },
+                playerCostSharePct: { type: Type.NUMBER, description: 'Percentage of setup cost Divine should contribute, 10 to 90.' },
+                playerProfitSharePct: { type: Type.NUMBER, description: 'Percentage of event profit allocated to Divine, 10 to 90.' },
+              },
+              required: ['decision', 'eventName', 'dayOffset', 'totalCost', 'playerCostSharePct', 'playerProfitSharePct'],
+              propertyOrdering: ['decision', 'eventName', 'dayOffset', 'totalCost', 'playerCostSharePct', 'playerProfitSharePct'],
+            },
           },
-          required: ['reply', 'speaker', 'memory'],
-          propertyOrdering: ['reply', 'speaker', 'memory'],
+          required: ['reply', 'speaker', 'memory', 'collaboration'],
+          propertyOrdering: ['reply', 'speaker', 'memory', 'collaboration'],
         },
       },
     });
-    let parsed: { reply?: unknown; speaker?: unknown; memory?: { summary?: unknown; add?: unknown } };
+    let parsed: {
+      reply?: unknown;
+      speaker?: unknown;
+      memory?: { summary?: unknown; add?: unknown };
+      collaboration?: {
+        decision?: unknown;
+        eventName?: unknown;
+        dayOffset?: unknown;
+        totalCost?: unknown;
+        playerCostSharePct?: unknown;
+        playerProfitSharePct?: unknown;
+      };
+    };
     try {
       parsed = JSON.parse(response.text || '') as typeof parsed;
     } catch {
@@ -164,7 +195,18 @@ app.post('/api/ai-chat', async (req, res) => {
         ? rawMemoryNotes.filter((note: unknown): note is string => typeof note === 'string').slice(0, 2).map((note: string) => asText(note, 160)).filter(Boolean)
         : [],
     };
-    res.json({ reply, speaker, memory });
+    const rawCollaboration = parsed.collaboration && typeof parsed.collaboration === 'object' ? parsed.collaboration : {};
+    const rawDecision = asText(rawCollaboration.decision, 20);
+    const validDecision = ['none', 'accept', 'counter', 'reject'].includes(rawDecision) ? rawDecision : 'none';
+    const collaboration = {
+      decision: canDiscussCollaboration && validDecision !== 'none' ? validDecision : 'none',
+      eventName: asText(rawCollaboration.eventName, 80) || 'Asanwa Boutique x ' + characterName + ' Fashion Pop-up',
+      dayOffset: Math.round(Math.max(3, Math.min(14, typeof rawCollaboration.dayOffset === 'number' && Number.isFinite(rawCollaboration.dayOffset) ? rawCollaboration.dayOffset : 7))),
+      totalCost: Math.round(Math.max(15000, Math.min(80000, typeof rawCollaboration.totalCost === 'number' && Number.isFinite(rawCollaboration.totalCost) ? rawCollaboration.totalCost : 20000)) / 2500) * 2500,
+      playerCostSharePct: Math.round(Math.max(10, Math.min(90, typeof rawCollaboration.playerCostSharePct === 'number' && Number.isFinite(rawCollaboration.playerCostSharePct) ? rawCollaboration.playerCostSharePct : 50))),
+      playerProfitSharePct: Math.round(Math.max(10, Math.min(90, typeof rawCollaboration.playerProfitSharePct === 'number' && Number.isFinite(rawCollaboration.playerProfitSharePct) ? rawCollaboration.playerProfitSharePct : 50))),
+    };
+    res.json({ reply, speaker, memory, collaboration });
   } catch (error) {
     // Log diagnostic details on the server, never the API key.
     const providerError = error as { status?: unknown; code?: unknown; message?: unknown };
