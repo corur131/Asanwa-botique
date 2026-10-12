@@ -864,10 +864,15 @@ function eventNameForLog(event: CollaborationEvent, grossRevenue: number, profit
 }
 
 function planSponsorshipOffer(s0: GameState): GameState {
-  if (s0.day % 7 !== 4 || (s0.lastSponsorshipDay !== undefined && s0.day - s0.lastSponsorshipDay < 14)) return s0;
-  const followers = Math.max(0, s0.followers || 0);
+  const offers = (s0.sponsorshipOffers || []).map((offer) =>
+    offer.status === 'offered' && s0.day > offer.expiresDay ? { ...offer, status: 'expired' as const } : offer);
+  const state = offers.length === (s0.sponsorshipOffers || []).length && offers.every((offer, i) => offer === (s0.sponsorshipOffers || [])[i])
+    ? s0 : { ...s0, sponsorshipOffers: offers };
+  const pending = offers.some((offer) => offer.status === 'offered' && state.day <= offer.expiresDay);
+  if (pending || state.day % 7 !== 4 || (state.lastSponsorshipDay !== undefined && state.day - state.lastSponsorshipDay < 14)) return state;
+  const followers = Math.max(0, state.followers || 0);
   const tier = followers >= 500_000 ? 4 : followers >= 100_000 ? 3 : followers >= 25_000 ? 2 : followers >= 5_000 ? 1 : followers >= 1_000 ? 0 : -1;
-  if (tier < 0 || Math.random() > 0.68) return s0;
+  if (tier < 0 || Math.random() > 0.68) return state;
   const offers = [
     { threshold: 1_000, sponsor: 'Lagos Style Collective', min: 15_000, max: 60_000, followers: 40 },
     { threshold: 5_000, sponsor: 'Naija Fashion Market', min: 50_000, max: 200_000, followers: 120 },
@@ -876,19 +881,19 @@ function planSponsorshipOffer(s0: GameState): GameState {
     { threshold: 500_000, sponsor: 'National Fashion Awards', min: 8_000_000, max: 25_000_000, followers: 8_000 },
   ];
   const band = offers[tier];
-  const power = getBrandMetrics(s0);
+  const power = getBrandMetrics(state);
   const engagement = clamp((power.awareness * 0.25 + power.loyalty * 0.5 + power.reliability * 0.25) / 75, 0.65, 1.35);
   const offer: SponsorshipOffer = {
-    id: 'sponsor-' + s0.day + '-' + Math.random().toString(36).slice(2, 8),
+    id: 'sponsor-' + state.day + '-' + Math.random().toString(36).slice(2, 8),
     sponsor: band.sponsor,
-    day: s0.day,
-    expiresDay: s0.day + 3,
+    day: state.day,
+    expiresDay: state.day + 3,
     followersRequired: band.threshold,
     payout: Math.round((band.min + Math.random() * (band.max - band.min)) * engagement / 5000) * 5000,
     bonusFollowers: Math.round(band.followers * engagement),
     status: 'offered',
   };
-  const id = (s0.msgSeq || 0) + 1;
+  const id = (state.msgSeq || 0) + 1;
   const message: Message = {
     id, day: s0.day, from: offer.sponsor,
     text: 'Your audience is growing. We would like to sponsor a Gidigram campaign for Asanwa Boutique. We can pay ' + naira(offer.payout) + ' for a branded fashion post, with an extra audience boost if you accept. This offer expires after Day ' + offer.expiresDay + '.',
@@ -897,8 +902,8 @@ function planSponsorshipOffer(s0: GameState): GameState {
     ctx: { kind: 'sponsorship', offerId: offer.id },
   };
   return {
-    ...s0, msgSeq: id, messages: [message, ...(s0.messages || [])].slice(0, 160),
-    sponsorshipOffers: [...(s0.sponsorshipOffers || []), offer].slice(-40), lastSponsorshipDay: s0.day,
+    ...state, msgSeq: id, messages: [message, ...(state.messages || [])].slice(0, 160),
+    sponsorshipOffers: [...offers, offer].slice(-40), lastSponsorshipDay: state.day,
   };
 }
 
@@ -925,7 +930,7 @@ function answerSponsorship(s0: GameState, message: Message, choice: ReplyChoice[
     sponsorshipOffers: (s.sponsorshipOffers || []).map((item) => item.id === offer.id ? { ...item, status: 'accepted' as const } : item),
   };
   s = gist(s, 'Asanwa Boutique lands a sponsored campaign', offer.sponsor + ' paid ' + naira(offer.payout) + ' for a Gidigram campaign. Divine gained ' + offer.bonusFollowers + ' followers.', 'you', true);
-  return msg(s, offer.sponsor, 'The partnership is confirmed. Your payment is on its way, and we have shared your campaign with our fashion audience.', 'good');
+  return refreshEveningHistory(msg(s, offer.sponsor, 'The partnership is confirmed. Your payment is on its way, and we have shared your campaign with our fashion audience.', 'good'));
 }
 
 /** A reply picked in WhatsApp. */
