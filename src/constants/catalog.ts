@@ -537,18 +537,18 @@ export const SHOES: AccessoryItem[] = [
   A('oxfords', 'Oxfords', 'm', 6500),
   A('palmSlippers', 'Palm Slippers', 'm', 3000, true),
   A('mensBoots', 'Chelsea Boots', 'm', 11000),
-  A('premiumLeatherHeels', 'Premium Leather Heels', 'f', 32_000, false, { renderId: 'heels', minTier: 1 }),
-  A('crystalEveningHeels', 'Crystal Evening Heels', 'f', 88_000, false, { renderId: 'heels', minTier: 2 }),
-  A('atelierSculptedMules', 'Atelier Sculpted Mules', 'f', 165_000, false, { renderId: 'mules', minTier: 3 }),
-  A('coutureGoldSlingbacks', 'Couture Gold Slingbacks', 'f', 390_000, false, { renderId: 'heels', minTier: 3 }),
-  A('diamondRunwayPumps', 'Diamond-Detail Runway Pumps', 'f', 850_000, false, { renderId: 'heels', minTier: 4 }),
-  A('premiumSuedeLoafers', 'Premium Suede Loafers', 'm', 38_000, false, { renderId: 'loafers', minTier: 1 }),
-  A('italianLeatherOxfords', 'Italian Leather Oxfords', 'm', 92_000, false, { renderId: 'oxfords', minTier: 2 }),
-  A('bespokeVelvetLoafers', 'Bespoke Velvet Loafers', 'm', 185_000, false, { renderId: 'loafers', minTier: 3 }),
-  A('goldHardwareDressShoes', 'Gold-Hardware Dress Shoes', 'm', 420_000, false, { renderId: 'oxfords', minTier: 3 }),
-  A('handFinishedOxfordCouture', 'Hand-Finished Oxford Couture', 'm', 780_000, false, { renderId: 'oxfords', minTier: 4 }),
-  A('everydayCanvasSneakers', 'Everyday Canvas Sneakers', 'both', 7_500, false, { renderId: 'sneakers', minTier: 0 }),
-  A('atelierLeatherSneakers', 'Atelier Leather Sneakers', 'both', 65_000, false, { renderId: 'sneakers', minTier: 2 }),
+  A('premiumLeatherHeels', 'Premium Leather Heels', 'f', 32_000, false, { renderId: 'premiumLeatherHeels', minTier: 1 }),
+  A('crystalEveningHeels', 'Crystal Evening Heels', 'f', 88_000, false, { renderId: 'crystalEveningHeels', minTier: 2 }),
+  A('atelierSculptedMules', 'Atelier Sculpted Mules', 'f', 165_000, false, { renderId: 'atelierSculptedMules', minTier: 3 }),
+  A('coutureGoldSlingbacks', 'Couture Gold Slingbacks', 'f', 390_000, false, { renderId: 'coutureGoldSlingbacks', minTier: 3 }),
+  A('diamondRunwayPumps', 'Diamond-Detail Runway Pumps', 'f', 850_000, false, { renderId: 'diamondRunwayPumps', minTier: 4 }),
+  A('premiumSuedeLoafers', 'Premium Suede Loafers', 'm', 38_000, false, { renderId: 'premiumSuedeLoafers', minTier: 1 }),
+  A('italianLeatherOxfords', 'Italian Leather Oxfords', 'm', 92_000, false, { renderId: 'italianLeatherOxfords', minTier: 2 }),
+  A('bespokeVelvetLoafers', 'Bespoke Velvet Loafers', 'm', 185_000, false, { renderId: 'bespokeVelvetLoafers', minTier: 3 }),
+  A('goldHardwareDressShoes', 'Gold-Hardware Dress Shoes', 'm', 420_000, false, { renderId: 'goldHardwareDressShoes', minTier: 3 }),
+  A('handFinishedOxfordCouture', 'Hand-Finished Oxford Couture', 'm', 780_000, false, { renderId: 'handFinishedOxfordCouture', minTier: 4 }),
+  A('everydayCanvasSneakers', 'Everyday Canvas Sneakers', 'both', 7_500, false, { renderId: 'everydayCanvasSneakers', minTier: 0 }),
+  A('atelierLeatherSneakers', 'Atelier Leather Sneakers', 'both', 65_000, false, { renderId: 'atelierLeatherSneakers', minTier: 2 }),
 ];
 
 export const BAGS: AccessoryItem[] = [
@@ -561,14 +561,14 @@ export const BAGS: AccessoryItem[] = [
   A('bucketBag', 'Bucket Bag', 'f', 5000),
   A('backpack', 'Backpack', 'both', 4000),
   A('beadedBag', 'Beaded Bag', 'f', 10000, true),
-  A('structuredWorkTote', 'Structured Work Tote', 'f', 22_000, false, { renderId: 'tote', minTier: 1 }),
-  A('sculptedEveningClutch', 'Sculpted Evening Clutch', 'f', 68_000, false, { renderId: 'clutch', minTier: 2 }),
-  A('artisanAsoOkeBag', 'Artisan Aso-Oke Handbag', 'f', 82_000, true, { renderId: 'beadedBag', minTier: 2 }),
-  A('premiumLeatherCrossbody', 'Premium Leather Crossbody', 'both', 120_000, false, { renderId: 'crossbody', minTier: 2 }),
-  A('atelierTopHandleBag', 'Atelier Top-Handle Bag', 'f', 220_000, false, { renderId: 'miniBag', minTier: 3 }),
-  A('handwovenCeremonyBag', 'Handwoven Ceremony Bag', 'both', 380_000, true, { renderId: 'beadedBag', minTier: 3 }),
-  A('couturePearlEveningBag', 'Couture Pearl Evening Bag', 'f', 680_000, false, { renderId: 'clutch', minTier: 4 }),
-  A('heirloomLeatherWeekender', 'Heirloom Leather Weekender', 'm', 850_000, false, { renderId: 'backpack', minTier: 4 }),
+  A('structuredWorkTote', 'Structured Work Tote', 'f', 22_000, false, { renderId: 'structuredWorkTote', minTier: 1 }),
+  A('sculptedEveningClutch', 'Sculpted Evening Clutch', 'f', 68_000, false, { renderId: 'sculptedEveningClutch', minTier: 2 }),
+  A('artisanAsoOkeBag', 'Artisan Aso-Oke Handbag', 'f', 82_000, true, { renderId: 'artisanAsoOkeBag', minTier: 2 }),
+  A('premiumLeatherCrossbody', 'Premium Leather Crossbody', 'both', 120_000, false, { renderId: 'premiumLeatherCrossbody', minTier: 2 }),
+  A('atelierTopHandleBag', 'Atelier Top-Handle Bag', 'f', 220_000, false, { renderId: 'atelierTopHandleBag', minTier: 3 }),
+  A('handwovenCeremonyBag', 'Handwoven Ceremony Bag', 'both', 380_000, true, { renderId: 'handwovenCeremonyBag', minTier: 3 }),
+  A('couturePearlEveningBag', 'Couture Pearl Evening Bag', 'f', 680_000, false, { renderId: 'couturePearlEveningBag', minTier: 4 }),
+  A('heirloomLeatherWeekender', 'Heirloom Leather Weekender', 'm', 850_000, false, { renderId: 'heirloomLeatherWeekender', minTier: 4 }),
 ];
 
 export const HEADWEAR: AccessoryItem[] = [
@@ -581,12 +581,12 @@ export const HEADWEAR: AccessoryItem[] = [
   A('bucketHat', 'Bucket Hat', 'both', 2000),
   A('fascinator', 'Fascinator', 'f', 6500),
   A('fila', 'Fila Cap', 'm', 2000, true),
-  A('embroideredCeremonyFila', 'Embroidered Ceremony Fila', 'm', 28_000, true, { renderId: 'fila', minTier: 1 }),
-  A('beadedStatementFascinator', 'Beaded Statement Fascinator', 'f', 48_000, false, { renderId: 'fascinator', minTier: 2 }),
-  A('goldThreadAsoOkeGele', 'Gold-Thread Aso-Oke Gele', 'f', 125_000, true, { renderId: 'gele', minTier: 3 }),
-  A('coutureCrystalHeadpiece', 'Couture Crystal Headpiece', 'f', 340_000, false, { renderId: 'fascinator', minTier: 3 }),
-  A('royalFilaAsoOke', 'Royal Aso-Oke Fila', 'm', 250_000, true, { renderId: 'fila', minTier: 3 }),
-  A('heirloomGoldGele', 'Heirloom Gold-Worked Gele', 'f', 720_000, true, { renderId: 'gele', minTier: 4 }),
+  A('embroideredCeremonyFila', 'Embroidered Ceremony Fila', 'm', 28_000, true, { renderId: 'embroideredCeremonyFila', minTier: 1 }),
+  A('beadedStatementFascinator', 'Beaded Statement Fascinator', 'f', 48_000, false, { renderId: 'beadedStatementFascinator', minTier: 2 }),
+  A('goldThreadAsoOkeGele', 'Gold-Thread Aso-Oke Gele', 'f', 125_000, true, { renderId: 'goldThreadAsoOkeGele', minTier: 3 }),
+  A('coutureCrystalHeadpiece', 'Couture Crystal Headpiece', 'f', 340_000, false, { renderId: 'coutureCrystalHeadpiece', minTier: 3 }),
+  A('royalFilaAsoOke', 'Royal Aso-Oke Fila', 'm', 250_000, true, { renderId: 'royalFilaAsoOke', minTier: 3 }),
+  A('heirloomGoldGele', 'Heirloom Gold-Worked Gele', 'f', 720_000, true, { renderId: 'heirloomGoldGele', minTier: 4 }),
 ];
 
 /** Premium hairpieces are merchandise colourways; the renderer reuses its detailed hair silhouettes. */
@@ -633,11 +633,11 @@ export const NECKLACES: AccessoryItem[] = [
   A('layered', 'Layered Chains', 'f', 5000),
   A('coral', 'Coral Beads (Iyun)', 'both', 20000, true),
   A('cuban', 'Cuban Link', 'm', 10000),
-  A('freshwaterPearlStrand', 'Freshwater Pearl Strand', 'f', 42_000, false, { renderId: 'pearls', minTier: 1 }),
-  A('goldLayeredNecklace', 'Gold Layered Necklace', 'both', 88_000, false, { renderId: 'layered', minTier: 2 }),
-  A('handsetCoralNecklace', 'Hand-Set Coral Necklace', 'both', 180_000, true, { renderId: 'coral', minTier: 3 }),
-  A('sculptedGoldChoker', 'Sculpted Gold Choker', 'f', 280_000, false, { renderId: 'choker', minTier: 3 }),
-  A('heirloomCoralSet', 'Heirloom Coral Necklace', 'both', 650_000, true, { renderId: 'coral', minTier: 4 }),
+  A('freshwaterPearlStrand', 'Freshwater Pearl Strand', 'f', 42_000, false, { renderId: 'freshwaterPearlStrand', minTier: 1 }),
+  A('goldLayeredNecklace', 'Gold Layered Necklace', 'both', 88_000, false, { renderId: 'goldLayeredNecklace', minTier: 2 }),
+  A('handsetCoralNecklace', 'Hand-Set Coral Necklace', 'both', 180_000, true, { renderId: 'handsetCoralNecklace', minTier: 3 }),
+  A('sculptedGoldChoker', 'Sculpted Gold Choker', 'f', 280_000, false, { renderId: 'sculptedGoldChoker', minTier: 3 }),
+  A('heirloomCoralSet', 'Heirloom Coral Necklace', 'both', 650_000, true, { renderId: 'heirloomCoralSet', minTier: 4 }),
 ];
 
 export const WRIST: AccessoryItem[] = [
@@ -646,10 +646,10 @@ export const WRIST: AccessoryItem[] = [
   A('bangles', 'Gold Bangles', 'f', 3500),
   A('coralBracelet', 'Coral Beads', 'both', 5000, true),
   A('cuff', 'Cuff', 'f', 3000),
-  A('premiumAutomaticWatch', 'Premium Automatic Watch', 'both', 45_000, false, { renderId: 'watch', minTier: 1 }),
-  A('goldBangleStack', 'Gold Bangle Stack', 'f', 72_000, false, { renderId: 'bangles', minTier: 2 }),
-  A('designerSteelChronograph', 'Designer Steel Chronograph', 'both', 185_000, false, { renderId: 'watch', minTier: 3 }),
-  A('diamondDialWatch', 'Diamond-Dial Watch', 'both', 780_000, false, { renderId: 'watch', minTier: 4 }),
+  A('premiumAutomaticWatch', 'Premium Automatic Watch', 'both', 45_000, false, { renderId: 'premiumAutomaticWatch', minTier: 1 }),
+  A('goldBangleStack', 'Gold Bangle Stack', 'f', 72_000, false, { renderId: 'goldBangleStack', minTier: 2 }),
+  A('designerSteelChronograph', 'Designer Steel Chronograph', 'both', 185_000, false, { renderId: 'designerSteelChronograph', minTier: 3 }),
+  A('diamondDialWatch', 'Diamond-Dial Watch', 'both', 780_000, false, { renderId: 'diamondDialWatch', minTier: 4 }),
 ];
 
 export const GLASSES: AccessoryItem[] = [
@@ -659,11 +659,11 @@ export const GLASSES: AccessoryItem[] = [
   A('aviators', 'Aviators', 'both', 3000),
   A('oversized', 'Oversized Shades', 'f', 3500),
   A('clear', 'Clear Frames', 'both', 3000),
-  A('acetateStatementFrames', 'Acetate Statement Frames', 'both', 32_000, false, { renderId: 'clear', minTier: 1 }),
-  A('titaniumDesignerFrames', 'Titanium Designer Frames', 'both', 96_000, false, { renderId: 'aviators', minTier: 2 }),
-  A('goldTempleSunglasses', 'Gold-Temple Sunglasses', 'both', 165_000, false, { renderId: 'oversized', minTier: 3 }),
-  A('runwaySculptedShades', 'Runway Sculpted Shades', 'both', 420_000, false, { renderId: 'catEye', minTier: 3 }),
-  A('heirloomGoldSunglasses', 'Heirloom Gold Sunglasses', 'both', 750_000, false, { renderId: 'aviators', minTier: 4 }),
+  A('acetateStatementFrames', 'Acetate Statement Frames', 'both', 32_000, false, { renderId: 'acetateStatementFrames', minTier: 1 }),
+  A('titaniumDesignerFrames', 'Titanium Designer Frames', 'both', 96_000, false, { renderId: 'titaniumDesignerFrames', minTier: 2 }),
+  A('goldTempleSunglasses', 'Gold-Temple Sunglasses', 'both', 165_000, false, { renderId: 'goldTempleSunglasses', minTier: 3 }),
+  A('runwaySculptedShades', 'Runway Sculpted Shades', 'both', 420_000, false, { renderId: 'runwaySculptedShades', minTier: 3 }),
+  A('heirloomGoldSunglasses', 'Heirloom Gold Sunglasses', 'both', 750_000, false, { renderId: 'heirloomGoldSunglasses', minTier: 4 }),
 ];
 
 export const forBody = <T extends { for: 'f' | 'm' | 'both' }>(list: T[], male: boolean) => list.filter((i) => i.for === 'both' || i.for === (male ? 'm' : 'f'));
