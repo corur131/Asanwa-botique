@@ -320,6 +320,37 @@ export interface ReplyChoice {
   tag?: string;
 }
 
+export type CollaborationDecision = 'none' | 'accept' | 'counter' | 'reject';
+
+/** AI's proposed response to a concrete pop-up collaboration invitation. Game rules validate it before use. */
+export interface CollaborationReply {
+  decision: CollaborationDecision;
+  eventName: string;
+  /** Number of in-game days from today, bounded by the engine. */
+  dayOffset: number;
+  totalCost: number;
+  playerCostSharePct: number;
+  playerProfitSharePct: number;
+}
+
+/** A real collaboration that has been confirmed and will resolve through the game engine. */
+export interface CollaborationEvent {
+  id: string;
+  partnerId: string;
+  partnerName: string;
+  eventName: string;
+  day: number;
+  createdDay: number;
+  totalCost: number;
+  playerCostSharePct: number;
+  playerProfitSharePct: number;
+  status: 'scheduled' | 'completed';
+  grossRevenue?: number;
+  profit?: number;
+  playerPayout?: number;
+  partnerPayout?: number;
+}
+
 export interface Message {
   id: number;
   /** Group chat or DM thread this belongs to (defaults to the sender). */
@@ -331,6 +362,10 @@ export interface Message {
   convo?: string;
   /** What the message is about, for the reply's effect. */
   ctx?: { kind: 'shade' | 'brag' | 'bait' | 'invite'; rivalId?: string; eventId?: string };
+  /** Structured business proposal returned by the AI; only explicit player confirmation makes it real. */
+  collaboration?: CollaborationReply;
+  /** Result of the player's action on a collaboration proposal. */
+  collaborationOutcome?: 'scheduled' | 'declined' | 'unaffordable' | 'already_booked' | 'partner_unable';
   /** Game minute (shop clock) it arrived, if during the day. */
   t?: number;
   day: number;
@@ -416,6 +451,8 @@ export interface GameState {
   read: Record<string, number>;
   /** Persistent, compact AI memories keyed by the character's chat name. */
   characterMemories?: Record<string, CharacterMemory>;
+  /** Confirmed joint business pop-ups; absent in legacy saves. */
+  collaborations?: CollaborationEvent[];
   rivals: Rival[];
   /** Official weekly ladder: ids in order ('you' is Divine). */
   ranking: { week: number; order: string[] }[];
