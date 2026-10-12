@@ -689,6 +689,11 @@ export function closeShop(s0: GameState): GameState {
   s = planEvents(s);
   s = planTips(s);
   s = resolveDueCollaborations(s);
+  // closeShop records today's history before resolving due events; refresh that log
+  // so collaboration payouts count in weekly performance and end-of-day summaries.
+  if (s.history.length && s.history[s.history.length - 1].day === s.day) {
+    s = { ...s, history: [...s.history.slice(0, -1), s.today] };
+  }
   return { ...s, phase: 'evening', visit: null };
 }
 
