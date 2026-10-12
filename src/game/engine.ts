@@ -873,14 +873,14 @@ function planSponsorshipOffer(s0: GameState): GameState {
   const followers = Math.max(0, state.followers || 0);
   const tier = followers >= 500_000 ? 4 : followers >= 100_000 ? 3 : followers >= 25_000 ? 2 : followers >= 5_000 ? 1 : followers >= 1_000 ? 0 : -1;
   if (tier < 0 || Math.random() > 0.68) return state;
-  const offers = [
+  const bands = [
     { threshold: 1_000, sponsor: 'Lagos Style Collective', min: 15_000, max: 60_000, followers: 40 },
     { threshold: 5_000, sponsor: 'Naija Fashion Market', min: 50_000, max: 200_000, followers: 120 },
     { threshold: 25_000, sponsor: 'StyleHouse Media', min: 250_000, max: 900_000, followers: 350 },
     { threshold: 100_000, sponsor: 'Luxe Africa Campaigns', min: 1_000_000, max: 4_000_000, followers: 1_200 },
     { threshold: 500_000, sponsor: 'National Fashion Awards', min: 8_000_000, max: 25_000_000, followers: 8_000 },
   ];
-  const band = offers[tier];
+  const band = bands[tier];
   const power = getBrandMetrics(state);
   const engagement = clamp((power.awareness * 0.25 + power.loyalty * 0.5 + power.reliability * 0.25) / 75, 0.65, 1.35);
   const offer: SponsorshipOffer = {
@@ -895,7 +895,7 @@ function planSponsorshipOffer(s0: GameState): GameState {
   };
   const id = (state.msgSeq || 0) + 1;
   const message: Message = {
-    id, day: s0.day, from: offer.sponsor,
+    id, day: state.day, from: offer.sponsor,
     text: 'Your audience is growing. We would like to sponsor a Gidigram campaign for Asanwa Boutique. We can pay ' + naira(offer.payout) + ' for a branded fashion post, with an extra audience boost if you accept. This offer expires after Day ' + offer.expiresDay + '.',
     tone: 'good', t: -1,
     choices: [{ id: 'accept', label: 'Accept sponsorship' }, { id: 'decline', label: 'Decline offer' }],
