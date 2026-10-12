@@ -244,14 +244,16 @@ const rivalProfile = (r: Rival) => [
     : 'This is a supporting rival. Use their specific shop, speciality, position and relationship to distinguish them without inventing a personal backstory.'
 ].join(' ');
 
-const memoryBrief = (name: string, memory?: CharacterMemory) => {
+const memoryBrief = (name: string, memory?: CharacterMemory, compact = false) => {
   if (!memory || (!memory.summary.trim() && memory.notes.length === 0)) {
     return 'Persistent memory for ' + name + ': no established long-term memories yet. Build continuity from the actual conversation; do not invent a shared past.';
   }
+  const summary = compact ? memory.summary.slice(0, 220) : memory.summary;
+  const notes = compact ? memory.notes.slice(-3).map((note) => note.slice(0, 120)) : memory.notes;
   return [
     'Persistent memory for ' + name + ' (saved from prior chats; use for continuity, not as a script):',
-    memory.summary ? 'Current summary: ' + memory.summary : '',
-    memory.notes.length ? 'Established memory notes: ' + memory.notes.map((note) => '- ' + note).join(' ') : '',
+    summary ? 'Current summary: ' + summary : '',
+    notes.length ? 'Established memory notes: ' + notes.map((note) => '- ' + note).join(' ') : '',
     'These notes are a compact record, not permission to invent details beyond them.'
   ].filter(Boolean).join(' ');
 };
@@ -280,7 +282,7 @@ const Chats: React.FC<PhoneProps> = ({ s, up, chat, setChat, staff }) => {
       ? (s.rivals || []).filter((r) => r.main).map((r) => r.owner)
       : [];
     const characterProfile = targetChat === GROUP
-      ? 'Group setting: Lagos fashion-business rivals who already know one another and Divine. Each listed participant has a separate personality profile and saved memory below. Choose the person whose viewpoint most naturally fits the latest message and recent group history. Do not blend their voices or make everyone speak in one turn. Do not rotate speakers mechanically.\n\n' + (s.rivals || []).filter((r) => r.main).map((r) => rivalProfile(r) + '\n' + memoryBrief(r.owner, s.characterMemories?.[r.owner])).join('\n\n')
+      ? 'Group setting: Lagos fashion-business rivals who already know one another and Divine. Each listed participant has a separate personality profile and saved memory below. Choose the person whose viewpoint most naturally fits the latest message and recent group history. Do not blend their voices or make everyone speak in one turn. Do not rotate speakers mechanically.\n\n' + (s.rivals || []).filter((r) => r.main).map((r) => rivalProfile(r) + '\n' + memoryBrief(r.owner, s.characterMemories?.[r.owner], true)).join('\n\n')
       : targetRival
         ? rivalProfile(targetRival)
         : targetStaff
