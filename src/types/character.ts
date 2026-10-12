@@ -224,4 +224,4 @@ export interface CharacterConfig {
   };
 }
 
-export type CameraView = 'full' | 'portrait' | 'bust';
+export type CameraView = 'full' | 'portrait' | 'bust' | 'feet' | 'accessory';
