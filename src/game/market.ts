@@ -100,9 +100,9 @@ export const HAIR_SWATCHES = [
 export const minTierFor = (e: MarketEntry) => e.minTier ?? (e.luxury ? 2 : 0);
 export const canBuy = (e: MarketEntry, tier: number) => tier >= minTierFor(e);
 
-/** Stock identity excludes the selected primary colour, but keeps fabric and print identity. */
+/** One rack slot represents a garment/product style. Fabric, print and colour remain selectable stocked variants. */
 export function productKey(d: Pick<Design, 'kind' | 'itemId' | 'fabric' | 'color2' | 'pattern'>): string {
-  return [d.kind, d.itemId, isClothing(d.kind) ? d.fabric : '', isClothing(d.kind) ? d.color2 : '', isClothing(d.kind) ? d.pattern : ''].join('|');
+  return [d.kind, d.itemId].join('|');
 }
 
 let uidCounter = Date.now() % 100000;
