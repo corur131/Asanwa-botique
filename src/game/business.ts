@@ -350,7 +350,7 @@ export function saveRentAtClose(s0: GameState): GameState {
 /** Release matured fixed deposits on their exact in-game maturity day. Safe to call daily. */
 export function processFixedDepositMaturities(s0: GameState): GameState {
   let s = s0;
-  const bank = s.bank || initialBankState();
+  let bank = s.bank || initialBankState();
   const maturity = bank.fixedDeposits.filter((deposit) => deposit.maturityDay <= s.day);
   if (maturity.length) {
     const returned = maturity.reduce((sum, deposit) => sum + roundMoney(deposit.amount * (1 + deposit.ratePct / 100)), 0);
