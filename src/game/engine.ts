@@ -981,7 +981,7 @@ export function answerMessage(s: GameState, msgId: number, choice: ReplyChoice['
 
 export { answerVisit, buyDrop, contestFor, noteVisit, rivalShop, VISIT_CHOICES } from './encounters';
 
-function settleLateRent(s0: GameState): GameState {
+export function settleLateRent(s0: GameState): GameState {
   const late = s0.lateRent;
   if (!late || late.amount <= 0) return late ? { ...s0, lateRent: null } : s0;
 
@@ -1011,7 +1011,7 @@ function settleLateRent(s0: GameState): GameState {
   return next;
 }
 
-function payRent(s: GameState): GameState {
+export function payRent(s: GameState): GameState {
   const rent = Math.max(0, s.listing.rent);
   const bank = s.bank || initialBankState();
   const vaultPaid = Math.min(Math.max(0, bank.rentVault), rent);
@@ -1057,7 +1057,8 @@ function demote(s: GameState): GameState {
   const furniture = autoPlace(s.furniture.filter((f) => furnitureById(f.id).mount !== 'finish').map((f) => ({ ...f, placed: true })), listing);
   const staff = s.staff.slice(0, t.staff);
   const left = s.staff.slice(t.staff);
-  let next: GameState = money({ ...s, tier, listing, furniture, staff, lateRent: null, movedDay: s.day, grace: listing.grace, stats: { ...s.stats, demotions: s.stats.demotions + 1 } }, (s.lateRent?.amount || 0) * 0.5, 'Half the rent debt waived');
+  const remainingRentDebt = Math.max(0, Math.ceil((s.lateRent?.amount || 0) * 0.5));
+  let next: GameState = { ...s, tier, listing, furniture, staff, lateRent: remainingRentDebt > 0 ? { amount: remainingRentDebt, due: s.day + Math.max(1, listing.grace) } : null, movedDay: s.day, grace: listing.grace, stats: { ...s.stats, demotions: s.stats.demotions + 1 } };
   next = fitDisplay(next);
   next = msg(next, 'Landlord', `Time is up. Pack your things. You have been moved down to a ${t.name} on ${listing.street}, ${listing.area}. I've kept the deposit and waived half the debt.`, 'danger');
   next = reactToMove(next, false);
