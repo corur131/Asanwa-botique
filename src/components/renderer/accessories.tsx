@@ -290,7 +290,7 @@ export const HandAccessories: React.FC<{ id: Id; spec: BodySpec; acc: Accessorie
   const held = ['clutch', 'beadedBag', 'miniBag', 'bucketBag', 'sculptedEveningClutch', 'artisanAsoOkeBag', 'atelierTopHandleBag', 'handwovenCeremonyBag', 'couturePearlEveningBag', 'heirloomLeatherWeekender'].includes(bag);
   return (
     <g>
-      {['watch', 'premiumAutomaticWatch', 'designerSteelChronograph', 'diamondDialWatch'].includes(acc.wrist) && (
+      {!!acc.wrist && ['watch', 'premiumAutomaticWatch', 'designerSteelChronograph', 'diamondDialWatch'].includes(acc.wrist) && (
         <g>
           <rect x={wx - 13} y={wy - 18} width="26" height="10" rx="3" fill={acc.wrist === 'designerSteelChronograph' ? '#9A9EA5' : '#C9A24A'} />
           <circle cx={wx - 2} cy={wy - 13} r={acc.wrist === 'diamondDialWatch' ? 8.5 : 7} fill="#F4ECD8" stroke={acc.wrist === 'designerSteelChronograph' ? '#555B65' : '#A9781E'} strokeWidth="2" />
