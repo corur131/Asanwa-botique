@@ -281,7 +281,9 @@ export function maximumLoan(s: GameState): number {
   const affordabilityLimit = Math.max(100_000, weeklyRevenue * 2 + Math.max(0, s.cash) * 0.25 + netWorth * 0.05);
   const scoreFactor = 0.35 + ((profile.score - 450) / 400) * 0.65;
   const scoreAdjustedTierLimit = maxByTier * clamp(scoreFactor, 0, 1);
-  return Math.round(Math.max(0, Math.min(scoreAdjustedTierLimit, affordabilityLimit) - activeDebt) / 10_000) * 10_000;
+  // Round down to the nearest ₦10,000. Rounding to nearest could authorize
+  // a loan larger than the affordability/tier limit by up to ₦5,000.
+  return Math.floor(Math.max(0, Math.min(scoreAdjustedTierLimit, affordabilityLimit) - activeDebt) / 10_000) * 10_000;
 }
 
 export function takeBusinessLoan(s0: GameState, requested: number, termWeeks: number): GameState {
@@ -401,7 +403,7 @@ export function processBankWeekly(s0: GameState): GameState {
   // The engine runs banking on day 7, 14, 21, etc. Keep the rule inside the
   // function too, so an early or accidental extra call cannot credit another week
   // of savings interest or attempt a scheduled payment ahead of its banking day.
-  if (s0.day % 7 !== 0) return s0;
+  if (s0.day % 7 !== 0 || s0.bank?.lastProcessedDay === s0.day) return s0;
   let s = s0;
   let bank = s.bank || initialBankState();
   const savingsInterest = roundMoney(bank.savings * bank.savingsRatePct / 100);
@@ -470,7 +472,9 @@ export function processBankWeekly(s0: GameState): GameState {
       }
     }
   }
-  s = { ...s, bank };
+  // Persist this banking date so a repeated call on the same day cannot credit
+  // savings interest or process scheduled instalments twice.
+  s = { ...s, bank: { ...(s.bank || bank), lastProcessedDay: s.day } };
   // Credit recovery is gradual: a cleared/default-free account can rebuild trust over time.
   const finalBank = s.bank || bank;
   const profile = finalBank.creditProfile || creditProfile({ ...s, bank: finalBank });
