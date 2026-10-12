@@ -702,6 +702,11 @@ export function nextMorning(s: GameState): GameState {
 }
 
 /** Add a message to a specific WhatsApp thread without invoking a model call. */
+function refreshEveningHistory(s: GameState): GameState {
+  if (s.phase !== 'evening' || !s.history.length || s.history[s.history.length - 1].day !== s.day) return s;
+  return { ...s, history: [...s.history.slice(0, -1), s.today] };
+}
+
 function collaborationChatMessage(s: GameState, chat: string, from: string, text: string, tone: Message['tone'] = 'info'): GameState {
   const id = (s.msgSeq || 0) + 1;
   const message: Message = {
@@ -774,9 +779,10 @@ export function confirmCollaboration(s0: GameState, messageId: number): GameStat
     },
     messages: s.messages.map((m) => m.id === messageId ? { ...m, collaborationOutcome: 'scheduled', collaborationScheduledDay: event.day } : m),
   };
-  return collaborationChatMessage(s, partner.owner, 'You',
+  s = collaborationChatMessage(s, partner.owner, 'You',
     'Deal confirmed: ' + eventName + ' on Day ' + event.day + '. Total setup budget ' + naira(totalCost) +
     '; my contribution is ' + naira(playerContribution) + ' and my agreed profit share is ' + playerProfitSharePct + '%. Let’s make it work.');
+  return refreshEveningHistory(s);
 }
 
 /** Decline an offer without spending money or changing the rival relationship score. */
