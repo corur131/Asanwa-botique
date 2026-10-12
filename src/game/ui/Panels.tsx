@@ -2,6 +2,7 @@ import React, { Suspense, lazy, useState } from 'react';
 import { MARKUP, STAFF, TIERS, naira } from '../economy';
 import { POWER, RICH_CUSTOMER_STAFF_LEVEL, contestFor, fuelOf, fuelPerHour, tankSize, Candidate, RaiseAnswer, candidates, canHire, daysToRent, displayCap, displayedCount, listingsNow, marketWage, restockAllCost, stats, waitingRoom } from '../engine';
 import { FURNITURE_GROUPS, FurnitureDef, FurnitureGroup, Listing, ceilingCapacity, ceilingUsed, finishes, furnitureById, furnitureForGroup, listingsFor, roomOf, wallCapacity, wallUsed } from '../shop';
+import { productKey } from '../market';
 
 const FurniturePreview = lazy(() => import('../scene/Previews').then((m) => ({ default: m.FurniturePreview })));
 const RoomPreview = lazy(() => import('../scene/Previews').then((m) => ({ default: m.RoomPreview })));
@@ -59,52 +60,72 @@ export const Messages: React.FC<{ s: GameState; n?: number }> = ({ s, n = 14 }) 
 export const RailPanel: React.FC<{ s: GameState; display: (uid: string, on: boolean) => void; restock: (uid: string, n: number) => void; restockAll: () => void; clear: (uid: string) => void }> = ({ s, display, restock, restockAll, clear }) => {
   const [tab, setTab] = useState<'display' | 'storage'>('display');
   const cap = displayCap(s);
-  const shown = s.stock.filter((d) => d.displayed);
-  const stored = s.stock.filter((d) => !d.displayed);
+  const allGroups = useMemo(() => {
+    const groups = new Map<string, typeof s.stock>();
+    for (const d of s.stock) groups.set(productKey(d), [...(groups.get(productKey(d)) || []), d]);
+    return [...groups.entries()].map(([key, variants]) => ({ key, variants, displayed: variants.some((d) => d.displayed) }));
+  }, [s.stock]);
+  const shownGroups = allGroups.filter((g) => g.displayed);
+  const storedGroups = allGroups.filter((g) => !g.displayed);
   const used = displayedCount(s);
   const restockCost = restockAllCost(s);
-  const list = tab === 'display' ? shown : stored;
+  const list = tab === 'display' ? shownGroups : storedGroups;
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between gap-2">
         <div className="text-sm text-slate-300">
-          <b className="text-white">{used}/{cap}</b> on display
+          <b className="text-white">{used}/{cap}</b> styles on display
           {used >= cap && <span className="text-slate-500"> · full: buy another rail or shelf for more space</span>}
         </div>
         <div className="flex gap-1.5">
-          <Btn size="sm" tone={tab === 'display' ? 'gold' : 'ghost'} onClick={() => setTab('display')}>Display ({shown.length})</Btn>
-          <Btn size="sm" tone={tab === 'storage' ? 'gold' : 'ghost'} onClick={() => setTab('storage')}>Storage ({stored.length})</Btn>
+          <Btn size="sm" tone={tab === 'display' ? 'gold' : 'ghost'} onClick={() => setTab('display')}>Display ({shownGroups.length})</Btn>
+          <Btn size="sm" tone={tab === 'storage' ? 'gold' : 'ghost'} onClick={() => setTab('storage')}>Storage ({storedGroups.length})</Btn>
         </div>
       </div>
-      <p className="text-xs text-slate-400">You can only style customers with what is on display.</p>
+      <p className="text-xs text-slate-400">One product style uses one display slot. Choose a displayed product’s colourway for a client; inventory remains tracked separately by colour.</p>
       {tab === 'display' && restockCost > 0 && (
         <div className="flex items-center justify-between gap-2 rounded-lg bg-white/5 p-2">
-          <span className="text-xs text-slate-300">Some designs are sold out or low.</span>
-          <Btn size="sm" tone="green" disabled={s.cash < restockCost} onClick={restockAll}>
-            Restock all to 2 · {naira(restockCost)}
-          </Btn>
+          <span className="text-xs text-slate-300">Some colourways are sold out or low.</span>
+          <Btn size="sm" tone="green" disabled={s.cash < restockCost} onClick={restockAll}>Restock all to 2 · {naira(restockCost)}</Btn>
         </div>
       )}
       {list.length === 0 ? (
         <p className="text-sm text-slate-500">{tab === 'display' ? 'Nothing on display. Go to the market.' : 'Storage is empty.'}</p>
       ) : (
-        <div className="space-y-1.5">
-          {list.map((d) => (
-            <div key={d.uid} className={`flex flex-wrap items-center gap-2 p-2 rounded-lg border ${d.pieces === 0 ? 'border-rose-500/30 bg-rose-500/5' : 'border-white/10 bg-white/5'}`}>
-              <Swatch d={d} />
-              <div className="min-w-0 flex-1 basis-[55%]">
-                <div className="text-sm font-semibold text-white truncate">{d.label}</div>
-                <div className="text-[11px] text-slate-400">
-                  {d.fabric !== 'plain' ? `${d.fabric} · ` : ''}cost {naira(d.cost)} · sells ~{naira(d.cost * MARKUP)} · {d.pieces === 0 ? <span className="text-rose-300">sold out</span> : `${d.pieces} left`}
+        <div className="space-y-2">
+          {list.map(({ key, variants, displayed }) => {
+            const d = variants[0];
+            const pieces = variants.reduce((sum, v) => sum + v.pieces, 0);
+            return (
+              <div key={key} className="rounded-xl border border-white/10 bg-white/5 p-2.5">
+                <div className="flex items-start gap-2">
+                  <Swatch d={d} />
+                  <div className="min-w-0 flex-1">
+                    <div className="text-sm font-semibold text-white leading-tight">{d.label}</div>
+                    <div className="text-[11px] text-slate-400">{d.fabric !== 'plain' ? `${d.fabric} · ` : ''}{naira(d.cost)} each · {variants.length} colourway{variants.length === 1 ? '' : 's'} · {pieces} total pieces</div>
+                  </div>
+                  <div className="flex gap-1">
+                    {displayed
+                      ? <Btn size="sm" onClick={() => display(d.uid, false)}>Store style</Btn>
+                      : <Btn size="sm" tone="gold" disabled={used >= cap} onClick={() => display(d.uid, true)}>Display style</Btn>}
+                  </div>
+                </div>
+                <div className="mt-2 space-y-1.5">
+                  {variants.map((v) => (
+                    <div key={v.uid} className="flex flex-wrap items-center gap-2 rounded-lg bg-black/15 px-2 py-1.5">
+                      <span title={v.color} className="inline-block w-5 h-5 rounded-full border border-white/25 shrink-0" style={{ background: v.color }} />
+                      <div className="min-w-0 flex-1 text-[11px] text-slate-300">
+                        <span className="font-semibold text-white">{v.color}</span>
+                        <span> · {v.pieces === 0 ? 'sold out' : `${v.pieces} in stock`}</span>
+                      </div>
+                      <Btn size="sm" disabled={s.cash < v.cost} onClick={() => restock(v.uid, 1)}>+1 · {naira(v.cost)}</Btn>
+                      <Btn size="sm" onClick={() => clear(v.uid)} title="Sell this colourway at half price">Sell colour</Btn>
+                    </div>
+                  ))}
                 </div>
               </div>
-              <div className="flex gap-1">
-                <Btn size="sm" disabled={s.cash < d.cost} onClick={() => restock(d.uid, 1)}>+1 · {naira(d.cost)}</Btn>
-                {d.displayed ? <Btn size="sm" onClick={() => display(d.uid, false)}>Store</Btn> : <Btn size="sm" tone="gold" disabled={used >= cap} onClick={() => display(d.uid, true)}>Display</Btn>}
-                <Btn size="sm" onClick={() => clear(d.uid)} title="Sell back at half price">Sell off</Btn>
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>
