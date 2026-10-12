@@ -106,14 +106,17 @@ function ledger(s: GameState, amount: number, label: string): GameState {
   };
 }
 
-export function transferBank(s0: GameState, pocket: BankPocket, amount: number): GameState {
+export function transferBank(s0: GameState, pocket: BankPocket, amount: number, source: 'savings' | 'rentVault' = 'rentVault'): GameState {
   const bank = s0.bank || initialBankState();
   const value = roundMoney(amount);
   if (!value) return s0;
   if (pocket === 'current') {
-    const available = pocket === 'current' ? (s0.bank?.rentVault || 0) : 0;
+    const available = source === 'savings' ? bank.savings : bank.rentVault;
     if (available <= 0 || value > available) return s0;
-    return ledger({ ...s0, bank: { ...bank, rentVault: bank.rentVault - value } }, value, 'Transfer from Rent Vault to current account');
+    const nextBank = source === 'savings'
+      ? { ...bank, savings: bank.savings - value }
+      : { ...bank, rentVault: bank.rentVault - value };
+    return ledger({ ...s0, bank: nextBank }, value, 'Transfer from ' + (source === 'savings' ? 'savings' : 'Rent Vault') + ' to current account');
   }
   if (s0.cash < value) return s0;
   const updatedBank = pocket === 'savings'
