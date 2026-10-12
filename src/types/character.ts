@@ -70,7 +70,7 @@ export type FacialHairPreset =
   | 'chinStrap'
   | 'moustache';
 
-export type EarringStyle = 'none' | 'goldStuds' | 'goldHoops' | 'bigHoops' | 'goldDrops' | 'pearls' | 'chandelier' | 'coralDrops' | 'huggies';
+export type EarringStyle = 'none' | 'goldStuds' | 'goldHoops' | 'bigHoops' | 'goldDrops' | 'pearls' | 'chandelier' | 'coralDrops' | 'huggies' | 'pearlCascadeDrops' | 'goldFiligreeDrops' | 'diamondHaloStuds' | 'crystalBridalChandeliers' | 'heirloomCoralDrops' | 'diamondStatementHoops' | 'royalPearlChandeliers';
 
 export type CharacterState = 'styled' | 'plain';
 
