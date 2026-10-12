@@ -436,6 +436,8 @@ export interface BusinessLoan {
   termWeeks: number;
   nextPaymentDay: number;
   missedPayments: number;
+  /** Cumulative late fees, capped so missed payments cannot create runaway debt. */
+  lateFees?: number;
 }
 
 export interface FixedDeposit {
@@ -465,6 +467,15 @@ export interface BusinessExpansionState {
   designerCollections: number;
 }
 
+export interface CreditProfile {
+  score: number;
+  onTimePayments: number;
+  latePayments: number;
+  defaults: number;
+  loansTaken: number;
+  lastApplicationDay: number;
+}
+
 export interface BankState {
   savings: number;
   rentVault: number;
@@ -474,6 +485,8 @@ export interface BankState {
   rentVaultRatePct: number;
   fixedDeposits: FixedDeposit[];
   loans: BusinessLoan[];
+  /** Persisted in-game credit record; optional for older save compatibility. */
+  creditProfile?: CreditProfile;
   savingsGoalName: string;
   savingsGoalAmount: number;
 }
