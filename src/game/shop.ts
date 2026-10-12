@@ -118,6 +118,16 @@ const SIZES: [number, number][][] = [
   [[14, 9], [15, 10], [16, 10], [17, 11]],
 ];
 
+// Signature is a different class of property, not a slightly larger standard
+// room. Every tier gains a substantial, purpose-designed luxury floor plate.
+const SIGNATURE_SIZES: [number, number][] = [
+  [10, 7],
+  [15, 10],
+  [20, 13],
+  [25, 17],
+  [30, 20],
+];
+
 function shade(hex: string, toward: string, k: number) {
   const a = parseInt(hex.slice(1), 16);
   const b = parseInt(toward.slice(1), 16);
@@ -130,13 +140,32 @@ function shade(hex: string, toward: string, k: number) {
 export function roomOf(l: Pick<Listing, 'tier' | 'stars'> & Partial<Pick<Listing, 'signature'>>): RoomStyle {
   const base = ROOMS[l.tier];
   const sizes = SIZES[l.tier];
-  const [w, d] = l.signature ? ([[8, 5], [13, 8], [16, 10], [19, 13], [23, 16]][l.tier] as [number, number]) : sizes[Math.min(sizes.length, Math.max(1, l.stars)) - 1];
+  const [w, d] = l.signature ? SIGNATURE_SIZES[l.tier] : sizes[Math.min(sizes.length, Math.max(1, l.stars)) - 1];
   const finish = l.signature ? 4 : l.tier === 0 ? 1 : l.stars;
   // tired places look dull and grubby; the best ones are fresh and bright
   const dull = [0, 0.32, 0.16, 0, 0][finish];
   const bright = finish === 4 ? 0.12 : 0;
   const tone = (c: string) => (bright ? shade(c, '#FFFFFF', base.kind === 'flagship' ? 0.02 : bright) : shade(c, '#6E6A62', dull));
-  return { ...base, w, d, finish, wall: l.signature ? '#F8F3E8' : tone(base.wall), wallLow: l.signature ? '#E5D6BD' : tone(base.wallLow), floor: l.signature ? '#F3E8D2' : tone(base.floor), floor2: l.signature ? '#D8C39C' : tone(base.floor2), trim: l.signature ? '#D4AF37' : base.trim, height: base.height + (finish - 2) * 0.1 + (l.signature ? 0.45 : 0), signature: !!l.signature };
+  const signaturePalette = [
+    { wall: '#FFF7EE', wallLow: '#D9B3A4', floor: '#EADFCC', floor2: '#F8F3E9', trim: '#C99A58' },
+    { wall: '#F7F0E6', wallLow: '#A98A72', floor: '#DED0BF', floor2: '#F4E8D6', trim: '#D4AF37' },
+    { wall: '#F9F5EF', wallLow: '#B88D92', floor: '#E8E0D5', floor2: '#FAF8F5', trim: '#D7B66A' },
+    { wall: '#EFE8E0', wallLow: '#516456', floor: '#D8CCB8', floor2: '#F1E8DA', trim: '#D5B46A' },
+    { wall: '#241824', wallLow: '#111017', floor: '#E8E3DD', floor2: '#F7F3EB', trim: '#E9C96B' },
+  ][l.tier];
+  return {
+    ...base,
+    w,
+    d,
+    finish,
+    wall: l.signature ? signaturePalette.wall : tone(base.wall),
+    wallLow: l.signature ? signaturePalette.wallLow : tone(base.wallLow),
+    floor: l.signature ? signaturePalette.floor : tone(base.floor),
+    floor2: l.signature ? signaturePalette.floor2 : tone(base.floor2),
+    trim: l.signature ? signaturePalette.trim : base.trim,
+    height: base.height + (finish - 2) * 0.1 + (l.signature ? 0.9 + l.tier * 0.18 : 0),
+    signature: !!l.signature,
+  };
 }
 
 export type RoomKey = number | (Pick<Listing, 'tier' | 'stars'> & Partial<Pick<Listing, 'signature'>>);
@@ -302,7 +331,6 @@ export const FURNITURE: FurnitureDef[] = [
   { id: 'scarfStand', name: 'Scarf and gele stand', price: 19_000, w: 1, d: 1, mount: 'floor', group: 'Display', slots: 12, prestige: 1, note: 'Displays gele, scarves and headwear.' },
   { id: 'shoeBench', name: 'Shoe try-on bench', price: 32_000, w: 2, d: 1, mount: 'floor', group: 'Seating', seats: 2, patience: 0.05, prestige: 1, note: 'Two extra seats for customers trying shoes.' },
   { id: 'premiumFitting', name: 'Private luxury fitting room', price: 260_000, w: 2, d: 2, mount: 'floor', group: 'Decor', richBonus: 3, prestige: 4, minTier: 2, note: 'Private fitting space gives rich clients +3 to their look score.' },
-  { id: 'makeupChair', name: 'Professional makeup chair', price: 92_000, w: 1, d: 1, mount: 'floor', group: 'Hair & makeup', makeupBonus: 2, prestige: 2, note: 'Adds +2 to made-up looks.' },
   { id: 'hairMirror', name: 'Salon mirror and station', price: 82_000, w: 1, d: 1, mount: 'floor', group: 'Hair & makeup', mirror: 2, hairBonus: 1, wigs: true, prestige: 2, note: 'A mirror and hair station for wig installs and +1 hair quality.' },
   { id: 'salonWashBasin', name: 'Salon wash basin', price: 115_000, w: 1, d: 1, mount: 'floor', group: 'Hair & makeup', hairBonus: 2, wigs: true, prestige: 2, minTier: 1, note: 'A proper wash station improves hair services by +2.' },
   { id: 'nailPolishRack', name: 'Nail polish rack', price: 14_000, w: 1, d: 1, mount: 'floor', group: 'Hair & makeup', nailBonus: 1, prestige: 1, note: 'Adds +1 to requested nail styling when you choose a nail colour.' },
@@ -330,6 +358,16 @@ export const FURNITURE: FurnitureDef[] = [
   { id: 'herringbone', name: 'Herringbone wood', price: 180_000, w: 1, d: 1, mount: 'finish', group: 'Paint & floor', floorTiles: ['#8A5E3A', '#B4865A'], prestige: 3, minTier: 2, note: 'Designer wood floor.' },
   { id: 'marbleFloor', name: 'Polished marble', price: 300_000, w: 1, d: 1, mount: 'finish', group: 'Paint & floor', floorTiles: ['#F4F0EA', '#E2DAD0'], prestige: 3, minTier: 3, note: 'Shiny white marble.' },
 ];
+/** Catalogue items for one category. Deduplicate IDs to keep one definition and one buy action per item. */
+export const furnitureForGroup = (group: FurnitureGroup): FurnitureDef[] => {
+  const seen = new Set<string>();
+  return FURNITURE.filter((f) => {
+    if (f.group !== group || f.starter || seen.has(f.id)) return false;
+    seen.add(f.id);
+    return true;
+  });
+};
+
 export const furnitureById = (id: string) => FURNITURE.find((f) => f.id === id)!;
 
 export interface Placed {

@@ -11,7 +11,7 @@ import { YardModel } from './YardModels';
 
 const SAMPLE = ['#C2262E', '#2846A8', '#E3B23C', '#2F5D3A', '#7A3A8C', '#F6F1E8', '#E86A2E', '#1E1E24', '#E07AA0', '#3C5A8A', '#C9A163', '#6B8E23', '#8E1F3A', '#1F6FB2', '#5A3A28', '#F2C8CC'];
 
-const STORE = 'asanwa-thumbs-v4';
+const STORE = 'asanwa-thumbs-v5';
 const cache = new Map<string, string>(
   (() => {
     try {

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { TIERS, naira } from '../economy';
 import * as E from '../engine';
-import { FURNITURE, FURNITURE_GROUPS, FurnitureGroup, furnitureById, yardCapacity, yardUsed } from '../shop';
+import { FURNITURE, FURNITURE_GROUPS, FurnitureGroup, furnitureById, furnitureForGroup, yardCapacity, yardUsed } from '../shop';
 import { GameState } from '../types';
 import { useThumb } from '../scene/Thumbs';
 import type { View } from '../scene/ShopScene';
@@ -18,7 +18,7 @@ export const Catalogue: React.FC<{ s: GameState; onBuy: (id: string, yardSide?: 
   const [tab, setTab] = useState<FurnitureGroup | 'Stored'>('Display');
   const [yardSide, setYardSide] = useState<'left' | 'right'>('right');
   const stored = s.furniture.filter((p) => !p.placed && furnitureById(p.id).mount !== 'finish');
-  const items = tab === 'Stored' ? [] : FURNITURE.filter((f) => f.group === tab && !f.starter);
+  const items = tab === 'Stored' ? [] : furnitureForGroup(tab);
   const fin = s.furniture.filter((p) => furnitureById(p.id).mount === 'finish').map((p) => p.id);
   const yardFull = yardUsed(s.furniture) >= yardCapacity(s.listing);
   return (

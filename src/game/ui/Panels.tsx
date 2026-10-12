@@ -1,7 +1,7 @@
 import React, { Suspense, lazy, useState } from 'react';
 import { MARKUP, STAFF, TIERS, naira } from '../economy';
 import { POWER, RICH_CUSTOMER_STAFF_LEVEL, contestFor, fuelOf, fuelPerHour, tankSize, Candidate, RaiseAnswer, candidates, canHire, daysToRent, displayCap, displayedCount, listingsNow, marketWage, restockAllCost, stats, waitingRoom } from '../engine';
-import { FURNITURE, FURNITURE_GROUPS, FurnitureDef, FurnitureGroup, Listing, ceilingCapacity, ceilingUsed, finishes, furnitureById, listingsFor, roomOf, wallCapacity, wallUsed } from '../shop';
+import { FURNITURE_GROUPS, FurnitureDef, FurnitureGroup, Listing, ceilingCapacity, ceilingUsed, finishes, furnitureById, furnitureForGroup, listingsFor, roomOf, wallCapacity, wallUsed } from '../shop';
 
 const FurniturePreview = lazy(() => import('../scene/Previews').then((m) => ({ default: m.FurniturePreview })));
 const RoomPreview = lazy(() => import('../scene/Previews').then((m) => ({ default: m.RoomPreview })));
@@ -209,7 +209,7 @@ export const FurniturePanel: React.FC<{ s: GameState; a: FurnitureActions; selec
             Tap a piece to see it. Free wall: {wallLeft} m · ceiling: {ceilLeft} spot{ceilLeft === 1 ? '' : 's'}.
             {group === 'Paint & floor' && ' New paint covers the old paint; new flooring replaces the old floor. They stay behind if you move shop.'}
           </p>
-          {FURNITURE.filter((f) => f.group === group && !f.starter).map((f) => {
+          {furnitureForGroup(group).map((f) => {
             const locked = (f.minTier || 0) > s.tier;
             const open = look === f.id;
             const current = f === fin.paint || f === fin.floor;
@@ -261,7 +261,12 @@ export const MovePanel: React.FC<{ s: GameState; onMove: (l: Listing) => void }>
   const [pick, setPick] = useState<Listing | null>(null);
   const next = TIERS[s.tier + 1];
   const weekNo = Math.floor((s.day - 1) / 7);
-  const list = [...(next ? listingsNow(s) : []), ...(!s.listing.signature ? listingsFor(s.tier, weekNo).filter((l) => l.signature) : [])];
+  const sameTierSignatures = !s.listing.signature
+    ? listingsFor(s.tier, weekNo).filter((l) => l.signature && l.tier === s.tier)
+    : [];
+  const nextTierListings = next ? listingsNow(s) : [];
+  // Put the same-size alternative first, then the genuinely larger next-tier choices.
+  const list = [...sameTierSignatures, ...nextTierListings];
   return (
     <div className="space-y-3">
       <div className="text-sm text-slate-300">
@@ -270,18 +275,23 @@ export const MovePanel: React.FC<{ s: GameState; onMove: (l: Listing) => void }>
       {next ? <div className="rounded-lg border border-white/10 bg-white/5 p-3 text-xs text-slate-300">
         <b className="text-white">{next.name}</b>: bigger, better listings are roomier and hold more{next.staff ? `, ${next.staff} staff` : ''}{next.luxury ? ', luxury suppliers' : ''}. Your furniture comes with you; buy more rails to fill the bigger room. Listings change every week.
       </div> : <div className="rounded-lg border border-white/10 bg-white/5 p-3 text-xs text-slate-300">You have reached the highest standard level in Lagos. You can still upgrade to the Signature flagship if you have not already.</div>}
-      <div className="rounded-lg border border-amber-500/25 bg-amber-500/5 p-3 text-xs text-amber-100">Signature properties are substantially larger and more luxurious. They draw wealthy clients, bring rare celebrity visits with million-naira purchases and tips, and can make your shop trend while rivals get jealous. Weekly rent and move-in costs are much higher.</div>
-      {list.map((l0) => {
+      <div className="rounded-lg border border-amber-500/25 bg-amber-500/5 p-3 text-xs text-amber-100">Signature properties are purpose-built luxury spaces. Scheduled celebrity visits rise with the Signature tier: 2 per fortnight at level 0, increasing to 6 at the level-4 Flagship. Weekly rent and move-in costs are much higher.</div>
+      <p className="text-xs text-slate-400">A same-tier Signature is an alternative to your current standard shop at the same size. A next-tier Signature is a larger shop upgrade; those are separate levels, not duplicate properties at one level.</p>
+      {list.map((l0, index) => {
+        const sameTier = l0.signature && l0.tier === s.tier;
         const fight = contestFor(s, l0);
         const l = fight ? { ...l0, moveIn: l0.moveIn + fight.extra } : l0;
         const after = s.cash - l.moveIn;
         const risky = after < l.rent * 2;
         return (
-          <div key={l.id} className="rounded-xl border border-white/10 bg-[#15171f] p-3">
+          <React.Fragment key={l.id}>
+          {index === 0 && sameTierSignatures.length > 0 && <div className="pt-1 text-[10px] font-bold uppercase tracking-[0.16em] text-amber-200">Same shop size · Signature alternative</div>}
+          {index === sameTierSignatures.length && nextTierListings.length > 0 && <div className="pt-3 text-[10px] font-bold uppercase tracking-[0.16em] text-amber-200">Next shop level · larger floor plan</div>}
+          <div className="rounded-xl border border-white/10 bg-[#15171f] p-3">
             <div className="flex items-start justify-between gap-2">
               <div>
                 <div className="text-sm font-semibold text-white">{l.street} {l.signature && <Pill tone="gold">✦ SIGNATURE</Pill>}</div>
-                <div className="text-[10px] font-semibold uppercase tracking-wider text-amber-300">{l.signature ? `${l.tier === s.tier ? 'Current level' : 'Next level'} · ${TIERS[l.tier].name} Signature` : `${TIERS[l.tier].name} · Standard listing`}</div>
+                <div className="text-[10px] font-semibold uppercase tracking-wider text-amber-300">{sameTier ? `SAME-TIER ALTERNATIVE · ${TIERS[l.tier].name} Signature` : l.signature ? `NEXT-TIER UPGRADE · ${TIERS[l.tier].name} Signature` : `${TIERS[l.tier].name} · Standard listing`}</div>
                 <div className="text-[11px] text-slate-400">{l.area} · <Stars n={l.stars} /> · {roomOf(l).w}×{roomOf(l).d} m floor</div>
               </div>
               <Btn size="sm" tone="gold" onClick={() => setPick(l0)}>View</Btn>
@@ -294,6 +304,7 @@ export const MovePanel: React.FC<{ s: GameState; onMove: (l: Listing) => void }>
             {fight && <div className="text-[11px] text-amber-300 mt-1">⚔ {fight.rival.owner} ({fight.rival.shop}) wants this shop too. To get it you must outbid {fight.rival.male ? 'him' : 'her'} by {naira(fight.extra)} (included above). {fight.rival.male ? "He" : 'She'} won't be happy.</div>}
             {s.cash >= l.moveIn && risky && <div className="text-[11px] text-rose-300 mt-1">After moving you'd have {naira(after)}: less than two weeks of rent.</div>}
           </div>
+          </React.Fragment>
         );
       })}
       {pick && (
@@ -311,7 +322,7 @@ export const MovePanel: React.FC<{ s: GameState; onMove: (l: Listing) => void }>
             <li>Rent: <b>{naira(pick.rent)}</b> every 7 days</li>
             <li>Landlord: <b>{pick.landlord}</b>, {graceText(pick.grace)}</li>
             <li>Prestige from location: <b>{pick.stars * 2}</b> (more customers, more rich ones)</li>
-            {pick.signature && <li className="text-amber-200">Signature benefits: extra customer traffic, rich-only walk-ins, much larger tips, celebrity visits with multi-million-naira spending, trending posts and large follower gains. Celebrity frequency is rare by design.</li>}
+            {pick.signature && <li className="text-amber-200">Signature benefits: extra customer traffic, rich-only walk-ins, much larger tips, celebrity visits with multi-million-naira spending, trending posts and large follower gains. Scheduled celebrity visits become more frequent at each Signature tier.</li>}
           </ul>
           {s.cash - pick.moveIn < pick.rent * 2 && <p className="text-sm text-rose-300 mb-3">Careful: the first two weeks in a new shop are quiet, and you'd have less than two weeks of rent saved.</p>}
           <div className="flex gap-2 justify-end">
