@@ -7,12 +7,13 @@ import { RoomStyle, finishes, room, cellsBlocked, footprint, furnitureById, wall
 import { solarCap, source } from '../power';
 import { stats } from '../engine';
 import { ApplianceOn, CeilingPiece, FloorPiece, WallPiece, B, MirrorLive } from './Furniture3D';
+import { YardModel } from './YardModels';
 import { Cell, Figure, FigureLook, Walker, lookToFigure } from './People';
 
 export interface SceneProps {
   s: GameState;
   /** A floor piece in Divine's hands in build mode: where it would go. */
-  placing: { uid: string; rot: Rot; x: number; z: number } | null;
+  placing: { uid: string; rot: Rot; x: number; z: number; id?: string; yardSide?: 'left' | 'right' } | null;
   /** Build mode: grid on, taps select pieces to move. */
   build?: boolean;
   view?: View;
@@ -141,13 +142,28 @@ export function Room({ r, tier, painted }: { r: RoomStyle; tier: number; painted
         out.push(
           <mesh key={`${x}-${z}`} position={[x + 0.5, -0.025, z + 0.5]} receiveShadow>
             <boxGeometry args={[0.98, 0.05, 0.98]} />
-            <meshStandardMaterial color={(x + z) % 2 ? r.floor : r.floor2} roughness={r.kind === 'marble' || r.kind === 'flagship' ? 0.25 : 0.9} metalness={r.kind === 'flagship' ? 0.1 : 0} />
+            <meshStandardMaterial
+              color={r.signature
+                ? (Math.floor(x / 2) + Math.floor(z / 2)) % 2 ? r.floor : r.floor2
+                : (x + z) % 2 ? r.floor : r.floor2}
+              roughness={r.signature ? 0.18 : r.kind === 'marble' || r.kind === 'flagship' ? 0.25 : 0.9}
+              metalness={r.signature ? 0.08 : r.kind === 'flagship' ? 0.1 : 0}
+            />
           </mesh>,
         );
     return out;
   }, [r]);
   const door = Math.floor(r.w / 2);
   const ridges = r.kind === 'container' && !r.signature;
+  const signatureGold = tier === 4 ? '#F0CD78' : tier === 3 ? '#D6B86C' : '#D4AF37';
+  const signatureAccent = tier === 4 ? '#281B2D' : tier === 3 ? '#29483B' : '#61263A';
+  const signatureInset = tier === 4 ? '#E9E1D6' : '#F4E9D6';
+  const carpetWidth = Math.min(3.2, Math.max(2.25, r.w * 0.095));
+  const portalCenter = door + 0.5;
+  const portalLeft = portalCenter - carpetWidth / 2 - 0.18;
+  const portalRight = portalCenter + carpetWidth / 2 + 0.18;
+  const featureWidth = Math.max(4.6, r.w * 0.58);
+  const featureHeight = Math.min(2.65, H * 0.62);
   return (
     <group>
       {/* street around the shop */}
@@ -175,17 +191,85 @@ export function Room({ r, tier, painted }: { r: RoomStyle; tier: number; painted
       <B p={[0.01, H - 0.05, r.d / 2]} s={[0.03, 0.1, r.d]} c={r.trim} m={r.kind === 'marble' || r.kind === 'flagship' ? 0.8 : 0} />
       {r.signature && (
         <>
-          {/* Signature entrance portal, carpeted central aisle, and designer feature wall. */}
-          <B p={[door - 0.1, H / 2, r.d + 0.1]} s={[0.08, H, 0.12]} c="#D4AF37" m={0.8} e="#D4AF37" ei={0.12} />
-          <B p={[door + 1.1, H / 2, r.d + 0.1]} s={[0.08, H, 0.12]} c="#D4AF37" m={0.8} e="#D4AF37" ei={0.12} />
-          <B p={[door + 0.5, H - 0.04, r.d + 0.1]} s={[1.28, 0.09, 0.13]} c="#D4AF37" m={0.8} e="#D4AF37" ei={0.2} />
-          <B p={[door + 0.5, 0.012, r.d / 2 + 0.2]} s={[0.66, 0.014, Math.max(1, r.d - 1)]} c="#6B1424" r={0.45} />
-          <B p={[r.w * 0.25, 0.03, r.d / 2]} s={[0.035, 0.02, r.d - 0.15]} c="#D4AF37" m={0.7} e="#D4AF37" ei={0.08} />
-          <B p={[r.w * 0.75, 0.03, r.d / 2]} s={[0.035, 0.02, r.d - 0.15]} c="#D4AF37" m={0.7} e="#D4AF37" ei={0.08} />
-          <B p={[r.w / 2, H * 0.7, 0.016]} s={[r.w * 0.44, 0.04, 0.025]} c="#D4AF37" m={0.8} e="#D4AF37" ei={0.18} />
-          {Array.from({ length: Math.max(2, tier + 2) }, (_, i) => {
-            const n = Math.max(2, tier + 2);
-            return <B key={`signature-light-${i}`} p={[r.w / 2, H - 0.09, 1 + (i * Math.max(0, r.d - 2)) / Math.max(1, n - 1)]} s={[0.42, 0.035, 0.42]} c="#D4AF37" m={0.7} e="#FFE7A0" ei={0.35} />;
+          {/* Grand entrance portal: the Signature shop reads as a destination from the doorway. */}
+          <B p={[portalLeft, H / 2, r.d + 0.1]} s={[0.26, H + 0.08, 0.24]} c={signatureGold} m={0.82} e={signatureGold} ei={0.16} />
+          <B p={[portalRight, H / 2, r.d + 0.1]} s={[0.26, H + 0.08, 0.24]} c={signatureGold} m={0.82} e={signatureGold} ei={0.16} />
+          <B p={[portalCenter, H - 0.08, r.d + 0.1]} s={[portalRight - portalLeft + 0.3, 0.24, 0.25]} c={signatureGold} m={0.82} e={signatureGold} ei={0.18} />
+          <B p={[portalCenter, 0.035, r.d + 0.18]} s={[carpetWidth + 0.48, 0.07, 0.55]} c={signatureGold} m={0.72} e={signatureGold} ei={0.12} />
+          <B p={[portalCenter, 0.075, r.d + 0.18]} s={[carpetWidth + 0.26, 0.025, 0.39]} c={signatureAccent} />
+
+          {/* A wide runway carpet with twin brass runners and stone inlay around the whole room. */}
+          <B p={[portalCenter, 0.008, r.d / 2 + 0.28]} s={[carpetWidth, 0.016, r.d + 0.82]} c={tier === 4 ? '#4B1425' : '#671A31'} r={0.92} />
+          <B p={[portalCenter - carpetWidth / 2 + 0.08, 0.022, r.d / 2 + 0.28]} s={[0.045, 0.018, r.d + 0.72]} c={signatureGold} m={0.74} e={signatureGold} ei={0.08} />
+          <B p={[portalCenter + carpetWidth / 2 - 0.08, 0.022, r.d / 2 + 0.28]} s={[0.045, 0.018, r.d + 0.72]} c={signatureGold} m={0.74} e={signatureGold} ei={0.08} />
+          <B p={[r.w / 2, 0.016, 0.3]} s={[r.w - 0.55, 0.018, 0.045]} c={signatureGold} m={0.72} e={signatureGold} ei={0.08} />
+          <B p={[r.w / 2, 0.016, r.d - 0.3]} s={[r.w - 0.55, 0.018, 0.045]} c={signatureGold} m={0.72} e={signatureGold} ei={0.08} />
+          <B p={[0.31, 0.015, r.d / 2]} s={[0.045, 0.018, r.d - 0.55]} c={signatureGold} m={0.72} />
+          <B p={[r.w - 0.31, 0.015, r.d / 2]} s={[0.045, 0.018, r.d - 0.55]} c={signatureGold} m={0.72} />
+
+          {/* Oversized back-wall feature gallery: layered panel, brass frame, and house emblem. */}
+          <B p={[r.w / 2, H * 0.57, 0.055]} s={[featureWidth, featureHeight, 0.08]} c={signatureAccent} m={0.12} r={0.55} />
+          <B p={[r.w / 2, H * 0.57, 0.104]} s={[featureWidth - 0.25, featureHeight - 0.24, 0.025]} c={signatureGold} m={0.72} r={0.28} />
+          <B p={[r.w / 2, H * 0.57, 0.124]} s={[featureWidth - 0.43, featureHeight - 0.42, 0.022]} c={signatureInset} m={0.05} r={0.45} />
+          <B p={[r.w / 2, H * 0.75, 0.145]} s={[featureWidth - 0.85, 0.045, 0.022]} c={signatureGold} m={0.78} e={signatureGold} ei={0.12} />
+          <B p={[r.w / 2, H * 0.39, 0.145]} s={[featureWidth - 0.85, 0.045, 0.022]} c={signatureGold} m={0.78} e={signatureGold} ei={0.12} />
+          <mesh position={[r.w / 2, H * 0.57, 0.17]} rotation={[0, 0, Math.PI / 4]} castShadow>
+            <boxGeometry args={[0.72, 0.72, 0.06]} />
+            <meshStandardMaterial color={signatureGold} metalness={0.78} roughness={0.25} emissive={signatureGold} emissiveIntensity={0.12} />
+          </mesh>
+          <mesh position={[r.w / 2, H * 0.57, 0.215]} rotation={[0, 0, Math.PI / 4]} castShadow>
+            <boxGeometry args={[0.43, 0.43, 0.06]} />
+            <meshStandardMaterial color={signatureAccent} metalness={0.25} roughness={0.3} />
+          </mesh>
+
+          {/* Full-height fluted wall treatment on the long side wall. */}
+          {Array.from({ length: Math.max(4, Math.floor(r.d / 1.7)) }, (_, i) => {
+            const count = Math.max(4, Math.floor(r.d / 1.7));
+            const z = 0.65 + (i * Math.max(0, r.d - 1.3)) / Math.max(1, count - 1);
+            return (
+              <React.Fragment key={'signature-flute-' + i}>
+                <B p={[0.075, H * 0.5, z]} s={[0.075, H * 0.78, 0.07]} c={signatureGold} m={0.75} r={0.28} />
+                <B p={[0.12, H * 0.5, z + 0.15]} s={[0.035, H * 0.66, 0.2]} c={tier === 4 ? '#47334B' : '#C9A99A'} r={0.62} />
+              </React.Fragment>
+            );
+          })}
+
+          {/* A floor medallion and ceiling-hung ring chandeliers establish a grand hall scale. */}
+          <mesh position={[r.w * 0.77, 0.022, r.d * 0.55]} rotation={[-Math.PI / 2, 0, 0]}>
+            <torusGeometry args={[Math.min(1.05, r.d * 0.14), 0.035, 8, 40]} />
+            <meshStandardMaterial color={signatureGold} metalness={0.8} roughness={0.22} emissive={signatureGold} emissiveIntensity={0.08} />
+          </mesh>
+          <mesh position={[r.w * 0.77, 0.024, r.d * 0.55]} rotation={[-Math.PI / 2, 0, 0]}>
+            <torusGeometry args={[Math.min(0.72, r.d * 0.095), 0.018, 8, 40]} />
+            <meshStandardMaterial color={signatureGold} metalness={0.8} roughness={0.22} />
+          </mesh>
+          {Array.from({ length: tier >= 3 ? 4 : 2 }, (_, i) => {
+            const x = r.w * (tier >= 3 ? (i % 2 === 0 ? 0.3 : 0.7) : (i === 0 ? 0.38 : 0.62));
+            const z = r.d * (tier >= 3 ? (i < 2 ? 0.34 : 0.68) : 0.52);
+            const radius = tier >= 3 ? 0.72 : 0.56;
+            return (
+              <group key={'signature-chandelier-' + i} position={[x, H - 0.26, z]}>
+                <B p={[0, 0.02, 0]} s={[0.08, 0.4, 0.08]} c={signatureGold} m={0.8} />
+                <mesh position={[0, -0.24, 0]} rotation={[Math.PI / 2, 0, 0]}>
+                  <torusGeometry args={[radius, 0.045, 8, 32]} />
+                  <meshStandardMaterial color={signatureGold} metalness={0.82} roughness={0.2} emissive={signatureGold} emissiveIntensity={0.16} />
+                </mesh>
+                <mesh position={[0, -0.33, 0]} rotation={[Math.PI / 2, 0, 0]}>
+                  <torusGeometry args={[radius * 0.73, 0.025, 8, 32]} />
+                  <meshStandardMaterial color="#FFF2CC" metalness={0.55} roughness={0.2} emissive="#FFE9AB" emissiveIntensity={0.2} />
+                </mesh>
+                <mesh position={[0, -0.39, 0]}>
+                  <sphereGeometry args={[0.14, 14, 10]} />
+                  <meshStandardMaterial color="#FFF4CF" emissive="#FFD778" emissiveIntensity={0.62} roughness={0.22} />
+                </mesh>
+                {[-1, 1].map((side) => (
+                  <mesh key={side} position={[side * radius * 0.82, -0.31, 0]}>
+                    <sphereGeometry args={[0.075, 10, 8]} />
+                    <meshStandardMaterial color="#FFF4D0" emissive="#FFD778" emissiveIntensity={0.45} roughness={0.2} />
+                  </mesh>
+                ))}
+              </group>
+            );
           })}
         </>
       )}
