@@ -1,4 +1,4 @@
-import React, { Suspense, lazy, useState } from 'react';
+import React, { Suspense, lazy, useMemo, useState } from 'react';
 import { MARKUP, STAFF, TIERS, naira } from '../economy';
 import { POWER, RICH_CUSTOMER_STAFF_LEVEL, contestFor, fuelOf, fuelPerHour, tankSize, Candidate, RaiseAnswer, candidates, canHire, daysToRent, displayCap, displayedCount, listingsNow, marketWage, restockAllCost, stats, waitingRoom } from '../engine';
 import { FURNITURE_GROUPS, FurnitureDef, FurnitureGroup, Listing, ceilingCapacity, ceilingUsed, finishes, furnitureById, furnitureForGroup, listingsFor, roomOf, wallCapacity, wallUsed } from '../shop';
