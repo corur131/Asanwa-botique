@@ -1,7 +1,7 @@
 import { CharacterConfig } from '../types/character';
 import { generateRandomCustomer } from '../utils/randomizer';
 import { DIVINE_CAPACITY, HOUR_WEIGHTS, PATIENCE, SHOP_MINUTES, staffMinutes, NEW_SHOP_RAMP_DAYS, NEW_SHOP_START, SERVICE_FEE, SLOW_WEEK_CHANCE, STAFF, STAFF_CAPACITY, START_CASH, SUPPLIES_SHARE, MARKUP, TIERS, naira } from './economy';
-import { canBuy, entryFor, isClothing, makeDesign, pieceCost } from './market';
+import { canBuy, entryFor, isClothing, makeDesign, pieceCost, productKey } from './market';
 import { FabricId } from '../types/character';
 import { answerRival, competition, initRivals, poacher, reactToMove, simulateRivals } from './rivals';
 import { answerInvite, contestFor, contestModel, dropStep, judge, planDrop, planEvents, planTips, visitStep, wonListing } from './encounters';
@@ -927,18 +927,29 @@ export { FURNITURE, usesFloor };
 // ---------------------------------------------------------------------------
 // Stock
 // ---------------------------------------------------------------------------
-export const displayedCount = (s: GameState) => s.stock.filter((d) => d.displayed).length;
+/** Display space is per product/style, not per colourway. Old saves remain compatible. */
+export const displayedCount = (s: GameState) => new Set(s.stock.filter((d) => d.displayed).map(productKey)).size;
 
 export function buyDesign(s: GameState, d: ReturnType<typeof makeDesign>): GameState {
   const total = d.cost * d.pieces;
   if (s.cash < total) return s;
-  const free = displayedCount(s) < displayCap(s);
+  const key = productKey(d);
+  const existingVariants = s.stock.filter((x) => productKey(x) === key);
+  // A new colour of an already-displayed design joins that rack slot; if the
+  // parent style is stored, new colours remain in storage until the style is displayed.
+  const free = existingVariants.length
+    ? existingVariants.some((x) => x.displayed)
+    : displayedCount(s) < displayCap(s);
   return money({ ...s, stock: [...s.stock, { ...d, displayed: free }] }, -total, `Stock: ${d.label} ×${d.pieces}`);
 }
 
 export function setDisplayed(s: GameState, uid: string, on: boolean): GameState {
-  if (on && displayedCount(s) >= displayCap(s)) return s;
-  return { ...s, stock: s.stock.map((d) => (d.uid === uid ? { ...d, displayed: on } : d)) };
+  const target = s.stock.find((d) => d.uid === uid);
+  if (!target) return s;
+  const key = productKey(target);
+  const alreadyDisplayed = s.stock.some((d) => productKey(d) === key && d.displayed);
+  if (on && !alreadyDisplayed && displayedCount(s) >= displayCap(s)) return s;
+  return { ...s, stock: s.stock.map((d) => (productKey(d) === key ? { ...d, displayed: on } : d)) };
 }
 
 /** Buy more pieces of a design Divine already stocks. */
@@ -975,8 +986,19 @@ export const cartTotal = (lines: CartLine[]) => lines.reduce((a, l) => a + cartL
 
 const sameDesign = (d: Design, l: CartLine) => d.kind === l.kind && d.itemId === l.itemId && (!isClothing(l.kind) || d.fabric === (l.fabric || d.fabric)) && d.color === l.color && (!isClothing(l.kind) || (d.color2 === l.color2 && d.pattern === l.pattern));
 
-/** How many new designs a cart adds (the rest top up what's already in stock). */
-export const cartNewDesigns = (s: GameState, lines: CartLine[]) => lines.filter((l, i) => !s.stock.some((d) => sameDesign(d, l)) && !lines.slice(0, i).some((o) => o.kind === l.kind && o.itemId === l.itemId && o.fabric === l.fabric && o.color === l.color && o.color2 === l.color2 && o.pattern === l.pattern)).length;
+/** Number of new rack styles a cart introduces; extra colours do not consume more display slots. */
+export const cartNewDesigns = (s: GameState, lines: CartLine[]) => {
+  const existing = new Set(s.stock.map(productKey));
+  const added = new Set<string>();
+  for (const line of lines) {
+    const key = productKey({
+      kind: line.kind, itemId: line.itemId, fabric: line.fabric || 'plain',
+      color2: line.color2, pattern: line.pattern,
+    });
+    if (!existing.has(key)) added.add(key);
+  }
+  return added.size;
+}
 
 /** Pay for everything in the cart. Matching designs already in stock get topped up. */
 export function buyCart(s0: GameState, lines: CartLine[]): GameState {

@@ -5,7 +5,7 @@ import type { Listing, Placed } from './shop';
 export type CustomerClass = 'poor' | 'middle' | 'rich';
 
 /** What an item in stock is. Clothes use the wardrobe slots; the rest are accessory kinds. */
-export type StockKind = 'top' | 'bottom' | 'dress' | 'outer' | 'shoes' | 'bag' | 'headwear' | 'necklace' | 'wrist' | 'glasses' | 'earrings';
+export type StockKind = 'top' | 'bottom' | 'dress' | 'outer' | 'shoes' | 'bag' | 'headwear' | 'necklace' | 'wrist' | 'glasses' | 'earrings' | 'hair';
 
 /** One design in the shop: a catalogue item in a chosen fabric and colour, with pieces in stock. */
 export interface Design {
@@ -247,6 +247,8 @@ export interface StyleChoice {
   wrist?: string;
   glasses?: string;
   earrings?: string;
+  /** UID of a stocked wig, bundle, or braided-hair product. */
+  hairpiece?: string;
   hair?: string;
   hairColor?: string;
   makeup?: Makeup;

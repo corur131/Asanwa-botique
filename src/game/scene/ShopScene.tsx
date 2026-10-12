@@ -8,6 +8,7 @@ import { solarCap, source } from '../power';
 import { stats } from '../engine';
 import { ApplianceOn, CeilingPiece, FloorPiece, WallPiece, B, MirrorLive } from './Furniture3D';
 import { Cell, Figure, FigureLook, Walker, lookToFigure } from './People';
+import { productKey } from '../market';
 
 export interface SceneProps {
   s: GameState;
@@ -154,15 +155,18 @@ export function Room({ r, tier, painted }: { r: RoomStyle; tier: number; painted
   }, [r]);
   const door = Math.floor(r.w / 2);
   const ridges = r.kind === 'container' && !r.signature;
-  const signatureGold = tier === 4 ? '#F0CD78' : tier === 3 ? '#D6B86C' : '#D4AF37';
-  const signatureAccent = tier === 4 ? '#281B2D' : tier === 3 ? '#29483B' : '#61263A';
-  const signatureInset = tier === 4 ? '#E9E1D6' : '#F4E9D6';
+  const signatureGold = tier === 0 ? '#78C8D5' : tier === 1 ? '#A8BCFF' : tier === 2 ? '#FFD54A' : tier === 3 ? '#D6B86C' : '#F0CD78';
+  const signatureAccent = tier === 0 ? '#315E67' : tier === 1 ? '#2D306E' : tier === 2 ? '#936013' : tier === 3 ? '#173D32' : '#281B2D';
+  const signatureInset = tier === 0 ? '#EAFBFD' : tier === 1 ? '#F4F6FF' : tier === 2 ? '#FFF2B2' : tier === 3 ? '#E1D4B9' : '#E9E1D6';
+  const runwayColor = tier === 0 ? '#8FCED7' : tier === 1 ? '#5B56AA' : tier === 2 ? '#E7C23D' : tier === 3 ? '#1B4A3D' : '#4B1425';
   const carpetWidth = Math.min(3.2, Math.max(2.25, r.w * 0.095));
   const portalCenter = door + 0.5;
   const portalLeft = portalCenter - carpetWidth / 2 - 0.18;
   const portalRight = portalCenter + carpetWidth / 2 + 0.18;
   const featureWidth = Math.max(4.6, r.w * 0.58);
   const featureHeight = Math.min(2.65, H * 0.62);
+  const glassXCount = Math.max(4, Math.floor(r.w / 1.8)) + 1;
+  const glassZCount = Math.max(3, Math.floor(r.d / 1.8)) + 1;
   return (
     <group>
       {/* street around the shop */}
@@ -176,18 +180,85 @@ export function Room({ r, tier, painted }: { r: RoomStyle; tier: number; painted
       </mesh>
       {tiles}
       {/* back wall */}
-      <B p={[r.w / 2, H / 2, -0.06]} s={[r.w + 0.12, H, 0.12]} c={r.wall} r={ridges ? 0.6 : 0.9} m={ridges ? 0.3 : 0} />
+      <B p={[r.w / 2, H / 2, -0.06]} s={[r.w + 0.12, H, 0.12]} c={r.wall} r={r.signature && tier <= 1 ? 0.16 : ridges ? 0.6 : 0.9} m={r.signature && tier <= 1 ? 0.22 : ridges ? 0.3 : 0} o={r.signature && tier === 0 ? 0.32 : undefined} />
       <B p={[r.w / 2, 0.35, 0.005]} s={[r.w, 0.7, 0.02]} c={r.wallLow} />
       {/* left wall */}
-      <B p={[-0.06, H / 2, r.d / 2]} s={[0.12, H, r.d + 0.12]} c={r.wall} r={ridges ? 0.6 : 0.9} m={ridges ? 0.3 : 0} />
+      <B p={[-0.06, H / 2, r.d / 2]} s={[0.12, H, r.d + 0.12]} c={r.wall} r={r.signature && tier <= 1 ? 0.16 : ridges ? 0.6 : 0.9} m={r.signature && tier <= 1 ? 0.22 : ridges ? 0.3 : 0} o={r.signature && tier === 0 ? 0.32 : undefined} />
       <B p={[0.005, 0.35, r.d / 2]} s={[0.02, 0.7, r.d]} c={r.wallLow} />
       {/* low cutaway walls at the front and right */}
-      <B p={[r.w + 0.06, 0.3, r.d / 2]} s={[0.12, 0.6, r.d + 0.12]} c={r.wall} />
+      <B p={[r.w + 0.06, 0.3, r.d / 2]} s={[0.12, 0.6, r.d + 0.12]} c={r.wall} o={r.signature && tier === 0 ? 0.38 : undefined} />
       <B p={[door / 2, 0.3, r.d + 0.06]} s={[door, 0.6, 0.12]} c={r.wall} />
       <B p={[door + 1 + (r.w - door - 1) / 2, 0.3, r.d + 0.06]} s={[r.w - door - 1, 0.6, 0.12]} c={r.wall} />
       {/* trim */}
-      <B p={[r.w / 2, H - 0.05, 0.01]} s={[r.w, 0.1, 0.03]} c={r.trim} m={r.kind === 'marble' || r.kind === 'flagship' ? 0.8 : 0} />
-      <B p={[0.01, H - 0.05, r.d / 2]} s={[0.03, 0.1, r.d]} c={r.trim} m={r.kind === 'marble' || r.kind === 'flagship' ? 0.8 : 0} />
+      <B p={[r.w / 2, H - 0.05, 0.01]} s={[r.w, 0.1, 0.03]} c={r.trim} m={r.signature || r.kind === 'marble' || r.kind === 'flagship' ? 0.8 : 0} />
+      <B p={[0.01, H - 0.05, r.d / 2]} s={[0.03, 0.1, r.d]} c={r.trim} m={r.signature || r.kind === 'marble' || r.kind === 'flagship' ? 0.8 : 0} />
+
+      {r.signature && tier === 0 && (
+        <>
+          {/* Glasshouse mullions and transparent roof panels: a real architectural identity. */}
+          {Array.from({ length: glassXCount }, (_, i) => (
+            <B key={'glass-back-mullion-' + i} p={[0.18 + i * (r.w - 0.36) / Math.max(1, glassXCount - 1), H / 2, -0.14]} s={[0.065, H, 0.065]} c="#6AA9B7" m={0.82} r={0.18} />
+          ))}
+          {Array.from({ length: glassZCount }, (_, i) => (
+            <B key={'glass-side-mullion-' + i} p={[-0.14, H / 2, 0.16 + i * (r.d - 0.32) / Math.max(1, glassZCount - 1)]} s={[0.065, H, 0.065]} c="#6AA9B7" m={0.82} r={0.18} />
+          ))}
+          <B p={[r.w / 2, H * 0.33, -0.15]} s={[r.w, 0.055, 0.07]} c="#6AA9B7" m={0.82} r={0.18} />
+          <B p={[r.w / 2, H * 0.68, -0.15]} s={[r.w, 0.055, 0.07]} c="#6AA9B7" m={0.82} r={0.18} />
+          <B p={[0.05, H * 0.35, r.d / 2]} s={[0.07, 0.055, r.d]} c="#6AA9B7" m={0.82} r={0.18} />
+          <B p={[0.05, H * 0.68, r.d / 2]} s={[0.07, 0.055, r.d]} c="#6AA9B7" m={0.82} r={0.18} />
+          {Array.from({ length: glassZCount }, (_, i) => (
+            <React.Fragment key={'glass-roof-bay-' + i}>
+              <B p={[r.w / 2, H + 0.005, 0.6 + (i + 0.5) * (r.d - 1.2) / glassZCount]} s={[r.w - 0.12, 0.025, Math.max(0.2, (r.d - 1.2) / glassZCount - 0.04)]} c="#E7F8FB" r={0.12} m={0.08} o={0.18} />
+              <B p={[r.w / 2, H + 0.025, 0.6 + i * (r.d - 1.2) / Math.max(1, glassZCount - 1)]} s={[r.w, 0.045, 0.045]} c="#B5DCE3" m={0.6} o={0.68} />
+            </React.Fragment>
+          ))}
+        </>
+      )}
+
+      {r.signature && tier === 1 && (
+        <>
+          {/* Sky pavilion: a floating light canopy, luminous arches, and pearl-blue crystal geometry. */}
+          {Array.from({ length: 5 }, (_, i) => (
+            <group key={'sky-arch-' + i} position={[r.w * (0.18 + i * 0.16), H - 0.22, r.d * 0.52]}>
+              <mesh rotation={[Math.PI / 2, 0, 0]}>
+                <torusGeometry args={[1.65 + (i % 2) * 0.16, 0.045, 10, 48]} />
+                <meshStandardMaterial color="#A8BCFF" metalness={0.76} roughness={0.18} emissive="#7A95FF" emissiveIntensity={0.34} />
+              </mesh>
+            </group>
+          ))}
+          {Array.from({ length: 9 }, (_, i) => (
+            <mesh key={'sky-crystal-' + i} position={[r.w * (0.14 + (i % 5) * 0.18), H * (0.48 + (i % 3) * 0.12), 0.23]} rotation={[0.3, i * 0.6, Math.PI / 4]}>
+              <octahedronGeometry args={[0.1 + (i % 3) * 0.035, 0]} />
+              <meshStandardMaterial color="#EAF0FF" metalness={0.3} roughness={0.14} emissive="#9CB5FF" emissiveIntensity={0.72} />
+            </mesh>
+          ))}
+        </>
+      )}
+
+      {r.signature && tier === 2 && (
+        <>
+          {/* The gold tier is intentionally lavish: polished gold reveals and sparkling stones. */}
+          <B p={[r.w / 2, H * 0.54, 0.2]} s={[r.w * 0.72, H * 0.56, 0.12]} c="#F4C643" m={0.88} r={0.16} e="#EAB72E" ei={0.28} />
+          <B p={[r.w / 2, H * 0.54, 0.27]} s={[r.w * 0.67, H * 0.51, 0.04]} c="#FFF1A8" m={0.82} r={0.12} e="#FFE27A" ei={0.42} />
+          <B p={[r.w / 2, H * 0.54, 0.30]} s={[r.w * 0.61, H * 0.45, 0.03]} c="#FFF8D9" m={0.52} r={0.12} />
+          {Array.from({ length: 22 }, (_, i) => {
+            const x = 0.7 + ((i * 17) % Math.max(2, Math.floor(r.w - 1.4)));
+            const y = 0.8 + ((i * 11) % Math.max(2, Math.floor(H * 0.8)));
+            return (
+              <mesh key={'gold-spark-' + i} position={[x, y, 0.36]} rotation={[i * 0.4, i * 0.5, Math.PI / 4]}>
+                <octahedronGeometry args={[0.045 + (i % 3) * 0.018, 0]} />
+                <meshStandardMaterial color="#FFF7C2" metalness={0.4} roughness={0.12} emissive="#FFE55C" emissiveIntensity={0.85} />
+              </mesh>
+            );
+          })}
+          {Array.from({ length: 20 }, (_, i) => {
+            const a = (i / 20) * Math.PI * 2;
+            const x = r.w / 2 + Math.cos(a) * Math.max(2, r.w * 0.33);
+            const z = r.d / 2 + Math.sin(a) * Math.max(1.5, r.d * 0.33);
+            return <B key={'gold-floor-inlay-' + i} p={[x, 0.025, z]} s={[0.07, 0.025, 0.07]} c="#FFE56A" m={0.85} e="#FFE56A" ei={0.85} />;
+          })}
+        </>
+      )}
       {r.signature && (
         <>
           {/* Grand entrance portal: the Signature shop reads as a destination from the doorway. */}
@@ -198,7 +269,7 @@ export function Room({ r, tier, painted }: { r: RoomStyle; tier: number; painted
           <B p={[portalCenter, 0.075, r.d + 0.18]} s={[carpetWidth + 0.26, 0.025, 0.39]} c={signatureAccent} />
 
           {/* A wide runway carpet with twin brass runners and stone inlay around the whole room. */}
-          <B p={[portalCenter, 0.008, r.d / 2 + 0.28]} s={[carpetWidth, 0.016, r.d + 0.82]} c={tier === 4 ? '#4B1425' : '#671A31'} r={0.92} />
+          <B p={[portalCenter, 0.008, r.d / 2 + 0.28]} s={[carpetWidth, 0.016, r.d + 0.82]} c={runwayColor} r={tier <= 1 ? 0.16 : 0.92} m={tier === 2 ? 0.32 : 0.04} e={tier === 2 ? '#FFD54A' : undefined} ei={tier === 2 ? 0.12 : 0} />
           <B p={[portalCenter - carpetWidth / 2 + 0.08, 0.022, r.d / 2 + 0.28]} s={[0.045, 0.018, r.d + 0.72]} c={signatureGold} m={0.74} e={signatureGold} ei={0.08} />
           <B p={[portalCenter + carpetWidth / 2 - 0.08, 0.022, r.d / 2 + 0.28]} s={[0.045, 0.018, r.d + 0.72]} c={signatureGold} m={0.74} e={signatureGold} ei={0.08} />
           <B p={[r.w / 2, 0.016, 0.3]} s={[r.w - 0.55, 0.018, 0.045]} c={signatureGold} m={0.72} e={signatureGold} ei={0.08} />
@@ -242,10 +313,10 @@ export function Room({ r, tier, painted }: { r: RoomStyle; tier: number; painted
             <torusGeometry args={[Math.min(0.72, r.d * 0.095), 0.018, 8, 40]} />
             <meshStandardMaterial color={signatureGold} metalness={0.8} roughness={0.22} />
           </mesh>
-          {Array.from({ length: tier >= 3 ? 4 : 2 }, (_, i) => {
-            const x = r.w * (tier >= 3 ? (i % 2 === 0 ? 0.3 : 0.7) : (i === 0 ? 0.38 : 0.62));
-            const z = r.d * (tier >= 3 ? (i < 2 ? 0.34 : 0.68) : 0.52);
-            const radius = tier >= 3 ? 0.72 : 0.56;
+          {Array.from({ length: tier >= 3 ? 4 : tier === 2 ? 6 : tier === 1 ? 4 : 2 }, (_, i) => {
+            const x = r.w * (tier >= 3 || tier === 2 || tier === 1 ? (i % 2 === 0 ? 0.3 : 0.7) : (i === 0 ? 0.38 : 0.62));
+            const z = r.d * (tier >= 3 || tier === 2 || tier === 1 ? (i < 2 ? 0.28 : 0.72) : 0.52);
+            const radius = tier === 2 ? 0.86 : tier >= 3 ? 0.72 : tier === 1 ? 0.66 : 0.56;
             return (
               <group key={'signature-chandelier-' + i} position={[x, H - 0.26, z]}>
                 <B p={[0, 0.02, 0]} s={[0.08, 0.4, 0.08]} c={signatureGold} m={0.8} />
@@ -268,6 +339,17 @@ export function Room({ r, tier, painted }: { r: RoomStyle; tier: number; painted
                   </mesh>
                 ))}
               </group>
+            );
+          })}
+
+          {tier === 2 && Array.from({ length: 18 }, (_, i) => {
+            const x = r.w * (0.08 + (i % 9) * 0.105);
+            const z = r.d * (i < 9 ? 0.12 : 0.88);
+            return (
+              <mesh key={'gold-ceiling-spark-' + i} position={[x, H - 0.08, z]}>
+                <octahedronGeometry args={[0.07 + (i % 3) * 0.025, 0]} />
+                <meshStandardMaterial color="#FFF1A1" metalness={0.65} roughness={0.15} emissive="#FFD84C" emissiveIntensity={0.9} />
+              </mesh>
             );
           })}
         </>
@@ -628,8 +710,17 @@ function Furniture({ s, selected, placing, onTap, dark, reflections }: Pick<Scen
   const r = room(s.listing);
   const wl = wallLayout(s.furniture, s.listing);
   const live = useMemo(() => liveMirrorUids(s, reflections !== false), [s.furniture, reflections]); // eslint-disable-line react-hooks/exhaustive-deps
-  // colours of displayed stock, shared out to display furniture
-  const shown = s.stock.filter((d) => d.displayed && d.pieces > 0);
+  // One rack/drawer slot represents one style. Individual colourways stay in stock,
+  // but only the first in-stock colour paints a representative garment on the rack.
+  const shown: typeof s.stock = [];
+  const seenStyles = new Set<string>();
+  for (const d of s.stock) {
+    if (!d.displayed || d.pieces <= 0) continue;
+    const key = productKey(d);
+    if (seenStyles.has(key)) continue;
+    seenStyles.add(key);
+    shown.push(d);
+  }
   let cursor = 0;
   const take = (n: number) => {
     const out = shown.slice(cursor, cursor + n).map((d) => d.color);
