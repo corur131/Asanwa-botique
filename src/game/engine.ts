@@ -767,7 +767,7 @@ export function confirmCollaboration(s0: GameState, messageId: number): GameStat
       costs: s.today.costs + playerContribution,
       events: [...s.today.events, 'Committed ' + naira(playerContribution) + ' to ' + eventName + ', scheduled for Day ' + event.day + '.'],
     },
-    messages: s.messages.map((m) => m.id === messageId ? { ...m, collaborationOutcome: 'scheduled' } : m),
+    messages: s.messages.map((m) => m.id === messageId ? { ...m, collaborationOutcome: 'scheduled', collaborationScheduledDay: event.day } : m),
   };
   return collaborationChatMessage(s, partner.owner, 'You',
     'Deal confirmed: ' + eventName + ' on Day ' + event.day + '. Total setup budget ' + naira(totalCost) +
