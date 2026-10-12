@@ -692,10 +692,11 @@ const Bank: React.FC<{ s: GameState; up: PhoneProps['up'] }> = ({ s, up }) => {
         <section className="rounded-xl border border-white/10 p-3 space-y-2">
           <h3 className="font-semibold text-white">Move money between accounts</h3>
           <label className="block text-xs text-slate-400">Amount (₦)<input type="number" min="500" step="500" value={transferAmount} onChange={e => setTransferAmount(e.target.value)} className="mt-1 w-full rounded-lg bg-white/5 border border-white/10 p-2 text-white text-sm" /></label>
-          <div className="grid grid-cols-3 gap-2">
+          <div className="grid grid-cols-2 gap-2">
             <button onClick={() => up(g => E.transferBank(g, 'savings', amount(transferAmount)))} disabled={amount(transferAmount) <= 0 || s.cash < amount(transferAmount)} className="rounded-lg bg-emerald-700 disabled:opacity-40 py-2 text-xs font-semibold">To savings</button>
             <button onClick={() => up(g => E.transferBank(g, 'rentVault', amount(transferAmount)))} disabled={amount(transferAmount) <= 0 || s.cash < amount(transferAmount)} className="rounded-lg bg-teal-700 disabled:opacity-40 py-2 text-xs font-semibold">To Rent Vault</button>
-            <button onClick={() => up(g => E.transferBank(g, 'current', amount(transferAmount)))} disabled={amount(transferAmount) <= 0 || bank.rentVault < amount(transferAmount)} className="rounded-lg bg-slate-700 disabled:opacity-40 py-2 text-xs font-semibold">Withdraw vault</button>
+            <button onClick={() => up(g => E.transferBank(g, 'current', amount(transferAmount), 'rentVault'))} disabled={amount(transferAmount) <= 0 || bank.rentVault < amount(transferAmount)} className="rounded-lg bg-slate-700 disabled:opacity-40 py-2 text-xs font-semibold">Withdraw vault</button>
+            <button onClick={() => up(g => E.transferBank(g, 'current', amount(transferAmount), 'savings'))} disabled={amount(transferAmount) <= 0 || bank.savings < amount(transferAmount)} className="rounded-lg bg-slate-700 disabled:opacity-40 py-2 text-xs font-semibold">Withdraw savings</button>
           </div>
         </section>
         <section className="rounded-xl border border-white/10 p-3 space-y-2">
