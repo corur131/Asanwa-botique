@@ -17,6 +17,7 @@ import {
   maximumLoan,
   takeBusinessLoan,
   transferBank,
+  investInExpansion,
 } from './business';
 
 function state(overrides: Partial<GameState> = {}): GameState {
@@ -477,4 +478,19 @@ test('credit report continues to show arrears after a hardship plan resets conse
   const report = creditHistoryReport(before);
   assert.equal(report.arrearsAmount, 9_000);
   assert.equal(report.standing, 'In arrears');
+});
+
+
+test('new branch names follow the correct sequence without skipping a number', () => {
+  let game = state({ day: 10, tier: 4, cash: 100_000_000, businessExpansion: {
+    branches: [], departments: [], wholesaleActive: false, designerCollections: 0,
+  } });
+  game = investInExpansion(game, 'branch');
+  game = investInExpansion(game, 'branch');
+  game = investInExpansion(game, 'branch');
+  assert.deepEqual(game.businessExpansion!.branches.map((branch) => branch.name), [
+    'Asanwa Boutique Lekki Outlet',
+    'Asanwa Boutique Branch 2',
+    'Asanwa Boutique Branch 3',
+  ]);
 });
