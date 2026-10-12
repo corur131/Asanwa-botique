@@ -400,7 +400,7 @@ const Chats: React.FC<PhoneProps> = ({ s, up, chat, setChat, staff }) => {
       const timeoutId = window.setTimeout(() => controller.abort(), 60000);
       let response: Response;
       try {
-        response = await fetch('/api/ai-chat', {
+        response = await fetch(`${import.meta.env.VITE_AI_API_BASE_URL || ''}/api/ai-chat`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           signal: controller.signal,
