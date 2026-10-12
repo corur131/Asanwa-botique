@@ -5,7 +5,7 @@ import { harmony, isNeutral, sameColour } from './colours';
 import { entryFor } from './market';
 import { Customer, Design, ScoreBreakdown, StyleChoice } from './types';
 
-export const SLOTS = ['top', 'bottom', 'dress', 'outer', 'shoes', 'bag', 'headwear', 'necklace', 'wrist', 'glasses', 'earrings'] as const;
+export const SLOTS = ['top', 'bottom', 'dress', 'outer', 'shoes', 'bag', 'headwear', 'necklace', 'wrist', 'glasses', 'earrings', 'hair'] as const;
 type Slot = (typeof SLOTS)[number];
 
 export const hairGroup = (id: string) => {
@@ -56,7 +56,7 @@ const CLASS_RANK = { poor: 0, middle: 1, rich: 2 } as const;
 export function designsOf(choice: StyleChoice, stock: Design[]): Partial<Record<Slot, Design>> {
   const out: Partial<Record<Slot, Design>> = {};
   for (const s of SLOTS) {
-    const uid = choice[s];
+    const uid = s === 'hair' ? choice.hairpiece : choice[s as keyof StyleChoice];
     if (!uid) continue;
     const d = stock.find((x) => x.uid === uid && x.pieces > 0);
     if (d) out[s] = d;
@@ -71,7 +71,7 @@ export function designsOf(choice: StyleChoice, stock: Design[]): Partial<Record<
 /** The customer as Divine has styled them, for the renderer. */
 export function buildLook(c: Customer, choice: StyleChoice, stock: Design[], state: 'plain' | 'styled' = 'styled'): CharacterConfig {
   const d = designsOf(choice, stock);
-  const g = (x?: Design) => (x ? { style: x.itemId, fabric: x.fabric, color: x.color, color2: x.color2, pattern: x.pattern } : undefined);
+  const g = (x?: Design) => (x ? { style: entryFor(x.kind, x.itemId)?.renderId || x.itemId, fabric: x.fabric, color: x.color, color2: x.color2, pattern: x.pattern } : undefined);
   const wardrobe: Wardrobe = d.dress ? { dress: g(d.dress), outer: g(d.outer) } : { top: g(d.top), bottom: g(d.bottom), outer: g(d.outer) };
   const base = c.look;
   const hasClothes = !!(d.dress || d.top || d.bottom);
@@ -81,23 +81,23 @@ export function buildLook(c: Customer, choice: StyleChoice, stock: Design[], sta
     state,
     wardrobe: hasClothes ? wardrobe : base.wardrobe,
     outfit: undefined,
-    hair: (choice.hair as CharacterConfig['hair']) || base.hair,
-    hairColor: (choice.hairColor as CharacterConfig['hairColor']) || base.hairColor,
+    hair: ((d.hair ? entryFor(d.hair.kind, d.hair.itemId)?.renderId || d.hair.itemId : choice.hair) as CharacterConfig['hair']) || base.hair,
+    hairColor: (d.hair ? (['black', 'darkBrown', 'burgundy', 'honeyBlonde', 'ginger', 'ombre', 'platinum'][d.hair.pattern] || base.hairColor) : choice.hairColor) as CharacterConfig['hairColor'] || base.hairColor,
     makeup: choice.makeup || { ...MAKEUP_LOOKS[0].makeup, lipColor: base.lips.color },
     maleOnly: { facialHair: (choice.beard as CharacterConfig['maleOnly']['facialHair']) || base.maleOnly.facialHair },
-    earrings: (d.earrings?.itemId as CharacterConfig['earrings']) || 'none',
+    earrings: ((d.earrings ? entryFor(d.earrings.kind, d.earrings.itemId)?.renderId || d.earrings.itemId : undefined) as CharacterConfig['earrings']) || 'none',
     necklace: false,
     accessories: {
       ...dflt,
-      shoes: d.shoes?.itemId || (c.male ? 'slides' : 'flats'),
+      shoes: d.shoes ? entryFor(d.shoes.kind, d.shoes.itemId)?.renderId || d.shoes.itemId : (c.male ? 'slides' : 'flats'),
       shoesColor: d.shoes?.color || '#5A5A60',
-      bag: d.bag?.itemId || 'none',
+      bag: d.bag ? entryFor(d.bag.kind, d.bag.itemId)?.renderId || d.bag.itemId : 'none',
       bagColor: d.bag?.color,
-      headwear: d.headwear?.itemId || 'none',
+      headwear: d.headwear ? entryFor(d.headwear.kind, d.headwear.itemId)?.renderId || d.headwear.itemId : 'none',
       headwearColor: d.headwear?.color,
-      necklace: d.necklace?.itemId || 'none',
-      wrist: d.wrist?.itemId || 'none',
-      glasses: d.glasses?.itemId || 'none',
+      necklace: d.necklace ? entryFor(d.necklace.kind, d.necklace.itemId)?.renderId || d.necklace.itemId : 'none',
+      wrist: d.wrist ? entryFor(d.wrist.kind, d.wrist.itemId)?.renderId || d.wrist.itemId : 'none',
+      glasses: d.glasses ? entryFor(d.glasses.kind, d.glasses.itemId)?.renderId || d.glasses.itemId : 'none',
       beads: false,
       watch: false,
     },
@@ -107,7 +107,9 @@ export function buildLook(c: Customer, choice: StyleChoice, stock: Design[], sta
 export function lookCost(c: Customer, choice: StyleChoice, stock: Design[]) {
   const d = designsOf(choice, stock);
   const goods = Object.values(d).reduce((s, x) => s + (x?.cost || 0), 0);
-  const hair = choice.hair ? HAIR_COST[hairGroup(choice.hair)] || 1_000 : 0;
+  const stockedHair = d.hair ? entryFor(d.hair.kind, d.hair.itemId)?.renderId || d.hair.itemId : undefined;
+  const hairStyle = choice.hair || stockedHair;
+  const hair = hairStyle ? HAIR_COST[hairGroup(hairStyle)] || 1_000 : 0;
   const fee = SERVICE_FEE[c.cls];
   const wholesale = goods + hair + fee * SUPPLIES_SHARE;
   const fair = Math.round(((goods + hair) * MARKUP + fee) / 500) * 500;
@@ -129,7 +131,11 @@ function scoreService(c: Customer, choice: StyleChoice): ScoreBreakdown {
   let hit = 0;
   for (const w of c.wants) {
     let ok = 0;
-    if (w.kind === 'hair') ok = choice.hair && (w.group === 'male' || hairGroup(choice.hair) === w.group) ? 1 : 0;
+    if (w.kind === 'hair') {
+      const stocked = designsOf(c, stock).hair;
+      const selectedHair = stocked ? entryFor(stocked.kind, stocked.itemId)?.renderId || stocked.itemId : choice.hair;
+      ok = selectedHair && (w.group === 'male' || hairGroup(selectedHair) === w.group) ? 1 : 0;
+    }
     if (w.kind === 'glam') ok = glam >= 0.7 ? 1 : glam >= 0.5 ? 0.5 : 0;
     if (w.kind === 'naturalFace') ok = glam > 0.05 && glam <= 0.4 ? 1 : glam <= 0.55 ? 0.5 : 0;
     if (ok < 1) notes.push(missLine(w));
@@ -219,7 +225,11 @@ export function scoreLook(c: Customer, choice: StyleChoice, stock: Design[]): Sc
   if (ranked.length) {
     const vals = ranked.map((x) => {
       const w = itemById(x.itemId);
-      const rank = w ? CLASS_RANK[w.cls] : entryFor(x.kind, x.itemId)?.luxury ? 2 : x.cost >= 9_000 ? 1 : 0;
+      const entry = entryFor(x.kind, x.itemId);
+      const productRank = entry
+        ? (entry.price >= 150_000 || (entry.minTier || 0) >= 3 ? 2 : entry.price >= 25_000 || (entry.minTier || 0) >= 2 ? 1 : 0)
+        : 0;
+      const rank = Math.max(w ? CLASS_RANK[w.cls] : 0, productRank);
       if (c.cls === 'rich') return rank === 2 ? 1 : rank === 1 ? 0.6 : 0.25;
       if (c.cls === 'middle') return rank >= 1 ? 1 : 0.75;
       return 1;
@@ -232,7 +242,7 @@ export function scoreLook(c: Customer, choice: StyleChoice, stock: Design[]): Sc
   // --- complete look (15)
   let complete = 0;
   if (d.shoes) complete += 5; else notes.push('No shoes from the shop.');
-  if (choice.hair) complete += 4; else notes.push(c.male ? 'Hair not touched.' : 'You did not do her hair.');
+  if (choice.hair || d.hair) complete += 4; else notes.push(c.male ? 'Hair not touched.' : 'You did not do her hair.');
   if (c.male) complete += 3; else if (choice.makeup && glam > 0.02) complete += 3; else notes.push('No makeup.');
   const extras = [d.bag, d.necklace, d.earrings, d.headwear, d.wrist].filter(Boolean).length;
   if (!FORMAL.includes(c.occasion) && c.occasion !== 'church') complete += 3;
