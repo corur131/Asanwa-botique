@@ -703,8 +703,9 @@ const Bank: React.FC<{ s: GameState; up: PhoneProps['up'] }> = ({ s, up }) => {
   const [depositTerm, setDepositTerm] = useState(28);
   const [goalName, setGoalName] = useState(bank.savingsGoalName);
   const [goalAmount, setGoalAmount] = useState(String(bank.savingsGoalAmount));
-  const weekIn = lines.filter((l) => E.week(l.day) === E.week(s.day) && l.amount > 0).reduce((a, l) => a + l.amount, 0);
-  const weekOut = lines.filter((l) => E.week(l.day) === E.week(s.day) && l.amount < 0).reduce((a, l) => a + l.amount, 0);
+  // Account transfers are movements between our own pockets, not income or spending.
+  const weekIn = lines.filter((l) => l.category !== 'transfer' && E.week(l.day) === E.week(s.day) && l.amount > 0).reduce((a, l) => a + l.amount, 0);
+  const weekOut = lines.filter((l) => l.category !== 'transfer' && E.week(l.day) === E.week(s.day) && l.amount < 0).reduce((a, l) => a + l.amount, 0);
   const dueDays = E.daysToRent(s.day);
   const amount = (v: string) => Math.max(0, Math.round(Number(v) || 0));
   return (
@@ -719,7 +720,19 @@ const Bank: React.FC<{ s: GameState; up: PhoneProps['up'] }> = ({ s, up }) => {
           <div className="rounded-xl bg-white/5 p-2.5"><div className="text-slate-400">Rent Vault</div><div className="text-white font-semibold">{naira(bank.rentVault)}</div><div className="text-[10px] text-emerald-200">{bank.rentVaultRatePct}% weekly interest</div></div>
         </div>
         <div className={s.lateRent ? 'mt-2 rounded-xl p-2.5 text-xs bg-rose-900/50 text-rose-200' : 'mt-2 rounded-xl p-2.5 text-xs bg-white/5 text-slate-300'}>
-          {s.lateRent ? 'Rent is late. Clear it by the end of day ' + s.lateRent.due + '.' : 'Rent ' + naira(s.listing.rent) + ' goes out ' + (dueDays === 0 ? 'tonight' : 'in ' + dueDays + ' days') + ' to ' + s.listing.landlord + '. Rent Vault is used first.'}
+          {s.lateRent ? 'Rent arrears: ' + naira(s.lateRent.amount) + '. Clear them by the end of day ' + s.lateRent.due + '.' : 'Rent ' + naira(s.listing.rent) + ' goes out ' + (dueDays === 0 ? 'tonight' : 'in ' + dueDays + ' days') + ' to ' + s.listing.landlord + '. Rent Vault is used first.'}
+        </div>
+        <div className="grid grid-cols-2 gap-2 mt-2 text-xs">
+          <div className="rounded-xl border border-white/10 bg-white/5 p-2.5">
+            <div className="text-slate-400">Cash + account balances</div>
+            <div className="text-white font-semibold">{naira(E.financialAssets(s))}</div>
+            <div className="text-[10px] text-slate-500">Includes fixed-deposit principal</div>
+          </div>
+          <div className="rounded-xl border border-white/10 bg-white/5 p-2.5">
+            <div className="text-slate-400">Outstanding liabilities</div>
+            <div className={E.totalLiabilities(s) > 0 ? 'text-rose-300 font-semibold' : 'text-white font-semibold'}>{naira(E.totalLiabilities(s))}</div>
+            <div className="text-[10px] text-slate-500">Loans + unpaid rent</div>
+          </div>
         </div>
       </div>
       <div className="px-4 pb-4 space-y-4">
