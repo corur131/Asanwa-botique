@@ -206,8 +206,11 @@ export function Room({ r, tier, painted }: { r: RoomStyle; tier: number; painted
           <B p={[r.w / 2, H * 0.68, -0.15]} s={[r.w, 0.055, 0.07]} c="#6AA9B7" m={0.82} r={0.18} />
           <B p={[0.05, H * 0.35, r.d / 2]} s={[0.07, 0.055, r.d]} c="#6AA9B7" m={0.82} r={0.18} />
           <B p={[0.05, H * 0.68, r.d / 2]} s={[0.07, 0.055, r.d]} c="#6AA9B7" m={0.82} r={0.18} />
-          {Array.from({ length: Math.max(3, Math.floor(r.d / 2)) }, (_, i) => (
-            <B key={'glass-roof-beam-' + i} p={[r.w / 2, H + 0.015, 0.6 + i * (r.d - 1.2) / Math.max(1, Math.max(3, Math.floor(r.d / 2)) - 1)]} s={[r.w, 0.045, 0.045]} c="#B5DCE3" m={0.6} o={0.68} />
+          {Array.from({ length: glassZCount }, (_, i) => (
+            <React.Fragment key={'glass-roof-bay-' + i}>
+              <B p={[r.w / 2, H + 0.005, 0.6 + (i + 0.5) * (r.d - 1.2) / glassZCount]} s={[r.w - 0.12, 0.025, Math.max(0.2, (r.d - 1.2) / glassZCount - 0.04)]} c="#E7F8FB" r={0.12} m={0.08} o={0.18} />
+              <B p={[r.w / 2, H + 0.025, 0.6 + i * (r.d - 1.2) / Math.max(1, glassZCount - 1)]} s={[r.w, 0.045, 0.045]} c="#B5DCE3" m={0.6} o={0.68} />
+            </React.Fragment>
           ))}
         </>
       )}
