@@ -5,6 +5,7 @@ import { CharacterConfig } from '../types/character';
 import { ControlsPanel } from '../components/ControlsPanel';
 import { generateRandomCustomer } from '../utils/randomizer';
 import { SHOP_MINUTES, TIERS, naira } from './economy';
+import { brandPower, getBrandMetrics } from './business';
 import * as E from './engine';
 import { lookCost, buildLook } from './scoring';
 import { Customer, GameState, Rival, ScoreBreakdown, Settlement, Shout, StyleChoice, Visitor } from './types';
