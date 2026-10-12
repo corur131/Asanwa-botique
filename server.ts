@@ -12,7 +12,7 @@ const model = process.env.GEMINI_MODEL || 'gemini-3.8-flash';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 app.disable('x-powered-by');
-app.use(express.json({ limit: '12kb' }));
+app.use(express.json({ limit: '24kb' }));
 
 // Small in-memory limit for a single-player prototype. Use a shared limiter/auth
 // before opening this endpoint to a larger public audience.
