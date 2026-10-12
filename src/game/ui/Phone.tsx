@@ -266,7 +266,7 @@ const rivalProfile = (r: Rival, s: GameState) => {
       : r.aggression >= 0.4
         ? 'competitive and capable of a sharp response, but not automatically looking for a fight.'
         : 'usually measured and professional; competes more through the business than personal attacks.'),
-    'Current position: ' + (TIERS[r.tier]?.name || 'fashion') + ' tier, reputation ' + Math.round(r.rep) + '/100, ' + r.followers.toLocaleString('en-NG') + ' followers.',
+    'Current position: ' + (TIERS[r.tier]?.name || 'fashion') + ' tier, Brand Power ' + E.brandPower(r.brand || E.getBrandMetrics(s), r.followers, r.tier).toLocaleString('en-NG') + ', awareness ' + Math.round(r.brand?.awareness || 0) + ', ' + r.followers.toLocaleString('en-NG') + ' followers.',
     'Available business cash for feasibility checks only: ' + naira(Math.max(0, r.cash)) + '. Do not mention this figure unless discussing a collaboration budget.',
     rankContext,
     r.main
@@ -367,7 +367,7 @@ const Chats: React.FC<PhoneProps> = ({ s, up, chat, setChat, staff }) => {
             participants,
             history: prior,
             message: text,
-            gameContext: { day: s.day, reputation: s.rep, brandPower: E.brandPower(E.getBrandMetrics(s), s.followers || 0, s.tier), tier: s.tier, followers: s.followers, cash: s.cash, netWorth: E.netWorthPlayer(s), shopName: 'Asanwa Boutique', partnerTier: targetRival?.tier, partnerCash: targetRival?.cash },
+            gameContext: { day: s.day, brandPower: E.brandPower(E.getBrandMetrics(s), s.followers || 0, s.tier), tier: s.tier, followers: s.followers, cash: s.cash, netWorth: E.netWorthPlayer(s), shopName: 'Asanwa Boutique', partnerTier: targetRival?.tier, partnerCash: targetRival?.cash },
             canDiscussCollaboration: Boolean(targetRival?.main && targetChat !== GROUP),
           }),
         });
