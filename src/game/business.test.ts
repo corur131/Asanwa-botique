@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import type { GameState } from './types';
-import { money, payRent, settleLateRent } from './engine';
+import { money, payRent, settleLateRent, demote } from './engine';
 import {
   financialAssets,
   netWorthPlayer,
@@ -279,4 +279,37 @@ test('net worth falls by the value of newly recorded rent arrears', () => {
   const noDebt = state({ ...common, lateRent: null });
   const withDebt = state({ ...common, lateRent: { amount: 15_000, due: 20 } });
   assert.equal(netWorthPlayer(noDebt) - netWorthPlayer(withDebt), 15_000);
+});
+
+
+test('demotion waives half of rent arrears without creating fake cash and preserves the remaining debt', () => {
+  const before = state({
+    day: 14,
+    cash: 2_000,
+    tier: 1,
+    grace: 3,
+    lateRent: { amount: 10_000, due: 14 },
+    furniture: [],
+    stock: [],
+    staff: [],
+    rivals: [],
+    history: [],
+    stats: { served: 0, totalEarned: 0, demotions: 0, bestScore: 0 },
+    businessExpansion: { branches: [], departments: [], wholesaleActive: false, designerCollections: 0 },
+  });
+  const after = demote(before);
+  assert.equal(after.cash, 2_000);
+  assert.equal(after.tier, 0);
+  assert.equal(after.lateRent!.amount, 5_000);
+  assert.ok(after.lateRent!.due > after.day);
+  assert.equal(totalLiabilities(after), 5_000);
+});
+
+test('the smallest shop keeps rent debt on the books and extends its deadline instead of erasing it', () => {
+  const before = state({ day: 20, tier: 0, lateRent: { amount: 4_000, due: 20 } });
+  const after = demote(before);
+  assert.equal(after.cash, before.cash);
+  assert.equal(after.lateRent!.amount, 4_000);
+  assert.equal(after.lateRent!.due, 27);
+  assert.equal(totalLiabilities(after), 4_000);
 });
