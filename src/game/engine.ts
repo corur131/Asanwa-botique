@@ -765,7 +765,7 @@ export function confirmCollaboration(s0: GameState, messageId: number): GameStat
   let s = money(s0, -playerContribution, 'Pop-up setup share with ' + partner.owner);
   s = {
     ...s,
-    rivals: s.rivals.map((r) => r.id === partner.id ? { ...r, cash: r.cash - partnerContribution } : r),
+    rivals: s.rivals.map((r) => r.id === partner.id ? { ...r, cash: r.cash - partnerContribution, feeling: clamp(r.feeling + 3, -100, 100) } : r),
     collaborations: [...(s.collaborations || []), event].slice(-30),
     today: {
       ...s.today,
@@ -816,7 +816,7 @@ function resolveDueCollaborations(s0: GameState): GameState {
     s = money(s, playerPayout, 'Pop-up payout from ' + event.eventName);
     s = {
       ...s,
-      rivals: s.rivals.map((r) => r.id === partner.id ? { ...r, cash: r.cash + partnerPayout, rep: clamp(r.rep + (profit >= 0 ? 0.5 : -0.3), 0, 100), followers: r.followers + (profit > 0 ? Math.min(150, Math.max(10, Math.round(profit / 1500))) : 0) } : r),
+      rivals: s.rivals.map((r) => r.id === partner.id ? { ...r, cash: r.cash + partnerPayout, rep: clamp(r.rep + (profit >= 0 ? 0.5 : -0.3), 0, 100), feeling: clamp(r.feeling + (profit >= 0 ? 5 : -8), -100, 100), followers: r.followers + (profit > 0 ? Math.min(150, Math.max(10, Math.round(profit / 1500))) : 0) } : r),
       rep: clamp(s.rep + (profit > 0 ? Math.min(2, Math.max(0.3, profit / 60000)) : profit < 0 ? -0.8 : 0), 0, 100),
       followers: (s.followers || 0) + (profit > 0 ? Math.min(250, Math.max(15, Math.round(profit / 1000))) : 0),
       today: {
