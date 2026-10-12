@@ -14,6 +14,7 @@ import {
   processExpansionAtClose,
   repayBusinessLoan,
   arrangeBusinessLoanRepayment,
+  maximumLoan,
   transferBank,
 } from './business';
 
@@ -317,7 +318,7 @@ test('the smallest shop keeps rent debt on the books and extends its deadline in
 
 
 
-test('successful scheduled loan payments reduce monetary arrears instead of leaving the account permanently in arrears', () => {
+test('scheduled loan payments do not falsely clear older arrears or count one instalment twice', () => {
   const loan = {
     id: 'loan-current-again', principal: 50_000, balance: 50_000, weeklyRatePct: 0,
     weeklyPayment: 10_000, termWeeks: 8, nextPaymentDay: 7,
@@ -328,9 +329,11 @@ test('successful scheduled loan payments reduce monetary arrears instead of leav
     cash: 30_000,
     bank: { ...initialBankState(), savings: 0, rentVault: 0, loans: [loan] },
   });
+  assert.equal(maximumLoan(before), 0, 'new borrowing is blocked while monetary arrears remain');
+
   const first = processBankWeekly(before);
   assert.equal(first.bank!.loans[0].balance, 40_000);
-  assert.equal(first.bank!.loans[0].arrearsBalance, 2_000);
+  assert.equal(first.bank!.loans[0].arrearsBalance, 12_000);
   assert.equal(creditHistoryReport(first).standing, 'In arrears');
 
   const second = processBankWeekly({
@@ -340,8 +343,12 @@ test('successful scheduled loan payments reduce monetary arrears instead of leav
     bank: { ...first.bank!, loans: first.bank!.loans.map((item) => ({ ...item, nextPaymentDay: 14 })) },
   });
   assert.equal(second.bank!.loans[0].balance, 30_000);
-  assert.equal(second.bank!.loans[0].arrearsBalance, 0);
-  assert.equal(creditHistoryReport(second).standing, 'Current');
+  assert.equal(second.bank!.loans[0].arrearsBalance, 12_000);
+  assert.equal(creditHistoryReport(second).standing, 'In arrears');
+
+  const cure = repayBusinessLoan({ ...second, cash: 30_000 }, 'loan-current-again', 12_000);
+  assert.equal(cure.bank!.loans[0].arrearsBalance, 0);
+  assert.equal(creditHistoryReport(cure).standing, 'Current');
 });
 
 test('credit report continues to show arrears after a hardship plan resets consecutive missed-payment count', () => {
