@@ -178,12 +178,13 @@ export function creditHistoryReport(s: GameState) {
   const profile = creditProfile(s);
   const activeDebt = bank.loans.reduce((sum, loan) => sum + Math.max(0, loan.balance), 0);
   const arrears = bank.loans.reduce((sum, loan) => sum + Math.max(0, loan.missedPayments || 0), 0);
+  const arrearsAmount = bank.loans.reduce((sum, loan) => sum + Math.max(0, loan.arrearsBalance || 0), 0);
   const defaults = Math.max(profile.defaults, bank.loans.filter((loan) => loan.defaulted || (loan.missedPayments || 0) >= 3).length);
   return {
     score: profile.score, rating: creditRating(profile.score), onTimePayments: profile.onTimePayments,
     latePayments: profile.latePayments, defaults, loansTaken: profile.loansTaken,
-    activeLoans: bank.loans.length, activeDebt, arrears,
-    standing: bank.loans.some((loan) => loan.collectionsStarted || (loan.missedPayments || 0) >= 5) ? 'Collections' : defaults > 0 ? 'Default recorded' : arrears > 0 ? 'In arrears' : 'Current',
+    activeLoans: bank.loans.length, activeDebt, arrears, arrearsAmount,
+    standing: bank.loans.some((loan) => loan.collectionsStarted || (loan.missedPayments || 0) >= 5) ? 'Collections' : defaults > 0 ? 'Default recorded' : arrearsAmount > 0 || arrears > 0 ? 'In arrears' : 'Current',
   };
 }
 
@@ -191,7 +192,7 @@ export function premiumLoanEligible(s: GameState): boolean {
   const bank = s.bank || initialBankState();
   const profile = creditProfile(s);
   return profile.score >= 750 && profile.onTimePayments >= 3 && netWorthPlayer(s) >= 1_000_000
-    && !bank.loans.some((loan) => loan.defaulted || (loan.missedPayments || 0) > 0 || loan.collectionsStarted)
+    && !bank.loans.some((loan) => loan.defaulted || (loan.missedPayments || 0) > 0 || (loan.arrearsBalance || 0) > 0 || loan.collectionsStarted)
     && maximumLoan(s) >= 10_000;
 }
 
@@ -252,7 +253,7 @@ export function maximumLoan(s: GameState): number {
 
 export function takeBusinessLoan(s0: GameState, requested: number, termWeeks: number): GameState {
   const amount = roundMoney(requested);
-  if (!amount || ![4, 8, 12, 24].includes(termWeeks) || amount > maximumLoan(s0)) return s0;
+  if (!Number.isFinite(requested) || requested <= 0 || !amount || ![4, 8, 12, 24].includes(termWeeks) || amount > maximumLoan(s0)) return s0;
   const bank = s0.bank || initialBankState();
   const profile = creditProfile(s0);
   const rate = loanRateForScore(profile.score);
@@ -261,7 +262,8 @@ export function takeBusinessLoan(s0: GameState, requested: number, termWeeks: nu
   const loan: BusinessLoan = {
     id: 'loan-' + s0.day + '-' + Math.random().toString(36).slice(2, 8),
     principal: amount, balance: amount, weeklyRatePct: rate, weeklyPayment, termWeeks,
-    nextPaymentDay: (Math.floor(s0.day / 7) + 1) * 7, missedPayments: 0,
+    // First instalment is due at the first weekly banking cycle at least seven days after origination.
+    nextPaymentDay: Math.ceil((s0.day + 7) / 7) * 7, missedPayments: 0, arrearsBalance: 0,
   };
   const next = ledger({ ...s0, bank: { ...bank, loans: [...bank.loans, loan], creditProfile: { ...profile, score: clamp(profile.score - 3, 300, 850), loansTaken: profile.loansTaken + 1, lastApplicationDay: s0.day } } }, amount, 'Business loan disbursement');
   return { ...next, today: { ...next.today, events: [...next.today.events, 'Business loan approved: ' + amount.toLocaleString('en-NG') + ' naira over ' + termWeeks + ' weeks.'] } };
@@ -271,10 +273,11 @@ export function repayBusinessLoan(s0: GameState, loanId: string, amount: number)
   const bank = s0.bank || initialBankState();
   const loan = bank.loans.find((item) => item.id === loanId);
   const value = roundMoney(amount);
-  if (!loan || !value || value > s0.cash) return s0;
+  if (!Number.isFinite(amount) || amount <= 0 || !loan || !value || value > s0.cash) return s0;
   const paid = Math.min(value, loan.balance);
   const remaining = Math.max(0, loan.balance - paid);
-  const loans = bank.loans.map((item) => item.id === loanId ? { ...item, balance: remaining } : item).filter((item) => item.balance > 0);
+  const remainingArrears = Math.max(0, (loan.arrearsBalance || 0) - paid);
+  const loans = bank.loans.map((item) => item.id === loanId ? { ...item, balance: remaining, arrearsBalance: remainingArrears } : item).filter((item) => item.balance > 0);
   const profile = creditProfile(s0);
   const cleared = remaining <= 0;
   const creditProfileNext = cleared ? { ...profile, score: clamp(profile.score + (loan.missedPayments ? 3 : 8), 300, 850), onTimePayments: profile.onTimePayments + (loan.missedPayments ? 0 : 1) } : profile;
@@ -285,7 +288,7 @@ export function repayBusinessLoan(s0: GameState, loanId: string, amount: number)
 export function arrangeBusinessLoanRepayment(s0: GameState, loanId: string): GameState {
   const bank = s0.bank || initialBankState();
   const loan = bank.loans.find((item) => item.id === loanId);
-  if (!loan || loan.balance <= 0 || loan.arrangementUsed || (loan.missedPayments || 0) < 1) return s0;
+  if (!loan || loan.balance <= 0 || loan.arrangementUsed || ((loan.missedPayments || 0) < 1 && (loan.arrearsBalance || 0) <= 0)) return s0;
   const nextRate = Math.min(5, Math.round((loan.weeklyRatePct + 0.5) * 10) / 10);
   const nextTerm = Math.min(loan.termWeeks + 8, 32);
   const nextPayment = Math.max(1, roundMoney(loan.weeklyPayment * 0.75));
@@ -395,10 +398,14 @@ export function processBankWeekly(s0: GameState): GameState {
       const feeRoom = Math.max(0, roundMoney(loan.principal * 0.1) - Math.max(0, loan.lateFees || 0));
       const penalty = Math.min(feeRoom, Math.max(2_500, roundMoney(loan.balance * 0.025)));
       const formalCollectionsNotice = nextMissed >= 5 && !loan.collectionsNoticeIssued;
-      const loans = currentBank.loans.map((item) => item.id === loan.id ? { ...item, balance: item.balance + penalty, lateFees: Math.max(0, item.lateFees || 0) + penalty, nextPaymentDay: item.nextPaymentDay + 7, missedPayments: nextMissed, defaulted: item.defaulted || nextMissed >= 3, collectionsStarted: item.collectionsStarted || nextMissed >= 5, collectionsNoticeIssued: item.collectionsNoticeIssued || nextMissed >= 5 } : item);
+      const loans = currentBank.loans.map((item) => item.id === loan.id ? { ...item, balance: item.balance + interest + penalty, arrearsBalance: Math.max(0, item.arrearsBalance || 0) + due, lateFees: Math.max(0, item.lateFees || 0) + penalty, nextPaymentDay: item.nextPaymentDay + 7, missedPayments: nextMissed, defaulted: item.defaulted || nextMissed >= 3, collectionsStarted: item.collectionsStarted || nextMissed >= 5, collectionsNoticeIssued: item.collectionsNoticeIssued || nextMissed >= 5 } : item);
       const scoreLoss = newlyDefaulted ? 65 : 22;
       const creditProfileNext = { ...profile, score: clamp(profile.score - scoreLoss, 300, 850), latePayments: profile.latePayments + 1, defaults: profile.defaults + (newlyDefaulted ? 1 : 0) };
-      s = { ...s, bank: { ...currentBank, loans, creditProfile: creditProfileNext }, today: { ...s.today, costs: s.today.costs + penalty, events: [...s.today.events, 'A missed loan payment added ' + penalty.toLocaleString('en-NG') + ' naira to the loan balance.'] }, ledger: [{ day: s.day, t: -1, label: 'Missed loan payment fee', amount: -penalty }, ...(s.ledger || [])].slice(0, 150) };
+      const missedEntries = [
+        ...(interest ? [{ day: s.day, t: -1, label: 'Missed loan interest', amount: -interest }] : []),
+        ...(penalty ? [{ day: s.day, t: -1, label: 'Missed loan payment fee', amount: -penalty }] : []),
+      ];
+      s = { ...s, bank: { ...currentBank, loans, creditProfile: creditProfileNext }, today: { ...s.today, costs: s.today.costs + interest + penalty, events: [...s.today.events, 'A missed loan payment added ' + interest.toLocaleString('en-NG') + ' naira in interest and ' + penalty.toLocaleString('en-NG') + ' naira in late fees.'] }, ledger: [...missedEntries, ...(s.ledger || [])].slice(0, 150) };
       s = { ...s, messages: [{ id: (s.msgSeq || 0) + 1, day: s.day, from: 'KoboBank', text: formalCollectionsNotice ? 'FORMAL COLLECTIONS NOTICE: Your account has reached five consecutive missed payments and has been referred to KoboBank collections. Limited recovery from available business cash may begin, while protecting ₦25,000 for operating needs. Please clear the arrears or use an eligible repayment option.' : (nextMissed >= 3 ? 'Your KoboBank loan is now in DEFAULT. New borrowing is blocked until this loan is cleared. Your credit score has fallen sharply.' : 'A scheduled loan payment was missed. A capped late fee was added and your credit score has fallen.'), tone: 'danger' as const, t: -1 }, ...(s.messages || [])].slice(0, 160), msgSeq: (s.msgSeq || 0) + 1 };
       bank = s.bank || currentBank;
       // Persistent, limited collections begin at five consecutive missed payments.
@@ -408,7 +415,7 @@ export function processBankWeekly(s0: GameState): GameState {
         const currentLoan = (s.bank || bank).loans.find((item) => item.id === loan.id);
         const collection = Math.min(availableForCollection, currentLoan ? currentLoan.balance : 0, Math.max(5_000, roundMoney(((currentLoan?.balance || 0) * 0.03))));
         if (collection > 0 && currentLoan) {
-          const afterCollectionLoans = (s.bank || bank).loans.map((item) => item.id === loan.id ? { ...item, balance: Math.max(0, item.balance - collection), collectionsStarted: true } : item).filter((item) => item.balance > 0);
+          const afterCollectionLoans = (s.bank || bank).loans.map((item) => item.id === loan.id ? { ...item, balance: Math.max(0, item.balance - collection), arrearsBalance: Math.max(0, (item.arrearsBalance || 0) - collection), collectionsStarted: true } : item).filter((item) => item.balance > 0);
           s = { ...s, cash: s.cash - collection, bank: { ...(s.bank || bank), loans: afterCollectionLoans }, ledger: [{ day: s.day, t: -1, label: 'KoboBank debt recovery', amount: -collection }, ...(s.ledger || [])].slice(0, 150), messages: [{ id: (s.msgSeq || 0) + 1, day: s.day, from: 'KoboBank', text: 'FORMAL COLLECTIONS NOTICE: Your loan has been referred to KoboBank collections after five or more consecutive missed payments. ' + collection.toLocaleString('en-NG') + ' naira was recovered from available business cash; the ₦25,000 operating buffer was protected. Contact the in-game bank options to clear the arrears or request an eligible plan.', tone: 'danger' as const, t: -1 }, ...(s.messages || [])].slice(0, 160), msgSeq: (s.msgSeq || 0) + 1, today: { ...s.today, events: [...s.today.events, 'Debt recovery collected ' + collection.toLocaleString('en-NG') + ' naira while protecting a 25,000 naira operating buffer.'] } };
           bank = s.bank || bank;
         }
