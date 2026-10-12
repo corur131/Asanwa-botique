@@ -242,18 +242,32 @@ const Chats: React.FC<PhoneProps> = ({ s, up, chat, setChat, staff }) => {
       }, ...g.messages].slice(0, 160),
     }));
     try {
-      const response = await fetch('/api/ai-chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          characterName: targetChat,
-          characterProfile,
-          participants,
-          history: prior,
-          message: text,
-          gameContext: { day: s.day, reputation: s.rep, followers: s.followers, shopName: 'Asanwa Boutique' },
-        }),
-      });
+      // Never leave the composer in "Waiting for reply…" forever if the server stalls.
+      const controller = new AbortController();
+      const timeoutId = window.setTimeout(() => controller.abort(), 60000);
+      let response: Response;
+      try {
+        response = await fetch('/api/ai-chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          signal: controller.signal,
+          body: JSON.stringify({
+            characterName: targetChat,
+            characterProfile,
+            participants,
+            history: prior,
+            message: text,
+            gameContext: { day: s.day, reputation: s.rep, followers: s.followers, shopName: 'Asanwa Boutique' },
+          }),
+        });
+      } catch (fetchError) {
+        if (controller.signal.aborted) {
+          throw new Error('The AI took too long to respond. Please try again in a moment.');
+        }
+        throw new Error('Could not reach the AI server. Check your connection and try again.');
+      } finally {
+        window.clearTimeout(timeoutId);
+      }
       const data = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(data.error || `Gemini request failed (${response.status}).`);
       if (typeof data.reply !== 'string' || !data.reply.trim()) throw new Error('Gemini returned an empty reply.');
