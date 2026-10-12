@@ -86,6 +86,17 @@ export function priceBand(price: number): PriceBand {
   return 'Very expensive';
 }
 
+/** Hair merchandise colourways map to actual renderer hair-palette IDs via pattern. */
+export const HAIR_SWATCHES = [
+  { id: 'black', label: 'Natural Black', color: '#1E1E24' },
+  { id: 'darkBrown', label: 'Espresso Brown', color: '#5A3A28' },
+  { id: 'burgundy', label: 'Burgundy', color: '#8E1F3A' },
+  { id: 'honeyBlonde', label: 'Honey Blonde', color: '#C9A163' },
+  { id: 'ginger', label: 'Ginger Copper', color: '#E86A2E' },
+  { id: 'ombre', label: 'Ombre Violet', color: '#7A3A8C' },
+  { id: 'platinum', label: 'Platinum Blonde', color: '#F6F1E8' },
+] as const;
+
 export const minTierFor = (e: MarketEntry) => e.minTier ?? (e.luxury ? 2 : 0);
 export const canBuy = (e: MarketEntry, tier: number) => tier >= minTierFor(e);
 
