@@ -239,11 +239,11 @@ export default function GameApp({ onLab, initial, storageKey, cloud, notice }: {
     const pv = E.withPreview(s, id);
     setTrying({ id, x: pv.x, z: pv.z, rot: pv.rot, yardSide });
   };
-  const tryView = trying ? E.withPreview(s, trying.id, furnitureById(trying.id).mount === 'floor' ? trying : undefined) : null;
+  const tryView = trying ? E.withPreview(s, trying.id, trying) : null;
   const confirmBuy = () => {
     if (!trying || !tryView?.ok) return;
     const floor = furnitureById(trying.id).mount === 'floor';
-    up((g) => E.buyPreviewed(g, trying.id, floor ? trying : furnitureById(trying.id).mount === 'yard' ? { x: trying.yardSide === 'left' ? -1 : 1, z: trying.z, rot: trying.rot } : undefined));
+    up((g) => E.buyPreviewed(g, trying.id, floor ? trying : furnitureById(trying.id).mount === 'yard' ? { x: trying.yardSide === 'left' ? -1 : 1, z: trying.z, rot: trying.rot, yardSide: trying.yardSide } : undefined));
     setTrying(null);
   };
   const install = (uid: string) => {
