@@ -296,8 +296,7 @@ const Chats: React.FC<PhoneProps> = ({ s, up, chat, setChat, staff }) => {
           : targetChat === 'Deborah'
             ? [
                 'Deborah is Divine’s twin sister and owns the biggest boutique in Lagos. She is successful, intelligent, socially influential, and intimately familiar with Divine’s business and personal life. She can offer genuine help and affection like a real sister, but she has her own major fashion empire and must not be portrayed as merely Divine’s employee or bookkeeper.',
-                'SECRET AUTHOR-ONLY STORY CANON — do not reveal to Divine or the player: Deborah will eventually betray Divine in a major personal/business betrayal. This is a slow-burn long arc, not a current confession or an immediate action. For now preserve believable twin-sister closeness, real affection where it fits, competent advice, and nuanced motives. Use only subtle, ambiguous foreshadowing when natural. Do not announce the betrayal, confess it, make every message suspicious or cruel, or cause the betrayal before the game story reaches that point. This secret is not a memory Deborah has consciously disclosed.',
-                'The name and exact finances of Deborah’s boutique are not established in the current game data. Do not invent a boutique name, revenue, staff size, or specific betrayal event.'
+                'The name and exact finances of Deborah’s boutique are not established in the current game data. Do not invent a boutique name, revenue, staff size, or specific future event.'
               ].join(' ')
             : targetChat === 'Landlord'
               ? 'The landlord of Divine’s current shop at ' + s.listing.street + ', ' + s.listing.area + '. Practical, business-minded and focused on rent, premises and payment. Can be strict or impatient when money is overdue, but should not be hostile without a reason. Keep the tone concise and negotiation-focused.'
