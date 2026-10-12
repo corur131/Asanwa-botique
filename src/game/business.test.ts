@@ -153,6 +153,8 @@ test('unfunded operating costs become payables instead of negative cash', () => 
   assert.equal(after.cash, 0);
   assert.equal(after.operatingPayables, 2_000);
   assert.equal(totalLiabilities(after), 2_000);
+  assert.equal(after.ledger?.[0]?.amount, 0, 'unpaid shortfall is informational, not a cash movement');
+  assert.equal(after.ledger?.[1]?.amount, -1_000, 'ledger records only the amount actually paid from cash');
 });
 
 test('new operating receipts settle payables before increasing spendable cash', () => {
@@ -161,6 +163,7 @@ test('new operating receipts settle payables before increasing spendable cash', 
   assert.equal(after.cash, 3_000);
   assert.equal(after.operatingPayables, 0);
   assert.equal(after.ledger?.[0]?.label, 'Operating payables settled');
+  assert.equal(after.ledger!.reduce((sum, line) => sum + line.amount, 0), after.cash - before.cash, 'cash ledger reconciles to the cash balance change');
 });
 
 test('legacy negative cash is migrated into an operating liability', () => {
