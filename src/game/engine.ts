@@ -15,9 +15,9 @@ import { colourName } from './colours';
 import { FURNITURE, KIOSK_LISTING, Listing, Placed, STARTER_FURNITURE, autoPlace,
   findSpot, canPlace, turn, Rot, ceilingCapacity, ceilingUsed, yardCapacity, yardUsed, cheapestListing, furnitureById, listingsFor, newUid, prestigeRichShift, prestigeTraffic, shopStats, usesFloor, wallCapacity, wallUsed } from './shop';
 import { CharacterMemory, CollaborationEvent, CollaborationReply, Customer, DayLog, Departure, Design, ReplyChoice, GameState, LedgerLine, Message, Regular, ScoreBreakdown, Settlement, SponsorshipOffer, StaffMember, StaffProfession, StyleChoice } from './types';
-import { closeBrandDay, ensureBusinessState, getBrandMetrics, initialBankState, processBankWeekly, processPromotionAtClose, promotionTrafficBoost, recordWeeklyWealth, saveRentAtClose } from './business';
+import { closeBrandDay, ensureBusinessState, getBrandMetrics, initialBankState, processBankWeekly, processPromotionAtClose, processExpansionAtClose, promotionTrafficBoost, recordWeeklyWealth, saveRentAtClose } from './business';
 
-export { brandPower, currentWealthRows, getBrandMetrics, maximumLoan, netWorthPlayer, netWorthRival, playerWeekTotals, unlocksForFollowers, availablePromotionLevels, promotionBudgetBounds, promotionTrafficBoost, startPromotion, stopPromotion, transferBank, setRentSaving, setSavingsGoal, createFixedDeposit, takeBusinessLoan, repayBusinessLoan } from './business';
+export { brandPower, currentWealthRows, getBrandMetrics, maximumLoan, netWorthPlayer, netWorthRival, playerWeekTotals, unlocksForFollowers, availablePromotionLevels, promotionBudgetBounds, promotionTrafficBoost, startPromotion, stopPromotion, transferBank, setRentSaving, setSavingsGoal, createFixedDeposit, takeBusinessLoan, repayBusinessLoan, expansionOptions, investInExpansion } from './business';
 
 const pick = <T,>(a: readonly T[]): T => a[Math.floor(Math.random() * a.length)];
 const chance = (p: number) => Math.random() < p;
@@ -667,6 +667,7 @@ export function closeShop(s0: GameState): GameState {
   if (d.litres) ev.push(`Bought ${Math.round(d.litres * 10) / 10} litres of fuel for ${naira(d.fuel || 0)}.`);
   if (d.closedOn) ev.push(`${d.closedOn} ${d.closedOn > 1 ? 'were' : 'was'} still waiting at closing time and went home.`);
   s = { ...s, today: { ...s.today, events: [...s.today.events, ...ev] } };
+  s = processExpansionAtClose(s);
   s = processPromotionAtClose(s);
   s = saveRentAtClose(s);
 
