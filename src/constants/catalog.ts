@@ -450,22 +450,22 @@ export const WARDROBE: WardrobeItem[] = [
   W('bomberJacket', 'Bomber Jacket', 'outer', 'Outerwear', false, ['casual', 'party', 'birthday'], 'middle', 8000, 'satin', 'm'),
 
   // ---- designer womenswear: high, expensive, and couture price architecture ----
-  W('silkAtelierBlouse', 'Atelier Silk Blouse', 'top', 'Designer Tops', false, ['office', 'brunch', 'dateNight'], 'rich', 38_000, 'satin', 'f', { renderId: 'blouse', minTier: 1 }),
-  W('handBeadedCorset', 'Hand-Beaded Corset Top', 'top', 'Designer Tops', false, ['party', 'wedding', 'redCarpet'], 'rich', 125_000, 'sequin', 'f', { renderId: 'corsetTop', minTier: 2 }),
+  W('silkAtelierBlouse', 'Atelier Silk Blouse', 'top', 'Designer Tops', false, ['office', 'brunch', 'dateNight'], 'middle', 38_000, 'satin', 'f', { renderId: 'blouse', minTier: 1 }),
+  W('handBeadedCorset', 'Hand-Beaded Corset Top', 'top', 'Designer Tops', false, ['party', 'wedding', 'redCarpet'], 'middle', 125_000, 'sequin', 'f', { renderId: 'corsetTop', minTier: 2 }),
   W('asoOkeSculptedBodice', 'Sculpted Aso-Oke Bodice', 'top', 'Designer Native Tops', true, ['owambe', 'wedding'], 'rich', 185_000, 'asoOke', 'f', { renderId: 'laceBlouse', minTier: 2 }),
   W('coutureFeatherBlouse', 'Couture Statement Blouse', 'top', 'Couture Tops', false, ['party', 'redCarpet'], 'rich', 360_000, 'velvet', 'f', { renderId: 'puffBlouse', minTier: 3 }),
   W('heirloomAsoOkeBodice', 'Heirloom Handwoven Bodice', 'top', 'Couture Native Tops', true, ['wedding', 'owambe', 'redCarpet'], 'rich', 780_000, 'asoOke', 'f', { renderId: 'offShoulderBuba', minTier: 4 }),
 
   // ---- designer womenswear bottoms ----
-  W('tailoredWoolTrousers', 'Tailored Wool Trousers', 'bottom', 'Designer Trousers', false, ['office', 'church', 'dateNight'], 'rich', 42_000, 'plain', 'f', { renderId: 'straightTrousers', minTier: 1 }),
-  W('silkPalazzoTrousers', 'Silk Palazzo Trousers', 'bottom', 'Designer Trousers', false, ['brunch', 'dateNight', 'party'], 'rich', 88_000, 'satin', 'f', { renderId: 'wideLegTrousers', minTier: 2 }),
+  W('tailoredWoolTrousers', 'Tailored Wool Trousers', 'bottom', 'Designer Trousers', false, ['office', 'church', 'dateNight'], 'middle', 42_000, 'plain', 'f', { renderId: 'straightTrousers', minTier: 1 }),
+  W('silkPalazzoTrousers', 'Silk Palazzo Trousers', 'bottom', 'Designer Trousers', false, ['brunch', 'dateNight', 'party'], 'middle', 88_000, 'satin', 'f', { renderId: 'wideLegTrousers', minTier: 2 }),
   W('coutureEveningSkirt', 'Couture Evening Skirt', 'bottom', 'Couture Skirts', false, ['wedding', 'redCarpet', 'party'], 'rich', 220_000, 'velvet', 'f', { renderId: 'pleatedMidi', minTier: 3 }),
   W('embroideredGeorgeWrapper', 'Embroidered George Wrapper', 'bottom', 'Designer Native Wrappers', true, ['owambe', 'wedding'], 'rich', 265_000, 'george', 'f', { renderId: 'georgeWrapper', minTier: 3 }),
   W('royalLoomWrapper', 'Royal Handwoven Wrapper', 'bottom', 'Couture Native Wrappers', true, ['owambe', 'wedding', 'redCarpet'], 'rich', 850_000, 'asoOke', 'f', { renderId: 'georgeWrapper', minTier: 4 }),
 
   // ---- designer gowns, made-to-measure silhouettes, and bridal couture ----
-  W('designerSatinSlip', 'Designer Satin Slip Dress', 'dress', 'Designer Dresses', false, ['dateNight', 'party', 'brunch'], 'rich', 55_000, 'satin', 'f', { renderId: 'slipDress', minTier: 1 }),
-  W('atelierWrapDress', 'Atelier Wrap Dress', 'dress', 'Designer Dresses', false, ['office', 'brunch', 'wedding'], 'rich', 98_000, 'chiffon', 'f', { renderId: 'wrapDress', minTier: 2 }),
+  W('designerSatinSlip', 'Designer Satin Slip Dress', 'dress', 'Designer Dresses', false, ['dateNight', 'party', 'brunch'], 'middle', 55_000, 'satin', 'f', { renderId: 'slipDress', minTier: 1 }),
+  W('atelierWrapDress', 'Atelier Wrap Dress', 'dress', 'Designer Dresses', false, ['office', 'brunch', 'wedding'], 'middle', 98_000, 'chiffon', 'f', { renderId: 'wrapDress', minTier: 2 }),
   W('lagosRedCarpetGown', 'Lagos Red-Carpet Gown', 'dress', 'Designer Evening Gowns', false, ['redCarpet', 'wedding', 'party'], 'rich', 185_000, 'satin', 'f', { renderId: 'capeGown', minTier: 2 }),
   W('crystalMermaidGown', 'Crystal-Embellished Mermaid Gown', 'dress', 'Couture Evening Gowns', false, ['redCarpet', 'wedding'], 'rich', 420_000, 'sequin', 'f', { renderId: 'mermaidGown', minTier: 3 }),
   W('atelierBridalBallGown', 'Atelier Bridal Ball Gown', 'dress', 'Bridal Couture', false, ['wedding', 'redCarpet'], 'rich', 680_000, 'lace', 'f', { renderId: 'ballGown', minTier: 4 }),
@@ -475,24 +475,24 @@ export const WARDROBE: WardrobeItem[] = [
   W('beadedOwambeMermaid', 'Hand-Beaded Owambe Mermaid', 'dress', 'Couture Native Gowns', true, ['owambe', 'wedding'], 'rich', 890_000, 'george', 'f', { renderId: 'mermaidGown', minTier: 4 }),
 
   // ---- designer womenswear outer layers ----
-  W('tailoredWomensTuxedo', 'Tailored Women’s Tuxedo Jacket', 'outer', 'Designer Tailoring', false, ['office', 'redCarpet', 'dateNight'], 'rich', 145_000, 'velvet', 'f', { renderId: 'blazer', minTier: 2 }),
+  W('tailoredWomensTuxedo', 'Tailored Women’s Tuxedo Jacket', 'outer', 'Designer Tailoring', false, ['office', 'redCarpet', 'dateNight'], 'middle', 145_000, 'velvet', 'f', { renderId: 'blazer', minTier: 2 }),
   W('atelierTrench', 'Atelier Trench Coat', 'outer', 'Designer Outerwear', false, ['office', 'casual', 'brunch'], 'rich', 185_000, 'leather', 'f', { renderId: 'trenchCoat', minTier: 2 }),
   W('embroideredCapeJacket', 'Embroidered Cape Jacket', 'outer', 'Couture Outerwear', true, ['owambe', 'wedding', 'redCarpet'], 'rich', 285_000, 'asoOke', 'f', { renderId: 'kimono', minTier: 3 }),
   W('runwayLeatherTrench', 'Runway Leather Trench', 'outer', 'Couture Outerwear', false, ['party', 'dateNight', 'redCarpet'], 'rich', 470_000, 'leather', 'f', { renderId: 'trenchCoat', minTier: 3 }),
   W('coutureVelvetCape', 'Couture Velvet Cape', 'outer', 'Couture Outerwear', false, ['wedding', 'redCarpet'], 'rich', 820_000, 'velvet', 'f', { renderId: 'kimono', minTier: 4 }),
 
   // ---- premium menswear and suit separates ----
-  W('premiumCottonShirt', 'Premium Cotton Dress Shirt', 'top', 'Premium Menswear', false, ['office', 'church', 'dateNight'], 'rich', 22_000, 'plain', 'm', { renderId: 'shirt', minTier: 1 }),
-  W('silkDinnerShirt', 'Silk Dinner Shirt', 'top', 'Designer Menswear', false, ['wedding', 'dateNight', 'redCarpet'], 'rich', 72_000, 'satin', 'm', { renderId: 'shirt', minTier: 2 }),
+  W('premiumCottonShirt', 'Premium Cotton Dress Shirt', 'top', 'Premium Menswear', false, ['office', 'church', 'dateNight'], 'middle', 22_000, 'plain', 'm', { renderId: 'shirt', minTier: 1 }),
+  W('silkDinnerShirt', 'Silk Dinner Shirt', 'top', 'Designer Menswear', false, ['wedding', 'dateNight', 'redCarpet'], 'middle', 72_000, 'satin', 'm', { renderId: 'shirt', minTier: 2 }),
   W('embroideredDamaskDanshiki', 'Embroidered Damask Danshiki', 'top', 'Designer Native Menswear', true, ['owambe', 'wedding'], 'rich', 150_000, 'george', 'm', { renderId: 'dashiki', minTier: 2 }),
   W('luxuryVelvetIsiagu', 'Luxury Velvet Isiagu', 'top', 'Couture Native Menswear', true, ['owambe', 'wedding', 'redCarpet'], 'rich', 330_000, 'velvet', 'm', { renderId: 'isiagu', minTier: 3 }),
   W('heirloomAsoOkeMensTop', 'Heirloom Aso-Oke Ceremony Top', 'top', 'Couture Native Menswear', true, ['owambe', 'wedding'], 'rich', 720_000, 'asoOke', 'm', { renderId: 'mensBuba', minTier: 4 }),
-  W('premiumTailoredTrousers', 'Premium Tailored Trousers', 'bottom', 'Premium Menswear', false, ['office', 'church', 'dateNight'], 'rich', 28_000, 'plain', 'm', { renderId: 'trousers', minTier: 1 }),
-  W('italianWoolSuitTrousers', 'Italian-Wool Suit Trousers', 'bottom', 'Designer Menswear', false, ['office', 'wedding', 'redCarpet'], 'rich', 68_000, 'plain', 'm', { renderId: 'trousers', minTier: 2 }),
+  W('premiumTailoredTrousers', 'Premium Tailored Trousers', 'bottom', 'Premium Menswear', false, ['office', 'church', 'dateNight'], 'middle', 28_000, 'plain', 'm', { renderId: 'trousers', minTier: 1 }),
+  W('italianWoolSuitTrousers', 'Italian-Wool Suit Trousers', 'bottom', 'Designer Menswear', false, ['office', 'wedding', 'redCarpet'], 'middle', 68_000, 'plain', 'm', { renderId: 'trousers', minTier: 2 }),
   W('tailoredTuxedoTrousers', 'Tailored Tuxedo Trousers', 'bottom', 'Couture Menswear', false, ['wedding', 'redCarpet'], 'rich', 165_000, 'velvet', 'm', { renderId: 'trousers', minTier: 3 }),
   W('embroideredSenatorSokoto', 'Embroidered Senator Sokoto', 'bottom', 'Designer Native Menswear', true, ['owambe', 'wedding'], 'rich', 185_000, 'asoOke', 'm', { renderId: 'sokoto', minTier: 3 }),
   W('royalHandwovenSokoto', 'Royal Handwoven Sokoto', 'bottom', 'Couture Native Menswear', true, ['owambe', 'wedding'], 'rich', 650_000, 'asoOke', 'm', { renderId: 'sokoto', minTier: 4 }),
-  W('designerSenatorSet', 'Designer Senator Two-Piece', 'dress', 'Designer Native Sets', true, ['owambe', 'wedding', 'church'], 'rich', 135_000, 'plain', 'm', { renderId: 'senator', minTier: 2 }),
+  W('designerSenatorSet', 'Designer Senator Two-Piece', 'dress', 'Designer Native Sets', true, ['owambe', 'wedding', 'church'], 'middle', 135_000, 'plain', 'm', { renderId: 'senator', minTier: 2 }),
   W('coutureVelvetAgbada', 'Couture Velvet Agbada', 'dress', 'Couture Native Sets', true, ['owambe', 'wedding'], 'rich', 620_000, 'velvet', 'm', { renderId: 'agbada', minTier: 4 }),
   W('royalAsoOkeAgbada', 'Royal Aso-Oke Agbada', 'dress', 'Couture Native Sets', true, ['owambe', 'wedding', 'redCarpet'], 'rich', 1_100_000, 'asoOke', 'm', { renderId: 'agbada', minTier: 4 }),
   W('atelierSenatorKaftan', 'Atelier Senator Kaftan', 'dress', 'Designer Native Sets', true, ['office', 'church', 'owambe'], 'rich', 255_000, 'adire', 'm', { renderId: 'senator', minTier: 3 }),
