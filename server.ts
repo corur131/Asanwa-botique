@@ -48,7 +48,7 @@ app.post('/api/ai-chat', async (req, res) => {
   }
 
   const characterName = asText(req.body?.characterName, 80);
-  const characterProfile = asText(req.body?.characterProfile, 5000);
+  const characterProfile = asText(req.body?.characterProfile, 10000);
   const message = asText(req.body?.message, 1000);
   const isGroup = characterName === 'Lagos Fashion Babes';
   const participants = Array.isArray(req.body?.participants)
@@ -150,10 +150,12 @@ app.post('/api/ai-chat', async (req, res) => {
     const speaker = isGroup
       ? participants.find((name) => name.toLowerCase() === requestedSpeaker.toLowerCase()) || participants[0] || characterName
       : characterName;
+    const memoryPayload = parsed.memory && typeof parsed.memory === 'object' ? parsed.memory : {};
+    const rawMemoryNotes = memoryPayload.add;
     const memory = {
-      summary: asText(parsed.memory?.summary, 500),
-      add: Array.isArray(parsed.memory?.add)
-        ? parsed.memory.add.filter((note): note is string => typeof note === 'string').slice(0, 2).map((note) => asText(note, 160)).filter(Boolean)
+      summary: asText(memoryPayload.summary, 500),
+      add: Array.isArray(rawMemoryNotes)
+        ? rawMemoryNotes.filter((note: unknown): note is string => typeof note === 'string').slice(0, 2).map((note: string) => asText(note, 160)).filter(Boolean)
         : [],
     };
     res.json({ reply, speaker, memory });
