@@ -549,6 +549,8 @@ export interface GameState {
   grace: number;
   /** Rent owed and the day it must be cleared by. */
   lateRent: { amount: number; due: number } | null;
+  /** Unpaid operating costs when a recurring bill exceeds available cash; included in liabilities. */
+  operatingPayables?: number;
   stock: Design[];
   regulars: Regular[];
   staff: StaffMember[];
