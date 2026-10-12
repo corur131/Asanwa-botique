@@ -54,7 +54,7 @@ const Chip: React.FC<{ on?: boolean; onClick: () => void; children: React.ReactN
 
 export const MarketApp: React.FC<{ s: GameState; cart: CartLine[]; setCart: (f: (c: CartLine[]) => CartLine[]) => void; onPay: () => void; onBuyDrop: (n: number) => void }> = ({ s, cart, setCart, onPay, onBuyDrop }) => {
   const [view, setView] = useState<'list' | 'item' | 'cart'>('list');
-  const [cat, setCat] = useState<MarketCategory>('dress');
+  const [cat, setCat] = useState<MarketCategory>('clothes');
   const [who, setWho] = useState<'f' | 'm'>('f');
   const [origin, setOrigin] = useState<'all' | 'native' | 'english'>('all');
   const [sel, setSel] = useState<MarketEntry | null>(null);
@@ -245,6 +245,10 @@ export const MarketApp: React.FC<{ s: GameState; cart: CartLine[]; setCart: (f: 
           <Chip on={who === 'm'} onClick={() => setWho('m')}>Men</Chip>
           <span className="w-2 shrink-0" />
           {(['all', 'native', 'english'] as const).map((o) => <Chip key={o} on={origin === o} onClick={() => setOrigin(o)}>{o === 'all' ? 'All' : o === 'native' ? 'Native' : 'English'}</Chip>)}
+        </div>
+        <div className="flex items-center justify-between gap-2 pb-2 text-[10px] text-slate-400">
+          <span>{list.length} styles · sorted low to high</span>
+          <span>{who === 'm' && origin === 'english' ? 'Men’s English wear' : who === 'm' && origin === 'native' ? 'Men’s native wear' : who === 'f' && origin === 'english' ? 'Women’s English wear' : who === 'f' && origin === 'native' ? 'Women’s native wear' : 'Filter by gender and style'}</span>
         </div>
       </div>
       {flash && <div className="text-center text-xs text-emerald-300 py-1">{flash}</div>}
