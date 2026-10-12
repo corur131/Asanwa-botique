@@ -438,6 +438,12 @@ export interface BusinessLoan {
   missedPayments: number;
   /** Cumulative late fees, capped so missed payments cannot create runaway debt. */
   lateFees?: number;
+  /** Once defaulted, this remains on the account until the loan is fully cleared. */
+  defaulted?: boolean;
+  /** Collections begin after five consecutive missed payments. */
+  collectionsStarted?: boolean;
+  /** One hardship repayment arrangement is allowed per loan. */
+  arrangementUsed?: boolean;
 }
 
 export interface FixedDeposit {
