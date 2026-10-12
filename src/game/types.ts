@@ -202,6 +202,8 @@ export interface LedgerLine {
   t: number;
   label: string;
   amount: number;
+  /** Internal account transfers change the pocket, not total wealth or operating profit. */
+  category?: 'transfer' | 'operating' | 'financing' | 'interest';
 }
 
 export interface Post {
