@@ -162,7 +162,7 @@ export function takeBusinessLoan(s0: GameState, requested: number, termWeeks: nu
   const loan: BusinessLoan = {
     id: 'loan-' + s0.day + '-' + Math.random().toString(36).slice(2, 8),
     principal: amount, balance: amount, weeklyRatePct: rate, weeklyPayment, termWeeks,
-    nextPaymentDay: s0.day + 7, missedPayments: 0,
+    nextPaymentDay: (Math.floor(s0.day / 7) + 1) * 7, missedPayments: 0,
   };
   const next = ledger({ ...s0, bank: { ...bank, loans: [...bank.loans, loan] } }, amount, 'Business loan disbursement');
   return { ...next, today: { ...next.today, events: [...next.today.events, 'Business loan approved: ' + amount.toLocaleString('en-NG') + ' naira over ' + termWeeks + ' weeks.'] } };
