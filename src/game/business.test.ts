@@ -1,9 +1,10 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import type { GameState } from './types';
-import { money } from './engine';
+import { money, payRent, settleLateRent } from './engine';
 import {
   financialAssets,
+  netWorthPlayer,
   totalLiabilities,
   ensureBusinessState,
   initialBankState,
@@ -204,4 +205,78 @@ test('older loans with missed payments receive an arrears estimate when saves ar
     bank: { ...initialBankState(), loans: [legacyLoan] },
   }));
   assert.equal(after.bank!.loans[0].arrearsBalance, 24_000);
+});
+
+
+test('rent paid from both Rent Vault and cash is charged once and reconciles across accounts', () => {
+  const before = state({
+    day: 14,
+    cash: 10_000,
+    tier: 0,
+    grace: 3,
+    listing: { rent: 12_000 } as GameState['listing'],
+    lateRent: null,
+    bank: { ...initialBankState(), savings: 0, rentVault: 4_000, fixedDeposits: [], loans: [] },
+  });
+  const after = payRent(before);
+  assert.equal(after.cash, 2_000);
+  assert.equal(after.bank!.rentVault, 0);
+  assert.equal(after.lateRent, null);
+  assert.equal(after.today.costs, 12_000);
+  assert.equal(after.ledger!.reduce((sum, line) => sum + line.amount, 0), -12_000);
+});
+
+test('rent covered entirely by Rent Vault does not also deduct cash', () => {
+  const before = state({
+    cash: 7_000,
+    tier: 0,
+    grace: 3,
+    listing: { rent: 5_000 } as GameState['listing'],
+    lateRent: null,
+    bank: { ...initialBankState(), savings: 0, rentVault: 8_000, fixedDeposits: [], loans: [] },
+  });
+  const after = payRent(before);
+  assert.equal(after.cash, 7_000);
+  assert.equal(after.bank!.rentVault, 3_000);
+  assert.equal(after.lateRent, null);
+  assert.equal(after.today.costs, 5_000);
+});
+
+test('short rent becomes one visible liability and later partial settlement reduces it without recharging rent', () => {
+  const before = state({
+    cash: 1_000,
+    tier: 0,
+    grace: 3,
+    listing: { rent: 10_000 } as GameState['listing'],
+    lateRent: null,
+    bank: { ...initialBankState(), savings: 0, rentVault: 2_000, fixedDeposits: [], loans: [] },
+  });
+  const billed = payRent(before);
+  assert.equal(billed.cash, 0);
+  assert.equal(billed.bank!.rentVault, 0);
+  assert.equal(billed.lateRent!.amount, 7_000);
+  assert.equal(totalLiabilities(billed), 7_000);
+  assert.equal(billed.today.costs, 10_000);
+
+  const partiallySettled = settleLateRent({
+    ...billed,
+    cash: 3_000,
+    bank: { ...billed.bank!, rentVault: 1_000 },
+  });
+  assert.equal(partiallySettled.cash, 0);
+  assert.equal(partiallySettled.bank!.rentVault, 0);
+  assert.equal(partiallySettled.lateRent!.amount, 3_000);
+  assert.equal(totalLiabilities(partiallySettled), 3_000);
+  assert.equal(partiallySettled.today.costs, 10_000, 'clearing arrears must not charge the original rent again');
+});
+
+test('net worth falls by the value of newly recorded rent arrears', () => {
+  const common = {
+    tier: 0, rep: 35, followers: 120, stock: [], furniture: [],
+    bank: { ...initialBankState(), savings: 0, rentVault: 0, fixedDeposits: [], loans: [] },
+    businessExpansion: { branches: [], departments: [], wholesaleActive: false, designerCollections: 0 },
+  };
+  const noDebt = state({ ...common, lateRent: null });
+  const withDebt = state({ ...common, lateRent: { amount: 15_000, due: 20 } });
+  assert.equal(netWorthPlayer(noDebt) - netWorthPlayer(withDebt), 15_000);
 });
