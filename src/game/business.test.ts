@@ -316,6 +316,34 @@ test('the smallest shop keeps rent debt on the books and extends its deadline in
 });
 
 
+
+test('successful scheduled loan payments reduce monetary arrears instead of leaving the account permanently in arrears', () => {
+  const loan = {
+    id: 'loan-current-again', principal: 50_000, balance: 50_000, weeklyRatePct: 0,
+    weeklyPayment: 10_000, termWeeks: 8, nextPaymentDay: 7,
+    missedPayments: 0, arrearsBalance: 12_000,
+  };
+  const before = state({
+    day: 7,
+    cash: 30_000,
+    bank: { ...initialBankState(), savings: 0, rentVault: 0, loans: [loan] },
+  });
+  const first = processBankWeekly(before);
+  assert.equal(first.bank!.loans[0].balance, 40_000);
+  assert.equal(first.bank!.loans[0].arrearsBalance, 2_000);
+  assert.equal(creditHistoryReport(first).standing, 'In arrears');
+
+  const second = processBankWeekly({
+    ...first,
+    day: 14,
+    cash: 30_000,
+    bank: { ...first.bank!, loans: first.bank!.loans.map((item) => ({ ...item, nextPaymentDay: 14 })) },
+  });
+  assert.equal(second.bank!.loans[0].balance, 30_000);
+  assert.equal(second.bank!.loans[0].arrearsBalance, 0);
+  assert.equal(creditHistoryReport(second).standing, 'Current');
+});
+
 test('credit report continues to show arrears after a hardship plan resets consecutive missed-payment count', () => {
   const before = state({
     bank: { ...initialBankState(), loans: [{
