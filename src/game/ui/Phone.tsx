@@ -228,21 +228,41 @@ const relationshipRead = (feeling: number) => feeling <= -60
         ? 'There is some goodwill: more open or respectful, but still an independent business rival.'
         : 'There is strong goodwill or trust: warmer and more cooperative, while keeping the character’s core personality.';
 
-const rivalProfile = (r: Rival) => [
-  r.owner + ' owns ' + r.shop + ' in ' + r.area + '.',
-  'Core personality: ' + RIVAL_VOICE[r.personality],
-  'Fashion expertise: ' + SPECIALITY_VOICE[r.speciality],
-  'Relationship toward Divine: ' + relationshipRead(r.feeling),
-  'Competitive behaviour: ' + (r.aggression >= 0.7
-    ? 'highly willing to fight for customers and may use provocative or underhand tactics when the situation supports it.'
-    : r.aggression >= 0.4
-      ? 'competitive and capable of a sharp response, but not automatically looking for a fight.'
-      : 'usually measured and professional; competes more through the business than personal attacks.'),
-  'Current position: ' + (TIERS[r.tier]?.name || 'fashion') + ' tier, reputation ' + Math.round(r.rep) + '/100, ' + r.followers.toLocaleString('en-NG') + ' followers.',
-  r.main
-    ? 'This is one of the five principal rivals. Keep this individual recognisable across chats.'
-    : 'This is a supporting rival. Use their specific shop, speciality, position and relationship to distinguish them without inventing a personal backstory.'
-].join(' ');
+const RIVAL_DRIVES: Record<string, string> = {
+  tolani: 'Long-term ambition: keep House of Tolani the first name people think of for elite bridal fashion. She protects exclusivity, reputation and access to influential brides; genuine craft earns respect, but a rising competitor can make her guarded.',
+  amaka: 'Long-term ambition: own the youth-fashion conversation and turn online attention into repeat customers. She chases fresh trends and public wins, hates being dismissed as unserious, and may react quickly before thinking things through.',
+  bisi: 'Long-term ambition: preserve a trusted, profitable native-wear business built on quality, fit and experience. She values respect, craftsmanship and cultural knowledge, and worries that careless shortcuts or a destructive price war cheapen the work.',
+  chioma: 'Long-term ambition: win price-sensitive shoppers and build a recognisable affordable-fashion brand. She watches margins, prices and marketing opportunities closely; she is cheeky and opportunistic, but her business decisions should still make practical sense.',
+  zainab: 'Long-term ambition: make Zee Hair & Glam the go-to name for beautiful, dependable wigs and finishing services. She values loyalty, partnerships and being taken seriously; she can be warm without being a pushover.'
+};
+
+const rivalProfile = (r: Rival, s: GameState) => {
+  const currentLadder = ladder(s);
+  const ownRank = currentLadder.findIndex((row) => row.id === r.id) + 1;
+  const divineRank = currentLadder.findIndex((row) => row.you) + 1;
+  const rankContext = ownRank > 0 && divineRank > 0
+    ? 'Current public Top 20 snapshot: ' + r.owner + ' is ranked #' + ownRank + ' of ' + currentLadder.length + '; Divine is ranked #' + divineRank + '. React to this only when the topic makes it natural, and do not claim either rank changed during this conversation.'
+    : '';
+  return [
+    r.owner + ' owns ' + r.shop + ' in ' + r.area + '.',
+    'Core personality: ' + RIVAL_VOICE[r.personality],
+    'Fashion expertise: ' + SPECIALITY_VOICE[r.speciality],
+    'Personal ambition and pressure: ' + (RIVAL_DRIVES[r.id] || 'Build a sustainable boutique by serving a clear customer niche, protecting margins and reputation, and letting business choices reflect this shop’s speciality.'),
+    'Relationship toward Divine: ' + relationshipRead(r.feeling),
+    'Competitive behaviour: ' + (r.aggression >= 0.7
+      ? 'highly willing to fight for customers and may use provocative or underhand tactics when the situation supports it.'
+      : r.aggression >= 0.4
+        ? 'competitive and capable of a sharp response, but not automatically looking for a fight.'
+        : 'usually measured and professional; competes more through the business than personal attacks.'),
+    'Current position: ' + (TIERS[r.tier]?.name || 'fashion') + ' tier, reputation ' + Math.round(r.rep) + '/100, ' + r.followers.toLocaleString('en-NG') + ' followers.',
+    rankContext,
+    r.main
+      ? 'This is one of the five principal rivals. Keep this individual recognisable across chats.'
+      : 'This is a supporting rival. Use their specific shop, speciality, position and relationship to distinguish them without inventing a personal backstory.',
+    'Agency rule: this character has priorities independent of Divine. They can disagree, negotiate, refuse a request, protect their interests, offer help for their own reasons or change their mind when events justify it. Do not force the ambition into every reply.'
+  ].filter(Boolean).join(' ');
+};
+const groupMemoryKey = (name: string) => `${GROUP}::${name}`;
 
 const memoryBrief = (name: string, memory?: CharacterMemory, compact = false) => {
   if (!memory || (!memory.summary.trim() && memory.notes.length === 0)) {
@@ -282,9 +302,9 @@ const Chats: React.FC<PhoneProps> = ({ s, up, chat, setChat, staff }) => {
       ? (s.rivals || []).filter((r) => r.main).map((r) => r.owner)
       : [];
     const characterProfile = targetChat === GROUP
-      ? 'Group setting: Lagos fashion-business rivals who already know one another and Divine. Each listed participant has a separate personality profile and saved memory below. Choose the person whose viewpoint most naturally fits the latest message and recent group history. Do not blend their voices or make everyone speak in one turn. Do not rotate speakers mechanically.\n\n' + (s.rivals || []).filter((r) => r.main).map((r) => rivalProfile(r) + '\n' + memoryBrief(r.owner, s.characterMemories?.[r.owner], true)).join('\n\n')
+      ? 'Group setting: Lagos fashion-business rivals who already know one another and Divine. Each listed participant has a distinct personality, independent ambition and group-only memory below. The group history and these group-only memories are shared context; private direct-message memories are not available in this room and must never be inferred. Choose the person whose viewpoint most naturally fits the latest message and recent group history. Do not blend voices, disclose private-chat information, write multiple replies or rotate speakers mechanically.\n\n' + (s.rivals || []).filter((r) => r.main).map((r) => rivalProfile(r, s) + '\n' + memoryBrief(r.owner, s.characterMemories?.[groupMemoryKey(r.owner)], true)).join('\n\n')
       : targetRival
-        ? rivalProfile(targetRival)
+        ? rivalProfile(targetRival, s)
         : targetStaff
           ? [
               targetStaff.name + ' works at Asanwa Boutique as a ' + (targetStaff.profession || 'stylist') + '.',
@@ -367,7 +387,10 @@ const Chats: React.FC<PhoneProps> = ({ s, up, chat, setChat, staff }) => {
           text: data.reply.trim().slice(0, 1200), tone: 'info',
           t: g.phase === 'shop' ? Math.floor(g.clock) : undefined,
         };
-        const previous = g.characterMemories?.[replyFrom];
+        // Group-chat memories are separate from each character's private DM memory.
+        // The same character can remember a public group exchange without exposing private DMs to the room.
+        const memoryKey = targetChat === GROUP ? groupMemoryKey(replyFrom) : replyFrom;
+        const previous = g.characterMemories?.[memoryKey];
         const notes = [...(previous?.notes || [])];
         for (const note of proposedNotes) {
           if (!notes.some((old) => old.toLocaleLowerCase() === note.toLocaleLowerCase())) notes.push(note);
@@ -380,7 +403,7 @@ const Chats: React.FC<PhoneProps> = ({ s, up, chat, setChat, staff }) => {
         const characterMemories = memoryChanged
           ? {
               ...(g.characterMemories || {}),
-              [replyFrom]: { summary: nextSummary, notes: trimmedNotes, updatedDay: g.day },
+              [memoryKey]: { summary: nextSummary, notes: trimmedNotes, updatedDay: g.day },
             }
           : g.characterMemories;
         return {
