@@ -1,7 +1,7 @@
 import React, { Suspense, lazy, useState } from 'react';
 import { MARKUP, STAFF, TIERS, naira } from '../economy';
 import { POWER, RICH_CUSTOMER_STAFF_LEVEL, contestFor, fuelOf, fuelPerHour, tankSize, Candidate, RaiseAnswer, candidates, canHire, daysToRent, displayCap, displayedCount, listingsNow, marketWage, restockAllCost, stats, waitingRoom } from '../engine';
-import { FURNITURE, FURNITURE_GROUPS, FurnitureDef, FurnitureGroup, Listing, ceilingCapacity, ceilingUsed, finishes, furnitureById, furnitureForGroup, listingsFor, roomOf, wallCapacity, wallUsed } from '../shop';
+import { FURNITURE_GROUPS, FurnitureDef, FurnitureGroup, Listing, ceilingCapacity, ceilingUsed, finishes, furnitureById, furnitureForGroup, listingsFor, roomOf, wallCapacity, wallUsed } from '../shop';
 
 const FurniturePreview = lazy(() => import('../scene/Previews').then((m) => ({ default: m.FurniturePreview })));
 const RoomPreview = lazy(() => import('../scene/Previews').then((m) => ({ default: m.RoomPreview })));
@@ -322,7 +322,7 @@ export const MovePanel: React.FC<{ s: GameState; onMove: (l: Listing) => void }>
             <li>Rent: <b>{naira(pick.rent)}</b> every 7 days</li>
             <li>Landlord: <b>{pick.landlord}</b>, {graceText(pick.grace)}</li>
             <li>Prestige from location: <b>{pick.stars * 2}</b> (more customers, more rich ones)</li>
-            {pick.signature && <li className="text-amber-200">Signature benefits: extra customer traffic, rich-only walk-ins, much larger tips, celebrity visits with multi-million-naira spending, trending posts and large follower gains. Celebrity frequency is rare by design.</li>}
+            {pick.signature && <li className="text-amber-200">Signature benefits: extra customer traffic, rich-only walk-ins, much larger tips, celebrity visits with multi-million-naira spending, trending posts and large follower gains. Scheduled celebrity visits become more frequent at each Signature tier.</li>}
           </ul>
           {s.cash - pick.moveIn < pick.rent * 2 && <p className="text-sm text-rose-300 mb-3">Careful: the first two weeks in a new shop are quiet, and you'd have less than two weeks of rent saved.</p>}
           <div className="flex gap-2 justify-end">
