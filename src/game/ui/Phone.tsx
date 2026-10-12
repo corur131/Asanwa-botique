@@ -4,7 +4,7 @@ import { getDeborahConfig, MALE_CONFIG } from '../../constants/presets';
 import { naira } from '../economy';
 import * as E from '../engine';
 import { Listing } from '../shop';
-import { CharacterMemory, GameState, Message, Post, Rival } from '../types';
+import { CharacterMemory, CollaborationReply, GameState, Message, Post, Rival } from '../types';
 import { MarketApp } from './MarketApp';
 import { MovePanel, StaffActions, StaffPanel } from './Panels';
 import type { CartLine } from '../engine';
@@ -363,6 +363,7 @@ const Chats: React.FC<PhoneProps> = ({ s, up, chat, setChat, staff }) => {
             history: prior,
             message: text,
             gameContext: { day: s.day, reputation: s.rep, followers: s.followers, shopName: 'Asanwa Boutique' },
+            canDiscussCollaboration: Boolean(targetRival?.main && targetChat !== GROUP),
           }),
         });
       } catch (fetchError) {
@@ -383,6 +384,21 @@ const Chats: React.FC<PhoneProps> = ({ s, up, chat, setChat, staff }) => {
       const memoryUpdate = data.memory && typeof data.memory === 'object'
         ? data.memory as { summary?: unknown; add?: unknown }
         : {};
+      const rawCollaboration = data.collaboration && typeof data.collaboration === 'object'
+        ? data.collaboration as Partial<CollaborationReply>
+        : {};
+      const decision = rawCollaboration.decision;
+      const collaboration: CollaborationReply | undefined = targetRival?.main &&
+        (decision === 'accept' || decision === 'counter' || decision === 'reject')
+        ? {
+            decision,
+            eventName: typeof rawCollaboration.eventName === 'string' ? rawCollaboration.eventName.trim().slice(0, 80) : 'Asanwa Boutique x ' + targetRival.shop + ' Fashion Pop-up',
+            dayOffset: Math.round(Math.max(3, Math.min(14, typeof rawCollaboration.dayOffset === 'number' && Number.isFinite(rawCollaboration.dayOffset) ? rawCollaboration.dayOffset : 7))),
+            totalCost: Math.round(Math.max(15000, Math.min(80000, typeof rawCollaboration.totalCost === 'number' && Number.isFinite(rawCollaboration.totalCost) ? rawCollaboration.totalCost : 20000)) / 2500) * 2500,
+            playerCostSharePct: Math.round(Math.max(10, Math.min(90, typeof rawCollaboration.playerCostSharePct === 'number' && Number.isFinite(rawCollaboration.playerCostSharePct) ? rawCollaboration.playerCostSharePct : 50))),
+            playerProfitSharePct: Math.round(Math.max(10, Math.min(90, typeof rawCollaboration.playerProfitSharePct === 'number' && Number.isFinite(rawCollaboration.playerProfitSharePct) ? rawCollaboration.playerProfitSharePct : 50))),
+          }
+        : undefined;
       const proposedSummary = typeof memoryUpdate.summary === 'string' ? memoryUpdate.summary.trim().slice(0, 500) : '';
       const proposedNotes = Array.isArray(memoryUpdate.add)
         ? memoryUpdate.add.filter((note): note is string => typeof note === 'string').slice(0, 2).map((note) => note.trim().slice(0, 160)).filter(Boolean)
@@ -393,6 +409,7 @@ const Chats: React.FC<PhoneProps> = ({ s, up, chat, setChat, staff }) => {
           id, day: g.day, from: replyFrom,
           ...(targetChat === GROUP ? { chat: targetChat } : {}),
           text: data.reply.trim().slice(0, 1200), tone: 'info',
+          ...(collaboration ? { collaboration } : {}),
           t: g.phase === 'shop' ? Math.floor(g.clock) : undefined,
         };
         // Group-chat memories are separate from each character's private DM memory.
@@ -520,6 +537,40 @@ const Chats: React.FC<PhoneProps> = ({ s, up, chat, setChat, staff }) => {
                   <div className="text-[10px] text-slate-400 text-right mt-0.5">{m.t !== undefined ? E.clockText(m.t) : ''}</div>
                 </div>
               </div>
+              {m.collaboration && (m.collaboration.decision === 'accept' || m.collaboration.decision === 'counter') && (
+                <div className="ml-8 mt-1 mb-2 max-w-[90%] rounded-xl border border-emerald-400/25 bg-[#132920] p-3 text-[12px] text-slate-100">
+                  <div className="font-semibold text-emerald-200 mb-1">
+                    {m.collaboration.decision === 'counter' ? 'Business counter-offer' : 'Joint fashion pop-up proposal'}
+                  </div>
+                  <div className="font-medium text-white">{m.collaboration.eventName}</div>
+                  <div className="text-slate-300 mt-1">Proposed for in-game Day {s.day + Math.round(Math.max(3, Math.min(14, m.collaboration.dayOffset)))} · {m.collaboration.dayOffset} days from today</div>
+                  <div className="grid grid-cols-2 gap-x-3 gap-y-1 my-2">
+                    <div><span className="text-slate-400">Total setup cost</span><div className="font-semibold">{naira(m.collaboration.totalCost)}</div></div>
+                    <div><span className="text-slate-400">Your contribution</span><div className="font-semibold">{naira(Math.round(m.collaboration.totalCost * m.collaboration.playerCostSharePct / 100))} ({m.collaboration.playerCostSharePct}%)</div></div>
+                    <div><span className="text-slate-400">Your profit share</span><div className="font-semibold">{m.collaboration.playerProfitSharePct}%</div></div>
+                    <div><span className="text-slate-400">Partner's cost share</span><div className="font-semibold">{100 - m.collaboration.playerCostSharePct}%</div></div>
+                  </div>
+                  <div className="text-[10px] text-slate-400 mb-2">Confirming deducts your contribution immediately. The game calculates sales and the final payout when the event day ends.</div>
+                  {m.collaborationOutcome === 'scheduled' ? (
+                    <div className="rounded-lg bg-emerald-900/60 px-2.5 py-2 text-emerald-100">✓ Confirmed · scheduled for in-game Day {m.collaborationScheduledDay || (m.day + m.collaboration.dayOffset)}</div>
+                  ) : m.collaborationOutcome === 'declined' ? (
+                    <div className="rounded-lg bg-white/5 px-2.5 py-2 text-slate-300">Offer declined.</div>
+                  ) : m.collaborationOutcome === 'unaffordable' ? (
+                    <div className="rounded-lg bg-amber-900/40 px-2.5 py-2 text-amber-100">Not enough cash for your share. Discuss a smaller budget with the rival.</div>
+                  ) : m.collaborationOutcome === 'partner_unable' ? (
+                    <div className="rounded-lg bg-amber-900/40 px-2.5 py-2 text-amber-100">The rival cannot fund their share yet. Negotiate a smaller budget.</div>
+                  ) : m.collaborationOutcome === 'already_booked' ? (
+                    <div className="rounded-lg bg-white/5 px-2.5 py-2 text-slate-300">You already have an active pop-up with this rival.</div>
+                  ) : (
+                    <div className="flex gap-2">
+                      <button className="flex-1 rounded-lg bg-emerald-700 hover:bg-emerald-600 px-3 py-2 font-semibold text-white" onClick={() => up((g) => E.confirmCollaboration(g, m.id))}>
+                        {m.collaboration.decision === 'counter' ? 'Accept counter-offer' : 'Confirm pop-up'}
+                      </button>
+                      <button className="rounded-lg bg-[#2A3942] hover:bg-[#354751] px-3 py-2 text-slate-200" onClick={() => up((g) => E.declineCollaboration(g, m.id))}>Decline</button>
+                    </div>
+                  )}
+                </div>
+              )}
             </React.Fragment>
           );
         })}
