@@ -216,10 +216,17 @@ export function openShop(s0: GameState): GameState {
     mix[2] = Math.max(0, mix[2] + shift);
   }
   const arrivals = Array.from({ length: n }, () => ({ at: arrivalMinute(), c: makeCustomer(s, mix) }));
-  // Keep celebrity visits rare but predictable: three per 14 days for tiers 0–3,
-  // and one per 14 days for the flagship tier, instead of relying on random luck.
-  const fortnightDay = s.day % 14;
-  const celebrityScheduled = s.tier === 4 ? fortnightDay === 7 : [3, 8, 12].includes(fortnightDay);
+  // Premium access scales with property tier. These are the scheduled visit
+  // days within each 14-day cycle (2, 3, 4, 5, and 6 visits, respectively).
+  const celebrityDaysByTier: number[][] = [
+    [2, 9],
+    [1, 5, 10],
+    [0, 4, 7, 11],
+    [1, 4, 7, 10, 13],
+    [0, 2, 4, 7, 9, 12],
+  ];
+  const fortnightDay = (s.day - 1) % 14;
+  const celebrityScheduled = (celebrityDaysByTier[s.tier] || []).includes(fortnightDay);
   if (s.listing.signature && celebrityScheduled) {
     const c = makeCelebrityCustomer(s);
     arrivals.push({ at: 100 + Math.random() * 560, c });
@@ -1294,7 +1301,7 @@ export const PREVIEW_UID = '__preview';
  * "Buy / Cancel" step. Paint and flooring show on the walls and floor;
  * floor pieces sit where they would go (x, z, rot), others in their spot.
  */
-export function withPreview(s: GameState, id: string, at?: { x: number; z: number; rot: Rot }): { view: GameState; ok: boolean; why?: string; x: number; z: number; rot: Rot } {
+export function withPreview(s: GameState, id: string, at?: { x: number; z: number; rot: Rot; yardSide?: 'left' | 'right' }): { view: GameState; ok: boolean; why?: string; x: number; z: number; rot: Rot } {
   const f = furnitureById(id);
   const base = { uid: PREVIEW_UID, id, x: 0, z: 0, rot: 0 as Rot, placed: true };
   let furniture = s.furniture;
@@ -1319,7 +1326,7 @@ export function withPreview(s: GameState, id: string, at?: { x: number; z: numbe
     if (!ok) why = 'No ceiling space left';
   } else if (f.mount === 'yard') {
     ok = yardUsed(furniture) < yardCapacity(s.listing) && !(f.solar && furniture.filter((p) => furnitureById(p.id).solar).length >= POWER_CFG.maxPanels);
-    item = { ...base, placed: ok, x: yardUsed(furniture) };
+    item = { ...base, placed: ok, x: yardUsed(furniture), yardSide: at?.yardSide || 'right' };
     if (!ok) why = 'The yard is full';
   }
   if (s.cash < f.price) { ok = false; why = `You need ${naira(f.price)}`; }
@@ -1328,12 +1335,12 @@ export function withPreview(s: GameState, id: string, at?: { x: number; z: numbe
 }
 
 /** Buy the piece you were trying, where you put it. */
-export function buyPreviewed(s: GameState, id: string, at?: { x: number; z: number; rot: Rot }): GameState {
+export function buyPreviewed(s: GameState, id: string, at?: { x: number; z: number; rot: Rot; yardSide?: 'left' | 'right' }): GameState {
   const before = new Set(s.furniture.map((p) => p.uid));
   let next = buyFurniture(s, id);
   if (next === s) return s;
   const fresh = next.furniture.find((p) => !before.has(p.uid));
   if (fresh && at && furnitureById(id).mount === 'floor') next = placeFurniture(next, fresh.uid, at.x, at.z, at.rot);
-  if (fresh && at && furnitureById(id).mount === 'yard') next = { ...next, furniture: next.furniture.map((p) => p.uid === fresh.uid ? { ...p, yardSide: at.x < 0 ? 'left' : 'right' } : p) };
+  if (fresh && at && furnitureById(id).mount === 'yard') next = { ...next, furniture: next.furniture.map((p) => p.uid === fresh.uid ? { ...p, yardSide: at.yardSide || (at.x < 0 ? 'left' : 'right') } : p) };
   return next;
 }
