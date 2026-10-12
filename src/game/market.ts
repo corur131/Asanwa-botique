@@ -1,5 +1,5 @@
 import { FabricId } from '../types/character';
-import { AccessoryItem, BAGS, EARRINGS, GLASSES, HEADWEAR, NECKLACES, SHOES, WARDROBE, WRIST, WardrobeItem } from '../constants/catalog';
+import { AccessoryItem, BAGS, EARRINGS, GLASSES, HAIR_PRODUCTS, HEADWEAR, NECKLACES, SHOES, WARDROBE, WRIST, WardrobeItem } from '../constants/catalog';
 import { EARRING_PRICE, FABRIC_COST, PIECES_PER_DESIGN, TIERS } from './economy';
 import { Design, StockKind } from './types';
 
@@ -16,9 +16,12 @@ export interface MarketEntry {
   group: string;
   fabric?: FabricId;
   wardrobe?: WardrobeItem;
+  /** Reuse high-quality renderer assets while keeping market IDs and prices independent. */
+  renderId?: string;
+  minTier?: number;
 }
 
-export type MarketCategory = 'top' | 'bottom' | 'dress' | 'outer' | 'shoes' | 'bag' | 'headwear' | 'jewellery' | 'glasses';
+export type MarketCategory = 'top' | 'bottom' | 'dress' | 'outer' | 'shoes' | 'bag' | 'headwear' | 'jewellery' | 'glasses' | 'hair';
 export const MARKET_CATEGORIES: { id: MarketCategory; label: string }[] = [
   { id: 'top', label: 'Tops' },
   { id: 'bottom', label: 'Bottoms' },
@@ -29,16 +32,25 @@ export const MARKET_CATEGORIES: { id: MarketCategory; label: string }[] = [
   { id: 'headwear', label: 'Headwear' },
   { id: 'jewellery', label: 'Jewellery' },
   { id: 'glasses', label: 'Eyewear' },
+  { id: 'hair', label: 'Wigs & braids' },
 ];
 
 const acc = (kind: StockKind, list: AccessoryItem[], group: string): MarketEntry[] =>
-  list.filter((a) => a.id !== 'none').map((a) => ({ kind, id: a.id, label: a.label, price: a.price, for: a.for, native: !!a.native, luxury: a.price >= 10_000, group }));
+  list.filter((a) => a.id !== 'none').map((a) => ({
+    kind, id: a.id, label: a.label, price: a.price, for: a.for, native: !!a.native,
+    luxury: a.price >= 10_000, group, renderId: a.renderId || a.id, minTier: a.minTier,
+  }));
 
 export const MARKET: MarketEntry[] = [
-  ...WARDROBE.map((w) => ({ kind: w.slot as StockKind, id: w.id, label: w.label, price: w.price, for: w.for, native: w.native, luxury: w.cls === 'rich', group: w.group, fabric: w.fabric, wardrobe: w })),
+  ...WARDROBE.map((w) => ({
+    kind: w.slot as StockKind, id: w.id, label: w.label, price: w.price, for: w.for, native: w.native,
+    luxury: w.cls === 'rich', group: w.group, fabric: w.fabric, wardrobe: w,
+    renderId: w.renderId || w.id, minTier: w.minTier,
+  })),
   ...acc('shoes', SHOES, 'Shoes'),
   ...acc('bag', BAGS, 'Bags'),
   ...acc('headwear', HEADWEAR, 'Headwear'),
+  ...acc('hair', HAIR_PRODUCTS, 'Wigs & Braided Hair'),
   ...acc('necklace', NECKLACES, 'Necklaces'),
   ...acc('wrist', WRIST, 'Wrist'),
   ...acc('glasses', GLASSES, 'Eyewear'),
@@ -56,7 +68,7 @@ export function inCategory(e: MarketEntry, cat: MarketCategory) {
 export const isClothing = (k: StockKind) => k === 'top' || k === 'bottom' || k === 'dress' || k === 'outer';
 
 /** Colour matters for these accessories; jewellery and glasses are fixed. */
-export const takesColour = (k: StockKind) => isClothing(k) || k === 'shoes' || k === 'bag' || k === 'headwear';
+export const takesColour = (k: StockKind) => isClothing(k) || k === 'shoes' || k === 'bag' || k === 'headwear' || k === 'hair';
 
 export function pieceCost(e: MarketEntry, fabric?: FabricId) {
   if (!isClothing(e.kind) || !fabric) return e.price;
@@ -64,7 +76,23 @@ export function pieceCost(e: MarketEntry, fabric?: FabricId) {
   return Math.round(((e.price * (FABRIC_COST[fabric] || 1)) / base) / 100) * 100;
 }
 
-export const canBuy = (e: MarketEntry, tier: number) => !e.luxury || TIERS[tier].luxury;
+/** Cheap → mid → high → expensive → very expensive retail assortment ladder. */
+export type PriceBand = 'Cheap' | 'Mid' | 'High' | 'Expensive' | 'Very expensive';
+export function priceBand(price: number): PriceBand {
+  if (price < 10_000) return 'Cheap';
+  if (price < 40_000) return 'Mid';
+  if (price < 150_000) return 'High';
+  if (price < 500_000) return 'Expensive';
+  return 'Very expensive';
+}
+
+export const minTierFor = (e: MarketEntry) => e.minTier ?? (e.luxury ? 2 : 0);
+export const canBuy = (e: MarketEntry, tier: number) => tier >= minTierFor(e);
+
+/** Stock identity excludes the selected primary colour, but keeps fabric and print identity. */
+export function productKey(d: Pick<Design, 'kind' | 'itemId' | 'fabric' | 'color2' | 'pattern'>): string {
+  return [d.kind, d.itemId, isClothing(d.kind) ? d.fabric : '', isClothing(d.kind) ? d.color2 : '', isClothing(d.kind) ? d.pattern : ''].join('|');
+}
 
 let uidCounter = Date.now() % 100000;
 export function makeDesign(e: MarketEntry, o: { fabric?: FabricId; color: string; color2: string; pattern: number; pieces?: number }): Design {
