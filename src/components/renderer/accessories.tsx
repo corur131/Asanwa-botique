@@ -292,9 +292,10 @@ export const HandAccessories: React.FC<{ id: Id; spec: BodySpec; acc: Accessorie
     <g>
       {!!acc.wrist && ['watch', 'premiumAutomaticWatch', 'designerSteelChronograph', 'diamondDialWatch'].includes(acc.wrist) && (
         <g>
-          <rect x={wx - 13} y={wy - 18} width="26" height="10" rx="3" fill={acc.wrist === 'designerSteelChronograph' ? '#9A9EA5' : '#C9A24A'} />
-          <circle cx={wx - 2} cy={wy - 13} r={acc.wrist === 'diamondDialWatch' ? 8.5 : 7} fill="#F4ECD8" stroke={acc.wrist === 'designerSteelChronograph' ? '#555B65' : '#A9781E'} strokeWidth="2" />
+          <rect x={wx - (acc.wrist === 'premiumAutomaticWatch' ? 14 : 13)} y={wy - 18} width={acc.wrist === 'premiumAutomaticWatch' ? 28 : 26} height="10" rx="3" fill={acc.wrist === 'designerSteelChronograph' ? '#9A9EA5' : acc.wrist === 'premiumAutomaticWatch' ? '#5A3825' : '#C9A24A'} />
+          <circle cx={wx - 2} cy={wy - 13} r={acc.wrist === 'diamondDialWatch' ? 8.5 : acc.wrist === 'premiumAutomaticWatch' ? 8 : 7} fill="#F4ECD8" stroke={acc.wrist === 'designerSteelChronograph' ? '#555B65' : '#A9781E'} strokeWidth={acc.wrist === 'premiumAutomaticWatch' ? 2.8 : 2} />
           <path d={`M ${wx - 2} ${wy - 13} l 0 -4 M ${wx - 2} ${wy - 13} l 3 1`} stroke="#3A2A1A" strokeWidth="0.9" />
+          {acc.wrist === 'premiumAutomaticWatch' && <>{[0,1,2,3,4,5,6,7].map((i) => <circle key={i} cx={wx - 2 + Math.cos(i * Math.PI / 4) * 6} cy={wy - 13 + Math.sin(i * Math.PI / 4) * 6} r="0.85" fill="#A9781E" />)}<path d={`M ${wx - 2} ${wy - 13} L ${wx + 2} ${wy - 15}`} stroke="#A9781E" strokeWidth="1" /></>}
           {acc.wrist === 'designerSteelChronograph' && <>{[-5, 2, 7].map((dx) => <circle key={dx} cx={wx + dx} cy={wy - 13} r="1.6" fill="#777C84" />)}<path d={`M ${wx - 8} ${wy - 13} L ${wx + 5} ${wy - 13}`} stroke="#777C84" strokeWidth="0.8" /></>}
           {acc.wrist === 'diamondDialWatch' && Array.from({ length: 8 }, (_, i) => <path key={i} d={`M ${wx - 2 + Math.cos(i * Math.PI / 4) * 6} ${wy - 13 + Math.sin(i * Math.PI / 4) * 6} l 1.5 1.5 l -1.5 1.5 l -1.5 -1.5 Z`} fill="#EEF7FF" stroke="#AEBED0" strokeWidth="0.4" />)}
         </g>
@@ -303,8 +304,8 @@ export const HandAccessories: React.FC<{ id: Id; spec: BodySpec; acc: Accessorie
       {(acc.wrist === 'bangles' || acc.wrist === 'goldBangleStack') &&
         [0, 1].map((m) => (
           <g key={m} transform={m ? MIRROR : undefined}>
-            {[0, 6, 12].map((dy) => (
-              <ellipse key={dy} cx={wx} cy={wy - 26 + dy} rx="14" ry="4" fill="none" stroke={`url(#${id('gold')})`} strokeWidth="2.6" />
+            {(acc.wrist === 'goldBangleStack' ? [0, 5, 10, 15, 20] : [0, 6, 12]).map((dy) => (
+              <ellipse key={dy} cx={wx} cy={wy - (acc.wrist === 'goldBangleStack' ? 30 : 26) + dy} rx={acc.wrist === 'goldBangleStack' ? 15 : 14} ry={acc.wrist === 'goldBangleStack' ? 3.5 : 4} fill="none" stroke={`url(#${id('gold')})`} strokeWidth={acc.wrist === 'goldBangleStack' ? 2.1 : 2.6} />
             ))}
           </g>
         ))}
@@ -319,6 +320,11 @@ export const HandAccessories: React.FC<{ id: Id; spec: BodySpec; acc: Accessorie
           <path d={`M ${spec.elbow[0] - 88} ${spec.elbow[1] + 26} L ${spec.elbow[0] - 20} ${spec.elbow[1] + 26} L ${spec.elbow[0] - 12} ${spec.elbow[1] + 116} L ${spec.elbow[0] - 96} ${spec.elbow[1] + 116} Z`} fill={bc} />
           <path d={`M ${spec.elbow[0] - 88} ${spec.elbow[1] + 26} L ${spec.elbow[0] - 20} ${spec.elbow[1] + 26}`} stroke={darken(bc, 0.4)} strokeWidth="2" />
           <path d={`M ${spec.elbow[0] - 80} ${spec.elbow[1] + 40} L ${spec.elbow[0] - 84} ${spec.elbow[1] + 108}`} stroke={lighten(bc, 0.3)} strokeWidth="5" opacity="0.4" />
+          {bag === 'structuredWorkTote' && <>
+            <path d={`M ${spec.elbow[0] - 80} ${spec.elbow[1] + 38} L ${spec.elbow[0] - 84} ${spec.elbow[1] + 108} L ${spec.elbow[0] - 22} ${spec.elbow[1] + 108}`} fill="none" stroke="#D9B25A" strokeWidth="2.1" />
+            <path d={`M ${spec.elbow[0] - 74} ${spec.elbow[1] + 42} L ${spec.elbow[0] - 78} ${spec.elbow[1] + 98}`} fill="none" stroke={lighten(bc, 0.38)} strokeWidth="2.2" strokeDasharray="3 3" />
+            <rect x={spec.elbow[0] - 55} y={spec.elbow[1] + 66} width="17" height="13" rx="2" fill="#D9B25A" stroke="#87631D" strokeWidth="1" />
+          </>}
         </g>
       )}
 
@@ -346,6 +352,11 @@ export const HandAccessories: React.FC<{ id: Id; spec: BodySpec; acc: Accessorie
             <rect x={bx - 26} y={by - 24} width="54" height="40" rx="8" fill={bc} />
             <path d={`M ${bx - 26} ${by - 16} Q ${bx + 1} ${by + 4} ${bx + 28} ${by - 16} L ${bx + 28} ${by - 16} L ${bx + 28} ${by - 16}`} fill="none" stroke={darken(bc, 0.4)} strokeWidth="1.4" />
             <circle cx={bx + 1} cy={by - 4} r="3.4" fill={hw(bc)} />
+            {bag === 'premiumLeatherCrossbody' && <>
+              <path d={`M ${bx - 20} ${by - 13} Q ${bx + 1} ${by + 1} ${bx + 22} ${by - 13}`} fill="none" stroke={lighten(bc, 0.36)} strokeWidth="2" />
+              <rect x={bx - 5} y={by - 8} width="12" height="8" rx="1.5" fill="#D9B25A" stroke="#8A661D" strokeWidth="0.8" />
+              <path d={`M ${bx - 20} ${by + 9} L ${bx - 22} ${by + 12} M ${bx - 12} ${by + 11} L ${bx - 14} ${by + 14} M ${bx + 14} ${by + 11} L ${bx + 16} ${by + 14} M ${bx + 22} ${by + 9} L ${bx + 24} ${by + 12}`} stroke="#E4C16E" strokeWidth="1.1" />
+            </>}
           </g>
         );
       })()}
