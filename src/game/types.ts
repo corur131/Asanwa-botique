@@ -369,7 +369,7 @@ export interface Message {
   /** The back-and-forth conversation this message belongs to. */
   convo?: string;
   /** What the message is about, for the reply's effect. */
-  ctx?: { kind: 'shade' | 'brag' | 'bait' | 'invite'; rivalId?: string; eventId?: string };
+  ctx?: { kind: 'shade' | 'brag' | 'bait' | 'invite' | 'sponsorship'; rivalId?: string; eventId?: string; offerId?: string };
   /** Structured business proposal returned by the AI; only explicit player confirmation makes it real. */
   collaboration?: CollaborationReply;
   /** Result of the player's action on a collaboration proposal. */
@@ -471,6 +471,17 @@ export interface WeeklyWealthSnapshot {
   brandPower: number;
 }
 
+export interface SponsorshipOffer {
+  id: string;
+  sponsor: string;
+  day: number;
+  expiresDay: number;
+  followersRequired: number;
+  payout: number;
+  bonusFollowers: number;
+  status: 'offered' | 'accepted' | 'declined' | 'expired';
+}
+
 export interface GameState {
   version: 5;
   /** Lagos-season weather, optional so older saves continue loading. */
@@ -544,6 +555,9 @@ export interface GameState {
   promotion?: PromotionCampaign;
   /** Historical weekly wealth snapshots for every modeled business owner. */
   wealthHistory?: WeeklyWealthSnapshot[];
+  /** Sponsored-content opportunities unlocked by social audience growth. */
+  sponsorshipOffers?: SponsorshipOffer[];
+  lastSponsorshipDay?: number;
   rivals: Rival[];
   /** Official weekly ladder: ids in order ('you' is Divine). */
   ranking: { week: number; order: string[] }[];
