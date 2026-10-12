@@ -94,6 +94,10 @@ export interface Rival {
   assetValue?: number;
   brand?: BrandMetrics;
   promotion?: PromotionCampaign;
+  /** Extra operating units beyond the original shop. */
+  branches?: number;
+  departments?: string[];
+  wholesaleActive?: boolean;
   /** How they feel about Divine, -100 (enemy) … 100 (friend). */
   feeling: number;
   look: CharacterConfig;
@@ -440,6 +444,25 @@ export interface FixedDeposit {
   maturityDay: number;
 }
 
+export interface BusinessBranch {
+  id: string;
+  name: string;
+  area: string;
+  tier: number;
+  openedDay: number;
+  weeklyRent: number;
+  assetValue: number;
+}
+
+export type ExpansionInvestment = 'branch' | 'wholesale' | 'bridal' | 'accessories' | 'menswear' | 'designer';
+
+export interface BusinessExpansionState {
+  branches: BusinessBranch[];
+  departments: string[];
+  wholesaleActive: boolean;
+  designerCollections: number;
+}
+
 export interface BankState {
   savings: number;
   rentVault: number;
@@ -551,6 +574,7 @@ export interface GameState {
   collaborations?: CollaborationEvent[];
   /** New financial systems are optional in the type so versioned saves can be migrated safely. */
   bank?: BankState;
+  businessExpansion?: BusinessExpansionState;
   brand?: BrandMetrics;
   promotion?: PromotionCampaign;
   /** Historical weekly wealth snapshots for every modeled business owner. */
