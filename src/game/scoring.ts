@@ -125,14 +125,14 @@ const itemOcc = (d: Design) => {
 const occFit = (occ: Occasion[], target: Occasion) => (occ.includes(target) ? 1 : occ.some((o) => NEAR[target]?.includes(o)) ? 0.6 : 0.15);
 
 /** Hair or makeup only: judged on what they asked for and how well it suits the occasion. */
-function scoreService(c: Customer, choice: StyleChoice): ScoreBreakdown {
+function scoreService(c: Customer, choice: StyleChoice, stock: Design[]): ScoreBreakdown {
   const notes: string[] = [];
   const glam = glamLevel(choice.makeup);
   let hit = 0;
   for (const w of c.wants) {
     let ok = 0;
     if (w.kind === 'hair') {
-      const stocked = designsOf(c, stock).hair;
+      const stocked = designsOf(choice, stock).hair;
       const selectedHair = stocked ? entryFor(stocked.kind, stocked.itemId)?.renderId || stocked.itemId : choice.hair;
       ok = selectedHair && (w.group === 'male' || hairGroup(selectedHair) === w.group) ? 1 : 0;
     }
@@ -145,7 +145,8 @@ function scoreService(c: Customer, choice: StyleChoice): ScoreBreakdown {
   const wantsFace = c.service !== 'hair' && !c.male;
   const wantsHair = c.service !== 'makeup';
   let quality = 1;
-  if (wantsHair && !choice.hair) { quality -= 0.5; notes.push(c.male ? 'You did not touch his hair.' : 'You did not do her hair.'); }
+  const hasStockedHair = !!designsOf(choice, stock).hair;
+  if (wantsHair && !choice.hair && !hasStockedHair) { quality -= 0.5; notes.push(c.male ? 'You did not touch his hair.' : 'You did not do her hair.'); }
   if (wantsFace) {
     const fit = 1 - Math.min(1, Math.abs(glam - GLAM_WANTED[c.occasion]) * 1.6);
     quality = quality * 0.5 + fit * 0.5;
@@ -161,7 +162,7 @@ function scoreService(c: Customer, choice: StyleChoice): ScoreBreakdown {
 }
 
 export function scoreLook(c: Customer, choice: StyleChoice, stock: Design[]): ScoreBreakdown {
-  if (c.service) return scoreService(c, choice);
+  if (c.service) return scoreService(c, choice, stock);
   const d = designsOf(choice, stock);
   const notes: string[] = [];
   const main = [d.dress, d.top, d.bottom].filter(Boolean) as Design[];
