@@ -193,10 +193,94 @@ const ContactAvatar: React.FC<{ name: string; s: GameState; size?: AvatarSize }>
   );
 };
 
+const targetChatLabel = (chat: string) => chat === GROUP ? 'the group' : chat.split(' ')[0];
+
 const stamp = (m: Message) => (m.t !== undefined ? `Day ${m.day} · ${E.clockText(m.t)}` : `Day ${m.day}`);
 
 const Chats: React.FC<PhoneProps> = ({ s, up, chat, setChat, staff }) => {
   const list = E.chats(s);
+  const [draft, setDraft] = useState('');
+  const [aiSending, setAiSending] = useState(false);
+  const [aiError, setAiError] = useState('');
+  const sendFreeform = async (event: React.FormEvent) => {
+    event.preventDefault();
+    const text = draft.trim();
+    if (!chat || !text || aiSending) return;
+    const targetChat = chat;
+    const prior = s.messages
+      .filter((m) => E.thread(m) === targetChat)
+      .sort((a, b) => a.id - b.id)
+      .slice(-12)
+      .map((m) => ({
+        role: m.from === 'You' ? 'user' : 'model',
+        text: targetChat === GROUP && m.from !== 'You' ? `${m.from}: ${m.text}` : m.text,
+      }));
+    const targetRival = (s.rivals || []).find((r) => r.owner === targetChat);
+    const targetStaff = (s.staff || []).find((m) => m.name === targetChat);
+    const characterProfile = targetRival
+      ? `${targetRival.owner} owns ${targetRival.shop} in ${targetRival.area}. Personality: ${targetRival.personality}. Speciality: ${targetRival.speciality}. Relationship feeling toward Divine: ${targetRival.feeling}/100. Reputation: ${targetRival.rep}; followers: ${targetRival.followers}. Stay consistent with this character and the established game world.`
+      : targetStaff
+        ? `${targetStaff.name} works at Asanwa Boutique as a ${targetStaff.profession || 'stylist'}, level ${targetStaff.level}, loyalty ${targetStaff.loyalty}/100. Speak naturally as a staff member with a distinct voice.`
+        : targetChat === 'Deborah'
+          ? 'Deborah is Divine’s twin sister, close confidante, and helps manage the boutique books. She is warm, candid, playful, and protective of Divine.'
+          : targetChat === 'Landlord'
+            ? `The landlord of Divine's current shop at ${s.listing.street}, ${s.listing.area}. Be practical, business-minded, and sometimes strict about rent.`
+            : `A character in Asanwa Boutique, a contemporary Lagos fashion-business drama game. Stay consistent with the conversation history and do not invent major game facts.`;
+    const participants = targetChat === GROUP
+      ? (s.rivals || []).filter((r) => r.main).map((r) => r.owner)
+      : [];
+    setDraft('');
+    setAiError('');
+    setAiSending(true);
+    const userMessageId = s.msgSeq + 1;
+    up((g) => ({
+      ...g,
+      msgSeq: Math.max(g.msgSeq || 0, userMessageId),
+      messages: [{
+        id: userMessageId, day: g.day, from: 'You', chat: targetChat, text,
+        tone: 'info' as const, t: g.phase === 'shop' ? Math.floor(g.clock) : undefined,
+      }, ...g.messages].slice(0, 160),
+    }));
+    try {
+      const response = await fetch('/api/ai-chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          characterName: targetChat,
+          characterProfile,
+          participants,
+          history: prior,
+          message: text,
+          gameContext: { day: s.day, reputation: s.rep, followers: s.followers, shopName: 'Asanwa Boutique' },
+        }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error || `Gemini request failed (${response.status}).`);
+      if (typeof data.reply !== 'string' || !data.reply.trim()) throw new Error('Gemini returned an empty reply.');
+      up((g) => {
+        const id = (g.msgSeq || 0) + 1;
+        const replyMessage: Message = {
+          id, day: g.day, from: targetChat === GROUP && typeof data.speaker === 'string' ? data.speaker : targetChat,
+          ...(targetChat === GROUP ? { chat: targetChat } : {}),
+          text: data.reply.trim().slice(0, 1200), tone: 'info',
+          t: g.phase === 'shop' ? Math.floor(g.clock) : undefined,
+        };
+        return {
+          ...g,
+          msgSeq: id,
+          messages: [replyMessage, ...g.messages.map((m) =>
+            E.thread(m) === targetChat && m.choices && !m.answered ? { ...m, answered: 'freeform' } : m,
+          )].slice(0, 160),
+        };
+      });
+    } catch (error) {
+      up((g) => ({ ...g, messages: g.messages.filter((m) => m.id !== userMessageId) }));
+      setDraft(text);
+      setAiError(error instanceof Error ? error.message : 'Could not reach the AI service.');
+    } finally {
+      setAiSending(false);
+    }
+  };
   const endRef = useRef<HTMLDivElement>(null);
   // after Divine replies, their answers arrive one by one with "typing…"
   const [typing, setTyping] = useState<{ from: number; start: number } | null>(null);
@@ -330,10 +414,34 @@ const Chats: React.FC<PhoneProps> = ({ s, up, chat, setChat, staff }) => {
           <button className="flex-1 rounded-full bg-[#2A3942] text-white text-xs py-2 px-3" onClick={() => staff.raise(member.id, 'counter')}>Offer {naira(Math.round((member.wage + ask) / 2 / 500) * 500)}</button>
           <button className="flex-1 rounded-full bg-[#2A3942] text-rose-300 text-xs py-2 px-3" onClick={() => staff.raise(member.id, 'refuse')}>No</button>
         </div>
-      ) : (
-        <div className="bg-[#202C33] px-3 py-2 shrink-0">
-          <div className="rounded-full bg-[#2A3942] text-slate-500 text-sm px-4 py-2">Message</div>
+      ) : member && ask ? (
+        <div className="bg-[#202C33] p-2 flex flex-wrap gap-1.5 shrink-0">
+          <button className="flex-1 rounded-full bg-[#005C4B] text-white text-xs py-2 px-3" onClick={() => staff.raise(member.id, 'accept')}>Okay, {naira(ask)}</button>
+          <button className="flex-1 rounded-full bg-[#2A3942] text-white text-xs py-2 px-3" onClick={() => staff.raise(member.id, 'counter')}>Offer {naira(Math.round((member.wage + ask) / 2 / 500) * 500)}</button>
+          <button className="flex-1 rounded-full bg-[#2A3942] text-rose-300 text-xs py-2 px-3" onClick={() => staff.raise(member.id, 'refuse')}>No</button>
         </div>
+      ) : null}
+      {chat && (
+        <form onSubmit={sendFreeform} className="bg-[#202C33] border-t border-white/5 p-2 shrink-0">
+          {aiError && <div role="alert" className="text-[11px] text-rose-300 px-2 pb-1">{aiError}</div>}
+          <div className="flex items-end gap-2">
+            <textarea
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); e.currentTarget.form?.requestSubmit(); } }}
+              placeholder={aiSending ? 'Waiting for reply…' : `Message ${targetChatLabel(chat)}`}
+              aria-label="Write a message"
+              rows={1}
+              maxLength={1000}
+              disabled={aiSending}
+              className="min-w-0 flex-1 resize-none rounded-2xl bg-[#2A3942] text-white placeholder:text-slate-400 text-sm px-4 py-2.5 outline-none focus:ring-1 focus:ring-emerald-500 disabled:opacity-60"
+            />
+            <button type="submit" disabled={aiSending || !draft.trim()} className="rounded-full w-10 h-10 shrink-0 bg-[#00A884] text-white font-bold disabled:opacity-40" aria-label="Send message">
+              {aiSending ? '…' : '➤'}
+            </button>
+          </div>
+          <div className="text-[10px] text-slate-500 px-2 pt-1">Free-form AI chat · Enter to send, Shift+Enter for a new line</div>
+        </form>
       )}
     </div>
   );
