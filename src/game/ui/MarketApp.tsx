@@ -3,9 +3,9 @@ import { CharacterSvg } from '../../components/renderer/renderCharacter';
 import { ANKARA_PRINTS, DEFAULT_WARDROBE, FABRICS, FABRIC_COLORS } from '../../constants/catalog';
 import { DIVINE_CONFIG, MALE_CONFIG } from '../../constants/presets';
 import { CharacterConfig, FabricId } from '../../types/character';
-import { MARKUP, naira } from '../economy';
+import { MARKUP, TIERS, naira } from '../economy';
 import { CartLine, cartLineCost, cartNewDesigns, cartTotal, displayCap, displayedCount } from '../engine';
-import { MARKET, MARKET_CATEGORIES, MarketCategory, MarketEntry, canBuy, entryFor, inCategory, isClothing, pieceCost, takesColour } from '../market';
+import { HAIR_SWATCHES, MARKET, MARKET_CATEGORIES, MarketCategory, MarketEntry, canBuy, entryFor, inCategory, isClothing, minTierFor, pieceCost, priceBand, takesColour } from '../market';
 import { colourName } from '../colours';
 import { GameState } from '../types';
 import { Swatch } from './kit';
@@ -15,20 +15,27 @@ const colourList = FABRIC_COLORS.map((c) => ({ name: colourName(c), color: c }))
 export function mannequin(e: MarketEntry, fabric: FabricId, color: string, color2: string, pattern: number): CharacterConfig {
   const male = e.for === 'm';
   const base = male ? MALE_CONFIG : DIVINE_CONFIG;
-  const g = { style: e.id, fabric, color, color2, pattern };
+  const renderId = e.renderId || e.id;
+  const hairColour = e.kind === 'hair' ? HAIR_SWATCHES[((pattern % HAIR_SWATCHES.length) + HAIR_SWATCHES.length) % HAIR_SWATCHES.length].id : base.hairColor;
+  const g = { style: renderId, fabric, color, color2, pattern };
   const w = { ...DEFAULT_WARDROBE[male ? 'male' : 'femaleRegular'] };
   if (e.kind === 'dress') Object.assign(w, { dress: g, top: undefined, bottom: undefined });
   if (e.kind === 'top') w.top = g;
   if (e.kind === 'bottom') w.bottom = g;
   if (e.kind === 'outer') w.outer = g;
   const acc = { ...(base.accessories || {}), headwear: 'none', bag: 'none', glasses: 'none', necklace: 'none', wrist: 'none', beads: false, watch: false } as NonNullable<CharacterConfig['accessories']>;
-  if (e.kind === 'shoes') Object.assign(acc, { shoes: e.id, shoesColor: color });
-  if (e.kind === 'bag') Object.assign(acc, { bag: e.id, bagColor: color });
-  if (e.kind === 'headwear') Object.assign(acc, { headwear: e.id, headwearColor: color });
-  if (e.kind === 'necklace') acc.necklace = e.id;
-  if (e.kind === 'wrist') acc.wrist = e.id;
-  if (e.kind === 'glasses') acc.glasses = e.id;
-  return { ...base, wardrobe: w, outfit: undefined, accessories: acc, earrings: e.kind === 'earrings' ? (e.id as CharacterConfig['earrings']) : 'none', state: 'styled' };
+  if (e.kind === 'shoes') Object.assign(acc, { shoes: renderId, shoesColor: color });
+  if (e.kind === 'bag') Object.assign(acc, { bag: renderId, bagColor: color });
+  if (e.kind === 'headwear') Object.assign(acc, { headwear: renderId, headwearColor: color });
+  if (e.kind === 'necklace') acc.necklace = renderId;
+  if (e.kind === 'wrist') acc.wrist = renderId;
+  if (e.kind === 'glasses') acc.glasses = renderId;
+  return {
+    ...base,
+    ...(e.kind === 'hair' ? { hair: renderId as CharacterConfig['hair'], hairColor: hairColour as CharacterConfig['hairColor'] } : {}),
+    wardrobe: w, outfit: undefined, accessories: acc,
+    earrings: e.kind === 'earrings' ? (renderId as CharacterConfig['earrings']) : 'none', state: 'styled',
+  };
 }
 
 const lineKey = (l: Omit<CartLine, 'key' | 'pieces'>) => [l.kind, l.itemId, l.fabric || '', l.color, l.color2, l.pattern].join('|');
@@ -67,6 +74,10 @@ export const MarketApp: React.FC<{ s: GameState; cart: CartLine[]; setCart: (f: 
   const open = (e: MarketEntry) => {
     setSel(e);
     setFabric(e.fabric || 'plain');
+    setPattern(0);
+    const firstColour = e.kind === 'hair' ? HAIR_SWATCHES[0].color : FABRIC_COLORS[5];
+    setPreview(firstColour);
+    setColor2(FABRIC_COLORS[3]);
     setPicks(takesColour(e.kind) ? [] : [{ color: '#C9A163', n: 1 }]);
     setView('item');
   };
@@ -132,6 +143,9 @@ export const MarketApp: React.FC<{ s: GameState; cart: CartLine[]; setCart: (f: 
     const unit = pieceCost(sel, clothing ? fabric : undefined);
     const n = picks.reduce((a, p) => a + p.n, 0);
     const locked = !canBuy(sel, s.tier);
+    const requiredTier = minTierFor(sel);
+    const itemColours = sel.kind === 'hair' ? HAIR_SWATCHES : colourList;
+    const previewPattern = sel.kind === 'hair' ? Math.max(0, HAIR_SWATCHES.findIndex((h) => h.color === preview)) : pattern;
     const toggle = (color: string) => {
       setPreview(color);
       setPicks((ps) => (ps.some((p) => p.color === color) ? ps.filter((p) => p.color !== color) : [...ps, { color, n: 1 }]));
@@ -141,7 +155,7 @@ export const MarketApp: React.FC<{ s: GameState; cart: CartLine[]; setCart: (f: 
         let next = [...c];
         for (const p of picks) {
           if (!p.n) continue;
-          const base = { kind: sel.kind, itemId: sel.id, fabric: clothing ? fabric : undefined, color: p.color, color2: clothing ? color2 : p.color, pattern: clothing ? pattern : 0 };
+          const base = { kind: sel.kind, itemId: sel.id, fabric: clothing ? fabric : undefined, color: p.color, color2: clothing ? color2 : p.color, pattern: sel.kind === 'hair' ? Math.max(0, HAIR_SWATCHES.findIndex((h) => h.color === p.color)) : clothing ? pattern : 0 };
           const key = lineKey(base);
           const have = next.find((x) => x.key === key);
           next = have ? next.map((x) => (x.key === key ? { ...x, pieces: x.pieces + p.n } : x)) : [...next, { ...base, key, pieces: p.n }];
@@ -157,14 +171,14 @@ export const MarketApp: React.FC<{ s: GameState; cart: CartLine[]; setCart: (f: 
         {header(sel.label, () => setView('list'))}
         <div className="flex-1 overflow-y-auto">
           <div className="h-72 bg-gradient-to-b from-[#2a2320] to-[#141210] flex justify-center overflow-hidden py-1">
-            <CharacterSvg config={mannequin(sel, fabric, picks.length ? preview : takesColour(sel.kind) ? preview : '#C9A163', color2, pattern)} idPrefix="mkapp" camera={clothing || sel.kind === 'shoes' ? 'full' : 'bust'} className="h-full w-auto" />
+            <CharacterSvg config={mannequin(sel, fabric, picks.length ? preview : takesColour(sel.kind) ? preview : '#C9A163', color2, previewPattern)} idPrefix="mkapp" camera={clothing || sel.kind === 'shoes' ? 'full' : 'bust'} className="h-full w-auto" />
           </div>
           <div className="p-3 space-y-3">
             <div className="flex items-baseline justify-between">
               <div className="text-xs text-slate-400">{sel.group}{sel.native ? ' · Native' : ''}</div>
               <div className="text-sm text-white"><b>{naira(unit)}</b> <span className="text-slate-400 text-xs">each · sells ~{naira(unit * MARKUP)}</span></div>
             </div>
-            {locked && <div className="rounded-lg bg-amber-500/10 border border-amber-500/30 p-2 text-xs text-amber-200">Luxury suppliers only sell to a Boutique or bigger.</div>}
+            {locked && <div className="rounded-lg bg-amber-500/10 border border-amber-500/30 p-2 text-xs text-amber-200">Available from {TIERS[requiredTier]?.name || 'a later shop tier'} onwards. Premium suppliers unlock as your boutique grows.</div>}
             {clothing && (
               <div>
                 <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1">Fabric</div>
@@ -181,7 +195,7 @@ export const MarketApp: React.FC<{ s: GameState; cart: CartLine[]; setCart: (f: 
               <div>
                 <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1">Colours <span className="normal-case font-normal text-slate-500">· tap as many as you want</span></div>
                 <div className="flex flex-wrap gap-1.5">
-                  {colourList.map((c) => {
+                  {itemColours.map((c) => {
                     const on = picks.some((p) => p.color === c.color);
                     return <button key={c.color} title={c.name} onClick={() => toggle(c.color)} className={`w-7 h-7 rounded-full border-2 ${on ? 'border-orange-400 scale-110 ring-2 ring-orange-400/40' : 'border-white/20'}`} style={{ background: c.color }} />;
                   })}
@@ -245,8 +259,9 @@ export const MarketApp: React.FC<{ s: GameState; cart: CartLine[]; setCart: (f: 
               <div className="text-[13px] font-semibold text-white leading-tight">{e.label}</div>
               <div className="text-[11px] text-slate-400 mt-0.5">{naira(e.price)} · sells ~{naira(e.price * MARKUP)}</div>
               <div className="flex flex-wrap gap-1 mt-1.5">
+                <span className="text-[10px] rounded-full bg-sky-500/15 text-sky-200 px-1.5">{priceBand(e.price)}</span>
                 {e.native && <span className="text-[10px] rounded-full bg-emerald-500/20 text-emerald-200 px-1.5">Native</span>}
-                {lock && <span className="text-[10px] rounded-full bg-amber-500/20 text-amber-200 px-1.5">Boutique+</span>}
+                {lock && <span className="text-[10px] rounded-full bg-amber-500/20 text-amber-200 px-1.5">{TIERS[minTierFor(e)]?.name || 'Premium'}+</span>}
                 {inCart > 0 && <span className="text-[10px] rounded-full bg-orange-500/30 text-orange-100 px-1.5">{inCart} in cart</span>}
               </div>
             </button>
