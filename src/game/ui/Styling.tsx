@@ -7,6 +7,7 @@ import { HAIR_COST, MARKUP, naira } from '../economy';
 import { entryFor } from '../market';
 import { OCCASION_LABEL } from '../customers';
 import { buildLook, designsOf, hairGroup, lookCost } from '../scoring';
+import { productKey } from '../market';
 import { Customer, Design, GameState, StyleChoice, Want } from '../types';
 import { Btn, CLASS_LABEL, CLASS_TONE, Chip, ColourDots, Pill, Swatch } from './kit';
 
@@ -37,34 +38,66 @@ export const RequestCard: React.FC<{ c: Customer; compact?: boolean }> = ({ c, c
   </div>
 );
 
-const ItemList: React.FC<{ title: string; slot: keyof StyleChoice; items: Design[]; empty?: string; choice: StyleChoice; toggle: (slot: keyof StyleChoice, uid: string) => void }> = ({ title, slot, items, empty, choice, toggle }) => (
-    <div>
+const ItemList: React.FC<{ title: string; slot: keyof StyleChoice; items: Design[]; empty?: string; choice: StyleChoice; toggle: (slot: keyof StyleChoice, uid: string) => void }> = ({ title, slot, items, empty, choice, toggle }) => {
+  const [expanded, setExpanded] = useState<string | null>(null);
+  const groups = useMemo(() => {
+    const map = new Map<string, Design[]>();
+    for (const d of items) {
+      const key = productKey(d);
+      map.set(key, [...(map.get(key) || []), d]);
+    }
+    return [...map.entries()].map(([key, variants]) => ({ key, variants }));
+  }, [items]);
+  return (
+    <div className="mb-3">
       <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">{title}</div>
-      {items.length === 0 ? (
+      {groups.length === 0 ? (
         <p className="text-xs text-slate-500 mb-3">{empty || 'Nothing on display. Buy some at the market tomorrow morning.'}</p>
       ) : (
-        <div className="grid grid-cols-2 gap-1.5 mb-3">
-          {items.map((d) => {
-            const on = choice[slot] === d.uid;
+        <div className="grid grid-cols-2 gap-1.5">
+          {groups.map(({ key, variants }) => {
+            const selected = variants.find((d) => d.uid === choice[slot]);
+            const on = !!selected;
+            const open = expanded === key;
+            const d = selected || variants[0];
             const e = entryFor(d.kind, d.itemId);
+            const units = variants.reduce((sum, v) => sum + v.pieces, 0);
+            const colors = [...new Set(variants.map((v) => v.color))].length;
             return (
-              <button key={d.uid} onClick={() => toggle(slot, d.uid)} className={`flex items-center gap-2 p-2 rounded-lg border text-left transition-all ${on ? 'border-amber-500 bg-amber-500/15' : 'border-white/10 bg-white/5 hover:border-white/25'}`}>
-                <Swatch d={d} />
-                <span className="min-w-0">
-                  <span className="block text-xs font-semibold text-white truncate">{d.label}</span>
-                  <span className="block text-[10px] text-slate-400">
-                    {e?.native ? 'Native · ' : ''}
-                    {d.fabric !== 'plain' ? `${d.fabric} · ` : ''}
-                    {naira(d.cost * MARKUP)} · {d.pieces} left
+              <div key={key} className={`rounded-lg border overflow-hidden ${on ? 'border-amber-500 bg-amber-500/10' : 'border-white/10 bg-white/5'}`}>
+                <button type="button" onClick={() => setExpanded(open ? null : key)} className="w-full flex items-center gap-2 p-2 text-left hover:bg-white/5">
+                  <Swatch d={d} />
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-xs font-semibold text-white leading-tight">{d.label}</span>
+                    <span className="block text-[10px] text-slate-400">
+                      {e?.native ? 'Native · ' : ''}{d.fabric !== 'plain' ? `${d.fabric} · ` : ''}{naira(d.cost * MARKUP)} · {units} left
+                    </span>
+                    <span className="block text-[10px] text-amber-200">{colors} colour{colors === 1 ? '' : 's'} · {open ? 'choose colour' : 'tap to choose'}</span>
                   </span>
-                </span>
-              </button>
+                  <span className="text-slate-400 text-xs">{open ? '⌃' : '⌄'}</span>
+                </button>
+                {open && (
+                  <div className="border-t border-white/10 p-2 bg-black/15">
+                    <div className="text-[10px] text-slate-400 mb-1.5">Choose the colour to put on {slot === 'hairpiece' ? 'the hairpiece' : 'the look'}.</div>
+                    <div className="flex flex-wrap gap-2">
+                      {variants.map((v) => (
+                        <button key={v.uid} type="button" title={`${v.color} · ${v.pieces} left`} onClick={() => toggle(slot, v.uid)} className={`relative w-9 h-9 rounded-full border-2 ${choice[slot] === v.uid ? 'border-amber-300 ring-2 ring-amber-400/40' : 'border-white/25'} `} style={{ background: v.color }}>
+                          {v.pieces <= 0 && <span className="absolute inset-0 rounded-full bg-black/70 text-[9px] flex items-center justify-center text-rose-200">0</span>}
+                          {choice[slot] === v.uid && <span className="absolute -right-1 -top-1 bg-amber-300 text-black w-4 h-4 rounded-full text-[10px] flex items-center justify-center">✓</span>}
+                        </button>
+                      ))}
+                    </div>
+                    {selected && <div className="mt-2 text-[10px] text-emerald-200">Selected: {selected.color} · {selected.pieces} in stock</div>}
+                  </div>
+                )}
+              </div>
             );
           })}
         </div>
       )}
     </div>
   );
+};
 
 
 export const Styling: React.FC<{
@@ -117,7 +150,7 @@ export const Styling: React.FC<{
     ? [...(c.service !== 'makeup' ? [['hair', c.male ? 'Hair & beard' : 'Hair'] as [Tab, string]] : []), ...(c.service !== 'hair' && !c.male ? [['face', 'Makeup'] as [Tab, string]] : [])]
     : [['outfit', 'Outfit'], ['feet', 'Shoes & bags'], ['extras', 'Jewellery & head'], ['hair', c.male ? 'Hair & beard' : 'Hair'], ...(c.male ? [] : [['face', 'Makeup'] as [Tab, string]])];
   const hasOutfit = !!(chosen.dress || chosen.top || chosen.bottom);
-  const didService = !!choice.hair || !!choice.makeup || !!choice.beard;
+  const didService = !!choice.hair || !!choice.hairpiece || !!choice.makeup || !!choice.beard;
   const canFinish = serviceOnly ? didService : hasOutfit || didService;
 
   return (
@@ -195,6 +228,9 @@ export const Styling: React.FC<{
               </div>
               <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">Colour</div>
               <ColourDots colors={hairColours} value={hairColours.find((h) => h.id === (choice.hairColor || c.look.hairColor))?.color} onPick={(col) => setChoice((ch) => ({ ...ch, hairColor: hairColours.find((h) => h.color === col)?.id }))} />
+              <div className="mt-4">
+                <ItemList title="Wigs, braids & stocked hairpieces" choice={choice} toggle={toggle} slot="hairpiece" items={kind('hair')} empty="No wigs or braided-hair pieces on display. Stock some in Yaba Mart." />
+              </div>
               {c.male && (
                 <>
                   <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mt-4 mb-1.5">Beard</div>
