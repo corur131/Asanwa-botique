@@ -498,6 +498,8 @@ export interface BankState {
   rentVaultRatePct: number;
   fixedDeposits: FixedDeposit[];
   loans: BusinessLoan[];
+  /** Last in-game day on which weekly banking was processed; optional for old saves. */
+  lastProcessedDay?: number;
   /** Persisted in-game credit record; optional for older save compatibility. */
   creditProfile?: CreditProfile;
   savingsGoalName: string;
