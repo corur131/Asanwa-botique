@@ -366,6 +366,7 @@ export interface Message {
   collaboration?: CollaborationReply;
   /** Result of the player's action on a collaboration proposal. */
   collaborationOutcome?: 'scheduled' | 'declined' | 'unaffordable' | 'already_booked' | 'partner_unable';
+  collaborationScheduledDay?: number;
   /** Game minute (shop clock) it arrived, if during the day. */
   t?: number;
   day: number;
