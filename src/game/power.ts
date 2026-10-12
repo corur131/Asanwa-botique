@@ -135,9 +135,11 @@ export function coolRunning(s: GameState): number {
 /** How fast waiting customers use up their patience. */
 export function drainRate(s: GameState, cls: CustomerClass): number {
   const src = source(s);
-  if (src === 'none') return { poor: 1.3, middle: 2, rich: 3 }[cls];
+  // Power cuts still make customers less comfortable, but should not erase
+  // most of the longer patience window—especially for rich customers.
+  if (src === 'none') return { poor: 1.15, middle: 1.35, rich: 1.6 }[cls];
   const hot = coolRunning(s) <= 0;
-  let r = hot ? { poor: 1.1, middle: 1.2, rich: 1.35 }[cls] : 1;
+  let r = hot ? { poor: 1.05, middle: 1.1, rich: 1.2 }[cls] : 1;
   if (src === 'solar') r *= 0.9; // cool, quiet, and they're impressed
   return r;
 }
