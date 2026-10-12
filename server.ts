@@ -53,6 +53,9 @@ app.post('/api/ai-chat', async (req, res) => {
   const isGroup = characterName === 'Lagos Fashion Babes';
   const eligibleCollaborationPartners = new Set(['Tolani Adebayo', 'Amaka Obi', 'Iya Bisi', 'Chioma Eze', 'Zainab Bello']);
   const canDiscussCollaboration = !isGroup && eligibleCollaborationPartners.has(characterName) && req.body?.canDiscussCollaboration === true;
+  const hasCollaborationTopic = /(joint|pop[ -]?up|collaborat|partnership|partner up|team up|work together|co-host)/i.test(message);
+  const hasProposalLanguage = /(let's|let us|how about|what about|i want us to|can we|can you|we can|we could|we should|would you|i propose|are you open|share the cost|split the profit|run a|host)/i.test(message);
+  const canReturnCollaboration = canDiscussCollaboration && hasCollaborationTopic && hasProposalLanguage;
   const participants: string[] = Array.isArray(req.body?.participants)
     ? req.body.participants.filter((x: unknown): x is string => typeof x === 'string').slice(0, 8).map((x: string) => x.slice(0, 80))
     : [];
@@ -87,7 +90,7 @@ app.post('/api/ai-chat', async (req, res) => {
     'Characters are not merely agreeable assistants to Divine. They can disagree, set boundaries, bargain, protect their business, offer help for their own reasons, refuse requests or update an opinion when the conversation or game context justifies it. Preserve nuance rather than making rivals cartoon villains.',
     'Use current game facts and public standing only as context. Never claim that a rival took an off-screen action, changed their statistics, launched a promotion or made a decision unless that event is present in the supplied conversation or game context.',
     'COLLABORATION PROPOSALS:',
-    canDiscussCollaboration
+    canReturnCollaboration
       ? 'You are speaking privately with an eligible main rival. If and only if Divine explicitly proposes a concrete joint fashion pop-up, fashion event or business collaboration in the latest message, respond in character and return a structured collaboration decision. Choose accept when the terms are plausible for this rival, counter when they would participate only with changed terms, or reject when the idea conflicts with their interests. Use none for every ordinary message, hypothetical idea, request for advice, or vague remark that is not an actual proposal. Keep event cost between ₦15,000 and ₦80,000, dayOffset between 3 and 14 in-game days, and cost/profit share percentages between 10 and 90. If the player proposes to share both cost and profit equally, start at 50/50 unless this character has a clear reason to negotiate. These are proposed terms only: the game engine will check cash, schedule the event only after Divine confirms, and calculate the final result. Choose terms that fit the player’s available cash and the rival’s available business cash supplied in the profile; each party must be able to cover their contribution. Do not quote either cash figure unprompted. Do not claim the collaboration is already booked.'
       : 'No business-collaboration action is available in this chat. Set collaboration.decision to none and do not generate a collaboration offer.',
     'KNOWLEDGE BOUNDARIES:',
@@ -200,7 +203,7 @@ app.post('/api/ai-chat', async (req, res) => {
     const rawDecision = asText(rawCollaboration.decision, 20);
     const validDecision = ['none', 'accept', 'counter', 'reject'].includes(rawDecision) ? rawDecision : 'none';
     const collaboration = {
-      decision: canDiscussCollaboration && validDecision !== 'none' ? validDecision : 'none',
+      decision: canReturnCollaboration && validDecision !== 'none' ? validDecision : 'none',
       eventName: asText(rawCollaboration.eventName, 80) || 'Asanwa Boutique x ' + characterName + ' Fashion Pop-up',
       dayOffset: Math.round(Math.max(3, Math.min(14, typeof rawCollaboration.dayOffset === 'number' && Number.isFinite(rawCollaboration.dayOffset) ? rawCollaboration.dayOffset : 7))),
       totalCost: Math.round(Math.max(15000, Math.min(80000, typeof rawCollaboration.totalCost === 'number' && Number.isFinite(rawCollaboration.totalCost) ? rawCollaboration.totalCost : 20000)) / 2500) * 2500,
