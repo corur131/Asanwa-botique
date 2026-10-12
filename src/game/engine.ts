@@ -1075,6 +1075,7 @@ export function moveTo(s0: GameState, l0: Listing, equipmentPlan: 'arrange' | 's
   const t = TIERS[tier];
   let next: GameState = money({ ...s, tier, listing: l, furniture: move.furniture, movedDay: s.day, grace: l.grace }, -l.moveIn, `Move-in: ${l.street}`);
   if (move.saleProceeds > 0) next = money(next, move.saleProceeds, 'Sold shop equipment during move');
+  next = fitDisplay(next);
   const equipmentMessage = equipmentPlan === 'store'
     ? ' I have put your reusable equipment in storage; the new shop starts empty, and you can bring items out from Build mode.'
     : equipmentPlan === 'sell'
