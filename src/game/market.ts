@@ -21,12 +21,13 @@ export interface MarketEntry {
   minTier?: number;
 }
 
-export type MarketCategory = 'top' | 'bottom' | 'dress' | 'outer' | 'shoes' | 'bag' | 'headwear' | 'jewellery' | 'glasses' | 'hair';
+export type MarketCategory = 'top' | 'bottom' | 'dress' | 'outer' | 'suiting' | 'shoes' | 'bag' | 'headwear' | 'jewellery' | 'glasses' | 'hair';
 export const MARKET_CATEGORIES: { id: MarketCategory; label: string }[] = [
   { id: 'top', label: 'Tops' },
   { id: 'bottom', label: 'Bottoms' },
   { id: 'dress', label: 'Dresses & Gowns' },
   { id: 'outer', label: 'Outerwear' },
+  { id: 'suiting', label: 'Suits & tailoring' },
   { id: 'shoes', label: 'Shoes' },
   { id: 'bag', label: 'Bags' },
   { id: 'headwear', label: 'Headwear' },
@@ -61,6 +62,7 @@ export const entryFor = (kind: StockKind, id: string) => MARKET.find((m) => m.ki
 
 export function inCategory(e: MarketEntry, cat: MarketCategory) {
   if (cat === 'jewellery') return e.kind === 'necklace' || e.kind === 'wrist' || e.kind === 'earrings';
+  if (cat === 'suiting') return /suit|tuxedo|tailor/i.test(e.label + ' ' + e.group);
   return e.kind === cat;
 }
 
