@@ -493,12 +493,18 @@ function Shaker({ on, children }: { on: boolean; children: React.ReactNode }) {
 }
 
 /** Staff wander, take short idle breaks, and use a seat when one is free. */
-function StaffRoutine({ look, spawn, workTarget, blocked, w, d, assigned, seats }: {
+function StaffRoutine({ look, spawn, workTarget, blocked, w, d, assigned, leaving, seats }: {
   look: FigureLook; spawn: Cell; workTarget: Cell; blocked: boolean[][]; w: number; d: number;
-  assigned: boolean; seats: { cell: Cell; position: [number, number, number]; face: number }[];
+  assigned: boolean; leaving: boolean; seats: { cell: Cell; position: [number, number, number]; face: number }[];
 }) {
   const [routine, setRoutine] = useState<{ target: Cell; pose: Pose; seatPosition?: [number, number, number]; seatFace?: number }>({ target: spawn, pose: 'stand' });
   useEffect(() => {
+    // Build mode has priority over the normal idle/work routine: staff should
+    // physically walk through the shop entrance rather than wander inside.
+    if (leaving) {
+      setRoutine({ target: workTarget, pose: 'stand' });
+      return;
+    }
     if (assigned) {
       setRoutine({ target: workTarget, pose: 'work' });
       return;
@@ -517,8 +523,10 @@ function StaffRoutine({ look, spawn, workTarget, blocked, w, d, assigned, seats 
       setRoutine({ target, pose: poses[Math.floor(Math.random() * poses.length)] });
     }, 8500);
     return () => window.clearInterval(timer);
-  }, [assigned, workTarget[0], workTarget[1], spawn[0], spawn[1], seats, blocked, w, d]);
-  return <Walker look={look} spawn={spawn} target={assigned ? workTarget : routine.target} blocked={blocked} w={w} d={d} speed={1.15} pose={assigned ? 'work' : routine.pose} seatPosition={assigned ? undefined : routine.seatPosition} seatFace={assigned ? undefined : routine.seatFace} />;
+  }, [assigned, leaving, workTarget[0], workTarget[1], spawn[0], spawn[1], seats, blocked, w, d]);
+  const target = leaving || assigned ? workTarget : routine.target;
+  const pose: Pose = leaving ? 'stand' : assigned ? 'work' : routine.pose;
+  return <Walker look={look} spawn={spawn} target={target} blocked={blocked} w={w} d={d} speed={1.15} pose={pose} seatPosition={leaving || assigned ? undefined : routine.seatPosition} seatFace={leaving || assigned ? undefined : routine.seatFace} />;
 }
 
 /** Grey puffs from the exhaust while the generator runs. */
@@ -883,7 +891,7 @@ export default function ShopScene(p: SceneProps) {
     const station = assigned ? serviceStation(m.profession) : null;
     const workCell = station || sp.staffClient[i] || sp.style;
     const c = p.build ? ([Math.max(-1, sp.door[0] - 2 - i), r.d + 1] as Cell) : assigned ? nextTo(workCell) : sp.staff[i] || sp.divine;
-    people.push(<StaffRoutine key={m.id} look={lookToFigure(m.look)} spawn={sp.staff[i] || sp.divine} workTarget={c} blocked={blocked} w={r.w} d={r.d} assigned={!!assigned && !p.build} seats={sp.seatWait} />);
+    people.push(<StaffRoutine key={m.id} look={lookToFigure(m.look)} spawn={sp.staff[i] || sp.divine} workTarget={c} blocked={blocked} w={r.w} d={r.d} assigned={!!assigned && !p.build} leaving={!!p.build} seats={sp.seatWait} />);
   });
   if (s.phase === 'shop') {
     let k = 0;
