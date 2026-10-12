@@ -1,4 +1,4 @@
-import type { BankPocket, BankState, BrandMetrics, BusinessBranch, BusinessExpansionState, BusinessLoan, ExpansionInvestment, GameState, PromotionCampaign, PromotionLevel, PromotionMode, Rival, WeeklyWealthSnapshot } from './types';
+import type { BankPocket, BankState, BrandMetrics, BusinessBranch, BusinessExpansionState, BusinessLoan, CreditProfile, ExpansionInvestment, GameState, PromotionCampaign, PromotionLevel, PromotionMode, Rival, WeeklyWealthSnapshot } from './types';
 import { TIERS } from './economy';
 import { furnitureById } from './shop';
 
@@ -19,6 +19,7 @@ export function initialBankState(): BankState {
   return {
     savings: 0, rentVault: 0, rentMode: 'manual', autoRentPercent: 20,
     savingsRatePct: 0.65, rentVaultRatePct: 0.25, fixedDeposits: [], loans: [],
+    creditProfile: { score: 620, onTimePayments: 0, latePayments: 0, defaults: 0, loansTaken: 0, lastApplicationDay: -999 },
     savingsGoalName: 'Next shop upgrade', savingsGoalAmount: 1_000_000,
   };
 }
@@ -149,20 +150,58 @@ export function createFixedDeposit(s0: GameState, amount: number, durationDays: 
   return { ...s0, bank: { ...bank, savings: bank.savings - value, fixedDeposits: [...bank.fixedDeposits, deposit] } };
 }
 
-export function maximumLoan(s: GameState): number {
-  const maxByTier = [300_000, 1_500_000, 6_000_000, 25_000_000, 75_000_000][clamp(s.tier, 0, 4)];
+export function creditProfile(s: GameState): CreditProfile {
   const bank = s.bank || initialBankState();
-  const activeDebt = bank.loans.reduce((sum, loan) => sum + loan.balance, 0);
+  if (bank.creditProfile) return bank.creditProfile;
+  // Existing saves receive a fair starter profile, with any known delinquency reflected.
+  const missed = bank.loans.reduce((sum, loan) => sum + Math.max(0, loan.missedPayments || 0), 0);
+  const defaults = bank.loans.filter((loan) => (loan.missedPayments || 0) >= 3).length;
+  return {
+    score: clamp(620 - Math.min(180, missed * 18) - defaults * 45, 300, 850),
+    onTimePayments: 0, latePayments: missed, defaults,
+    loansTaken: bank.loans.length, lastApplicationDay: -999,
+  };
+}
+
+export function creditRating(score: number): string {
+  if (score >= 800) return 'Excellent';
+  if (score >= 750) return 'Very good';
+  if (score >= 650) return 'Good';
+  if (score >= 550) return 'Fair';
+  if (score >= 450) return 'Poor';
+  return 'Very poor';
+}
+
+export function loanRateForScore(score: number): number {
+  if (score >= 800) return 2.2;
+  if (score >= 750) return 2.5;
+  if (score >= 650) return 2.8;
+  if (score >= 550) return 3.2;
+  if (score >= 450) return 3.8;
+  return 4.5;
+}
+
+export function maximumLoan(s: GameState): number {
+  const profile = creditProfile(s);
+  const bank = s.bank || initialBankState();
+  const activeDebt = bank.loans.reduce((sum, loan) => sum + Math.max(0, loan.balance), 0);
+  // A current default blocks fresh borrowing until the player clears the defaulted loan.
+  if (profile.score < 450 || bank.loans.some((loan) => (loan.missedPayments || 0) >= 3)) return 0;
+  const maxByTier = [300_000, 1_500_000, 6_000_000, 25_000_000, 75_000_000][clamp(s.tier, 0, 4)];
   const weeklyRevenue = (s.history || []).slice(-7).reduce((sum, day) => sum + day.income, 0);
-  const cashFlowLimit = Math.max(100_000, weeklyRevenue * 2 + Math.max(0, s.cash) * 0.25);
-  return Math.round(Math.max(0, Math.min(maxByTier, cashFlowLimit - activeDebt)) / 10_000) * 10_000;
+  const netWorth = Math.max(0, netWorthPlayer(s));
+  const affordabilityLimit = Math.max(100_000, weeklyRevenue * 2 + Math.max(0, s.cash) * 0.25 + netWorth * 0.05);
+  const scoreFactor = 0.35 + ((profile.score - 450) / 400) * 0.65;
+  const scoreAdjustedTierLimit = maxByTier * clamp(scoreFactor, 0, 1);
+  return Math.round(Math.max(0, Math.min(scoreAdjustedTierLimit, affordabilityLimit) - activeDebt) / 10_000) * 10_000;
 }
 
 export function takeBusinessLoan(s0: GameState, requested: number, termWeeks: number): GameState {
   const amount = roundMoney(requested);
   if (!amount || ![4, 8, 12, 24].includes(termWeeks) || amount > maximumLoan(s0)) return s0;
   const bank = s0.bank || initialBankState();
-  const rate = 3.2;
+  const profile = creditProfile(s0);
+  const rate = loanRateForScore(profile.score);
   const r = rate / 100;
   const weeklyPayment = Math.round(amount * r * Math.pow(1 + r, termWeeks) / (Math.pow(1 + r, termWeeks) - 1));
   const loan: BusinessLoan = {
@@ -170,7 +209,7 @@ export function takeBusinessLoan(s0: GameState, requested: number, termWeeks: nu
     principal: amount, balance: amount, weeklyRatePct: rate, weeklyPayment, termWeeks,
     nextPaymentDay: (Math.floor(s0.day / 7) + 1) * 7, missedPayments: 0,
   };
-  const next = ledger({ ...s0, bank: { ...bank, loans: [...bank.loans, loan] } }, amount, 'Business loan disbursement');
+  const next = ledger({ ...s0, bank: { ...bank, loans: [...bank.loans, loan], creditProfile: { ...profile, score: clamp(profile.score - 3, 300, 850), loansTaken: profile.loansTaken + 1, lastApplicationDay: s0.day } } }, amount, 'Business loan disbursement');
   return { ...next, today: { ...next.today, events: [...next.today.events, 'Business loan approved: ' + amount.toLocaleString('en-NG') + ' naira over ' + termWeeks + ' weeks.'] } };
 }
 
@@ -180,8 +219,12 @@ export function repayBusinessLoan(s0: GameState, loanId: string, amount: number)
   const value = roundMoney(amount);
   if (!loan || !value || value > s0.cash) return s0;
   const paid = Math.min(value, loan.balance);
-  const loans = bank.loans.map((item) => item.id === loanId ? { ...item, balance: Math.max(0, item.balance - paid) } : item).filter((item) => item.balance > 0);
-  return ledger({ ...s0, bank: { ...bank, loans } }, -paid, 'Early loan repayment');
+  const remaining = Math.max(0, loan.balance - paid);
+  const loans = bank.loans.map((item) => item.id === loanId ? { ...item, balance: remaining } : item).filter((item) => item.balance > 0);
+  const profile = creditProfile(s0);
+  const cleared = remaining <= 0;
+  const creditProfileNext = cleared ? { ...profile, score: clamp(profile.score + (loan.missedPayments ? 3 : 8), 300, 850), onTimePayments: profile.onTimePayments + (loan.missedPayments ? 0 : 1) } : profile;
+  return ledger({ ...s0, bank: { ...bank, loans, creditProfile: creditProfileNext } }, -paid, cleared ? 'Loan paid off early' : 'Early loan repayment');
 }
 
 export function processPromotionAtClose(s0: GameState): GameState {
@@ -257,13 +300,22 @@ export function processBankWeekly(s0: GameState): GameState {
     if (s.cash >= due) {
       const newBalance = Math.max(0, loan.balance + interest - due);
       const loans = currentBank.loans.map((item) => item.id === loan.id ? { ...item, balance: newBalance, nextPaymentDay: item.nextPaymentDay + 7, missedPayments: 0 } : item).filter((item) => item.balance > 1);
-      s = ledger({ ...s, bank: { ...currentBank, loans }, today: { ...s.today, costs: s.today.costs + interest, events: [...s.today.events, 'Paid ' + interest.toLocaleString('en-NG') + ' naira in business-loan interest.'] } }, -due, 'Weekly loan repayment');
+      const profile = currentBank.creditProfile || creditProfile({ ...s, bank: currentBank });
+      const creditProfileNext = { ...profile, score: clamp(profile.score + (loan.missedPayments ? 2 : 5), 300, 850), onTimePayments: profile.onTimePayments + 1 };
+      s = ledger({ ...s, bank: { ...currentBank, loans, creditProfile: creditProfileNext }, today: { ...s.today, costs: s.today.costs + interest, events: [...s.today.events, 'Paid ' + interest.toLocaleString('en-NG') + ' naira in business-loan interest.'] } }, -due, 'Weekly loan repayment');
       bank = s.bank || currentBank;
     } else {
-      const penalty = Math.max(2_500, roundMoney(loan.balance * 0.025));
-      const loans = currentBank.loans.map((item) => item.id === loan.id ? { ...item, balance: item.balance + penalty, nextPaymentDay: item.nextPaymentDay + 7, missedPayments: item.missedPayments + 1 } : item);
-      s = { ...s, bank: { ...currentBank, loans }, today: { ...s.today, costs: s.today.costs + penalty, events: [...s.today.events, 'A missed loan payment added ' + penalty.toLocaleString('en-NG') + ' naira to the loan balance.'] }, ledger: [{ day: s.day, t: -1, label: 'Missed loan payment fee', amount: -penalty }, ...(s.ledger || [])].slice(0, 150) };
-      s = { ...s, messages: [{ id: (s.msgSeq || 0) + 1, day: s.day, from: 'KoboBank', text: 'A scheduled loan payment was missed. A penalty was added to the outstanding balance.', tone: 'danger' as const, t: -1 }, ...(s.messages || [])].slice(0, 160), msgSeq: (s.msgSeq || 0) + 1 };
+      const profile = currentBank.creditProfile || creditProfile({ ...s, bank: currentBank });
+      const nextMissed = (loan.missedPayments || 0) + 1;
+      const newlyDefaulted = (loan.missedPayments || 0) < 3 && nextMissed >= 3;
+      const feeRoom = Math.max(0, roundMoney(loan.principal * 0.1) - Math.max(0, loan.lateFees || 0));
+      const penalty = Math.min(feeRoom, Math.max(2_500, roundMoney(loan.balance * 0.025)));
+      const loans = currentBank.loans.map((item) => item.id === loan.id ? { ...item, balance: item.balance + penalty, lateFees: Math.max(0, item.lateFees || 0) + penalty, nextPaymentDay: item.nextPaymentDay + 7, missedPayments: nextMissed } : item);
+      const scoreLoss = newlyDefaulted ? 65 : 22;
+      const creditProfileNext = { ...profile, score: clamp(profile.score - scoreLoss, 300, 850), latePayments: profile.latePayments + 1, defaults: profile.defaults + (newlyDefaulted ? 1 : 0) };
+      const stage = nextMissed >= 3 ? 'default' : nextMissed === 2 ? 'serious arrears' : 'overdue';
+      s = { ...s, bank: { ...currentBank, loans, creditProfile: creditProfileNext }, today: { ...s.today, costs: s.today.costs + penalty, events: [...s.today.events, 'A missed loan payment added ' + penalty.toLocaleString('en-NG') + ' naira to the loan balance.'] }, ledger: [{ day: s.day, t: -1, label: 'Missed loan payment fee', amount: -penalty }, ...(s.ledger || [])].slice(0, 150) };
+      s = { ...s, messages: [{ id: (s.msgSeq || 0) + 1, day: s.day, from: 'KoboBank', text: (s.bank?.loans.find((item) => item.id === loan.id)?.missedPayments || 0) >= 3 ? 'Your KoboBank loan is now in DEFAULT. New borrowing is blocked until this loan is cleared. Your credit score has fallen sharply.' : 'A scheduled loan payment was missed. A capped late fee was added and your credit score has fallen.', tone: 'danger' as const, t: -1 }, ...(s.messages || [])].slice(0, 160), msgSeq: (s.msgSeq || 0) + 1 };
       bank = s.bank || currentBank;
     }
   }
