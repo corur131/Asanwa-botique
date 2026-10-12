@@ -436,6 +436,8 @@ export interface BusinessLoan {
   termWeeks: number;
   nextPaymentDay: number;
   missedPayments: number;
+  /** Monetary value of unpaid scheduled instalments; memo balance included in balance, not an extra liability. */
+  arrearsBalance?: number;
   /** Cumulative late fees, capped so missed payments cannot create runaway debt. */
   lateFees?: number;
   /** Once defaulted, this remains on the account until the loan is fully cleared. */
