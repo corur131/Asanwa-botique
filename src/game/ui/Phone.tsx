@@ -367,7 +367,7 @@ const Chats: React.FC<PhoneProps> = ({ s, up, chat, setChat, staff }) => {
             participants,
             history: prior,
             message: text,
-            gameContext: { day: s.day, reputation: s.rep, followers: s.followers, cash: s.cash, shopName: 'Asanwa Boutique' },
+            gameContext: { day: s.day, reputation: s.rep, brandPower: E.brandPower(E.getBrandMetrics(s), s.followers || 0, s.tier), tier: s.tier, followers: s.followers, cash: s.cash, netWorth: E.netWorthPlayer(s), shopName: 'Asanwa Boutique', partnerTier: targetRival?.tier, partnerCash: targetRival?.cash },
             canDiscussCollaboration: Boolean(targetRival?.main && targetChat !== GROUP),
           }),
         });
@@ -399,7 +399,7 @@ const Chats: React.FC<PhoneProps> = ({ s, up, chat, setChat, staff }) => {
             decision,
             eventName: typeof rawCollaboration.eventName === 'string' ? rawCollaboration.eventName.trim().slice(0, 80) : 'Asanwa Boutique x ' + targetRival.shop + ' Fashion Pop-up',
             dayOffset: Math.round(Math.max(3, Math.min(14, typeof rawCollaboration.dayOffset === 'number' && Number.isFinite(rawCollaboration.dayOffset) ? rawCollaboration.dayOffset : 7))),
-            totalCost: Math.round(Math.max(15000, Math.min(80000, typeof rawCollaboration.totalCost === 'number' && Number.isFinite(rawCollaboration.totalCost) ? rawCollaboration.totalCost : 20000)) / 2500) * 2500,
+            totalCost: Math.round(Math.max(15000, Math.min(Math.max(15000, Math.min([250000, 2000000, 10000000, 50000000, 150000000][Math.max(0, Math.min(4, Math.min(s.tier, targetRival.tier)))], Math.max(0, s.cash) * 2 + Math.max(0, targetRival.cash) * 2)), typeof rawCollaboration.totalCost === 'number' && Number.isFinite(rawCollaboration.totalCost) ? rawCollaboration.totalCost : 20000)) / 2500) * 2500,
             playerCostSharePct: Math.round(Math.max(10, Math.min(90, typeof rawCollaboration.playerCostSharePct === 'number' && Number.isFinite(rawCollaboration.playerCostSharePct) ? rawCollaboration.playerCostSharePct : 50))),
             playerProfitSharePct: Math.round(Math.max(10, Math.min(90, typeof rawCollaboration.playerProfitSharePct === 'number' && Number.isFinite(rawCollaboration.playerProfitSharePct) ? rawCollaboration.playerProfitSharePct : 50))),
           }
