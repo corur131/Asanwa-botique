@@ -414,12 +414,6 @@ const Chats: React.FC<PhoneProps> = ({ s, up, chat, setChat, staff }) => {
           <button className="flex-1 rounded-full bg-[#2A3942] text-white text-xs py-2 px-3" onClick={() => staff.raise(member.id, 'counter')}>Offer {naira(Math.round((member.wage + ask) / 2 / 500) * 500)}</button>
           <button className="flex-1 rounded-full bg-[#2A3942] text-rose-300 text-xs py-2 px-3" onClick={() => staff.raise(member.id, 'refuse')}>No</button>
         </div>
-      ) : member && ask ? (
-        <div className="bg-[#202C33] p-2 flex flex-wrap gap-1.5 shrink-0">
-          <button className="flex-1 rounded-full bg-[#005C4B] text-white text-xs py-2 px-3" onClick={() => staff.raise(member.id, 'accept')}>Okay, {naira(ask)}</button>
-          <button className="flex-1 rounded-full bg-[#2A3942] text-white text-xs py-2 px-3" onClick={() => staff.raise(member.id, 'counter')}>Offer {naira(Math.round((member.wage + ask) / 2 / 500) * 500)}</button>
-          <button className="flex-1 rounded-full bg-[#2A3942] text-rose-300 text-xs py-2 px-3" onClick={() => staff.raise(member.id, 'refuse')}>No</button>
-        </div>
       ) : null}
       {chat && (
         <form onSubmit={sendFreeform} className="bg-[#202C33] border-t border-white/5 p-2 shrink-0">
