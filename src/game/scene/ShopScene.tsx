@@ -7,7 +7,6 @@ import { RoomStyle, finishes, room, cellsBlocked, footprint, furnitureById, wall
 import { solarCap, source } from '../power';
 import { stats } from '../engine';
 import { ApplianceOn, CeilingPiece, FloorPiece, WallPiece, B, MirrorLive } from './Furniture3D';
-import { YardModel } from './YardModels';
 import { Cell, Figure, FigureLook, Walker, lookToFigure } from './People';
 
 export interface SceneProps {
