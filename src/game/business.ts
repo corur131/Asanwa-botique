@@ -323,9 +323,11 @@ export function processBankWeekly(s0: GameState): GameState {
   const finalBank = s.bank || bank;
   const profile = finalBank.creditProfile || creditProfile({ ...s, bank: finalBank });
   const hasOverdueLoan = finalBank.loans.some((loan) => (loan.missedPayments || 0) > 0);
-  if (!hasOverdueLoan && profile.score < 850) {
+  if (!hasOverdueLoan && profile.score < 620) {
+    // A quiet, fully current account can recover from past mistakes, but inactivity alone
+    // should not inflate an already healthy score.
     const recovery = finalBank.loans.length ? 1 : 2;
-    s = { ...s, bank: { ...finalBank, creditProfile: { ...profile, score: clamp(profile.score + recovery, 300, 850) } } };
+    s = { ...s, bank: { ...finalBank, creditProfile: { ...profile, score: clamp(profile.score + recovery, 300, 620) } } };
   }
   return s;
 }
