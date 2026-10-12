@@ -1,0 +1,39 @@
+name: Phase 3 Preview
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+  pull-requests: write
+  checks: write
+  deployments: write
+
+jobs:
+  preview:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install --legacy-peer-deps --no-audit --no-fund
+      - run: npx tsc --noEmit
+      - name: Build preview
+        run: npm run build
+        env:
+          VITE_AI_API_BASE_URL: https://asanwa-botique.onrender.com
+      - name: Check deploy key
+        id: key
+        env:
+          SA: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: if [ -n "$SA" ]; then echo "ok=1" >> "$GITHUB_OUTPUT"; else echo "FIREBASE_SERVICE_ACCOUNT secret is not set; preview deploy skipped"; fi
+      - if: steps.key.outputs.ok == '1'
+        uses: FirebaseExtended/action-hosting-deploy@v0
+        with:
+          repoToken: ${{ secrets.GITHUB_TOKEN }}
+          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          channelId: phase3-pr-${{ github.event.number }}
+          expires: 7d
