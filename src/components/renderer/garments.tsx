@@ -1315,7 +1315,7 @@ export const GARMENTS: Record<string, Build> = {
     };
   })(),
   contrastPanelNativeKaftan: (() => {
-    const base = cutBuild('kaftan');
+    const base = cutBuild('senator');
     return {
       under: (c) => <>{base.under?.(c)}
         <path d={"M " + (300 - c.s.bust[1] * 0.42) + " " + (c.s.neck[0] + 20) + " L " + (300 - 10) + " " + (c.s.ankle[1] - 120) + " L " + (300 + 10) + " " + (c.s.ankle[1] - 120) + " L " + (300 + c.s.bust[1] * 0.42) + " " + (c.s.neck[0] + 20) + " Z"} fill={c.p2.base} opacity="0.72" stroke={gold(c)} strokeWidth="2" />
