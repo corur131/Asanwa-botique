@@ -15,6 +15,7 @@ import {
   repayBusinessLoan,
   arrangeBusinessLoanRepayment,
   maximumLoan,
+  takeBusinessLoan,
   transferBank,
 } from './business';
 
@@ -64,6 +65,21 @@ test('weekly bank interest is not credited before a scheduled banking day', () =
   assert.equal(after.bank!.savings, 20_000);
   assert.equal(after.bank!.rentVault, 10_000);
   assert.equal(after.ledger!.length, before.ledger!.length);
+});
+
+test('loan disbursement and principal repayment preserve net worth apart from interest', () => {
+  const before = state();
+  const beforeWorth = netWorthPlayer(before);
+  const borrowed = takeBusinessLoan(before, 100_000, 8);
+  assert.notEqual(borrowed, before, 'eligible loan should be approved');
+  assert.equal(borrowed.cash, before.cash + 100_000);
+  assert.equal(netWorthPlayer(borrowed), beforeWorth, 'cash and loan liability rise by the same amount');
+
+  const loan = borrowed.bank!.loans[0];
+  const repaid = repayBusinessLoan(borrowed, loan.id, 10_000);
+  assert.equal(repaid.cash, borrowed.cash - 10_000);
+  assert.equal(repaid.bank!.loans[0].balance, loan.balance - 10_000);
+  assert.equal(netWorthPlayer(repaid), netWorthPlayer(borrowed), 'paying principal reduces cash and liability equally');
 });
 
 test('fixed deposit stays locked before its maturity day', () => {
