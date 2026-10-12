@@ -8,7 +8,9 @@
     "build": "vite build",
     "preview": "vite preview",
     "clean": "rm -rf dist server.js",
-    "lint": "tsc --noEmit"
+    "lint": "tsc --noEmit",
+    "server": "tsx server.ts",
+    "start": "npm run build && tsx server.ts"
   },
   "dependencies": {
     "@google/genai": "^2.4.0",
@@ -34,7 +36,7 @@
     "@types/react-dom": "^19.3.0",
     "@types/three": "0.170.0",
     "autoprefixer": "^10.4.21",
-    "esbuild": "^0.25.0",
+    "esbuild": "^0.28.0",
     "firebase-tools": "^14.11.0",
     "tailwindcss": "^4.3.3",
     "tsx": "^4.21.0",

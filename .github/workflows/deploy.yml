@@ -17,7 +17,10 @@ jobs:
           node-version: 22
       - run: npm install --legacy-peer-deps --no-audit --no-fund
       - run: npx tsc --noEmit
-      - run: npm run build
+      - name: Build frontend for Firebase Hosting
+        run: npm run build
+        env:
+          VITE_AI_API_BASE_URL: https://asanwa-botique.onrender.com
       - name: Check the deploy key is set
         id: key
         env:

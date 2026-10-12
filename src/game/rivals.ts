@@ -9,6 +9,7 @@ import { generateRandomCustomer } from '../utils/randomizer';
 import { TIERS } from './economy';
 import { GameState, Gist, Message, ReplyChoice, Rival, RivalPost } from './types';
 import { Topic, startConvo } from './convos';
+import { brandFromLegacy, brandPower, getBrandMetrics } from './business';
 
 const pick = <T,>(a: readonly T[]): T => a[Math.floor(Math.random() * a.length)];
 const chance = (p: number) => Math.random() < p;
@@ -81,23 +82,27 @@ export const mainRivals = (s: GameState) => (s.rivals || []).filter((r) => r.mai
 // The ladder
 // ---------------------------------------------------------------------------
 /** Recent trading performance leads the ladder; reputation, audience and premises still matter. */
-export function boutiqueScore(weekTakings: number, rep: number, followers: number, tier: number) {
-  return weekTakings / 5_000 + rep * 2.4 + Math.sqrt(followers) * 0.75 + tier * 45;
+export function boutiqueScore(weekTakings: number, strength: number, followers: number, tier: number) {
+  // `strength` is now an uncapped Brand Power score, not the legacy 0..100 reputation value.
+  return weekTakings / 5_000 + strength * 2.4 + Math.sqrt(Math.max(0, followers)) * 0.75 + tier * 45;
 }
 export function playerWeek(s: GameState) {
   return s.history.slice(-7).reduce((a, d) => a + d.income, 0);
 }
 export function playerScore(s: GameState) {
-  return boutiqueScore(playerWeek(s), s.rep, s.followers || 0, s.tier);
+  const power = brandPower(getBrandMetrics(s), s.followers || 0, s.tier);
+  return boutiqueScore(playerWeek(s), power, s.followers || 0, s.tier);
 }
 export function rivalScore(r: Rival) {
-  return boutiqueScore(r.week.reduce((a, b) => a + b, 0), r.rep, r.followers, r.tier);
+  const power = brandPower(r.brand || brandFromLegacy(r.rep, r.followers, r.tier), r.followers, r.tier);
+  return boutiqueScore(r.week.reduce((a, b) => a + b, 0), power, r.followers, r.tier);
 }
 
-export interface Rank { id: string; name: string; owner: string; score: number; tier: number; area: string; rep: number; followers: number; you?: boolean; main?: boolean }
+export interface Rank { id: string; name: string; owner: string; score: number; brandPower: number; tier: number; area: string; rep: number; followers: number; you?: boolean; main?: boolean }
 export function ladder(s: GameState): Rank[] {
-  const rows: Rank[] = (s.rivals || []).map((r) => ({ id: r.id, name: r.shop, owner: r.owner, score: rivalScore(r), tier: r.tier, area: r.area, rep: r.rep, followers: r.followers, main: r.main }));
-  rows.push({ id: 'you', name: 'Asanwa Boutique', owner: 'Divine', score: playerScore(s), tier: s.tier, area: s.listing.area, rep: s.rep, followers: s.followers || 0, you: true });
+  const rows: Rank[] = (s.rivals || []).map((r) => ({ id: r.id, name: r.shop, owner: r.owner, score: rivalScore(r), brandPower: brandPower(r.brand || brandFromLegacy(r.rep, r.followers, r.tier), r.followers, r.tier), tier: r.tier, area: r.area, rep: r.rep, followers: r.followers, main: r.main }));
+  const playerPower = brandPower(getBrandMetrics(s), s.followers || 0, s.tier);
+  rows.push({ id: 'you', name: 'Asanwa Boutique', owner: 'Divine', score: playerScore(s), brandPower: playerPower, tier: s.tier, area: s.listing.area, rep: s.rep, followers: s.followers || 0, you: true });
   return rows.sort((a, b) => b.score - a.score);
 }
 export const playerRank = (s: GameState) => ladder(s).findIndex((r) => r.you) + 1;
@@ -111,7 +116,9 @@ export function competition(s: GameState): number {
   let k = 0;
   for (const r of s.rivals || []) {
     if (r.area !== s.listing.area || Math.abs(r.tier - s.tier) > 1) continue;
-    if (r.rep > s.rep) k += 0.04 + (r.rep - s.rep) / 1000;
+    const rivalPower = brandPower(r.brand || brandFromLegacy(r.rep, r.followers, r.tier), r.followers, r.tier);
+    const playerPower = brandPower(getBrandMetrics(s), s.followers || 0, s.tier);
+    if (rivalPower > playerPower) k += 0.04 + Math.min(0.07, (rivalPower - playerPower) / 1200);
   }
   return Math.max(0.78, 1 - k);
 }
@@ -210,7 +217,7 @@ export function simulateRivals(s0: GameState): GameState {
   const rivals: Rival[] = [];
   const news: { kind: 'up' | 'down' | 'viral' | 'scandal' | 'campaign'; r: Rival }[] = [];
   for (const r0 of s.rivals) {
-    const r = { ...r0, week: [...r0.week] };
+    const r = { ...r0, week: [...r0.week], weekCosts: [...(r0.weekCosts || [])] };
     const t = TIERS[r.tier];
     const repK = 0.6 + (r.rep / 100) * 0.8;
     const followK = 1 + 0.3 * (r.followers / (r.followers + 8000));
@@ -243,28 +250,58 @@ export function simulateRivals(s0: GameState): GameState {
     const takings = DAILY[r.tier] * r.skill * form * repK * followK * ramp * rand(0.58, 1.48) * eventMultiplier * (r.stars === 1 ? 0.9 : r.stars >= 3 ? 1.1 : 1);
     r.week.push(takings);
     r.week = r.week.slice(-7);
+    let dailyCosts = takings * STOCK_SHARE[r.tier] + t.running;
     r.cash += takings * (1 - STOCK_SHARE[r.tier]) - t.running;
-    if (today % 7 === 0) r.cash -= t.rent * [0, 0.75, 1, 1.33, 1.75][r.stars] + WAGES[r.tier];
+    if (today % 7 === 0) {
+      const weeklyCosts = t.rent * [0, 0.75, 1, 1.33, 1.75][r.stars] + WAGES[r.tier];
+      r.cash -= weeklyCosts;
+      dailyCosts += weeklyCosts;
+    }
+    r.weekCosts = [...(r.weekCosts || []), dailyCosts].slice(-7);
     // reputation drifts toward what their skill earns, with small daily swings.
     const target = 30 + r.skill * 45;
     r.rep = clamp(r.rep + (target - r.rep) * 0.04 + rand(-1.5, 1.5), 5, 99);
-    r.followers = Math.round(r.followers * (1 + (r.rep - 45) / 9000) + rand(0, 6) * (r.tier + 1));
+    const priorFollowers = r.followers;
+    r.followers = Math.max(0, Math.round(r.followers * (1 + (r.rep - 45) / 9000) + rand(0, 6) * (r.tier + 1)));
+    const baseBrand = r.brand || brandFromLegacy(r.rep, priorFollowers, r.tier);
+    r.brand = {
+      awareness: clamp(baseBrand.awareness + (r.followers > priorFollowers ? 0.12 : -0.04) + (dayEvent === 'campaign' ? 1.15 : 0), 5, 100),
+      prestige: clamp(baseBrand.prestige + (r.skill > 1.1 ? 0.1 : -0.03) + (dayEvent === 'scandal' ? -0.9 : 0), 5, 100),
+      trendInfluence: clamp(baseBrand.trendInfluence + (dayEvent === 'viral' ? rand(1.5, 3.2) : dayEvent === 'campaign' ? 0.25 : -0.08), 5, 100),
+      loyalty: clamp(baseBrand.loyalty + (r.skill > 1.05 ? 0.08 : -0.04) + (dayEvent === 'scandal' ? -0.65 : 0), 5, 100),
+      reliability: clamp(baseBrand.reliability + (r.cash < 0 ? -0.16 : 0.03) + (dayEvent === 'scandal' ? -0.25 : 0), 5, 100),
+    };
+    r.assetValue = Math.max(0, Math.round(TIERS[r.tier].moveIn * 0.8 + TIERS[r.tier].rent * 2));
+    const bankSavings = Math.max(0, r.savings || 0);
+    if (r.cash < TIERS[r.tier].rent && bankSavings > 0) {
+      const released = Math.min(bankSavings, TIERS[r.tier].rent - r.cash);
+      r.cash += released;
+      r.savings = bankSavings - released;
+    } else if (r.cash > TIERS[r.tier].rent * 5 + TIERS[r.tier].moveIn * 0.5) {
+      const reserve = Math.min(Math.round((r.cash - TIERS[r.tier].rent * 3) * 0.02), Math.max(0, r.cash - TIERS[r.tier].rent * 3));
+      r.cash -= reserve;
+      r.savings = bankSavings + reserve;
+    }
     // Campaigns cost money but can turn into customers; aggressive rivals spend more readily.
     if (dayEvent === 'campaign') {
-      r.cash -= takings * rand(0.07, 0.13);
+      const campaignCost = Math.round(takings * rand(0.07, 0.13));
+      r.cash -= campaignCost;
+      r.weekCosts[r.weekCosts.length - 1] = (r.weekCosts[r.weekCosts.length - 1] || 0) + campaignCost;
       r.followers += Math.round(rand(90, 260) * (r.tier + 1) + takings / 10_000 * rand(1, 3));
       r.rep = clamp(r.rep + rand(0.2, 0.8), 5, 99);
       if (r.main) news.push({ kind: 'campaign', r });
     }
     // Bad weeks still hurt: theft, a landlord's surprise charge or a dead generator.
-    if (chance(0.025)) r.cash -= takings * rand(2, 4);
+    if (chance(0.025)) { const incidentCost = Math.round(takings * rand(2, 4)); r.cash -= incidentCost; r.weekCosts[r.weekCosts.length - 1] = (r.weekCosts[r.weekCosts.length - 1] || 0) + incidentCost; }
     if (dayEvent === 'viral') {
       r.followers += Math.round(rand(1_200, 4_800) * (r.tier + 1));
       r.rep = clamp(r.rep + rand(3, 7), 0, 99);
       news.push({ kind: 'viral', r });
     } else if (dayEvent === 'scandal') {
       r.rep = clamp(r.rep - rand(6, 12), 0, 99);
-      r.cash -= DAILY[r.tier] * rand(0.9, 1.8);
+      const scandalCost = Math.round(DAILY[r.tier] * rand(0.9, 1.8));
+      r.cash -= scandalCost;
+      r.weekCosts[r.weekCosts.length - 1] = (r.weekCosts[r.weekCosts.length - 1] || 0) + scandalCost;
       news.push({ kind: 'scandal', r });
     }
     // move up when they can afford it; get thrown down when broke too long
