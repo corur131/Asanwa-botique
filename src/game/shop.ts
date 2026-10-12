@@ -498,27 +498,46 @@ export function findSpot(items: Placed[], tier: RoomKey, it: Placed): Placed | n
   return null;
 }
 
-/** Puts every item somewhere it fits (after a move); what doesn't fit goes to storage. */
+/** Arrange owned equipment after a move. Floor pieces are distributed through the room instead of starting in the back-wall row. */
 export function autoPlace(items: Placed[], tier: RoomKey): Placed[] {
   const r = room(tier);
   const out: Placed[] = [];
   let wall = 0;
   const cap = wallCapacity(tier);
-  // big pieces first so they find room
-  const order = [...items].sort((a, b) => furnitureById(b.id).w * furnitureById(b.id).d - furnitureById(a.id).w * furnitureById(a.id).d);
+  // Large pieces are placed first; wall and ceiling equipment is handled separately.
+  const order = [...items].sort((a, b) => {
+    const fa = furnitureById(a.id), fb = furnitureById(b.id);
+    return fb.w * fb.d - fa.w * fa.d;
+  });
+  const centerXs = Array.from({ length: r.w }, (_, x) => x)
+    .sort((a, b) => Math.abs(a - (r.w - 1) / 2) - Math.abs(b - (r.w - 1) / 2));
+  const edgeXs = Array.from({ length: r.w }, (_, x) => x)
+    .sort((a, b) => Math.min(a, r.w - 1 - a) - Math.min(b, r.w - 1 - b));
+  // Keep the back-wall row clear for wall pieces and distribute floor pieces across the usable depth.
+  const backToFrontZs = Array.from({ length: Math.max(0, r.d - 2) }, (_, i) => i + 1);
+  const midToFrontZs = [...backToFrontZs]
+    .sort((a, b) => Math.abs(a - Math.max(1, Math.floor((r.d - 2) / 2))) - Math.abs(b - Math.max(1, Math.floor((r.d - 2) / 2))));
   for (const it of order) {
     const f = furnitureById(it.id);
     if (f.mount === 'finish' || f.mount === 'yard') { out.push({ ...it, placed: true }); continue; }
-    if (f.mount === 'ceiling') { const ok = out.filter((o) => o.placed && furnitureById(o.id).mount === 'ceiling').length < ceilingCapacity(tier); out.push({ ...it, placed: ok, x: 0, z: 0 }); continue; }
+    if (f.mount === 'ceiling') {
+      const ok = out.filter((o) => o.placed && furnitureById(o.id).mount === 'ceiling').length < ceilingCapacity(tier);
+      out.push({ ...it, placed: ok, x: 0, z: 0 });
+      continue;
+    }
     if (f.mount === 'wall') {
       const ok = wall + f.w <= cap;
       out.push({ ...it, placed: ok, x: wall, z: 0 });
       if (ok) wall += f.w;
       continue;
     }
+    const xOrder = ['Display', 'Hair & makeup', 'Comfort & power', 'Decor'].includes(f.group) ? edgeXs : centerXs;
+    const zOrder = f.group === 'Seating' || f.group === 'Mirrors' ? midToFrontZs : backToFrontZs;
     let done = false;
-    for (let z = 0; z < r.d - 1 && !done; z++) {
-      for (let x = 0; x < r.w && !done; x++) {
+    for (const z of zOrder) {
+      if (done) break;
+      for (const x of xOrder) {
+        if (done) break;
         for (const rot of [0, 1] as const) {
           const cand = { ...it, x, z, rot, placed: true };
           if (canPlace(out, tier, cand)) { out.push(cand); done = true; break; }
@@ -528,6 +547,21 @@ export function autoPlace(items: Placed[], tier: RoomKey): Placed[] {
     if (!done) out.push({ ...it, placed: false });
   }
   return out;
+}
+
+export type MoveEquipmentPlan = 'arrange' | 'store' | 'sell';
+
+/** Apply the player's chosen equipment plan. Shop finishes stay with the old premises. */
+export function prepareFurnitureForMove(items: Placed[], tier: RoomKey, plan: MoveEquipmentPlan): { furniture: Placed[]; saleProceeds: number } {
+  const equipment = items.filter((item) => furnitureById(item.id).mount !== 'finish');
+  if (plan === 'sell') {
+    const saleProceeds = equipment.reduce((sum, item) => sum + Math.round(furnitureById(item.id).price * 0.4), 0);
+    return { furniture: [], saleProceeds };
+  }
+  if (plan === 'store') {
+    return { furniture: equipment.map((item) => ({ ...item, placed: false, x: 0, z: 0 })), saleProceeds: 0 };
+  }
+  return { furniture: autoPlace(equipment, tier), saleProceeds: 0 };
 }
 
 // ---------------------------------------------------------------------------
