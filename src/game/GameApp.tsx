@@ -764,7 +764,7 @@ export default function GameApp({ onLab, initial, storageKey, cloud, notice }: {
               <div className="absolute bottom-3 left-3 right-3 sm:right-auto sm:w-96 rounded-xl border border-white/15 bg-[#12141c]/92 p-3 text-sm text-slate-200 space-y-1">
                 <div className="font-semibold text-white">What you notice</div>
                 <div>• A full look here costs about <b>{naira([15_000, 45_000, 110_000, 220_000, 400_000][r.tier] * (r.speciality === 'cheap' ? 0.6 : r.speciality === 'luxury' || r.speciality === 'bridal' ? 1.4 : 1))}</b>.</div>
-                <div>• {r.rep > s.rep ? 'Customers here look happier than yours. ' : 'Honestly, your shop gets better reviews. '}{r.tier > s.tier ? 'The shop is much bigger than yours.' : r.tier < s.tier ? "It's smaller than your shop." : "It's about your size."}</div>
+                <div>• {brandPower(r.brand || getBrandMetrics(s), r.followers, r.tier) > brandPower(getBrandMetrics(s), s.followers || 0, s.tier) ? 'This brand has stronger market pull than yours. ' : 'Your brand currently has stronger market pull. '}{r.tier > s.tier ? 'The shop is much bigger than yours.' : r.tier < s.tier ? "It's smaller than your shop." : "It's about your size."}</div>
                 <div>• {r.owner.split(' ')[0]} is known for <b>{({ bridal: 'bridal looks', genz: 'Gen Z wear', native: 'native and aso-ebi', cheap: 'low prices', wigs: 'wigs and glam', menswear: 'menswear', luxury: 'luxury pieces', thrift: 'thrift finds', everyday: 'everyday wear' } as const)[r.speciality]}</b>.</div>
               </div>
             </div>
@@ -1030,7 +1030,7 @@ const Evening: React.FC<{ s: GameState; onSleep: () => void; onPhone: () => void
           {d.tips > 0 && <li>Tips: {naira(d.tips)}</li>}
           {d.staffServed > 0 && <li>Your staff styled {d.staffServed} customer{d.staffServed > 1 ? 's' : ''}.</li>}
           {d.walkedOut > 0 && <li className="text-rose-300">{d.walkedOut} customer{d.walkedOut > 1 ? 's' : ''} didn't buy.</li>}
-          <li>Reputation {d.repChange >= 0 ? 'up' : 'down'} {Math.abs(d.repChange).toFixed(1)} → {Math.round(s.rep)}</li>
+          <li>Brand Power {brandPower(getBrandMetrics(s), s.followers || 0, s.tier).toLocaleString("en-NG")} · {Math.round(s.followers || 0).toLocaleString("en-NG")} social followers</li>
           {d.events.map((e, i) => <li key={i}>{e}</li>)}
         </ul>
       </Card>
