@@ -543,7 +543,7 @@ const Chats: React.FC<PhoneProps> = ({ s, up, chat, setChat, staff }) => {
                     {m.collaboration.decision === 'counter' ? 'Business counter-offer' : 'Joint fashion pop-up proposal'}
                   </div>
                   <div className="font-medium text-white">{m.collaboration.eventName}</div>
-                  <div className="text-slate-300 mt-1">Proposed for in-game Day {s.day + Math.round(Math.max(3, Math.min(14, m.collaboration.dayOffset)))} · {m.collaboration.dayOffset} days from today</div>
+                  <div className="text-slate-300 mt-1">Proposed for in-game Day {m.day + Math.round(Math.max(3, Math.min(14, m.collaboration.dayOffset)))} · {m.collaboration.dayOffset} days from when this offer was made</div>
                   <div className="grid grid-cols-2 gap-x-3 gap-y-1 my-2">
                     <div><span className="text-slate-400">Total setup cost</span><div className="font-semibold">{naira(m.collaboration.totalCost)}</div></div>
                     <div><span className="text-slate-400">Your contribution</span><div className="font-semibold">{naira(Math.round(m.collaboration.totalCost * m.collaboration.playerCostSharePct / 100))} ({m.collaboration.playerCostSharePct}%)</div></div>
