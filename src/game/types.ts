@@ -86,6 +86,14 @@ export interface Rival {
   aggression: number;
   /** Takings over the last 7 days. */
   week: number[];
+  /** Modeled operating costs for each matching day in week. */
+  weekCosts?: number[];
+  /** Business assets, retained earnings and debt are modeled separately from shop takings. */
+  savings?: number;
+  debt?: number;
+  assetValue?: number;
+  brand?: BrandMetrics;
+  promotion?: PromotionCampaign;
   /** How they feel about Divine, -100 (enemy) … 100 (friend). */
   feeling: number;
   look: CharacterConfig;
@@ -387,8 +395,84 @@ export interface CharacterMemory {
   updatedDay: number;
 }
 
+export type PromotionLevel = 'local' | 'citywide' | 'premium' | 'luxury';
+export type PromotionMode = 'period' | 'always';
+export type BankPocket = 'savings' | 'rentVault' | 'current';
+
+/** Brand indicators evolve over time; the combined Brand Power score is intentionally uncapped. */
+export interface BrandMetrics {
+  awareness: number;
+  prestige: number;
+  trendInfluence: number;
+  loyalty: number;
+  reliability: number;
+}
+
+export interface PromotionCampaign {
+  active: boolean;
+  mode: PromotionMode;
+  level: PromotionLevel;
+  hourlyBudget: number;
+  startedDay: number;
+  /** Remaining simulated business hours for a fixed-period campaign. */
+  hoursRemaining?: number;
+  hoursRun: number;
+  totalSpent: number;
+  estimatedReach: number;
+}
+
+export interface BusinessLoan {
+  id: string;
+  principal: number;
+  balance: number;
+  weeklyRatePct: number;
+  weeklyPayment: number;
+  termWeeks: number;
+  nextPaymentDay: number;
+  missedPayments: number;
+}
+
+export interface FixedDeposit {
+  id: string;
+  amount: number;
+  ratePct: number;
+  openedDay: number;
+  maturityDay: number;
+}
+
+export interface BankState {
+  savings: number;
+  rentVault: number;
+  rentMode: 'manual' | 'automatic';
+  autoRentPercent: number;
+  savingsRatePct: number;
+  rentVaultRatePct: number;
+  fixedDeposits: FixedDeposit[];
+  loans: BusinessLoan[];
+  savingsGoalName: string;
+  savingsGoalAmount: number;
+}
+
+/** Weekly public wealth snapshot; figures are game estimates, not real-world valuations. */
+export interface WeeklyWealthSnapshot {
+  day: number;
+  ownerId: string;
+  owner: string;
+  shop: string;
+  netWorth: number;
+  revenue: number;
+  costs: number;
+  profit: number;
+  rank: number;
+  previousRank: number;
+  wealthChange: number;
+  tier: number;
+  followers: number;
+  brandPower: number;
+}
+
 export interface GameState {
-  version: 4;
+  version: 5;
   /** Lagos-season weather, optional so older saves continue loading. */
   weather?: LagosWeather;
   /** The shop she rents now. */
@@ -454,6 +538,12 @@ export interface GameState {
   characterMemories?: Record<string, CharacterMemory>;
   /** Confirmed joint business pop-ups; absent in legacy saves. */
   collaborations?: CollaborationEvent[];
+  /** New financial systems are optional in the type so versioned saves can be migrated safely. */
+  bank?: BankState;
+  brand?: BrandMetrics;
+  promotion?: PromotionCampaign;
+  /** Historical weekly wealth snapshots for every modeled business owner. */
+  wealthHistory?: WeeklyWealthSnapshot[];
   rivals: Rival[];
   /** Official weekly ladder: ids in order ('you' is Divine). */
   ranking: { week: number; order: string[] }[];
