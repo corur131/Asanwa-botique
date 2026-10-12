@@ -592,11 +592,11 @@ export function financialAssets(s: Pick<GameState, 'cash' | 'bank'>): number {
 }
 
 /** Recorded liabilities: outstanding bank loans and any unpaid rent. */
-export function totalLiabilities(s: Pick<GameState, 'bank' | 'lateRent'>): number {
+export function totalLiabilities(s: Pick<GameState, 'bank' | 'lateRent' | 'operatingPayables'>): number {
   const bank = s.bank || initialBankState();
   const loans = bank.loans.reduce((sum, loan) => sum + Math.max(0, loan.balance), 0);
   const rentOwed = Math.max(0, s.lateRent?.amount || 0);
-  const operatingPayables = Math.max(0, ('operatingPayables' in s ? s.operatingPayables : 0) || 0);
+  const operatingPayables = Math.max(0, s.operatingPayables || 0);
   return Math.round(loans + rentOwed + operatingPayables);
 }
 
