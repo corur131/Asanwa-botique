@@ -461,7 +461,7 @@ export function processBankWeekly(s0: GameState): GameState {
   // Credit recovery is gradual: a cleared/default-free account can rebuild trust over time.
   const finalBank = s.bank || bank;
   const profile = finalBank.creditProfile || creditProfile({ ...s, bank: finalBank });
-  const hasOverdueLoan = finalBank.loans.some((loan) => (loan.missedPayments || 0) > 0);
+  const hasOverdueLoan = finalBank.loans.some((loan) => (loan.missedPayments || 0) > 0 || (loan.arrearsBalance || 0) > 0);
   if (!hasOverdueLoan && profile.score < 620) {
     // A quiet, fully current account can recover from past mistakes, but inactivity alone
     // should not inflate an already healthy score.
