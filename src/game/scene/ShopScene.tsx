@@ -165,6 +165,8 @@ export function Room({ r, tier, painted }: { r: RoomStyle; tier: number; painted
   const portalRight = portalCenter + carpetWidth / 2 + 0.18;
   const featureWidth = Math.max(4.6, r.w * 0.58);
   const featureHeight = Math.min(2.65, H * 0.62);
+  const glassXCount = Math.max(4, Math.floor(r.w / 1.8)) + 1;
+  const glassZCount = Math.max(3, Math.floor(r.d / 1.8)) + 1;
   return (
     <group>
       {/* street around the shop */}
@@ -194,11 +196,11 @@ export function Room({ r, tier, painted }: { r: RoomStyle; tier: number; painted
       {r.signature && tier === 0 && (
         <>
           {/* Glasshouse mullions and transparent roof panels: a real architectural identity. */}
-          {Array.from({ length: Math.max(4, Math.floor(r.w / 1.8)) + 1 }, (_, i, all) => (
-            <B key={'glass-back-mullion-' + i} p={[0.18 + i * (r.w - 0.36) / Math.max(1, all.length - 1), H / 2, -0.14]} s={[0.065, H, 0.065]} c="#6AA9B7" m={0.82} r={0.18} />
+          {Array.from({ length: glassXCount }, (_, i) => (
+            <B key={'glass-back-mullion-' + i} p={[0.18 + i * (r.w - 0.36) / Math.max(1, glassXCount - 1), H / 2, -0.14]} s={[0.065, H, 0.065]} c="#6AA9B7" m={0.82} r={0.18} />
           ))}
-          {Array.from({ length: Math.max(3, Math.floor(r.d / 1.8)) + 1 }, (_, i, all) => (
-            <B key={'glass-side-mullion-' + i} p={[-0.14, H / 2, 0.16 + i * (r.d - 0.32) / Math.max(1, all.length - 1)]} s={[0.065, H, 0.065]} c="#6AA9B7" m={0.82} r={0.18} />
+          {Array.from({ length: glassZCount }, (_, i) => (
+            <B key={'glass-side-mullion-' + i} p={[-0.14, H / 2, 0.16 + i * (r.d - 0.32) / Math.max(1, glassZCount - 1)]} s={[0.065, H, 0.065]} c="#6AA9B7" m={0.82} r={0.18} />
           ))}
           <B p={[r.w / 2, H * 0.33, -0.15]} s={[r.w, 0.055, 0.07]} c="#6AA9B7" m={0.82} r={0.18} />
           <B p={[r.w / 2, H * 0.68, -0.15]} s={[r.w, 0.055, 0.07]} c="#6AA9B7" m={0.82} r={0.18} />
@@ -705,8 +707,17 @@ function Furniture({ s, selected, placing, onTap, dark, reflections }: Pick<Scen
   const r = room(s.listing);
   const wl = wallLayout(s.furniture, s.listing);
   const live = useMemo(() => liveMirrorUids(s, reflections !== false), [s.furniture, reflections]); // eslint-disable-line react-hooks/exhaustive-deps
-  // colours of displayed stock, shared out to display furniture
-  const shown = s.stock.filter((d) => d.displayed && d.pieces > 0);
+  // One rack/drawer slot represents one style. Individual colourways stay in stock,
+  // but only the first in-stock colour paints a representative garment on the rack.
+  const shown: typeof s.stock = [];
+  const seenStyles = new Set<string>();
+  for (const d of s.stock) {
+    if (!d.displayed || d.pieces <= 0) continue;
+    const key = productKey(d);
+    if (seenStyles.has(key)) continue;
+    seenStyles.add(key);
+    shown.push(d);
+  }
   let cursor = 0;
   const take = (n: number) => {
     const out = shown.slice(cursor, cursor + n).map((d) => d.color);
