@@ -263,6 +263,7 @@ const rivalProfile = (r: Rival, s: GameState) => {
         ? 'competitive and capable of a sharp response, but not automatically looking for a fight.'
         : 'usually measured and professional; competes more through the business than personal attacks.'),
     'Current position: ' + (TIERS[r.tier]?.name || 'fashion') + ' tier, reputation ' + Math.round(r.rep) + '/100, ' + r.followers.toLocaleString('en-NG') + ' followers.',
+    'Available business cash for feasibility checks only: ' + naira(Math.max(0, r.cash)) + '. Do not mention this figure unless discussing a collaboration budget.',
     rankContext,
     r.main
       ? 'This is one of the five principal rivals. Keep this individual recognisable across chats.'
@@ -362,7 +363,7 @@ const Chats: React.FC<PhoneProps> = ({ s, up, chat, setChat, staff }) => {
             participants,
             history: prior,
             message: text,
-            gameContext: { day: s.day, reputation: s.rep, followers: s.followers, shopName: 'Asanwa Boutique' },
+            gameContext: { day: s.day, reputation: s.rep, followers: s.followers, cash: s.cash, shopName: 'Asanwa Boutique' },
             canDiscussCollaboration: Boolean(targetRival?.main && targetChat !== GROUP),
           }),
         });
