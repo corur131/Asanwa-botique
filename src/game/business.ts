@@ -274,7 +274,7 @@ export function maximumLoan(s: GameState): number {
   const bank = s.bank || initialBankState();
   const activeDebt = bank.loans.reduce((sum, loan) => sum + Math.max(0, loan.balance), 0);
   // A current default blocks fresh borrowing until the player clears the defaulted loan.
-  if (profile.score < 450 || bank.loans.some((loan) => loan.defaulted || (loan.missedPayments || 0) >= 3)) return 0;
+  if (profile.score < 450 || bank.loans.some((loan) => loan.defaulted || (loan.missedPayments || 0) >= 3 || (loan.arrearsBalance || 0) > 0)) return 0;
   const maxByTier = [300_000, 1_500_000, 6_000_000, 25_000_000, 75_000_000][clamp(s.tier, 0, 4)];
   const weeklyRevenue = (s.history || []).slice(-7).reduce((sum, day) => sum + day.income, 0);
   const netWorth = Math.max(0, netWorthPlayer(s));
@@ -423,9 +423,10 @@ export function processBankWeekly(s0: GameState): GameState {
       const loans = currentBank.loans.map((item) => item.id === loan.id ? {
         ...item,
         balance: newBalance,
-        // A successful scheduled payment also cures recorded instalment arrears.
-        // arrearsBalance is a memo amount already included in loan.balance, not a second debt.
-        arrearsBalance: newBalance <= 1 ? 0 : Math.max(0, (item.arrearsBalance || 0) - due),
+        // This payment satisfies the current scheduled instalment. Do not also
+        // clear an older overdue instalment from the memo balance: that would
+        // count one payment twice (as both current and overdue).
+        arrearsBalance: newBalance <= 1 ? 0 : Math.max(0, item.arrearsBalance || 0),
         nextPaymentDay: item.nextPaymentDay + 7,
         missedPayments: 0,
       } : item).filter((item) => item.balance > 1);
