@@ -365,7 +365,7 @@ export const MovePanel: React.FC<{ s: GameState; onMove: (l: Listing, plan: 'arr
           </section>
           <div className="flex gap-2 justify-end">
             <Btn onClick={() => setPick(null)}>Not yet</Btn>
-            <Btn tone="gold" disabled={s.cash < pick.moveIn + (contestFor(s, pick)?.extra || 0)} onClick={() => { onMove(pick, movePlan); setPick(null); }}>{s.cash < pick.moveIn + (contestFor(s, pick)?.extra || 0) ? `Need ${naira(pick.moveIn + (contestFor(s, pick)?.extra || 0))}` : movePlan === 'sell' ? 'Sell equipment and move' : movePlan === 'store' ? 'Store equipment and move' : 'Arrange equipment and move'}</Btn>
+            <Btn tone="gold" disabled={s.cash + (movePlan === 'sell' ? resaleValue : 0) < pick.moveIn + (contestFor(s, pick)?.extra || 0)} onClick={() => { onMove(pick, movePlan); setPick(null); }}>{s.cash + (movePlan === 'sell' ? resaleValue : 0) < pick.moveIn + (contestFor(s, pick)?.extra || 0) ? `Need ${naira(Math.max(0, pick.moveIn + (contestFor(s, pick)?.extra || 0) - (movePlan === 'sell' ? resaleValue : 0)))} after equipment sale` : movePlan === 'sell' ? 'Sell equipment and move' : movePlan === 'store' ? 'Store equipment and move' : 'Arrange equipment and move'}</Btn>
           </div>
         </Modal>
       )}
