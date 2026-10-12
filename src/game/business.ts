@@ -524,7 +524,7 @@ export function investInExpansion(s0: GameState, investment: ExpansionInvestment
       const areas = ['Lekki Phase 1', 'Ikeja', 'Surulere', 'Victoria Island'];
       const branch: BusinessBranch = {
         id: 'branch-' + s0.day + '-' + index,
-        name: 'Asanwa Boutique ' + (index === 1 ? 'Lekki Outlet' : 'Branch ' + (index + 1)),
+        name: 'Asanwa Boutique ' + (index === 1 ? 'Lekki Outlet' : 'Branch ' + index),
         area: areas[current.branches.length % areas.length],
         tier: 2,
         openedDay: s0.day,
