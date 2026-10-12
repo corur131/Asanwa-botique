@@ -501,6 +501,45 @@ export const WARDROBE: WardrobeItem[] = [
   W('italianWoolOvercoat', 'Italian-Wool Overcoat', 'outer', 'Designer Outerwear', false, ['office', 'dateNight', 'redCarpet'], 'rich', 295_000, 'plain', 'm', { renderId: 'italianWoolOvercoat', minTier: 3 }),
   W('luxuryLeatherBiker', 'Luxury Leather Biker Jacket', 'outer', 'Couture Outerwear', false, ['casual', 'party', 'redCarpet'], 'rich', 360_000, 'leather', 'm', { renderId: 'luxuryLeatherBiker', minTier: 3 }),
   W('monogramVelvetDinnerJacket', 'Velvet Dinner Jacket', 'outer', 'Couture Suiting', false, ['wedding', 'redCarpet'], 'rich', 780_000, 'velvet', 'm', { renderId: 'monogramVelvetDinnerJacket', minTier: 4 }),
+
+  // ---- 30 new researched, renderer-backed Yaba Mart designs ----
+  // Women's native collection: accessible everyday pieces through bespoke ceremony couture.
+  W('ankaraPeplumWrapperGown', 'Ankara Peplum Wrapper Gown', 'dress', 'New Native Womenswear', true, ['owambe', 'church', 'brunch'], 'poor', 8_500, 'ankara', 'f', { renderId: 'ankaraPeplumWrapperGown', minTier: 0 }),
+  W('adirePanelBubu', 'Adire Contrast-Panel Bubu', 'dress', 'New Native Womenswear', true, ['casual', 'church', 'brunch'], 'poor', 9_500, 'adire', 'f', { renderId: 'adirePanelBubu', minTier: 0 }),
+  W('iroBubaOccasionSet', 'Iro-and-Buba Occasion Set', 'dress', 'New Native Womenswear', true, ['owambe', 'church', 'wedding'], 'middle', 18_000, 'ankara', 'f', { renderId: 'iroBubaOccasionSet', minTier: 1 }),
+  W('twoToneAnkaraWrapDress', 'Two-Tone Ankara Wrap Dress', 'dress', 'New Native Womenswear', true, ['brunch', 'owambe', 'birthday'], 'middle', 24_000, 'ankara', 'f', { renderId: 'twoToneAnkaraWrapDress', minTier: 1 }),
+  W('georgeWrapperBlouseSet', 'George Wrapper and Blouse Set', 'dress', 'New Native Womenswear', true, ['owambe', 'wedding'], 'middle', 45_000, 'george', 'f', { renderId: 'georgeWrapperBlouseSet', minTier: 2 }),
+  W('lacePanelMermaidAsoEbi', 'Lace-Panel Mermaid Aso-Ebi', 'dress', 'New Native Womenswear', true, ['wedding', 'owambe'], 'middle', 95_000, 'lace', 'f', { renderId: 'lacePanelMermaidAsoEbi', minTier: 2 }),
+  W('puffSleeveKabaGown', 'Puff-Sleeve Kaba Gown', 'dress', 'New Native Womenswear', true, ['church', 'owambe', 'wedding'], 'middle', 125_000, 'lace', 'f', { renderId: 'puffSleeveKabaGown', minTier: 2 }),
+  W('sculptedAsoOkeWrapperSet', 'Sculpted Aso-Oke Wrapper Set', 'dress', 'New Native Womenswear', true, ['owambe', 'wedding', 'redCarpet'], 'rich', 185_000, 'asoOke', 'f', { renderId: 'sculptedAsoOkeWrapperSet', minTier: 3 }),
+  W('goldEmbroideredAdireKaftan', 'Gold-Embroidered Adire Kaftan', 'dress', 'New Native Womenswear', true, ['owambe', 'wedding', 'redCarpet'], 'rich', 320_000, 'adire', 'f', { renderId: 'goldEmbroideredAdireKaftan', minTier: 3 }),
+  W('coutureAsoOkeCapeCorsetGown', 'Couture Aso-Oke Corset Gown with Cape', 'dress', 'New Native Womenswear', true, ['wedding', 'owambe', 'redCarpet'], 'rich', 850_000, 'asoOke', 'f', { renderId: 'coutureAsoOkeCapeCorsetGown', minTier: 4 }),
+
+  // Women's English-wear collection: everyday separates through red-carpet tailoring.
+  W('contrastSeamBoxyTee', 'Contrast-Seam Boxy Cotton Tee', 'top', 'New English Womenswear', false, ['casual', 'brunch'], 'poor', 4_500, 'plain', 'f', { renderId: 'contrastSeamBoxyTee', minTier: 0 }),
+  W('aLineShirtDress', 'A-Line Short-Sleeve Shirt Dress', 'dress', 'New English Womenswear', false, ['office', 'church', 'brunch'], 'poor', 9_000, 'plain', 'f', { renderId: 'aLineShirtDress', minTier: 0 }),
+  W('tieWaistWrapBlouse', 'Tie-Waist Wrap Blouse', 'top', 'New English Womenswear', false, ['office', 'brunch', 'dateNight'], 'middle', 12_000, 'chiffon', 'f', { renderId: 'tieWaistWrapBlouse', minTier: 1 }),
+  W('highRiseStraightTrousers', 'High-Rise Straight-Leg Trousers', 'bottom', 'New English Womenswear', false, ['office', 'church', 'brunch'], 'middle', 16_000, 'plain', 'f', { renderId: 'highRiseStraightTrousers', minTier: 1 }),
+  W('deepPleatPalazzoTrousers', 'Deep-Pleat Palazzo Trousers', 'bottom', 'New English Womenswear', false, ['office', 'brunch', 'dateNight'], 'middle', 32_000, 'plain', 'f', { renderId: 'deepPleatPalazzoTrousers', minTier: 1 }),
+  W('fitFlareMidiDress', 'Fit-and-Flare Midi Dress', 'dress', 'New English Womenswear', false, ['office', 'church', 'brunch'], 'middle', 58_000, 'satin', 'f', { renderId: 'fitFlareMidiDress', minTier: 2 }),
+  W('doubleButtonTailoredBlazer', 'Double-Button Tailored Blazer', 'outer', 'New English Womenswear', false, ['office', 'dateNight', 'redCarpet'], 'middle', 95_000, 'plain', 'f', { renderId: 'doubleButtonTailoredBlazer', minTier: 2 }),
+  W('biasCutSatinEveningGown', 'Bias-Cut Satin Evening Gown', 'dress', 'New English Womenswear', false, ['dateNight', 'wedding', 'redCarpet'], 'rich', 165_000, 'satin', 'f', { renderId: 'biasCutSatinEveningGown', minTier: 3 }),
+  W('beltedTrenchShirtDress', 'Belted Trench Shirt Dress', 'dress', 'New English Womenswear', false, ['office', 'brunch', 'redCarpet'], 'rich', 220_000, 'plain', 'f', { renderId: 'beltedTrenchShirtDress', minTier: 3 }),
+  W('architecturalColumnTrainGown', 'Architectural Column Gown with Train', 'dress', 'New English Womenswear', false, ['wedding', 'redCarpet'], 'rich', 680_000, 'satin', 'f', { renderId: 'architecturalColumnTrainGown', minTier: 4 }),
+
+  // Men's native collection: dashiki, kaftan, senator tailoring, Isiagu and Agbada.
+  W('geometricDashikiShirt', 'Geometric-Embroidered Dashiki Shirt', 'top', 'New Native Menswear', true, ['casual', 'church', 'owambe'], 'poor', 8_500, 'ankara', 'm', { renderId: 'geometricDashikiShirt', minTier: 0 }),
+  W('contrastPanelNativeKaftan', 'Contrast-Panel Native Kaftan', 'dress', 'New Native Menswear', true, ['church', 'owambe', 'brunch'], 'middle', 24_000, 'adire', 'm', { renderId: 'contrastPanelNativeKaftan', minTier: 1 }),
+  W('embroideredSenatorTwoPiece', 'Embroidered Senator Two-Piece', 'dress', 'New Native Menswear', true, ['church', 'owambe', 'wedding'], 'middle', 95_000, 'plain', 'm', { renderId: 'embroideredSenatorTwoPiece', minTier: 2 }),
+  W('goldEmbroideredIsiaguTop', 'Gold-Embroidered Velvet Isiagu', 'top', 'New Native Menswear', true, ['owambe', 'wedding', 'redCarpet'], 'rich', 240_000, 'velvet', 'm', { renderId: 'goldEmbroideredIsiaguTop', minTier: 3 }),
+  W('royalAsoOkeCeremonyAgbada', 'Royal Aso-Oke Ceremony Agbada', 'dress', 'New Native Menswear', true, ['owambe', 'wedding', 'redCarpet'], 'rich', 650_000, 'asoOke', 'm', { renderId: 'royalAsoOkeCeremonyAgbada', minTier: 4 }),
+
+  // Men's English-wear collection: casual shirting, fitted officewear and formal suits.
+  W('contrastPlacketCasualShirt', 'Contrast-Placket Casual Shirt', 'top', 'New English Menswear', false, ['casual', 'brunch', 'dateNight'], 'poor', 7_500, 'plain', 'm', { renderId: 'contrastPlacketCasualShirt', minTier: 0 }),
+  W('slimFitDressShirt', 'Slim-Fit Formal Dress Shirt', 'top', 'New English Menswear', false, ['office', 'church', 'dateNight'], 'middle', 28_000, 'plain', 'm', { renderId: 'slimFitDressShirt', minTier: 1 }),
+  W('unstructuredNotchLapelBlazer', 'Unstructured Notch-Lapel Blazer', 'outer', 'New English Menswear', false, ['office', 'dateNight', 'wedding'], 'middle', 85_000, 'plain', 'm', { renderId: 'unstructuredNotchLapelBlazer', minTier: 2 }),
+  W('doubleBreastedEveningSuit', 'Double-Breasted Evening Suit', 'dress', 'New English Menswear', false, ['wedding', 'office', 'redCarpet'], 'rich', 210_000, 'plain', 'm', { renderId: 'doubleBreastedEveningSuit', minTier: 3 }),
+  W('satinLapelTuxedoSet', 'Satin-Lapel Tuxedo Set', 'dress', 'New English Menswear', false, ['wedding', 'redCarpet'], 'rich', 550_000, 'plain', 'm', { renderId: 'satinLapelTuxedoSet', minTier: 4 }),
 ];
 
 export const itemById = (id?: string) => WARDROBE.find((w) => w.id === id);
