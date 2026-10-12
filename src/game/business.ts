@@ -187,6 +187,9 @@ export function processPromotionAtClose(s0: GameState): GameState {
   const newHours = Math.max(0, (p.hoursRemaining || 0) - chargedHours);
   const reachMultiplier = { local: 1, citywide: 2.5, premium: 5.5, luxury: 10 }[p.level];
   const estimatedReach = Math.round(p.hourlyBudget * chargedHours * reachMultiplier / 15);
+  const followerRate = { local: 0.0007, citywide: 0.0011, premium: 0.0016, luxury: 0.002 }[p.level];
+  const brandBefore = getBrandMetrics(s);
+  const followersGained = estimatedReach > 0 ? Math.max(0, Math.round(estimatedReach * followerRate * (0.75 + Math.random() * 0.5) * (0.8 + brandBefore.loyalty / 250))) : 0;
   const stillActive = p.mode === 'always' ? chargedHours >= hours : newHours > 0;
   const promotion = {
     ...p, active: stillActive && (p.mode === 'always' || newHours > 0),
@@ -195,7 +198,7 @@ export function processPromotionAtClose(s0: GameState): GameState {
     totalSpent: p.totalSpent + cost,
     estimatedReach: p.estimatedReach + estimatedReach,
   };
-  s = { ...s, promotion };
+  s = { ...s, promotion, followers: Math.max(0, (s.followers || 0) + followersGained), brand: { ...brandBefore, awareness: clamp(brandBefore.awareness + (estimatedReach > 0 ? 0.3 : 0), 5, 100), trendInfluence: clamp(brandBefore.trendInfluence + (estimatedReach > 0 ? 0.15 : 0), 5, 100) }, today: { ...s.today, events: [...s.today.events, 'Promotion reached an estimated ' + estimatedReach.toLocaleString('en-NG') + ' people and added ' + followersGained.toLocaleString('en-NG') + ' followers.'] } };
   if (chargedHours < hours) {
     s = { ...s, messages: [{ id: (s.msgSeq || 0) + 1, day: s.day, from: 'KoboBank', text: 'Your promotion stopped because the current account could not cover the full hourly budget.', tone: 'warn', t: -1 }, ...(s.messages || [])].slice(0, 160), msgSeq: (s.msgSeq || 0) + 1, promotion: { ...promotion, active: false } };
   }
