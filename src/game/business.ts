@@ -69,8 +69,12 @@ export function ensureBusinessState(s: GameState): GameState {
       return Math.round(takings * 0.62 + (TIERS[r.tier]?.running || 1500));
     }),
   }));
+  const inheritedCashDeficit = Math.max(0, -(Number.isFinite(s.cash) ? s.cash : 0));
   return {
-    ...s, bank, businessExpansion, brand, rivals,
+    ...s,
+    cash: Math.max(0, Number.isFinite(s.cash) ? s.cash : 0),
+    operatingPayables: Math.max(0, bank0 ? (s.operatingPayables || 0) : 0) + inheritedCashDeficit,
+    bank, businessExpansion, brand, rivals,
     wealthHistory: Array.isArray(s.wealthHistory) ? s.wealthHistory : [],
     sponsorshipOffers: Array.isArray(s.sponsorshipOffers) ? s.sponsorshipOffers : [],
   };
@@ -112,12 +116,29 @@ export function stopPromotion(s: GameState): GameState {
 }
 
 function ledger(s: GameState, amount: number, label: string, category?: 'transfer' | 'operating' | 'financing' | 'interest'): GameState {
-  if (!amount) return s;
-  return {
-    ...s,
-    cash: s.cash + amount,
-    ledger: [{ day: s.day, t: s.phase === 'shop' ? Math.floor(s.clock) : -1, label, amount, ...(category ? { category } : {}) }, ...(s.ledger || [])].slice(0, 150),
-  };
+  if (!Number.isFinite(amount) || !amount) return s;
+  const inheritedDeficit = Math.max(0, -s.cash);
+  let cash = Math.max(0, s.cash);
+  let operatingPayables = Math.max(0, s.operatingPayables || 0) + inheritedDeficit;
+  const entries: GameState['ledger'] = [{ day: s.day, t: s.phase === 'shop' ? Math.floor(s.clock) : -1, label, amount, ...(category ? { category } : {}) }];
+  if (amount < 0) {
+    const requested = Math.abs(amount);
+    const paid = Math.min(cash, requested);
+    cash -= paid;
+    operatingPayables += requested - paid;
+  } else {
+    cash += amount;
+    // Sales and other operating receipts clear old payables first. Transfers and new loans do not.
+    if (category !== 'transfer' && category !== 'financing' && operatingPayables > 0) {
+      const settlement = Math.min(cash, operatingPayables);
+      if (settlement > 0) {
+        cash -= settlement;
+        operatingPayables -= settlement;
+        entries.unshift({ day: s.day, t: s.phase === 'shop' ? Math.floor(s.clock) : -1, label: 'Operating payables settled', amount: -settlement, category: 'operating' });
+      }
+    }
+  }
+  return { ...s, cash, operatingPayables, ledger: [...entries, ...(s.ledger || [])].slice(0, 150) };
 }
 
 export function transferBank(s0: GameState, pocket: BankPocket, amount: number, source: 'savings' | 'rentVault' = 'rentVault'): GameState {
@@ -272,7 +293,7 @@ export function takeBusinessLoan(s0: GameState, requested: number, termWeeks: nu
     // First instalment is due at the first weekly banking cycle at least seven days after origination.
     nextPaymentDay: Math.ceil((s0.day + 7) / 7) * 7, missedPayments: 0, arrearsBalance: 0,
   };
-  const next = ledger({ ...s0, bank: { ...bank, loans: [...bank.loans, loan], creditProfile: { ...profile, score: clamp(profile.score - 3, 300, 850), loansTaken: profile.loansTaken + 1, lastApplicationDay: s0.day } } }, amount, 'Business loan disbursement');
+  const next = ledger({ ...s0, bank: { ...bank, loans: [...bank.loans, loan], creditProfile: { ...profile, score: clamp(profile.score - 3, 300, 850), loansTaken: profile.loansTaken + 1, lastApplicationDay: s0.day } } }, amount, 'Business loan disbursement', 'financing');
   return { ...next, today: { ...next.today, events: [...next.today.events, 'Business loan approved: ' + amount.toLocaleString('en-NG') + ' naira over ' + termWeeks + ' weeks.'] } };
 }
 
@@ -575,7 +596,8 @@ export function totalLiabilities(s: Pick<GameState, 'bank' | 'lateRent'>): numbe
   const bank = s.bank || initialBankState();
   const loans = bank.loans.reduce((sum, loan) => sum + Math.max(0, loan.balance), 0);
   const rentOwed = Math.max(0, s.lateRent?.amount || 0);
-  return Math.round(loans + rentOwed);
+  const operatingPayables = Math.max(0, ('operatingPayables' in s ? s.operatingPayables : 0) || 0);
+  return Math.round(loans + rentOwed + operatingPayables);
 }
 
 export function netWorthPlayer(s: GameState): number {
