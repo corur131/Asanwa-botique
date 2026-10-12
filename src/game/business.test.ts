@@ -9,6 +9,7 @@ import {
   initialBankState,
   processFixedDepositMaturities,
   processBankWeekly,
+  processExpansionAtClose,
   repayBusinessLoan,
   arrangeBusinessLoanRepayment,
   transferBank,
@@ -171,4 +172,37 @@ test('legacy negative cash is migrated into an operating liability', () => {
   const after = ensureBusinessState(before);
   assert.equal(after.cash, 0);
   assert.equal(after.operatingPayables, 7_000);
+});
+
+
+test('branch operating costs create a payable rather than negative cash when funds run short', () => {
+  const before = state({
+    day: 7,
+    cash: 0,
+    rep: 35,
+    followers: 120,
+    tier: 0,
+    businessExpansion: {
+      branches: [{ id: 'branch-test', name: 'Test Branch', area: 'Lagos', tier: 0, openedDay: 1, weeklyRent: 1_000_000, assetValue: 90_000 }],
+      departments: [],
+      wholesaleActive: false,
+      designerCollections: 0,
+    },
+    today: { income: 0, costs: 0, events: [] },
+  });
+  const after = processExpansionAtClose(before);
+  assert.ok(after.cash >= 0);
+  assert.ok((after.operatingPayables || 0) > 0);
+  assert.ok(totalLiabilities(after) >= (after.operatingPayables || 0));
+});
+
+test('older loans with missed payments receive an arrears estimate when saves are normalized', () => {
+  const legacyLoan = {
+    id: 'legacy-loan', principal: 100_000, balance: 100_000, weeklyRatePct: 2,
+    weeklyPayment: 12_000, termWeeks: 12, nextPaymentDay: 14, missedPayments: 2,
+  };
+  const after = ensureBusinessState(state({
+    bank: { ...initialBankState(), loans: [legacyLoan] },
+  }));
+  assert.equal(after.bank!.loans[0].arrearsBalance, 24_000);
 });
