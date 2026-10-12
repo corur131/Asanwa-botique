@@ -420,7 +420,15 @@ export function processBankWeekly(s0: GameState): GameState {
     const due = Math.min(loan.balance + interest, loan.weeklyPayment);
     if (s.cash >= due) {
       const newBalance = Math.max(0, loan.balance + interest - due);
-      const loans = currentBank.loans.map((item) => item.id === loan.id ? { ...item, balance: newBalance, nextPaymentDay: item.nextPaymentDay + 7, missedPayments: 0 } : item).filter((item) => item.balance > 1);
+      const loans = currentBank.loans.map((item) => item.id === loan.id ? {
+        ...item,
+        balance: newBalance,
+        // A successful scheduled payment also cures recorded instalment arrears.
+        // arrearsBalance is a memo amount already included in loan.balance, not a second debt.
+        arrearsBalance: newBalance <= 1 ? 0 : Math.max(0, (item.arrearsBalance || 0) - due),
+        nextPaymentDay: item.nextPaymentDay + 7,
+        missedPayments: 0,
+      } : item).filter((item) => item.balance > 1);
       const profile = currentBank.creditProfile || creditProfile({ ...s, bank: currentBank });
       const hasDelinquency = (loan.missedPayments || 0) > 0 || (loan.arrearsBalance || 0) > 0;
       const creditProfileNext = { ...profile, score: clamp(profile.score + (hasDelinquency ? 2 : 5), 300, 850), onTimePayments: profile.onTimePayments + (hasDelinquency ? 0 : 1) };
