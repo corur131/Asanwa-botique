@@ -55,7 +55,15 @@ export const MARKET: MarketEntry[] = [
   ...acc('necklace', NECKLACES, 'Necklaces'),
   ...acc('wrist', WRIST, 'Wrist'),
   ...acc('glasses', GLASSES, 'Eyewear'),
-  ...EARRINGS.filter((e) => e.id !== 'none').map((e) => ({ kind: 'earrings' as StockKind, id: e.id, label: e.label, price: EARRING_PRICE[e.id] || 4_000, for: 'f' as const, native: e.id === 'coralDrops', luxury: false, group: 'Earrings' })),
+  ...EARRINGS.filter((e) => e.id !== 'none').map((e) => ({ kind: 'earrings' as StockKind, id: e.id, label: e.label, price: EARRING_PRICE[e.id] || 4_000, for: 'f' as const, native: e.id === 'coralDrops', luxury: false, group: 'Earrings', renderId: e.id })),
+  // Individually priced fine-jewellery variants, rendered with the detailed base earring designs.
+  { kind: 'earrings', id: 'pearlCascadeDrops', label: 'Pearl Cascade Drops', price: 52_000, for: 'f', native: false, luxury: true, group: 'Fine Jewellery', renderId: 'pearls', minTier: 2 },
+  { kind: 'earrings', id: 'goldFiligreeDrops', label: 'Gold Filigree Drops', price: 88_000, for: 'f', native: false, luxury: true, group: 'Fine Jewellery', renderId: 'goldDrops', minTier: 2 },
+  { kind: 'earrings', id: 'diamondHaloStuds', label: 'Diamond-Halo Studs', price: 185_000, for: 'f', native: false, luxury: true, group: 'Fine Jewellery', renderId: 'goldStuds', minTier: 3 },
+  { kind: 'earrings', id: 'crystalBridalChandeliers', label: 'Crystal Bridal Chandeliers', price: 265_000, for: 'f', native: false, luxury: true, group: 'Fine Jewellery', renderId: 'chandelier', minTier: 3 },
+  { kind: 'earrings', id: 'heirloomCoralDrops', label: 'Heirloom Coral Drops', price: 360_000, for: 'f', native: true, luxury: true, group: 'Fine Jewellery', renderId: 'coralDrops', minTier: 3 },
+  { kind: 'earrings', id: 'diamondStatementHoops', label: 'Diamond-Statement Hoops', price: 620_000, for: 'f', native: false, luxury: true, group: 'Couture Jewellery', renderId: 'bigHoops', minTier: 4 },
+  { kind: 'earrings', id: 'royalPearlChandeliers', label: 'Royal Pearl Chandeliers', price: 890_000, for: 'f', native: false, luxury: true, group: 'Couture Jewellery', renderId: 'chandelier', minTier: 4 },
 ];
 
 export const entryFor = (kind: StockKind, id: string) => MARKET.find((m) => m.kind === kind && m.id === id);
