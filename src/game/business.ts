@@ -398,6 +398,10 @@ export function processFixedDepositMaturities(s0: GameState): GameState {
 }
 
 export function processBankWeekly(s0: GameState): GameState {
+  // The engine runs banking on day 7, 14, 21, etc. Keep the rule inside the
+  // function too, so an early or accidental extra call cannot credit another week
+  // of savings interest or attempt a scheduled payment ahead of its banking day.
+  if (s0.day % 7 !== 0) return s0;
   let s = s0;
   let bank = s.bank || initialBankState();
   const savingsInterest = roundMoney(bank.savings * bank.savingsRatePct / 100);
