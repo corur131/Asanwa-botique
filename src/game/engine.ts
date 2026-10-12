@@ -670,6 +670,9 @@ function staffFinish(s: GameState, c: Customer, m: StaffMember): GameState {
 // End of day: running costs, weekly wages, staff drama, rent
 // ---------------------------------------------------------------------------
 export function closeShop(s0: GameState): GameState {
+  // Closing is a once-per-day transaction: a duplicate close must not charge
+  // wages, rent, branch costs, or banking a second time.
+  if (s0.phase === 'evening') return s0;
   let s = s0;
   // anyone still here goes home
   const sentHome = s.inShop.length;
