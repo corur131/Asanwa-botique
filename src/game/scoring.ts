@@ -53,8 +53,8 @@ const GLAM_WANTED: Record<Occasion, number> = { redCarpet: 0.85, owambe: 0.8, we
 
 const CLASS_RANK = { poor: 0, middle: 1, rich: 2 } as const;
 
-export function designsOf(choice: StyleChoice, stock: Design[]): Partial<Record<Slot, Design>> {
-  const out: Partial<Record<Slot, Design>> = {};
+export function designsOf(choice: StyleChoice, stock: Design[]): Partial<Record<Slot | 'hair', Design>> {
+  const out: Partial<Record<Slot | 'hair', Design>> = {};
   for (const s of SLOTS) {
     const uid = s === 'hair' ? choice.hairpiece : choice[s as keyof StyleChoice];
     if (!uid) continue;
