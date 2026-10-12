@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import type { GameState } from './types';
-import { money, payRent, settleLateRent, demote } from './engine';
+import { money, payRent, settleLateRent, demote, closeShop } from './engine';
 import {
   financialAssets,
   creditHistoryReport,
@@ -39,6 +39,11 @@ function state(overrides: Partial<GameState> = {}): GameState {
     ...overrides,
   } as unknown as GameState;
 }
+
+test('closing an already-closed day is a no-op and cannot charge obligations twice', () => {
+  const alreadyClosed = state({ phase: 'evening', day: 7, cash: 100_000 });
+  assert.equal(closeShop(alreadyClosed), alreadyClosed);
+});
 
 test('moving money from cash to savings does not change total financial assets', () => {
   const before = state();
