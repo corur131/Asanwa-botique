@@ -929,7 +929,7 @@ function answerSponsorship(s0: GameState, message: Message, choice: ReplyChoice[
     today: { ...s.today, income: s.today.income + offer.payout, events: [...s.today.events, 'Sponsored campaign from ' + offer.sponsor + ' earned ' + naira(offer.payout) + '.'] },
     sponsorshipOffers: (s.sponsorshipOffers || []).map((item) => item.id === offer.id ? { ...item, status: 'accepted' as const } : item),
   };
-  s = gist(s, 'Asanwa Boutique lands a sponsored campaign', offer.sponsor + ' paid ' + naira(offer.payout) + ' for a Gidigram campaign. Divine gained ' + offer.bonusFollowers + ' followers.', 'you', true);
+  s = { ...s, gist: [{ id: 'sponsor-gist-' + offer.id, day: s.day, title: 'Asanwa Boutique lands a sponsored campaign', body: offer.sponsor + ' paid ' + naira(offer.payout) + ' for a Gidigram campaign. Divine gained ' + offer.bonusFollowers + ' followers.', about: 'you', hot: false }, ...(s.gist || [])].slice(0, 40) };
   return refreshEveningHistory(msg(s, offer.sponsor, 'The partnership is confirmed. Your payment is on its way, and we have shared your campaign with our fashion audience.', 'good'));
 }
 
