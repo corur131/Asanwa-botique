@@ -197,6 +197,55 @@ const targetChatLabel = (chat: string) => chat === GROUP ? 'the group' : chat.sp
 
 const stamp = (m: Message) => (m.t !== undefined ? `Day ${m.day} · ${E.clockText(m.t)}` : `Day ${m.day}`);
 
+const RIVAL_VOICE: Record<Rival['personality'], string> = {
+  queen: 'Composed, proud, status-conscious and used to being one of the best. She speaks with polished confidence, protects her premium reputation, and delivers controlled, precise shade rather than noisy insults. Bridal clients, exclusivity and quality matter to her.',
+  loud: 'High-energy, expressive, socially bold and quick with a joke or comeback. Her rhythm can be lively and playful, with occasional current Nigerian slang and emojis when the moment earns them. She can boast or provoke, but can also laugh and ease off.',
+  oldschool: 'An experienced, tradition-minded fashion trader who values respect, craftsmanship, fabric quality and years of practical knowledge. She speaks more deliberately, can be firm or admonishing, and does not need to imitate Gen-Z slang.',
+  shady: 'Sharp, highly competitive and comfortable with indirect digs, price comparisons and sly little jabs. She watches customers and rivals closely, likes to make a point without sounding openly sentimental, and may escalate when challenged.',
+  sweet: 'Warm, encouraging and relationship-minded, with a softer conversational rhythm. She can be genuinely generous, use affectionate language or an occasional emoji, and may become quietly hurt or passive-aggressive when treated badly rather than suddenly turning into a loud bully.',
+  pro: 'Business-focused and comparatively measured. Let the individual shop, fashion speciality, market position and current relationship shape how formal, confident or competitive this person sounds; do not give every professional rival the same voice.'
+};
+
+const SPECIALITY_VOICE: Record<Rival['speciality'], string> = {
+  bridal: 'Bridal and occasionwear: notices fit, finishing, fabric quality, exclusivity, deadlines and the bride’s overall experience.',
+  genz: 'Gen-Z fashion: follows fast-moving trends, social-media presentation, youthful styling and what people will actually share or buy.',
+  native: 'Traditional/native wear, aso-oke and lace: cares about fabric integrity, craftsmanship, cultural fit, finishing and experience.',
+  cheap: 'Affordable fashion: focuses on prices, value for money, accessible styling and the practical reasons customers choose one shop over another.',
+  wigs: 'Wigs and glam: notices hair quality, installation, styling, face-framing and the confidence a finished look gives a client.',
+  menswear: 'Menswear: pays attention to fit, tailoring, proportion, fabric durability and clean details.',
+  luxury: 'Luxury fashion: values refinement, service, exclusivity, presentation and quality that justifies a premium price.',
+  thrift: 'Thrift fashion: has an eye for unusual finds, smart buys, good condition and value others may overlook.',
+  everyday: 'Everyday fashion: prioritises wearability, comfort, versatility, practical budgets and pieces customers will use often.'
+};
+
+const relationshipRead = (feeling: number) => feeling <= -60
+  ? 'Feels like a serious enemy: guarded, distrustful and quick to read bad intent.'
+  : feeling <= -25
+    ? 'There is clear tension: cool, competitive or suspicious, though not hostile in every single message.'
+    : feeling < 25
+      ? 'The relationship is mostly neutral: assess Divine’s actual message before deciding whether to be friendly or defensive.'
+      : feeling < 60
+        ? 'There is some goodwill: more open or respectful, but still an independent business rival.'
+        : 'There is strong goodwill or trust: warmer and more cooperative, while keeping the character’s core personality.';
+
+const rivalProfile = (r: Rival) => [
+  r.owner + ' owns ' + r.shop + ' in ' + r.area + '.',
+  'Core personality: ' + RIVAL_VOICE[r.personality],
+  'Fashion expertise: ' + SPECIALITY_VOICE[r.speciality],
+  'Relationship toward Divine: ' + relationshipRead(r.feeling),
+  'Competitive behaviour: ' + (r.aggression >= 0.7
+    ? 'highly willing to fight for customers and may use provocative or underhand tactics when the situation supports it.'
+    : r.aggression >= 0.4
+      ? 'competitive and capable of a sharp response, but not automatically looking for a fight.'
+      : 'usually measured and professional; competes more through the business than personal attacks.'),
+  'Current position: ' + (TIERS[r.tier]?.name || 'fashion') + ' tier, reputation ' + Math.round(r.rep) + '/100, ' + r.followers.toLocaleString('en-NG') + ' followers.',
+  r.main
+    ? 'This is one of the five principal rivals. Keep this individual recognisable across chats.'
+    : 'This is a supporting rival. Use their specific shop, speciality, position and relationship to distinguish them without inventing a personal backstory.'
+].join(' ');
+
+
+
 const Chats: React.FC<PhoneProps> = ({ s, up, chat, setChat, staff }) => {
   const list = E.chats(s);
   const [draft, setDraft] = useState('');
@@ -218,18 +267,28 @@ const Chats: React.FC<PhoneProps> = ({ s, up, chat, setChat, staff }) => {
       }));
     const targetRival = (s.rivals || []).find((r) => r.owner === targetChat);
     const targetStaff = (s.staff || []).find((m) => m.name === targetChat);
-    const characterProfile = targetRival
-      ? `${targetRival.owner} owns ${targetRival.shop} in ${targetRival.area}. Personality: ${targetRival.personality}. Speciality: ${targetRival.speciality}. Relationship feeling toward Divine: ${targetRival.feeling}/100. Reputation: ${targetRival.rep}; followers: ${targetRival.followers}. Stay consistent with this character and the established game world.`
-      : targetStaff
-        ? `${targetStaff.name} works at Asanwa Boutique as a ${targetStaff.profession || 'stylist'}, level ${targetStaff.level}, loyalty ${targetStaff.loyalty}/100. Speak naturally as a staff member with a distinct voice.`
-        : targetChat === 'Deborah'
-          ? 'Deborah is Divine’s twin sister, close confidante, and helps manage the boutique books. She is warm, candid, playful, and protective of Divine.'
-          : targetChat === 'Landlord'
-            ? `The landlord of Divine's current shop at ${s.listing.street}, ${s.listing.area}. Be practical, business-minded, and sometimes strict about rent.`
-            : `A character in Asanwa Boutique, a contemporary Lagos fashion-business drama game. Stay consistent with the conversation history and do not invent major game facts.`;
     const participants = targetChat === GROUP
       ? (s.rivals || []).filter((r) => r.main).map((r) => r.owner)
       : [];
+    const characterProfile = targetChat === GROUP
+      ? 'Group setting: Lagos fashion-business rivals who already know one another and Divine. Each listed participant has a separate personality profile below. Choose the person whose viewpoint most naturally fits the latest message and recent group history. Do not blend their voices or make everyone speak in one turn. Do not rotate speakers mechanically.\n\n' + (s.rivals || []).filter((r) => r.main).map(rivalProfile).join('\n\n')
+      : targetRival
+        ? rivalProfile(targetRival)
+        : targetStaff
+          ? [
+              targetStaff.name + ' works at Asanwa Boutique as a ' + (targetStaff.profession || 'stylist') + '.',
+              'Experience: level ' + targetStaff.level + (targetStaff.trained ? ', trained' : ', still learning') + '.',
+              'Work relationship: loyalty ' + targetStaff.loyalty + '/100. ' + (targetStaff.loyalty >= 70 ? 'They feel invested in Divine and can sound comfortably loyal.' : targetStaff.loyalty >= 35 ? 'They are cooperative but still have their own interests and boundaries.' : 'They are not strongly attached yet; keep them more cautious and work-focused rather than assuming closeness.'),
+              targetStaff.profession === 'makeup' ? SPECIALITY_VOICE.wigs + ' Speak from a makeup-and-client-finish perspective, not as a fashion-rival.' : 'Styling perspective: outfit coordination, fit, customer preferences, stock and practical shop-floor work.',
+              targetStaff.level >= 3 ? 'They are highly experienced and can speak confidently about their craft.' : targetStaff.level === 2 ? 'They have some experience and can give practical opinions without pretending to know everything.' : 'They are relatively junior; they may ask questions or speak modestly about unfamiliar tasks.',
+              targetStaff.raiseAsk ? 'They have an unresolved wage conversation, so compensation may make them more assertive if the topic arises.' : '',
+              'Give this staff member a recognisable conversational rhythm, but do not invent family history or personal facts that are not in the game.'
+            ].filter(Boolean).join(' ')
+          : targetChat === 'Deborah'
+            ? 'Deborah is Divine’s twin sister, close confidante, and helps manage the boutique books. She is warm, candid, playful and protective of Divine. She knows the boutique’s practical pressures and can tease Divine like a real sister, but she is not a rival or a generic cheerleader; she can disagree honestly and talk about money or business clearly.'
+            : targetChat === 'Landlord'
+              ? 'The landlord of Divine’s current shop at ' + s.listing.street + ', ' + s.listing.area + '. Practical, business-minded and focused on rent, premises and payment. Can be strict or impatient when money is overdue, but should not be hostile without a reason. Keep the tone concise and negotiation-focused.'
+              : 'A character in Asanwa Boutique, a contemporary Lagos fashion-business drama. Use the name and actual conversation history to stay consistent. Do not invent major game facts or a backstory that the game has not established.';
     setDraft('');
     setAiError('');
     setAiSending(true);
