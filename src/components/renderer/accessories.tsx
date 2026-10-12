@@ -129,6 +129,30 @@ function shoeShape(kind: string, c: string, skin: SkinPalette): React.ReactNode 
           {kind === 'mensBoots' && <path d="M -18 82 C -10 94 10 94 18 82" fill="none" stroke={darken(c, 0.5)} strokeWidth="3.4" />}
         </>
       );
+    case 'premiumLeatherHeels':
+      return <>{pump(c, { heel: 'stiletto', strap: true })}<path d="M -12 60 L 12 60" stroke="#E3C06D" strokeWidth="3.2" /><rect x="-4" y="54" width="8" height="8" rx="2" fill="#D7B254" /></>;
+    case 'crystalEveningHeels':
+      return <>{pump(c)}{[-9, -3, 3, 9].map((x) => <circle key={x} cx={x} cy={63 - Math.abs(x) * 0.3} r="2.3" fill="#F8FAFF" stroke="#B8C6D8" strokeWidth="0.6" />)}<path d="M -14 56 Q 0 49 14 56" fill="none" stroke="#F8FAFF" strokeWidth="2" /></>;
+    case 'atelierSculptedMules':
+      return <>{shoeShape('mules', c, skin)}<path d="M -15 43 Q 0 32 15 43 L 11 54 Q 0 60 -11 54 Z" fill={lighten(c, 0.18)} stroke={darken(c, 0.35)} strokeWidth="1.3" /><circle cx="0" cy="47" r="3" fill="#D9B25A" /></>;
+    case 'coutureGoldSlingbacks':
+      return <>{pump(c, { heel: 'stiletto', strap: true })}<path d="M -16 43 Q 0 52 16 43" fill="none" stroke="#D9B25A" strokeWidth="4.2" /><path d="M -4 42 l 4 3 l 4 -3 l -4 -3 Z" fill="#FFF0B8" stroke="#A9781E" strokeWidth="0.7" /></>;
+    case 'diamondRunwayPumps':
+      return <>{pump(c, { heel: 'stiletto' })}{Array.from({ length: 7 }, (_, i) => <path key={i} d={"M " + (-12 + i * 4) + " " + (55 - Math.sin(i / 6 * Math.PI) * 8) + " l 2.4 -3 l 2.4 3 l -2.4 3 Z"} fill="#F7FBFF" stroke="#BAC9D8" strokeWidth="0.65" />)}</>;
+    case 'premiumSuedeLoafers':
+      return <>{shoeShape('loafers', c, skin)}<path d="M -14 43 Q 0 53 14 43" fill="none" stroke={lighten(c, 0.38)} strokeWidth="2" /><path d="M -4 42 l 0 8 M 4 42 l 0 8" stroke={darken(c, 0.32)} strokeWidth="1.2" /></>;
+    case 'italianLeatherOxfords':
+      return <>{shoeShape('oxfords', c, skin)}<path d="M -14 48 Q 0 60 14 48 M -10 33 L 10 33 M -10 39 L 10 39" fill="none" stroke={lighten(c, 0.42)} strokeWidth="1.6" /></>;
+    case 'bespokeVelvetLoafers':
+      return <>{shoeShape('loafers', c, skin)}<path d="M -10 44 Q 0 36 10 44 L 7 50 L -7 50 Z" fill="#D7B254" stroke="#8D661B" strokeWidth="1" /><circle cx="0" cy="44" r="2" fill="#FFF0B8" /></>;
+    case 'goldHardwareDressShoes':
+      return <>{shoeShape('oxfords', c, skin)}<rect x="-8" y="43" width="16" height="6" rx="2" fill="#D6B45E" stroke="#8A661D" strokeWidth="0.8" /><path d="M -13 50 Q 0 58 13 50" fill="none" stroke="#F8E7AD" strokeWidth="2" /></>;
+    case 'handFinishedOxfordCouture':
+      return <>{shoeShape('oxfords', c, skin)}{[-10, -4, 4, 10].map((x) => <circle key={x} cx={x} cy="31" r="1.7" fill="#D9B25A" />)}<path d="M -14 57 Q 0 68 14 57" fill="none" stroke={lighten(c, 0.46)} strokeWidth="2.4" /></>;
+    case 'everydayCanvasSneakers':
+      return <>{shoeShape('sneakers', c, skin)}<path d="M -17 67 Q 0 73 17 67" fill="none" stroke="#55545A" strokeWidth="2.8" /><path d="M -9 35 L 9 35 M -9 42 L 9 42" stroke="#77747B" strokeWidth="1.6" /></>;
+    case 'atelierLeatherSneakers':
+      return <>{shoeShape('sneakers', c, skin)}<path d="M -20 58 L -3 51 L 4 62 L 20 55" fill="none" stroke={darken(c, 0.28)} strokeWidth="6" /><path d="M -20 58 L -3 51 L 4 62 L 20 55" fill="none" stroke={lighten(c, 0.3)} strokeWidth="1.4" /><rect x="-6" y="76" width="12" height="4" rx="1" fill="#D9B25A" /></>;
     default:
       // loafers
       return (
@@ -239,6 +263,18 @@ function bagBody(kind: string, bc: string, id: Id): React.ReactNode {
           <path d="M -16 -10 C -18 10 -16 28 -12 38" fill="none" stroke={hi} strokeWidth="4" opacity="0.35" />
         </g>
       );
+    case 'sculptedEveningClutch':
+      return <g transform="rotate(-10)"><path d="M -35 -10 Q -32 -24 0 -24 Q 32 -24 35 -10 L 30 16 L -30 16 Z" fill={bc} stroke={lo} strokeWidth="1.7" /><path d="M -35 -4 Q 0 8 35 -4" fill="none" stroke={hi} strokeWidth="3" /><path d="M -15 -18 L 0 -26 L 15 -18" fill="none" stroke="#D9B25A" strokeWidth="2.4" /><circle cx="0" cy="1" r="4" fill="#F8E8B8" stroke="#9B7625" strokeWidth="0.8" /></g>;
+    case 'artisanAsoOkeBag':
+      return <g transform="rotate(-6)"><path d="M -13 -20 Q -12 -40 12 -20" fill="none" stroke={hw(bc)} strokeWidth="3.2" /><path d="M -28 -18 L 28 -18 L 32 22 L -32 22 Z" fill={bc} stroke={lo} strokeWidth="1.3" />{Array.from({ length: 5 }, (_, i) => <path key={i} d={"M " + (-25 + i * 10) + " -14 L " + (-19 + i * 10) + " 18"} stroke={i % 2 ? hw(bc) : hi} strokeWidth="3" opacity="0.85" />)}<path d="M -26 0 L 26 0 M -26 9 L 26 9" stroke={hw(bc)} strokeWidth="2" /></g>;
+    case 'atelierTopHandleBag':
+      return <g><path d="M -15 -18 C -16 -42 16 -42 15 -18" fill="none" stroke={hw(bc)} strokeWidth="4" /><path d="M -27 -16 L 27 -16 L 31 20 L -31 20 Z" fill={bc} stroke={lo} strokeWidth="1.6" /><path d="M -27 -5 L 27 -5" stroke={hw(bc)} strokeWidth="2.2" /><rect x="-5" y="-1" width="10" height="10" rx="2" fill="#D9B25A" /><circle cx="0" cy="4" r="1.8" fill="#FFF4CC" /></g>;
+    case 'handwovenCeremonyBag':
+      return <g transform="rotate(-5)"><path d="M -14 -17 Q 0 -34 14 -17" fill="none" stroke={hw(bc)} strokeWidth="3" /><path d="M -29 -17 Q 0 -24 29 -17 L 25 20 Q 0 28 -25 20 Z" fill={bc} stroke={lo} strokeWidth="1.3" />{Array.from({ length: 6 }, (_, i) => <path key={i} d={"M -26 " + (-12 + i * 6) + " L 26 " + (-12 + i * 6)} stroke={i % 2 ? hi : hw(bc)} strokeWidth="2.2" />)}{Array.from({ length: 6 }, (_, i) => <circle key={i} cx={-20 + i * 8} cy="1" r="2.3" fill="#F7E7C4" />)}</g>;
+    case 'couturePearlEveningBag':
+      return <g><rect x="-32" y="-15" width="64" height="32" rx="8" fill={bc} stroke={hw(bc)} strokeWidth="2" /><path d="M -21 -15 Q 0 -35 21 -15" fill="none" stroke={hw(bc)} strokeWidth="2.8" />{Array.from({ length: 9 }, (_, i) => <circle key={i} cx={-24 + i * 6} cy="-3" r="2.6" fill="#FFF8E6" stroke="#C8BFB0" strokeWidth="0.6" />)}<circle cx="0" cy="9" r="3.2" fill="#D9B25A" /></g>;
+    case 'heirloomLeatherWeekender':
+      return <g><path d="M -36 -5 Q -34 -28 0 -28 Q 34 -28 36 -5 L 30 18 Q 0 30 -30 18 Z" fill={bc} stroke={lo} strokeWidth="1.7" /><path d="M -18 -21 Q -15 -38 0 -38 Q 15 -38 18 -21" fill="none" stroke={lo} strokeWidth="4" /><path d="M -33 0 L 33 0 M -27 15 L 27 15" stroke={hw(bc)} strokeWidth="2.1" /><rect x="-5" y="-3" width="10" height="9" rx="1.5" fill="#D9B25A" /></g>;
     default:
       return null;
   }
@@ -251,18 +287,20 @@ export const HandAccessories: React.FC<{ id: Id; spec: BodySpec; acc: Accessorie
   const rx = 600 - wx; // the right hand (image right) carries hand-held bags
   const [sy, sh] = spec.shoulder;
   const bag = acc.bag;
-  const held = ['clutch', 'beadedBag', 'miniBag', 'bucketBag'].includes(bag);
+  const held = ['clutch', 'beadedBag', 'miniBag', 'bucketBag', 'sculptedEveningClutch', 'artisanAsoOkeBag', 'atelierTopHandleBag', 'handwovenCeremonyBag', 'couturePearlEveningBag', 'heirloomLeatherWeekender'].includes(bag);
   return (
     <g>
-      {acc.wrist === 'watch' && (
+      {['watch', 'premiumAutomaticWatch', 'designerSteelChronograph', 'diamondDialWatch'].includes(acc.wrist) && (
         <g>
-          <rect x={wx - 13} y={wy - 18} width="26" height="10" rx="3" fill="#C9A24A" />
-          <circle cx={wx - 2} cy={wy - 13} r="7" fill="#F4ECD8" stroke="#A9781E" strokeWidth="2" />
+          <rect x={wx - 13} y={wy - 18} width="26" height="10" rx="3" fill={acc.wrist === 'designerSteelChronograph' ? '#9A9EA5' : '#C9A24A'} />
+          <circle cx={wx - 2} cy={wy - 13} r={acc.wrist === 'diamondDialWatch' ? 8.5 : 7} fill="#F4ECD8" stroke={acc.wrist === 'designerSteelChronograph' ? '#555B65' : '#A9781E'} strokeWidth="2" />
           <path d={`M ${wx - 2} ${wy - 13} l 0 -4 M ${wx - 2} ${wy - 13} l 3 1`} stroke="#3A2A1A" strokeWidth="0.9" />
+          {acc.wrist === 'designerSteelChronograph' && <>{[-5, 2, 7].map((dx) => <circle key={dx} cx={wx + dx} cy={wy - 13} r="1.6" fill="#777C84" />)}<path d={`M ${wx - 8} ${wy - 13} L ${wx + 5} ${wy - 13}`} stroke="#777C84" strokeWidth="0.8" /></>}
+          {acc.wrist === 'diamondDialWatch' && Array.from({ length: 8 }, (_, i) => <path key={i} d={`M ${wx - 2 + Math.cos(i * Math.PI / 4) * 6} ${wy - 13 + Math.sin(i * Math.PI / 4) * 6} l 1.5 1.5 l -1.5 1.5 l -1.5 -1.5 Z`} fill="#EEF7FF" stroke="#AEBED0" strokeWidth="0.4" />)}
         </g>
       )}
       {acc.wrist === 'cuff' && <rect x={wx - 14} y={wy - 26} width="28" height="18" rx="5" fill={`url(#${id('gold')})`} stroke="#A9781E" strokeWidth="1" />}
-      {acc.wrist === 'bangles' &&
+      {(acc.wrist === 'bangles' || acc.wrist === 'goldBangleStack') &&
         [0, 1].map((m) => (
           <g key={m} transform={m ? MIRROR : undefined}>
             {[0, 6, 12].map((dy) => (
@@ -275,7 +313,7 @@ export const HandAccessories: React.FC<{ id: Id; spec: BodySpec; acc: Accessorie
 
       {held && <g transform={`translate(${rx} ${wy + (bag === 'clutch' || bag === 'beadedBag' ? 50 : 96) * s})`}>{bagBody(bag, bc, id)}</g>}
 
-      {bag === 'tote' && (
+      {(bag === 'tote' || bag === 'structuredWorkTote') && (
         <g>
           <path d={`M ${spec.elbow[0] - 4} ${spec.elbow[1] - 10} C ${spec.elbow[0] - 30} ${spec.elbow[1] - 70} ${spec.elbow[0] - 70} ${spec.elbow[1] - 40} ${spec.elbow[0] - 60} ${spec.elbow[1] + 30}`} fill="none" stroke={darken(bc, 0.3)} strokeWidth="5" />
           <path d={`M ${spec.elbow[0] - 88} ${spec.elbow[1] + 26} L ${spec.elbow[0] - 20} ${spec.elbow[1] + 26} L ${spec.elbow[0] - 12} ${spec.elbow[1] + 116} L ${spec.elbow[0] - 96} ${spec.elbow[1] + 116} Z`} fill={bc} />
@@ -298,7 +336,7 @@ export const HandAccessories: React.FC<{ id: Id; spec: BodySpec; acc: Accessorie
         );
       })()}
 
-      {bag === 'crossbody' && (() => {
+      {(bag === 'crossbody' || bag === 'premiumLeatherCrossbody') && (() => {
         const bx = 300 - spec.hip[1] + 18;
         const by = spec.hhip[0] - 6;
         return (
@@ -410,6 +448,21 @@ export const Necklace: React.FC<{ id: Id; kind: string; male: boolean }> = ({ id
       break;
     case 'coral':
       return <g transform={male ? 'translate(300 0) scale(1.3 1) translate(-300 0)' : undefined}><Beads id={id} /></g>;
+    case 'freshwaterPearlStrand':
+      body = along(80, 29, 39).map(([x, y], i) => <circle key={i} cx={x} cy={y} r={4.2 + (i % 3) * 0.3} fill={`url(#${id('pearl')})`} stroke="#C8BFB0" strokeWidth="0.6" />);
+      break;
+    case 'goldLayeredNecklace':
+      body = <>{chain(30, 30, 2.8)}{chain(58, 35, 2.5)}{chain(90, 41, 2.2)}<path d="M 300 614 l 8 8 l -8 12 l -8 -12 Z" fill={g} stroke="#FFF3C9" strokeWidth="1" /></>;
+      break;
+    case 'handsetCoralNecklace':
+      body = <>{along(60, 23, 37).map(([x, y], i) => <circle key={i} cx={x} cy={y} r={4.1 + (i % 4) * 0.35} fill={i % 5 === 0 ? g : '#C2452D'} stroke={i % 5 === 0 ? '#FFF0B8' : '#8A2A1A'} strokeWidth="0.55" />)}<path d="M 300 610 l 6 7 l -6 10 l -6 -10 Z" fill={g} /></>;
+      break;
+    case 'sculptedGoldChoker':
+      body = <><path d="M 260 508 Q 300 535 340 508" fill="none" stroke={g} strokeWidth="11" /><path d="M 262 509 Q 300 531 338 509" fill="none" stroke="#FFF0B8" strokeWidth="1.7" /><path d="M 300 518 l 8 7 l -8 10 l -8 -10 Z" fill={g} stroke="#FFF2BF" strokeWidth="1.2" /></>;
+      break;
+    case 'heirloomCoralSet':
+      body = <>{along(58, 27, 40).map(([x, y], i) => <circle key={i} cx={x} cy={y} r={4.2 + (i % 4) * 0.25} fill={i % 4 === 0 ? g : '#C2452D'} stroke={i % 4 === 0 ? '#FFF0B8' : '#8A2A1A'} strokeWidth="0.5" />)}{along(83, 19, 34).map(([x, y], i) => <circle key={'second-' + i} cx={x} cy={y} r="2.4" fill="#E8C77A" />)}<path d="M 300 608 l 10 12 l -10 15 l -10 -15 Z" fill={g} stroke="#FFF0B8" strokeWidth="1.2" /></>;
+      break;
     default:
       return null;
   }
@@ -418,13 +471,13 @@ export const Necklace: React.FC<{ id: Id; kind: string; male: boolean }> = ({ id
 
 export const Glasses: React.FC<{ kind: string }> = ({ kind }) => {
   const clear = kind === 'clear';
-  const frame = clear ? '#2A2220' : kind === 'aviators' ? '#B8913E' : '#0A0808';
-  const lensFill = clear ? '#DCE8F0' : kind === 'aviators' ? '#3A2A1E' : '#1A1414';
-  const lensOp = clear ? 0.14 : 0.9;
+  const frame = kind === 'acetateStatementFrames' ? '#593824' : kind === 'titaniumDesignerFrames' ? '#8D949D' : kind === 'goldTempleSunglasses' || kind === 'heirloomGoldSunglasses' ? '#C6A34D' : clear ? '#2A2220' : kind === 'aviators' ? '#B8913E' : '#0A0808';
+  const lensFill = kind === 'titaniumDesignerFrames' || clear ? '#DCE8F0' : kind === 'aviators' || kind === 'goldTempleSunglasses' || kind === 'heirloomGoldSunglasses' ? '#3A2A1E' : '#1A1414';
+  const lensOp = clear || kind === 'titaniumDesignerFrames' ? 0.18 : 0.9;
   const lens = (cx: number, flip: number) => {
     let d: string;
-    if (kind === 'catEye') d = `M ${cx - 38 * flip} 316 C ${cx - 10 * flip} 310 ${cx + 30 * flip} 312 ${cx + 40 * flip} 306 C ${cx + 38 * flip} 336 ${cx + 22 * flip} 358 ${cx} 358 C ${cx - 24 * flip} 358 ${cx - 38 * flip} 340 ${cx - 38 * flip} 316 Z`;
-    else if (kind === 'aviators') d = `M ${cx - 36 * flip} 316 C ${cx - 10 * flip} 312 ${cx + 20 * flip} 312 ${cx + 38 * flip} 316 C ${cx + 40 * flip} 344 ${cx + 22 * flip} 366 ${cx + 4 * flip} 366 C ${cx - 20 * flip} 366 ${cx - 38 * flip} 344 ${cx - 36 * flip} 316 Z`;
+    if (kind === 'catEye' || kind === 'runwaySculptedShades') d = `M ${cx - 38 * flip} 316 C ${cx - 10 * flip} 310 ${cx + 30 * flip} 312 ${cx + 40 * flip} 306 C ${cx + 38 * flip} 336 ${cx + 22 * flip} 358 ${cx} 358 C ${cx - 24 * flip} 358 ${cx - 38 * flip} 340 ${cx - 38 * flip} 316 Z`;
+    else if (kind === 'aviators' || kind === 'goldTempleSunglasses' || kind === 'heirloomGoldSunglasses') d = `M ${cx - 36 * flip} 316 C ${cx - 10 * flip} 312 ${cx + 20 * flip} 312 ${cx + 38 * flip} 316 C ${cx + 40 * flip} 344 ${cx + 22 * flip} 366 ${cx + 4 * flip} 366 C ${cx - 20 * flip} 366 ${cx - 38 * flip} 344 ${cx - 36 * flip} 316 Z`;
     else if (kind === 'oversized') d = `M ${cx - 44} 306 L ${cx + 44} 306 C ${cx + 46} 340 ${cx + 40} 370 ${cx} 370 C ${cx - 40} 370 ${cx - 46} 340 ${cx - 44} 306 Z`;
     else d = `M ${cx - 36} 318 Q ${cx - 36} 314 ${cx - 18} 314 L ${cx + 18} 314 Q ${cx + 36} 314 ${cx + 36} 332 L ${cx + 36} 340 Q ${cx + 36} 358 ${cx + 18} 358 L ${cx - 18} 358 Q ${cx - 36} 358 ${cx - 36} 340 Z`;
     return (
@@ -440,8 +493,12 @@ export const Glasses: React.FC<{ kind: string }> = ({ kind }) => {
       {lens(251, -1)}
       {lens(349, 1)}
       <path d="M 287 328 Q 300 320 313 328" fill="none" stroke={frame} strokeWidth="3" />
-      {kind === 'aviators' && <path d="M 290 316 L 310 316" stroke={frame} strokeWidth="2" />}
+      {(kind === 'aviators' || kind === 'goldTempleSunglasses' || kind === 'heirloomGoldSunglasses') && <path d="M 290 316 L 310 316" stroke={frame} strokeWidth="2" />}
       <path d={`M ${kind === 'oversized' ? 207 : 215} 326 L 196 334 M ${kind === 'oversized' ? 393 : 385} 326 L 404 334`} stroke={frame} strokeWidth="3" />
+      {kind === 'acetateStatementFrames' && <path d="M 215 309 L 240 306 M 385 309 L 360 306" stroke={frame} strokeWidth="5" strokeLinecap="round" />}
+      {kind === 'titaniumDesignerFrames' && <path d="M 220 322 L 280 322 M 320 322 L 380 322" stroke="#C0C7CF" strokeWidth="1.2" />}
+      {(kind === 'goldTempleSunglasses' || kind === 'heirloomGoldSunglasses') && <><path d="M 215 326 L 196 334 M 385 326 L 404 334" stroke="#F4D780" strokeWidth="5" strokeLinecap="round" /><circle cx="217" cy="325" r="3" fill="#FFF0B8" /><circle cx="383" cy="325" r="3" fill="#FFF0B8" /></>}
+      {kind === 'heirloomGoldSunglasses' && <path d="M 233 344 Q 250 366 267 345 M 333 345 Q 350 366 367 344" fill="none" stroke="#D4B05A" strokeWidth="1.8" />}
     </g>
   );
 };
@@ -456,11 +513,12 @@ const FILA = 'M 200 254 C 196 204 230 160 300 150 C 362 146 420 160 442 200 C 44
 
 export const Headwear: React.FC<{ id: Id; acc: Accessories; plain: boolean }> = ({ id, acc, plain }) => {
   const kind = acc.headwear;
-  if (kind === 'none') return null;
+  const baseKind: string = ({ embroideredCeremonyFila: 'fila', royalFilaAsoOke: 'fila', beadedStatementFascinator: 'fascinator', coutureCrystalHeadpiece: 'fascinator', goldThreadAsoOkeGele: 'gele', heirloomGoldGele: 'gele' } as Record<string, string>)[kind] || kind;
+  if (baseKind === 'none') return null;
   const c = acc.headwearColor || '#C9A163';
-  const native = kind === 'gele' || kind === 'geleWrap' || kind === 'headwrap' || kind === 'fila';
-  const fabric = kind === 'headwrap' ? 'ankara' : native ? 'asoOke' : kind === 'beret' ? 'velvet' : 'plain';
-  const { defs, paint } = fabricDefs(id, 'headwear', fabric, c, kind === 'headwrap' ? mix(c, '#1E1E24', 0.6) : lighten(c, 0.35), 3, plain);
+  const native = baseKind === 'gele' || baseKind === 'geleWrap' || baseKind === 'headwrap' || baseKind === 'fila';
+  const fabric = baseKind === 'headwrap' ? 'ankara' : native ? 'asoOke' : baseKind === 'beret' ? 'velvet' : 'plain';
+  const { defs, paint } = fabricDefs(id, 'headwear', fabric, c, baseKind === 'headwrap' ? mix(c, '#1E1E24', 0.6) : lighten(c, 0.35), 3, plain);
   const fill = paint.pattern ? `url(#${paint.pattern})` : paint.base;
   const lo = darken(paint.base, 0.4);
   const piece = (d: string, key: string) => (
@@ -476,7 +534,7 @@ export const Headwear: React.FC<{ id: Id; acc: Accessories; plain: boolean }> = 
   return (
     <g>
       <defs>{defs}</defs>
-      {kind === 'gele' && (
+      {baseKind === 'gele' && (
         <>
           {piece(GELE_FAN2, 'f2')}
           {pleats(4, (i) => `M ${208 - i * 3} ${200 + i * 4} C ${180 - i * 8} ${168 + i * 4} ${150 - i * 4} ${154 + i * 4} ${126 + i * 2} ${148 + i * 3}`)}
@@ -488,7 +546,7 @@ export const Headwear: React.FC<{ id: Id; acc: Accessories; plain: boolean }> = 
           {shine(320, 90, 60, 22)}
         </>
       )}
-      {kind === 'geleWrap' && (
+      {baseKind === 'geleWrap' && (
         <>
           {piece(GELE_WRAP, 'w')}
           {pleats(7, (i) => `M ${192 + i * 4} ${270 - i * 22} C ${250} ${244 - i * 24} ${360} ${240 - i * 24} ${416 - i * 4} ${270 - i * 22}`)}
@@ -497,7 +555,7 @@ export const Headwear: React.FC<{ id: Id; acc: Accessories; plain: boolean }> = 
           {shine(300, 170, 70, 26)}
         </>
       )}
-      {kind === 'headwrap' && (
+      {baseKind === 'headwrap' && (
         <>
           {piece(WRAP, 'w')}
           {pleats(5, (i) => `M ${200 + i * 6} ${284 - i * 22} C 250 ${250 - i * 22} 350 ${250 - i * 22} ${400 - i * 6} ${284 - i * 22}`)}
@@ -506,14 +564,14 @@ export const Headwear: React.FC<{ id: Id; acc: Accessories; plain: boolean }> = 
           <path d="M 286 196 C 260 170 250 140 270 120 M 314 196 C 340 170 350 140 330 120" fill="none" stroke={darken(paint.base, 0.35)} strokeWidth="2.4" opacity="0.6" />
         </>
       )}
-      {kind === 'fila' && (
+      {baseKind === 'fila' && (
         <>
           {piece(FILA, 'fila')}
           <path d="M 200 254 C 240 248 330 248 350 242" fill="none" stroke={darken(paint.base, 0.45)} strokeWidth="4" />
           <path d="M 300 152 C 360 150 410 166 430 196" fill="none" stroke={darken(paint.base, 0.3)} strokeWidth="2.2" opacity="0.5" />
         </>
       )}
-      {kind === 'beret' && (
+      {baseKind === 'beret' && (
         <>
           {piece('M 186 236 C 176 186 222 132 300 126 C 380 122 446 156 452 200 C 456 226 420 236 392 232 C 340 226 250 226 186 236 Z', 'b')}
           <path d="M 196 236 C 250 224 340 224 400 232" fill="none" stroke={lo} strokeWidth="5" />
@@ -521,7 +579,7 @@ export const Headwear: React.FC<{ id: Id; acc: Accessories; plain: boolean }> = 
           {shine(300, 164, 60, 18)}
         </>
       )}
-      {kind === 'cap' && (
+      {baseKind === 'cap' && (
         <>
           {piece('M 200 248 C 194 180 238 128 300 124 C 362 128 406 180 400 248 C 340 236 260 236 200 248 Z', 'd')}
           {piece('M 196 248 C 260 232 340 232 404 248 C 410 264 380 276 300 272 C 220 276 190 264 196 248 Z', 'br')}
@@ -530,7 +588,7 @@ export const Headwear: React.FC<{ id: Id; acc: Accessories; plain: boolean }> = 
           {shine(270, 168, 34, 22)}
         </>
       )}
-      {kind === 'bucketHat' && (
+      {baseKind === 'bucketHat' && (
         <>
           {piece('M 214 236 C 210 176 246 134 300 132 C 354 134 390 176 386 236 Z', 'd')}
           {piece('M 214 230 C 260 222 340 222 386 230 C 412 240 440 266 450 292 C 380 270 220 270 150 292 C 160 266 188 240 214 230 Z', 'br')}
@@ -538,7 +596,7 @@ export const Headwear: React.FC<{ id: Id; acc: Accessories; plain: boolean }> = 
           {shine(290, 172, 40, 18)}
         </>
       )}
-      {kind === 'fascinator' && (
+      {baseKind === 'fascinator' && (
         <>
           <path d="M 330 150 C 360 70 420 30 470 40 C 440 60 400 100 360 160 Z" fill={darken(paint.base, 0.1)} opacity="0.9" />
           <path d="M 330 150 C 360 70 420 30 470 40" fill="none" stroke={lo} strokeWidth="1.6" />
@@ -549,6 +607,12 @@ export const Headwear: React.FC<{ id: Id; acc: Accessories; plain: boolean }> = 
           <circle cx="350" cy="170" r="6" fill={`url(#${id('gold')})`} />
         </>
       )}
+      {kind === 'embroideredCeremonyFila' && <>{[0,1,2,3,4,5,6].map((i) => <path key={i} d={`M ${228 + i * 20} 206 l 6 8 l -6 8 l -6 -8 Z`} fill="none" stroke={`url(#${id('gold')})`} strokeWidth="1.7" />)}<path d="M 207 245 Q 300 257 393 245" fill="none" stroke="#F4DA91" strokeWidth="3" /></>}
+      {kind === 'royalFilaAsoOke' && <>{[0,1,2,3,4].map((i) => <path key={i} d={`M ${246 + i * 22} 178 l 6 8 l -6 8 l -6 -8 Z`} fill={`url(#${id('gold')})`} stroke="#FFF0B8" strokeWidth="0.8" />)}<path d="M 204 251 Q 300 264 396 251" fill="none" stroke="#D9B25A" strokeWidth="5" /></>}
+      {kind === 'beadedStatementFascinator' && <>{[0,1,2,3,4,5,6].map((i) => <circle key={i} cx={345 + i * 15} cy={138 - i * 11} r="3.3" fill="#F8F0DA" stroke="#C8BFB0" strokeWidth="0.7" />)}<ellipse cx="350" cy="170" rx="62" ry="25" transform="rotate(-18 350 170)" fill="none" stroke="#F8F0DA" strokeWidth="2.5" /></>}
+      {kind === 'coutureCrystalHeadpiece' && <>{[0,1,2,3,4,5,6,7].map((i) => <path key={i} d={`M ${350 + i * 13} ${140 - i * 9} l 4 -5 l 4 5 l -4 5 Z`} fill="#F2F8FF" stroke="#B9CADF" strokeWidth="0.8" />)}<path d="M 316 166 Q 350 184 390 160" fill="none" stroke="#D9B25A" strokeWidth="2.5" /></>}
+      {kind === 'goldThreadAsoOkeGele' && <>{[0,1,2,3,4,5].map((i) => <path key={i} d={`M ${230 + i * 16} ${190 - i * 8} Q 300 ${164 - i * 10} ${390 + i * 3} ${190 - i * 8}`} fill="none" stroke={`url(#${id('gold')})`} strokeWidth="2" />)}</>}
+      {kind === 'heirloomGoldGele' && <>{[0,1,2,3,4,5,6,7,8].map((i) => <circle key={i} cx={230 + i * 17} cy={211 - Math.sin(i * Math.PI / 8) * 24} r="3.1" fill="#FFF1BC" stroke={`url(#${id('gold')})`} strokeWidth="1" />)}<path d="M 200 248 Q 300 222 400 248" fill="none" stroke={`url(#${id('gold')})`} strokeWidth="4" /></>}
     </g>
   );
 };
