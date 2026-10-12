@@ -347,6 +347,19 @@ export function saveRentAtClose(s0: GameState): GameState {
   return { ...result, today: { ...result.today, events: [...result.today.events, 'Automatic Rent Vault transfer: ' + amount.toLocaleString('en-NG') + ' naira.'] } };
 }
 
+/** Release matured fixed deposits on their exact in-game maturity day. Safe to call daily. */
+export function processFixedDepositMaturities(s0: GameState): GameState {
+  let s = s0;
+  const bank = s.bank || initialBankState();
+  const maturity = bank.fixedDeposits.filter((deposit) => deposit.maturityDay <= s.day);
+  if (maturity.length) {
+    const returned = maturity.reduce((sum, deposit) => sum + roundMoney(deposit.amount * (1 + deposit.ratePct / 100)), 0);
+    bank = { ...bank, savings: bank.savings + returned, fixedDeposits: bank.fixedDeposits.filter((deposit) => deposit.maturityDay > s.day) };
+    s = { ...s, bank, ledger: [{ day: s.day, t: -1, label: 'Fixed deposit maturity + interest', amount: returned }, ...(s.ledger || [])].slice(0, 150) };
+  }
+  return s;
+}
+
 export function processBankWeekly(s0: GameState): GameState {
   let s = s0;
   let bank = s.bank || initialBankState();
@@ -359,12 +372,6 @@ export function processBankWeekly(s0: GameState): GameState {
       ...(rentInterest ? [{ day: s.day, t: -1, label: 'Rent Vault interest', amount: rentInterest }] : []),
     ];
     s = { ...s, bank, ledger: [...entries, ...(s.ledger || [])].slice(0, 150) };
-  }
-  const maturity = bank.fixedDeposits.filter((deposit) => deposit.maturityDay <= s.day);
-  if (maturity.length) {
-    const returned = maturity.reduce((sum, deposit) => sum + roundMoney(deposit.amount * (1 + deposit.ratePct / 100)), 0);
-    bank = { ...bank, savings: bank.savings + returned, fixedDeposits: bank.fixedDeposits.filter((deposit) => deposit.maturityDay > s.day) };
-    s = { ...s, bank, ledger: [{ day: s.day, t: -1, label: 'Fixed deposit maturity + interest', amount: returned }, ...(s.ledger || [])].slice(0, 150) };
   }
   bank = s.bank || bank;
   for (const loan0 of [...bank.loans]) {
