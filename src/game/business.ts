@@ -319,6 +319,14 @@ export function processBankWeekly(s0: GameState): GameState {
     }
   }
   s = { ...s, bank };
+  // Credit recovery is gradual: a cleared/default-free account can rebuild trust over time.
+  const finalBank = s.bank || bank;
+  const profile = finalBank.creditProfile || creditProfile({ ...s, bank: finalBank });
+  const hasOverdueLoan = finalBank.loans.some((loan) => (loan.missedPayments || 0) > 0);
+  if (!hasOverdueLoan && profile.score < 850) {
+    const recovery = finalBank.loans.length ? 1 : 2;
+    s = { ...s, bank: { ...finalBank, creditProfile: { ...profile, score: clamp(profile.score + recovery, 300, 850) } } };
+  }
   return s;
 }
 
