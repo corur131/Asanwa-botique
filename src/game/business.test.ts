@@ -4,6 +4,7 @@ import type { GameState } from './types';
 import { money, payRent, settleLateRent, demote } from './engine';
 import {
   financialAssets,
+  creditHistoryReport,
   netWorthPlayer,
   totalLiabilities,
   ensureBusinessState,
@@ -312,4 +313,18 @@ test('the smallest shop keeps rent debt on the books and extends its deadline in
   assert.equal(after.lateRent!.amount, 4_000);
   assert.equal(after.lateRent!.due, 27);
   assert.equal(totalLiabilities(after), 4_000);
+});
+
+
+test('credit report continues to show arrears after a hardship plan resets consecutive missed-payment count', () => {
+  const before = state({
+    bank: { ...initialBankState(), loans: [{
+      id: 'loan-report', principal: 100_000, balance: 104_500, weeklyRatePct: 2,
+      weeklyPayment: 12_000, termWeeks: 12, nextPaymentDay: 21,
+      missedPayments: 0, arrearsBalance: 9_000, arrangementUsed: true,
+    }] },
+  });
+  const report = creditHistoryReport(before);
+  assert.equal(report.arrearsAmount, 9_000);
+  assert.equal(report.standing, 'In arrears');
 });
