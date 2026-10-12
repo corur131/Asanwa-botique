@@ -197,7 +197,7 @@ export const MarketApp: React.FC<{ s: GameState; cart: CartLine[]; setCart: (f: 
                 <div className="flex flex-wrap gap-1.5">
                   {itemColours.map((c) => {
                     const on = picks.some((p) => p.color === c.color);
-                    return <button key={c.color} title={c.name} onClick={() => toggle(c.color)} className={`w-7 h-7 rounded-full border-2 ${on ? 'border-orange-400 scale-110 ring-2 ring-orange-400/40' : 'border-white/20'}`} style={{ background: c.color }} />;
+                    return <button key={c.color} title={'name' in c ? c.name : c.label} onClick={() => toggle(c.color)} className={`w-7 h-7 rounded-full border-2 ${on ? 'border-orange-400 scale-110 ring-2 ring-orange-400/40' : 'border-white/20'}`} style={{ background: c.color }} />;
                   })}
                 </div>
               </div>
@@ -206,7 +206,7 @@ export const MarketApp: React.FC<{ s: GameState; cart: CartLine[]; setCart: (f: 
               <div>
                 <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1">Second colour (print, lace, trim)</div>
                 <div className="flex flex-wrap gap-1.5">
-                  {colourList.map((c) => <button key={c.color} title={c.name} onClick={() => setColor2(c.color)} className={`w-6 h-6 rounded-full border-2 ${color2 === c.color ? 'border-orange-400 scale-110' : 'border-white/20'}`} style={{ background: c.color }} />)}
+                  {colourList.map((c) => <button key={c.color} title={'name' in c ? c.name : c.label} onClick={() => setColor2(c.color)} className={`w-6 h-6 rounded-full border-2 ${color2 === c.color ? 'border-orange-400 scale-110' : 'border-white/20'}`} style={{ background: c.color }} />)}
                 </div>
               </div>
             )}
@@ -216,7 +216,7 @@ export const MarketApp: React.FC<{ s: GameState; cart: CartLine[]; setCart: (f: 
                 {picks.map((p) => (
                   <div key={p.color} className="flex items-center gap-2 rounded-xl bg-white/5 p-1.5 pl-2">
                     {takesColour(sel.kind) && <button onClick={() => setPreview(p.color)} className="w-6 h-6 rounded-full border border-white/30" style={{ background: p.color }} />}
-                    <span className="flex-1 text-sm text-white">{takesColour(sel.kind) ? colourName(p.color) : 'Pieces'}</span>
+                    <span className="flex-1 text-sm text-white">{takesColour(sel.kind) ? (sel.kind === 'hair' ? HAIR_SWATCHES.find((h) => h.color === p.color)?.label || colourName(p.color) : colourName(p.color)) : 'Pieces'}</span>
                     <span className="text-xs text-slate-400">{naira(unit * p.n)}</span>
                     <Stepper n={p.n} set={(v) => setPicks((ps) => ps.map((x) => (x.color === p.color ? { ...x, n: v } : x)))} />
                   </div>
