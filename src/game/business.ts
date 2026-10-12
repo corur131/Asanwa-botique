@@ -200,7 +200,7 @@ export function processPromotionAtClose(s0: GameState): GameState {
   };
   s = { ...s, promotion, followers: Math.max(0, (s.followers || 0) + followersGained), brand: { ...brandBefore, awareness: clamp(brandBefore.awareness + (estimatedReach > 0 ? 0.3 : 0), 5, 100), trendInfluence: clamp(brandBefore.trendInfluence + (estimatedReach > 0 ? 0.15 : 0), 5, 100) }, today: { ...s.today, events: [...s.today.events, 'Promotion reached an estimated ' + estimatedReach.toLocaleString('en-NG') + ' people and added ' + followersGained.toLocaleString('en-NG') + ' followers.'] } };
   if (chargedHours < hours) {
-    s = { ...s, messages: [{ id: (s.msgSeq || 0) + 1, day: s.day, from: 'KoboBank', text: 'Your promotion stopped because the current account could not cover the full hourly budget.', tone: 'warn', t: -1 }, ...(s.messages || [])].slice(0, 160), msgSeq: (s.msgSeq || 0) + 1, promotion: { ...promotion, active: false } };
+    s = { ...s, messages: [{ id: (s.msgSeq || 0) + 1, day: s.day, from: 'KoboBank', text: 'Your promotion stopped because the current account could not cover the full hourly budget.', tone: 'warn' as const, t: -1 }, ...(s.messages || [])].slice(0, 160), msgSeq: (s.msgSeq || 0) + 1, promotion: { ...promotion, active: false } };
   }
   return s;
 }
@@ -252,7 +252,7 @@ export function processBankWeekly(s0: GameState): GameState {
       const penalty = Math.max(2_500, roundMoney(loan.balance * 0.025));
       const loans = currentBank.loans.map((item) => item.id === loan.id ? { ...item, balance: item.balance + penalty, nextPaymentDay: item.nextPaymentDay + 7, missedPayments: item.missedPayments + 1 } : item);
       s = { ...s, bank: { ...currentBank, loans }, ledger: [{ day: s.day, t: -1, label: 'Missed loan payment fee', amount: 0 }, ...(s.ledger || [])].slice(0, 150) };
-      s = { ...s, messages: [{ id: (s.msgSeq || 0) + 1, day: s.day, from: 'KoboBank', text: 'A scheduled loan payment was missed. A penalty was added to the outstanding balance.', tone: 'danger', t: -1 }, ...(s.messages || [])].slice(0, 160), msgSeq: (s.msgSeq || 0) + 1 };
+      s = { ...s, messages: [{ id: (s.msgSeq || 0) + 1, day: s.day, from: 'KoboBank', text: 'A scheduled loan payment was missed. A penalty was added to the outstanding balance.', tone: 'danger' as const, t: -1 }, ...(s.messages || [])].slice(0, 160), msgSeq: (s.msgSeq || 0) + 1 };
       bank = s.bank || currentBank;
     }
   }
