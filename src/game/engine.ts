@@ -53,20 +53,25 @@ export function money(s: GameState, amount: number, label: string): GameState {
   const inheritedDeficit = Math.max(0, -s.cash);
   let cash = Math.max(0, s.cash);
   let operatingPayables = Math.max(0, s.operatingPayables || 0) + inheritedDeficit;
-  const entries: LedgerLine[] = [{ day: s.day, t: s.phase === 'shop' ? Math.floor(s.clock) : -1, label, amount: value, category: 'operating' }];
+  const t = s.phase === 'shop' ? Math.floor(s.clock) : -1;
+  const entries: LedgerLine[] = [];
   if (value < 0) {
     const requested = Math.abs(value);
     const paid = Math.min(cash, requested);
+    const shortfall = requested - paid;
     cash -= paid;
-    operatingPayables += requested - paid;
+    operatingPayables += shortfall;
+    entries.push({ day: s.day, t, label, amount: -paid, category: 'operating' });
+    if (shortfall > 0) entries.unshift({ day: s.day, t, label: 'Unpaid operating cost: ' + label + ' (' + shortfall.toLocaleString('en-NG') + ' naira)', amount: 0, category: 'operating' });
   } else {
     cash += value;
+    entries.push({ day: s.day, t, label, amount: value, category: 'operating' });
     // Incoming business receipts first settle bills that could not be paid earlier.
     const settlement = Math.min(cash, operatingPayables);
     if (settlement > 0) {
       cash -= settlement;
       operatingPayables -= settlement;
-      entries.unshift({ day: s.day, t: s.phase === 'shop' ? Math.floor(s.clock) : -1, label: 'Operating payables settled', amount: -settlement, category: 'operating' });
+      entries.unshift({ day: s.day, t, label: 'Operating payables settled', amount: -settlement, category: 'operating' });
     }
   }
   return { ...s, cash, operatingPayables, ledger: [...entries, ...(s.ledger || [])].slice(0, 150) };
