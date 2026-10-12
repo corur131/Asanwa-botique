@@ -122,6 +122,7 @@ const itemOcc = (d: Design) => {
   const w = itemById(d.itemId);
   return w ? w.occasions : [];
 };
+const itemRenderId = (d: Design) => entryFor(d.kind, d.itemId)?.renderId || d.itemId;
 const occFit = (occ: Occasion[], target: Occasion) => (occ.includes(target) ? 1 : occ.some((o) => NEAR[target]?.includes(o)) ? 0.6 : 0.15);
 
 /** Hair or makeup only: judged on what they asked for and how well it suits the occasion. */
@@ -181,7 +182,7 @@ export function scoreLook(c: Customer, choice: StyleChoice, stock: Design[]): Sc
   let shoes = 0.4;
   if (d.shoes) {
     const formal = FORMAL.includes(c.occasion);
-    if (formal && CASUAL_SHOES.has(d.shoes.itemId)) { shoes = 0.3; notes.push('Sneakers or slides at a formal event? No.'); }
+    if (formal && CASUAL_SHOES.has(itemRenderId(d.shoes))) { shoes = 0.3; notes.push('Sneakers or slides at a formal event? No.'); }
     else if (!formal && c.occasion !== 'church' && c.occasion !== 'office' && HEELS.has(d.shoes.itemId) && c.occasion === 'casual') shoes = 0.75;
     else shoes = 1;
   }
@@ -191,8 +192,8 @@ export function scoreLook(c: Customer, choice: StyleChoice, stock: Design[]): Sc
   if (!c.male && glam < want - 0.35) notes.push('The face needed more makeup for this occasion.');
   if (!c.male && glam > want + 0.4) notes.push('The makeup is too heavy for this occasion.');
   let head = 1;
-  if (d.headwear && ['owambe', 'wedding'].includes(c.occasion) && ['gele', 'geleWrap', 'fila'].includes(d.headwear.itemId)) head = 1;
-  else if (d.headwear && ['cap', 'bucketHat'].includes(d.headwear.itemId) && FORMAL.includes(c.occasion)) { head = 0.3; notes.push('A cap at a formal event lowers the look.'); }
+  if (d.headwear && ['owambe', 'wedding'].includes(c.occasion) && ['gele', 'geleWrap', 'fila'].includes(itemRenderId(d.headwear))) head = 1;
+  else if (d.headwear && ['cap', 'bucketHat'].includes(itemRenderId(d.headwear)) && FORMAL.includes(c.occasion)) { head = 0.3; notes.push('A cap at a formal event lowers the look.'); }
   const occasion = 35 * (0.6 * garments + 0.15 * shoes + 0.15 * face + 0.1 * head);
 
   // --- what she asked for (25)
@@ -204,11 +205,11 @@ export function scoreLook(c: Customer, choice: StyleChoice, stock: Design[]): Sc
       case 'color': ok = main.some((x) => sameColour(x.color, w.color)) ? 1 : [...main, ...worn].some((x) => sameColour(x.color2, w.color) || sameColour(x.color, w.color)) ? 0.6 : 0; break;
       case 'native': ok = main.length && main.every((x) => itemById(x.itemId)?.native) ? 1 : main.some((x) => itemById(x.itemId)?.native) ? 0.5 : 0; break;
       case 'english': ok = main.length && main.every((x) => !itemById(x.itemId)?.native) ? 1 : 0; break;
-      case 'gele': ok = d.headwear && (d.headwear.itemId === 'gele' || d.headwear.itemId === 'geleWrap') ? 1 : 0; break;
+      case 'gele': ok = d.headwear && ['gele', 'geleWrap'].includes(itemRenderId(d.headwear)) ? 1 : 0; break;
       case 'nails': ok = !!choice.makeup?.nailColor ? 1 : 0; break;
-      case 'noHeels': ok = d.shoes && !HEELS.has(d.shoes.itemId) ? 1 : 0; break;
-      case 'fitted': ok = main.length && main.every((x) => FITTED.has(x.itemId)) ? 1 : main.some((x) => FITTED.has(x.itemId)) ? 0.5 : 0; break;
-      case 'covered': ok = main.length && !main.some((x) => REVEALING.has(x.itemId)) ? 1 : 0; break;
+      case 'noHeels': ok = d.shoes && !HEELS.has(itemRenderId(d.shoes)) ? 1 : 0; break;
+      case 'fitted': ok = main.length && main.every((x) => FITTED.has(itemRenderId(x))) ? 1 : main.some((x) => FITTED.has(itemRenderId(x))) ? 0.5 : 0; break;
+      case 'covered': ok = main.length && !main.some((x) => REVEALING.has(itemRenderId(x))) ? 1 : 0; break;
       case 'jacket': ok = d.outer ? 1 : 0; break;
       case 'hair': {
         const stockedHair = designsOf(choice, stock).hair;
