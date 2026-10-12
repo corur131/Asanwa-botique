@@ -396,7 +396,8 @@ export function processBankWeekly(s0: GameState): GameState {
       const newBalance = Math.max(0, loan.balance + interest - due);
       const loans = currentBank.loans.map((item) => item.id === loan.id ? { ...item, balance: newBalance, nextPaymentDay: item.nextPaymentDay + 7, missedPayments: 0 } : item).filter((item) => item.balance > 1);
       const profile = currentBank.creditProfile || creditProfile({ ...s, bank: currentBank });
-      const creditProfileNext = { ...profile, score: clamp(profile.score + (loan.missedPayments ? 2 : 5), 300, 850), onTimePayments: profile.onTimePayments + 1 };
+      const hasDelinquency = (loan.missedPayments || 0) > 0 || (loan.arrearsBalance || 0) > 0;
+      const creditProfileNext = { ...profile, score: clamp(profile.score + (hasDelinquency ? 2 : 5), 300, 850), onTimePayments: profile.onTimePayments + (hasDelinquency ? 0 : 1) };
       s = ledger({ ...s, bank: { ...currentBank, loans, creditProfile: creditProfileNext }, today: { ...s.today, costs: s.today.costs + interest, events: [...s.today.events, 'Paid ' + interest.toLocaleString('en-NG') + ' naira in business-loan interest.'] } }, -due, 'Weekly loan repayment');
       bank = s.bank || currentBank;
     } else {
