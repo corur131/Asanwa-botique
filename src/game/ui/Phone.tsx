@@ -373,7 +373,9 @@ const Chats: React.FC<PhoneProps> = ({ s, up, chat, setChat, staff }) => {
         }
         const trimmedNotes = notes.slice(-6);
         const nextSummary = proposedSummary || previous?.summary || '';
-        const memoryChanged = nextSummary !== (previous?.summary || '') || trimmedNotes.length !== (previous?.notes.length || 0);
+        const previousNotes = previous?.notes || [];
+        const notesChanged = trimmedNotes.length !== previousNotes.length || trimmedNotes.some((note, index) => note !== previousNotes[index]);
+        const memoryChanged = nextSummary !== (previous?.summary || '') || notesChanged;
         const characterMemories = memoryChanged
           ? {
               ...(g.characterMemories || {}),
