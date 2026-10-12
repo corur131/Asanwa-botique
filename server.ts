@@ -12,6 +12,34 @@ const model = process.env.GEMINI_MODEL || 'gemini-3.8-flash';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 app.disable('x-powered-by');
+
+// Permit browser requests from the production Firebase site and the two Render
+// deployments. The Gemini key remains server-side; never put it in Vite config.
+const allowedOrigins = new Set(
+  (process.env.ALLOWED_ORIGINS ||
+    'https://asanwa-boutique-game.web.app,https://asanwa-boutique-game.firebaseapp.com,https://asanwa-boutique.onrender.com,https://asanwa-boutique-business-preview.onrender.com')
+    .split(',')
+    .map((origin) => origin.trim())
+    .filter(Boolean),
+);
+app.use('/api', (req, res, next) => {
+  const origin = req.headers.origin;
+  if (origin && allowedOrigins.has(origin)) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+    res.setHeader('Vary', 'Origin');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  }
+  if (req.method === 'OPTIONS') {
+    if (!origin || !allowedOrigins.has(origin)) {
+      res.sendStatus(403);
+      return;
+    }
+    res.sendStatus(204);
+    return;
+  }
+  next();
+});
 app.use(express.json({ limit: '32kb' }));
 
 // Small in-memory limit for a single-player prototype. Use a shared limiter/auth
