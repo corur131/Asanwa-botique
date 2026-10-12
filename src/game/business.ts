@@ -211,7 +211,9 @@ export function processPromotionAtClose(s0: GameState): GameState {
 export function saveRentAtClose(s0: GameState): GameState {
   const bank = s0.bank || initialBankState();
   if (bank.rentMode !== 'automatic' || bank.autoRentPercent <= 0) return s0;
-  const operatingProfit = Math.max(0, s0.today.income - s0.today.costs);
+  // On rent day, reserve rent first; do not sweep the rent money straight back into the vault.
+  const rentDueToday = s0.day % 7 === 0 ? s0.listing.rent : 0;
+  const operatingProfit = Math.max(0, s0.today.income - s0.today.costs - rentDueToday);
   const requested = roundMoney(operatingProfit * bank.autoRentPercent / 100);
   const amount = Math.min(requested, Math.max(0, s0.cash));
   if (!amount) return s0;
@@ -249,12 +251,12 @@ export function processBankWeekly(s0: GameState): GameState {
     if (s.cash >= due) {
       const newBalance = Math.max(0, loan.balance + interest - due);
       const loans = currentBank.loans.map((item) => item.id === loan.id ? { ...item, balance: newBalance, nextPaymentDay: item.nextPaymentDay + 7, missedPayments: 0 } : item).filter((item) => item.balance > 1);
-      s = ledger({ ...s, bank: { ...currentBank, loans } }, -due, 'Weekly loan repayment');
+      s = ledger({ ...s, bank: { ...currentBank, loans }, today: { ...s.today, costs: s.today.costs + interest, events: [...s.today.events, 'Paid ' + interest.toLocaleString('en-NG') + ' naira in business-loan interest.'] } }, -due, 'Weekly loan repayment');
       bank = s.bank || currentBank;
     } else {
       const penalty = Math.max(2_500, roundMoney(loan.balance * 0.025));
       const loans = currentBank.loans.map((item) => item.id === loan.id ? { ...item, balance: item.balance + penalty, nextPaymentDay: item.nextPaymentDay + 7, missedPayments: item.missedPayments + 1 } : item);
-      s = { ...s, bank: { ...currentBank, loans }, ledger: [{ day: s.day, t: -1, label: 'Missed loan payment fee', amount: 0 }, ...(s.ledger || [])].slice(0, 150) };
+      s = { ...s, bank: { ...currentBank, loans }, today: { ...s.today, costs: s.today.costs + penalty, events: [...s.today.events, 'A missed loan payment added ' + penalty.toLocaleString('en-NG') + ' naira to the loan balance.'] }, ledger: [{ day: s.day, t: -1, label: 'Missed loan payment fee', amount: -penalty }, ...(s.ledger || [])].slice(0, 150) };
       s = { ...s, messages: [{ id: (s.msgSeq || 0) + 1, day: s.day, from: 'KoboBank', text: 'A scheduled loan payment was missed. A penalty was added to the outstanding balance.', tone: 'danger' as const, t: -1 }, ...(s.messages || [])].slice(0, 160), msgSeq: (s.msgSeq || 0) + 1 };
       bank = s.bank || currentBank;
     }
