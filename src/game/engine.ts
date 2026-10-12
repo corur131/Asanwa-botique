@@ -669,9 +669,9 @@ export function closeShop(s0: GameState): GameState {
   s = { ...s, today: { ...s.today, events: [...s.today.events, ...ev] } };
   s = processExpansionAtClose(s);
   s = processPromotionAtClose(s);
-  s = saveRentAtClose(s);
 
-  // weekly
+  // Settle weekly obligations before calculating rent savings. Account transfers
+  // are not expenses and must not reduce profit or count twice in the ledger.
   if (s.day % 7 === 0) {
     s = weeklyStaff(s);
     if (s.security?.guard) {
@@ -679,6 +679,15 @@ export function closeShop(s0: GameState): GameState {
       s = money({ ...s, today: { ...s.today, costs: s.today.costs + wage, events: [...s.today.events, `Paid ${naira(wage)} in security wages.`] } }, -wage, `Security guard wages: ${s.security.guard.name}`);
     }
     s = payBills(s);
+    s = processBankWeekly(s);
+  }
+
+  // Clear any old rent arrears from the Rent Vault and available cash before
+  // saving for the next bill or creating a new rent liability.
+  s = settleLateRent(s);
+  s = saveRentAtClose(s);
+
+  if (s.day % 7 === 0) {
     s = payRent(s);
     s = { ...s, followers: Math.round((s.followers || 0) * 0.98) };
   } else if (daysToRent(s.day) === 2) {
@@ -686,13 +695,12 @@ export function closeShop(s0: GameState): GameState {
   }
   // late rent: the grace period runs out
   if (s.lateRent && s.day >= s.lateRent.due) {
-    if (s.cash < 0) s = demote(s);
+    if (s.lateRent.amount > 0) s = demote(s);
     else s = msg({ ...s, lateRent: null }, 'Landlord', 'Thank you, the rent is cleared.', 'good');
   }
   // Keep the old score only for legacy save compatibility; public-facing progression uses Brand Power.
   s = { ...s, rep: clamp(s.rep - (s.rep - 40) * 0.03, 0, 100) };
   s = closeBrandDay(s);
-  if (s.day % 7 === 0) s = processBankWeekly(s);
   const history = [...s.history, s.today].slice(-120);
   s = { ...s, history };
   s = simulateRivals(s);
@@ -946,30 +954,72 @@ export function answerMessage(s: GameState, msgId: number, choice: ReplyChoice['
 
 export { answerVisit, buyDrop, contestFor, noteVisit, rivalShop, VISIT_CHOICES } from './encounters';
 
+function settleLateRent(s0: GameState): GameState {
+  const late = s0.lateRent;
+  if (!late || late.amount <= 0) return late ? { ...s0, lateRent: null } : s0;
+
+  const bank = s0.bank || initialBankState();
+  const vaultPaid = Math.min(Math.max(0, bank.rentVault), late.amount);
+  const cashDue = late.amount - vaultPaid;
+  const cashPaid = Math.min(Math.max(0, s0.cash), cashDue);
+  const unpaid = Math.max(0, late.amount - vaultPaid - cashPaid);
+  if (vaultPaid === 0 && cashPaid === 0) return s0;
+
+  let next: GameState = {
+    ...s0,
+    bank: { ...bank, rentVault: bank.rentVault - vaultPaid },
+    lateRent: unpaid > 0 ? { ...late, amount: unpaid } : null,
+    today: {
+      ...s0.today,
+      events: [...s0.today.events, `Paid ${naira(vaultPaid + cashPaid)} toward overdue rent${unpaid ? `; ${naira(unpaid)} remains` : ''}.`],
+    },
+  };
+  if (vaultPaid > 0) {
+    next = {
+      ...next,
+      ledger: [{ day: next.day, t: -1, label: 'Overdue rent paid from Rent Vault', amount: -vaultPaid }, ...(next.ledger || [])].slice(0, 150),
+    };
+  }
+  if (cashPaid > 0) next = money(next, -cashPaid, 'Overdue rent payment');
+  return next;
+}
+
 function payRent(s: GameState): GameState {
-  const rent = s.listing.rent;
+  const rent = Math.max(0, s.listing.rent);
   const bank = s.bank || initialBankState();
-  const vaultUse = Math.min(Math.max(0, bank.rentVault), rent);
-  const currentDue = rent - vaultUse;
-  const bankAfterVault = { ...bank, rentVault: bank.rentVault - vaultUse };
-  if (s.cash >= currentDue && !s.lateRent) {
-    let paid: GameState = { ...s, bank: bankAfterVault, today: { ...s.today, costs: s.today.costs + rent, events: [...s.today.events, `Paid ${naira(rent)} rent${vaultUse ? ` (${naira(vaultUse)} from Rent Vault)` : ''}.`] } };
-    if (currentDue) paid = money(paid, -currentDue, 'Rent');
-    return msg(paid, 'Landlord', `Rent of ${naira(rent)} received. See you next week.`, 'info');
+  const vaultPaid = Math.min(Math.max(0, bank.rentVault), rent);
+  const afterVault = rent - vaultPaid;
+  // Rent must not create a second hidden overdraft. Any unpaid amount stays
+  // visible as a liability and can be paid from future cash or Rent Vault funds.
+  const cashPaid = Math.min(Math.max(0, s.cash), afterVault);
+  const unpaid = Math.max(0, rent - vaultPaid - cashPaid);
+  const bankAfter = { ...bank, rentVault: bank.rentVault - vaultPaid };
+  let next: GameState = {
+    ...s,
+    bank: bankAfter,
+    today: {
+      ...s.today,
+      costs: s.today.costs + rent,
+      events: [...s.today.events, `Rent bill ${naira(rent)}; Rent Vault paid ${naira(vaultPaid)}, current account paid ${naira(cashPaid)}${unpaid ? `, unpaid balance ${naira(unpaid)}` : ''}.`],
+    },
+  };
+  if (vaultPaid > 0) {
+    next = {
+      ...next,
+      ledger: [{ day: next.day, t: -1, label: 'Rent paid from Rent Vault', amount: -vaultPaid }, ...(next.ledger || [])].slice(0, 150),
+    };
   }
-  // Apply the Rent Vault balance first even when the current account is short;
-  // the remaining amount follows the game's existing late-rent/grace rules.
-  const remainingAfterVault = Math.max(0, rent - vaultUse);
-  const due = s.day + s.grace;
-  let next: GameState = { ...s, bank: bankAfterVault, lateRent: { amount: remainingAfterVault, due }, today: { ...s.today, costs: s.today.costs + rent, events: [...s.today.events, `Rent obligation ${naira(rent)}; Rent Vault covered ${naira(vaultUse)}.`] } };
-  if (s.cash >= remainingAfterVault && s.cash > 0) {
-    next = money({ ...next, lateRent: null }, -remainingAfterVault, 'Rent');
-    return msg(next, 'Landlord', `Rent of ${naira(rent)} received from the Rent Vault and current account.`, 'info');
+  if (cashPaid > 0) next = money(next, -cashPaid, 'Rent');
+  if (unpaid > 0) {
+    const previous = next.lateRent;
+    const totalOwed = unpaid + Math.max(0, previous?.amount || 0);
+    const due = previous?.due ?? (s.day + s.grace);
+    next = { ...next, lateRent: { amount: totalOwed, due } };
+    return msg(next, 'Landlord', s.grace === 0
+      ? `Rent is short by ${naira(totalOwed)}. Clear it today or you move out.`
+      : `Rent is short by ${naira(totalOwed)}. You have ${s.grace} day${s.grace > 1 ? 's' : ''} to clear it. If it remains unpaid by day ${due}, you move to a smaller shop.`, 'danger');
   }
-  next = money(next, -remainingAfterVault, 'Rent (late)');
-  return msg(next, 'Landlord', s.grace === 0
-    ? 'You are short on rent and I do not give grace. Clear it today or you move out.'
-    : `You are short on rent by ${naira(Math.max(0, remainingAfterVault - s.cash))}. I'm giving you ${s.grace} day${s.grace > 1 ? 's' : ''}. If it's not paid by day ${due}, you move to a smaller shop.`, 'danger');
+  return msg(next, 'Landlord', `Rent of ${naira(rent)} received. See you next week.`, 'info');
 }
 
 function demote(s: GameState): GameState {
