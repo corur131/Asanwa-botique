@@ -33,7 +33,8 @@ app.use('/api/', (req, res, next) => {
   next();
 });
 
-const ai = apiKey ? new GoogleGenAI({ apiKey }) : null;
+// Limit each provider request so the server returns an error instead of hanging indefinitely.
+const ai = apiKey ? new GoogleGenAI({ apiKey, httpOptions: { timeout: 45000 } }) : null;
 const asText = (value: unknown, max: number) => typeof value === 'string' ? value.trim().slice(0, max) : '';
 
 app.get('/api/health', (_req, res) => {
