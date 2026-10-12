@@ -15,6 +15,9 @@ import { colourName } from './colours';
 import { FURNITURE, KIOSK_LISTING, Listing, Placed, STARTER_FURNITURE, autoPlace,
   findSpot, canPlace, turn, Rot, ceilingCapacity, ceilingUsed, yardCapacity, yardUsed, cheapestListing, furnitureById, listingsFor, newUid, prestigeRichShift, prestigeTraffic, shopStats, usesFloor, wallCapacity, wallUsed } from './shop';
 import { CharacterMemory, CollaborationEvent, CollaborationReply, Customer, DayLog, Departure, Design, ReplyChoice, GameState, LedgerLine, Message, Regular, ScoreBreakdown, Settlement, StaffMember, StaffProfession, StyleChoice } from './types';
+import { brandFromLegacy, closeBrandDay, ensureBusinessState, getBrandMetrics, initialBankState, maximumLoan, netWorthPlayer, processBankWeekly, processPromotionAtClose, promotionTrafficBoost, recordWeeklyWealth, saveRentAtClose, startPromotion, stopPromotion, transferBank, setRentSaving, setSavingsGoal, createFixedDeposit, takeBusinessLoan, repayBusinessLoan, unlocksForFollowers } from './business';
+
+export { brandPower, currentWealthRows, getBrandMetrics, maximumLoan, netWorthPlayer, netWorthRival, playerWeekTotals, unlocksForFollowers, availablePromotionLevels, promotionBudgetBounds, promotionTrafficBoost, startPromotion, stopPromotion, transferBank, setRentSaving, setSavingsGoal, createFixedDeposit, takeBusinessLoan, repayBusinessLoan } from './business';
 
 const pick = <T,>(a: readonly T[]): T => a[Math.floor(Math.random() * a.length)];
 const chance = (p: number) => Math.random() < p;
@@ -84,7 +87,7 @@ export function newGame(divine: CharacterConfig): GameState {
   });
   const spent = stock.reduce((a, d) => a + d.cost * d.pieces, 0);
   let s: GameState = {
-    version: 4,
+    version: 5,
     listing: KIOSK_LISTING,
     furniture: STARTER_FURNITURE.map((f) => ({ ...f, uid: newUid() })),
     day: 1,
@@ -120,6 +123,7 @@ export function newGame(divine: CharacterConfig): GameState {
     stats: { served: 0, totalEarned: 0, demotions: 0, bestScore: 0 },
     seed: Math.floor(Math.random() * 1e9),
   };
+  s = ensureBusinessState(s);
   s = { ...s, weather: weatherForDay(s.day, s.seed) };
   s = money(s, -spent, 'Starter stock from Yaba market');
   s = msg(s, 'Deborah', `Sis! The kiosk is ready. I helped you stock it with ${naira(spent)} of clothes from Yaba market. You have ${naira(s.cash)} left. Rent is ${naira(TIERS[0].rent)} every 7 days. The place is small and rough, but we'll fix it up as the money comes.`, 'good');
@@ -131,7 +135,8 @@ export function newGame(divine: CharacterConfig): GameState {
 // Opening the shop: who will come today, and when
 // ---------------------------------------------------------------------------
 /** Followers bring people in: up to +40% traffic. */
-export const followerTraffic = (f: number) => 1 + 0.4 * (f / (f + 3000));
+/** Followers improve reach continuously; engaged audiences still matter beyond raw scale. */
+export const followerTraffic = (f: number) => 1 + 0.4 * (Math.max(0, f) / (Math.max(0, f) + 3000)) + Math.min(0.28, Math.log10(Math.max(0, f) + 1) / 45);
 
 export function weatherForDay(day: number, seed: number): NonNullable<GameState['weather']> {
   // A 360-day Lagos year: wet season around May–October, harmattan in Dec–Jan.
@@ -147,9 +152,11 @@ export function weatherForDay(day: number, seed: number): NonNullable<GameState[
 export function customersToday(s: GameState, slow: boolean) {
   const t = TIERS[s.tier];
   const ramp = Math.min(1, NEW_SHOP_START + (1 - NEW_SHOP_START) * Math.max(0, s.day - s.movedDay) / NEW_SHOP_RAMP_DAYS);
-  const traffic = prestigeTraffic(stats(s).prestige) * followerTraffic(s.followers || 0) * (1 + stats(s).traffic) * competition(s) * (s.listing.signature ? 1.35 : 1);
+  const brand = getBrandMetrics(s);
+  const traffic = prestigeTraffic(stats(s).prestige) * followerTraffic(s.followers || 0) * (1 + stats(s).traffic) * (1 + promotionTrafficBoost(s)) * competition(s) * (s.listing.signature ? 1.35 : 1);
+  const brandDemand = 0.55 + brand.awareness / 240 + brand.loyalty / 350 + brand.reliability / 400;
   const weatherTraffic = s.weather === 'rainy' ? 0.82 : s.weather === 'sunny' ? 1.04 : 1;
-  return Math.max(4, Math.round(t.customers * traffic * (0.6 + (s.rep / 100) * 0.8) * (0.85 + Math.random() * 0.3) * (slow ? 0.55 : 1) * ramp * weatherTraffic));
+  return Math.max(4, Math.round(t.customers * traffic * brandDemand * (0.85 + Math.random() * 0.3) * (slow ? 0.55 : 1) * ramp * weatherTraffic));
 }
 
 /** How many people can wait inside: three standing, plus seats. */
@@ -660,6 +667,8 @@ export function closeShop(s0: GameState): GameState {
   if (d.litres) ev.push(`Bought ${Math.round(d.litres * 10) / 10} litres of fuel for ${naira(d.fuel || 0)}.`);
   if (d.closedOn) ev.push(`${d.closedOn} ${d.closedOn > 1 ? 'were' : 'was'} still waiting at closing time and went home.`);
   s = { ...s, today: { ...s.today, events: [...s.today.events, ...ev] } };
+  s = processPromotionAtClose(s);
+  s = saveRentAtClose(s);
 
   // weekly
   if (s.day % 7 === 0) {
@@ -679,8 +688,10 @@ export function closeShop(s0: GameState): GameState {
     if (s.cash < 0) s = demote(s);
     else s = msg({ ...s, lateRent: null }, 'Landlord', 'Thank you, the rent is cleared.', 'good');
   }
-  // reputation drifts back toward 40 so it has to be earned every week
+  // Keep the old score only for legacy save compatibility; public-facing progression uses Brand Power.
   s = { ...s, rep: clamp(s.rep - (s.rep - 40) * 0.03, 0, 100) };
+  s = closeBrandDay(s);
+  if (s.day % 7 === 0) s = processBankWeekly(s);
   const history = [...s.history, s.today].slice(-120);
   s = { ...s, history };
   s = simulateRivals(s);
@@ -694,6 +705,7 @@ export function closeShop(s0: GameState): GameState {
   if (s.history.length && s.history[s.history.length - 1].day === s.day) {
     s = { ...s, history: [...s.history.slice(0, -1), s.today] };
   }
+  if (s.day % 7 === 0) s = recordWeeklyWealth(s);
   return { ...s, phase: 'evening', visit: null };
 }
 
@@ -738,7 +750,9 @@ export function confirmCollaboration(s0: GameState, messageId: number): GameStat
     return collaborationOutcome(s0, messageId, 'already_booked', 'I already have a pop-up scheduled with you. Let’s finish that one before booking another.');
   }
 
-  const totalCost = Math.round(Math.max(15000, Math.min(80000, Number.isFinite(offer.totalCost) ? offer.totalCost : 20000)) / 2500) * 2500;
+  const tierBudgetMax = [250_000, 2_000_000, 10_000_000, 50_000_000, 150_000_000][clamp(s0.tier, 0, 4)];
+  const cashBudgetMax = Math.max(25_000, Math.min(tierBudgetMax, Math.max(0, s0.cash) * 2 + Math.max(0, partner.cash) * 2));
+  const totalCost = Math.round(clamp(Number.isFinite(offer.totalCost) ? offer.totalCost : 20000, 15_000, cashBudgetMax) / 2500) * 2500;
   const playerCostSharePct = Math.round(Math.max(10, Math.min(90, Number.isFinite(offer.playerCostSharePct) ? offer.playerCostSharePct : 50)));
   const playerProfitSharePct = Math.round(Math.max(10, Math.min(90, Number.isFinite(offer.playerProfitSharePct) ? offer.playerProfitSharePct : 50)));
   const dayOffset = Math.round(Math.max(3, Math.min(14, Number.isFinite(offer.dayOffset) ? offer.dayOffset : 7)));
@@ -861,12 +875,28 @@ export { answerVisit, buyDrop, contestFor, noteVisit, rivalShop, VISIT_CHOICES }
 
 function payRent(s: GameState): GameState {
   const rent = s.listing.rent;
-  if (s.cash >= rent && !s.lateRent) return msg(money({ ...s, today: { ...s.today, costs: s.today.costs + rent, events: [...s.today.events, `Paid ${naira(rent)} rent.`] } }, -rent, 'Rent'), 'Landlord', `Rent of ${naira(rent)} received. See you next week.`, 'info');
+  const bank = s.bank || initialBankState();
+  const vaultUse = Math.min(Math.max(0, bank.rentVault), rent);
+  const currentDue = rent - vaultUse;
+  const bankAfterVault = { ...bank, rentVault: bank.rentVault - vaultUse };
+  if (s.cash >= currentDue && !s.lateRent) {
+    let paid: GameState = { ...s, bank: bankAfterVault, today: { ...s.today, costs: s.today.costs + rent, events: [...s.today.events, `Paid ${naira(rent)} rent${vaultUse ? ` (${naira(vaultUse)} from Rent Vault)` : ''}.`] } };
+    if (currentDue) paid = money(paid, -currentDue, 'Rent');
+    return msg(paid, 'Landlord', `Rent of ${naira(rent)} received. See you next week.`, 'info');
+  }
+  // Apply the Rent Vault balance first even when the current account is short;
+  // the remaining amount follows the game's existing late-rent/grace rules.
+  const remainingAfterVault = Math.max(0, rent - vaultUse);
   const due = s.day + s.grace;
-  const next = money({ ...s, lateRent: { amount: rent, due }, today: { ...s.today, costs: s.today.costs + rent } }, -rent, 'Rent (late)');
+  let next: GameState = { ...s, bank: bankAfterVault, lateRent: { amount: remainingAfterVault, due }, today: { ...s.today, costs: s.today.costs + rent, events: [...s.today.events, `Rent obligation ${naira(rent)}; Rent Vault covered ${naira(vaultUse)}.`] } };
+  if (s.cash >= remainingAfterVault && s.cash > 0) {
+    next = money({ ...next, lateRent: null }, -remainingAfterVault, 'Rent');
+    return msg(next, 'Landlord', `Rent of ${naira(rent)} received from the Rent Vault and current account.`, 'info');
+  }
+  next = money(next, -remainingAfterVault, 'Rent (late)');
   return msg(next, 'Landlord', s.grace === 0
-    ? `You are short on rent and I don't give grace. Clear it today or you move out.`
-    : `You are short on rent by ${naira(-next.cash)}. I'm giving you ${s.grace} day${s.grace > 1 ? 's' : ''}. If it's not paid by day ${due}, you move to a smaller shop.`, 'danger');
+    ? 'You are short on rent and I do not give grace. Clear it today or you move out.'
+    : `You are short on rent by ${naira(Math.max(0, remainingAfterVault - s.cash))}. I'm giving you ${s.grace} day${s.grace > 1 ? 's' : ''}. If it's not paid by day ${due}, you move to a smaller shop.`, 'danger');
 }
 
 function demote(s: GameState): GameState {
@@ -1360,27 +1390,32 @@ function normaliseCharacterMemories(value: unknown, day: number): NonNullable<Ga
 function migrate(raw: GameState): GameState | null {
   type Old = Omit<GameState, 'version'> & { version: number; queue?: unknown; queueIndex?: unknown };
   let s = raw as unknown as Old;
-  if (s.version === 4) {
+  if (s.version === 5) {
     const current = s as GameState;
-    const characterMemories = normaliseCharacterMemories(current.characterMemories, current.day);
-    return current.rivals ? { ...current, characterMemories, collaborations: Array.isArray(current.collaborations) ? current.collaborations : [] } : { ...current, characterMemories, collaborations: Array.isArray(current.collaborations) ? current.collaborations : [], ...rivalDefaults() };
+    return ensureBusinessState({
+      ...current,
+      characterMemories: normaliseCharacterMemories(current.characterMemories, current.day),
+      collaborations: Array.isArray(current.collaborations) ? current.collaborations : [],
+      version: 5,
+    });
+  }
+  if (s.version === 4) {
+    const current = s as unknown as GameState;
+    const base = current.rivals
+      ? { ...current, version: 5 as const, characterMemories: normaliseCharacterMemories(current.characterMemories, current.day), collaborations: Array.isArray(current.collaborations) ? current.collaborations : [] }
+      : { ...current, version: 5 as const, characterMemories: normaliseCharacterMemories(current.characterMemories, current.day), collaborations: Array.isArray(current.collaborations) ? current.collaborations : [], ...rivalDefaults() };
+    return ensureBusinessState(base as GameState);
   }
   if (s.version === 3) {
     const o = s as unknown as GameState & { blackout?: unknown };
     delete o.blackout;
     const midDay = o.phase === 'shop';
-    return {
-      ...o,
-      version: 4,
-      characterMemories: {},
-      collaborations: [],
-      outages: [],
-      power: { gen: false, solar: 0 },
-      shouts: [],
-      shoutSeq: 0,
-      ...rivalDefaults(),
+    const upgraded = {
+      ...o, version: 5 as const, characterMemories: {}, collaborations: [], outages: [],
+      power: { gen: false, solar: 0 }, shouts: [], shoutSeq: 0, ...rivalDefaults(),
       ...(midDay ? { ...freshDay, phase: 'morning' as const, today: emptyLog(o.day) } : {}),
-    };
+    } as unknown as GameState;
+    return ensureBusinessState(upgraded);
   }
   if (s.version === 1) {
     const listing = s.tier === 0 ? KIOSK_LISTING : { ...cheapestListing(s.tier, week(s.day)), rent: TIERS[s.tier].rent, stars: 2 };
@@ -1389,20 +1424,20 @@ function migrate(raw: GameState): GameState | null {
     s = { ...s, version: 2, listing, furniture: autoPlace([...base, ...rails], listing) } as Old;
   }
   if (s.version !== 2) return null;
-  const messages = s.messages.map((m, i) => ({ ...m, id: s.messages.length - i }));
+  const messages = (s.messages || []).map((m, i) => ({ ...m, id: (s.messages || []).length - i }));
   const { queue: _q, queueIndex: _qi, ...rest } = s;
   void _q; void _qi;
   const midDay = s.phase === 'shop';
-  return {
+  const upgraded = {
     ...(rest as unknown as GameState),
-    version: 4,
+    version: 5 as const,
     characterMemories: {},
     collaborations: [],
     ...freshDay,
     ...rivalDefaults(),
     power: { gen: false, solar: 0 },
     shoutSeq: 0,
-    phase: midDay ? 'morning' : s.phase,
+    phase: midDay ? 'morning' as const : s.phase,
     today: midDay ? emptyLog(s.day) : s.today,
     ledger: [],
     followers: 120,
@@ -1410,7 +1445,8 @@ function migrate(raw: GameState): GameState | null {
     messages,
     msgSeq: messages.length,
     read: Object.fromEntries(messages.map((m) => [m.from, messages.length])),
-  };
+  } as GameState;
+  return ensureBusinessState(upgraded);
 }
 /** The save on this device from before accounts existed. */
 export const LEGACY_KEY = KEY;
