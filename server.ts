@@ -34,7 +34,7 @@ app.use('/api/', (req, res, next) => {
 });
 
 // Limit each provider request so the server returns an error instead of hanging indefinitely.
-const ai = apiKey ? new GoogleGenAI({ apiKey, httpOptions: { timeout: 45000 } }) : null;
+const ai = apiKey ? new GoogleGenAI({ apiKey }) : null;
 const asText = (value: unknown, max: number) => typeof value === 'string' ? value.trim().slice(0, max) : '';
 
 app.get('/api/health', (_req, res) => {
@@ -90,7 +90,9 @@ app.post('/api/ai-chat', async (req, res) => {
       contents,
       config: {
         systemInstruction,
-        maxOutputTokens: 180,
+        // Low thinking is better suited to quick in-character chat replies.
+        thinkingConfig: { thinkingLevel: 'low' },
+        maxOutputTokens: 512,
       },
     });
     let reply = (response.text || '').trim().replace(/^["']|["']$/g, '');
