@@ -696,6 +696,8 @@ const BusinessExpansionApp: React.FC<{ s: GameState; up: PhoneProps['up'] }> = (
 const Bank: React.FC<{ s: GameState; up: PhoneProps['up'] }> = ({ s, up }) => {
   const lines = s.ledger || [];
   const bank = s.bank || { savings: 0, rentVault: 0, rentMode: 'manual' as const, autoRentPercent: 20, savingsRatePct: 0.65, rentVaultRatePct: 0.25, fixedDeposits: [], loans: [], savingsGoalName: 'Next shop upgrade', savingsGoalAmount: 1000000 };
+  const [tab, setTab] = useState<'overview' | 'transfer' | 'savings' | 'loans' | 'activity'>('overview');
+  const [activityFilter, setActivityFilter] = useState<'all' | 'in' | 'out'>('all');
   const [transferAmount, setTransferAmount] = useState('25000');
   const [loanAmount, setLoanAmount] = useState('100000');
   const [loanTerm, setLoanTerm] = useState(8);
@@ -703,87 +705,165 @@ const Bank: React.FC<{ s: GameState; up: PhoneProps['up'] }> = ({ s, up }) => {
   const [depositTerm, setDepositTerm] = useState(28);
   const [goalName, setGoalName] = useState(bank.savingsGoalName);
   const [goalAmount, setGoalAmount] = useState(String(bank.savingsGoalAmount));
-  // Account transfers are movements between our own pockets, not income or spending.
-  const weekIn = lines.filter((l) => l.category !== 'transfer' && E.week(l.day) === E.week(s.day) && l.amount > 0).reduce((a, l) => a + l.amount, 0);
-  const weekOut = lines.filter((l) => l.category !== 'transfer' && E.week(l.day) === E.week(s.day) && l.amount < 0).reduce((a, l) => a + l.amount, 0);
+  const weekIn = lines.filter(l => l.category !== 'transfer' && E.week(l.day) === E.week(s.day) && l.amount > 0).reduce((a, l) => a + l.amount, 0);
+  const weekOut = lines.filter(l => l.category !== 'transfer' && E.week(l.day) === E.week(s.day) && l.amount < 0).reduce((a, l) => a + l.amount, 0);
   const dueDays = E.daysToRent(s.day);
   const amount = (v: string) => Math.max(0, Math.round(Number(v) || 0));
+  const reserved = Math.max(0, bank.savings) + Math.max(0, bank.rentVault);
+  const goalProgress = bank.savingsGoalAmount > 0 ? Math.min(100, Math.round(reserved / bank.savingsGoalAmount * 100)) : 100;
+  const filteredLines = lines.slice(0, 100).filter(l => activityFilter === 'all' || (activityFilter === 'in' ? l.amount > 0 : l.amount < 0));
+  const tabs: { id: typeof tab; label: string; icon: string }[] = [
+    { id: 'overview', label: 'Home', icon: '⌂' },
+    { id: 'transfer', label: 'Transfer', icon: '⇄' },
+    { id: 'savings', label: 'Savings', icon: '◈' },
+    { id: 'loans', label: 'Loans', icon: '₦' },
+    { id: 'activity', label: 'Activity', icon: '↕' },
+  ];
+  const inputClass = 'mt-1 w-full rounded-xl bg-[#0d1b19] border border-white/10 p-3 text-white text-sm outline-none focus:border-emerald-500';
+  const sectionClass = 'rounded-2xl border border-white/10 bg-[#101c1b] p-4 space-y-3';
+  const headingClass = 'text-sm font-semibold text-white';
+  const moneyText = (value: number) => naira(value);
+  const transactionRows = (rows: typeof lines, limit?: number) => (
+    <div className="divide-y divide-white/[0.06]">
+      {(typeof limit === 'number' ? rows.slice(0, limit) : rows).map((line, i) => (
+        <div key={line.day + '-' + line.t + '-' + line.label + '-' + i} className="flex items-center gap-3 py-3">
+          <div className={'w-9 h-9 rounded-full flex items-center justify-center shrink-0 ' + (line.amount >= 0 ? 'bg-emerald-500/10 text-emerald-300' : 'bg-white/[0.06] text-slate-300')}>{line.amount >= 0 ? '↓' : '↑'}</div>
+          <div className="min-w-0 flex-1">
+            <div className="text-sm text-white truncate">{line.label}</div>
+            <div className="text-[11px] text-slate-500">Day {line.day}{line.t >= 0 ? ' · ' + E.clockText(line.t) : ' · Account activity'}</div>
+          </div>
+          <div className={'text-sm font-semibold tabular-nums shrink-0 ' + (line.amount >= 0 ? 'text-emerald-300' : 'text-slate-200')}>{line.amount >= 0 ? '+' : '−'}{moneyText(Math.abs(line.amount))}</div>
+        </div>
+      ))}
+    </div>
+  );
+
   return (
-    <AppFrame title="KoboBank" sub="Current · Savings · Rent Vault · Business loans" tone="bg-gradient-to-r from-emerald-700 to-teal-800">
-      <div className="p-4 bg-gradient-to-b from-teal-900/60 to-transparent">
-        <div className="text-xs text-emerald-200/80">Current account · available to spend</div>
-        <div className={s.cash < 0 ? 'text-3xl font-bold text-rose-300' : 'text-3xl font-bold text-white'}>{naira(s.cash)}</div>
-        <div className="grid grid-cols-2 gap-2 mt-3 text-xs">
-          <div className="rounded-xl bg-white/5 p-2.5"><div className="text-slate-400">In this week</div><div className="text-emerald-300 font-semibold">{naira(weekIn)}</div></div>
-          <div className="rounded-xl bg-white/5 p-2.5"><div className="text-slate-400">Out this week</div><div className="text-rose-300 font-semibold">{naira(weekOut)}</div></div>
-          <div className="rounded-xl bg-white/5 p-2.5"><div className="text-slate-400">General savings</div><div className="text-white font-semibold">{naira(bank.savings)}</div><div className="text-[10px] text-emerald-200">{bank.savingsRatePct}% weekly interest</div></div>
-          <div className="rounded-xl bg-white/5 p-2.5"><div className="text-slate-400">Rent Vault</div><div className="text-white font-semibold">{naira(bank.rentVault)}</div><div className="text-[10px] text-emerald-200">{bank.rentVaultRatePct}% weekly interest</div></div>
-        </div>
-        <div className={s.lateRent ? 'mt-2 rounded-xl p-2.5 text-xs bg-rose-900/50 text-rose-200' : 'mt-2 rounded-xl p-2.5 text-xs bg-white/5 text-slate-300'}>
-          {s.lateRent ? 'Rent arrears: ' + naira(s.lateRent.amount) + '. Clear them by the end of day ' + s.lateRent.due + '.' : 'Rent ' + naira(s.listing.rent) + ' goes out ' + (dueDays === 0 ? 'tonight' : 'in ' + dueDays + ' days') + ' to ' + s.listing.landlord + '. Rent Vault is used first.'}
-        </div>
-        <div className="grid grid-cols-2 gap-2 mt-2 text-xs">
-          <div className="rounded-xl border border-white/10 bg-white/5 p-2.5">
-            <div className="text-slate-400">Cash + account balances</div>
-            <div className="text-white font-semibold">{naira(E.financialAssets(s))}</div>
-            <div className="text-[10px] text-slate-500">Includes fixed-deposit principal</div>
+    <AppFrame title="KoboBank" sub="Your business banking, in one place" tone="bg-gradient-to-r from-emerald-800 via-teal-800 to-slate-900">
+      <div className="p-3 sm:p-4 space-y-4 bg-[#071310]">
+        <div className="relative overflow-hidden rounded-2xl border border-emerald-300/15 bg-gradient-to-br from-[#126b50] via-[#0b5142] to-[#102b31] p-4 shadow-lg">
+          <div className="absolute -right-8 -top-10 h-36 w-36 rounded-full border-[24px] border-white/[0.04]" />
+          <div className="absolute -right-2 -bottom-12 h-28 w-28 rounded-full border-[18px] border-white/[0.04]" />
+          <div className="relative flex items-start justify-between gap-3">
+            <div><div className="text-[10px] font-bold uppercase tracking-[0.18em] text-emerald-100/70">KoboBank Business</div><div className="mt-1 text-sm font-semibold text-white">Asanwa Boutique</div></div>
+            <div className="rounded-full border border-white/15 bg-black/10 px-2.5 py-1 text-[10px] font-medium text-emerald-50">Day {s.day}</div>
           </div>
-          <div className="rounded-xl border border-white/10 bg-white/5 p-2.5">
-            <div className="text-slate-400">Outstanding liabilities</div>
-            <div className={E.totalLiabilities(s) > 0 ? 'text-rose-300 font-semibold' : 'text-white font-semibold'}>{naira(E.totalLiabilities(s))}</div>
-            <div className="text-[10px] text-slate-500">Loans + unpaid rent</div>
+          <div className="relative mt-5"><div className="text-xs text-emerald-100/75">Current account · available balance</div><div className={'mt-1 text-3xl font-bold tracking-tight tabular-nums ' + (s.cash < 0 ? 'text-rose-200' : 'text-white')}>{moneyText(s.cash)}</div></div>
+          <div className="relative mt-4 flex flex-wrap gap-x-5 gap-y-2 border-t border-white/10 pt-3 text-xs">
+            <div><span className="text-emerald-100/65">Money in</span><div className="mt-0.5 font-semibold text-white">{moneyText(weekIn)}</div></div>
+            <div><span className="text-emerald-100/65">Money out</span><div className="mt-0.5 font-semibold text-white">{moneyText(Math.abs(weekOut))}</div></div>
+            <div><span className="text-emerald-100/65">Cash + accounts</span><div className="mt-0.5 font-semibold text-white">{moneyText(E.financialAssets(s))}</div></div>
           </div>
         </div>
-      </div>
-      <div className="px-4 pb-4 space-y-4">
-        <section className="rounded-xl border border-white/10 p-3 space-y-2">
-          <h3 className="font-semibold text-white">Move money between accounts</h3>
-          <label className="block text-xs text-slate-400">Amount (₦)<input type="number" min="500" step="500" value={transferAmount} onChange={e => setTransferAmount(e.target.value)} className="mt-1 w-full rounded-lg bg-white/5 border border-white/10 p-2 text-white text-sm" /></label>
-          <div className="grid grid-cols-2 gap-2">
-            <button onClick={() => up(g => E.transferBank(g, 'savings', amount(transferAmount)))} disabled={amount(transferAmount) <= 0 || s.cash < amount(transferAmount)} className="rounded-lg bg-emerald-700 disabled:opacity-40 py-2 text-xs font-semibold">To savings</button>
-            <button onClick={() => up(g => E.transferBank(g, 'rentVault', amount(transferAmount)))} disabled={amount(transferAmount) <= 0 || s.cash < amount(transferAmount)} className="rounded-lg bg-teal-700 disabled:opacity-40 py-2 text-xs font-semibold">To Rent Vault</button>
-            <button onClick={() => up(g => E.transferBank(g, 'current', amount(transferAmount), 'rentVault'))} disabled={amount(transferAmount) <= 0 || bank.rentVault < amount(transferAmount)} className="rounded-lg bg-slate-700 disabled:opacity-40 py-2 text-xs font-semibold">Withdraw vault</button>
-            <button onClick={() => up(g => E.transferBank(g, 'current', amount(transferAmount), 'savings'))} disabled={amount(transferAmount) <= 0 || bank.savings < amount(transferAmount)} className="rounded-lg bg-slate-700 disabled:opacity-40 py-2 text-xs font-semibold">Withdraw savings</button>
+
+        <div className="grid grid-cols-2 gap-3">
+          <button onClick={() => setTab('savings')} className="rounded-2xl border border-white/10 bg-[#111f1c] p-3 text-left transition hover:border-emerald-400/40">
+            <div className="flex items-center justify-between gap-2"><span className="text-xs text-slate-400">Savings account</span><span className="text-emerald-300">◈</span></div>
+            <div className="mt-2 text-lg font-bold text-white tabular-nums">{moneyText(bank.savings)}</div><div className="mt-1 text-[10px] text-emerald-300">{bank.savingsRatePct}% weekly interest</div>
+          </button>
+          <button onClick={() => setTab('savings')} className="rounded-2xl border border-white/10 bg-[#111f1c] p-3 text-left transition hover:border-emerald-400/40">
+            <div className="flex items-center justify-between gap-2"><span className="text-xs text-slate-400">Rent Vault</span><span className="text-teal-300">⌂</span></div>
+            <div className="mt-2 text-lg font-bold text-white tabular-nums">{moneyText(bank.rentVault)}</div><div className="mt-1 text-[10px] text-teal-300">{bank.rentVaultRatePct}% weekly interest</div>
+          </button>
+        </div>
+
+        <div className={'rounded-2xl border p-3 ' + (s.lateRent ? 'border-rose-500/30 bg-rose-950/30' : 'border-amber-300/15 bg-[#1b2016]')}>
+          <div className="flex items-start gap-3">
+            <div className={'w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ' + (s.lateRent ? 'bg-rose-500/15 text-rose-200' : 'bg-amber-400/10 text-amber-200')}>{s.lateRent ? '!' : '⌂'}</div>
+            <div className="min-w-0 flex-1"><div className="text-sm font-semibold text-white">{s.lateRent ? 'Rent payment needs attention' : 'Upcoming rent'}</div><div className="mt-1 text-xs leading-relaxed text-slate-300">{s.lateRent ? 'You owe ' + moneyText(s.lateRent.amount) + '. Clear the balance by the end of Day ' + s.lateRent.due + '.' : moneyText(s.listing.rent) + ' due ' + (dueDays === 0 ? 'tonight' : 'in ' + dueDays + ' days') + ' to ' + s.listing.landlord + '. Rent Vault is used first.'}</div></div>
+            <button onClick={() => setTab('savings')} className="shrink-0 rounded-lg bg-white/[0.06] px-2.5 py-1.5 text-[11px] font-semibold text-emerald-200">Manage</button>
           </div>
-        </section>
-        <section className="rounded-xl border border-white/10 p-3 space-y-2">
-          <h3 className="font-semibold text-white">Rent Vault settings</h3>
-          <label className="block text-xs text-slate-400">Saving mode
-            <select value={bank.rentMode} onChange={e => up(g => E.setRentSaving(g, e.target.value as 'manual' | 'automatic'))} className="mt-1 w-full rounded-lg bg-[#181b24] border border-white/10 p-2 text-white text-sm">
-              <option value="manual">Manual — I transfer money myself</option><option value="automatic">Automatic — save from eligible daily earnings</option>
-            </select>
-          </label>
-          {bank.rentMode === 'automatic' && <><div className="flex items-center justify-between text-xs"><span className="text-slate-300">Daily positive net operating earnings</span><b>{bank.autoRentPercent}%</b></div><input type="range" min="0" max="80" step="5" value={bank.autoRentPercent} onChange={e => up(g => E.setRentSaving(g, 'automatic', Number(e.target.value)))} className="w-full" /><p className="text-[11px] text-slate-500">Savings use positive daily earnings after recorded operating costs. Funds reserved here still belong to you.</p></>}
-        </section>
-        <section className="rounded-xl border border-white/10 p-3 space-y-2">
-          <h3 className="font-semibold text-white">Business loan</h3>
-          <div className="text-xs text-slate-400">Current eligible limit: <b className="text-emerald-200">{naira(E.maximumLoan(s))}</b> · quoted rate 3.2% per week.</div>
-          <label className="block text-xs text-slate-400">Amount<input type="number" min="10000" step="10000" value={loanAmount} onChange={e => setLoanAmount(e.target.value)} className="mt-1 w-full rounded-lg bg-white/5 border border-white/10 p-2 text-white text-sm" /></label>
-          <label className="block text-xs text-slate-400">Repayment term<select value={loanTerm} onChange={e => setLoanTerm(Number(e.target.value))} className="mt-1 w-full rounded-lg bg-[#181b24] border border-white/10 p-2 text-white text-sm">{[4,8,12,24].map(n => <option key={n} value={n}>{n} weeks</option>)}</select></label>
-          <button onClick={() => up(g => E.takeBusinessLoan(g, amount(loanAmount), loanTerm))} disabled={amount(loanAmount) <= 0 || amount(loanAmount) > E.maximumLoan(s)} className="w-full rounded-lg bg-emerald-700 disabled:opacity-40 py-2 text-sm font-semibold">Apply for loan</button>
-          {bank.loans.length > 0 && <div className="pt-2 space-y-2"><div className="text-xs font-bold uppercase tracking-wide text-slate-400">Outstanding loans</div>{bank.loans.map(loan => <div key={loan.id} className="rounded-lg bg-white/5 p-2 flex items-center gap-2"><div className="flex-1 min-w-0"><div className="text-sm text-white">{naira(loan.balance)} outstanding</div><div className="text-[11px] text-slate-400">{naira(loan.weeklyPayment)} weekly · next due Day {loan.nextPaymentDay} · {loan.missedPayments} missed</div></div><button disabled={s.cash < loan.balance} onClick={() => up(g => E.repayBusinessLoan(g, loan.id, loan.balance))} className="rounded-lg bg-white/10 disabled:opacity-40 px-2 py-1.5 text-[11px]">Repay</button></div>)}</div>}
-        </section>
-        <section className="rounded-xl border border-white/10 p-3 space-y-2">
-          <h3 className="font-semibold text-white">Fixed-term savings</h3>
-          <div className="text-xs text-slate-400">Move general savings into a fixed deposit until maturity.</div>
-          <label className="block text-xs text-slate-400">Deposit amount<input type="number" min="1000" step="1000" value={depositAmount} onChange={e => setDepositAmount(e.target.value)} className="mt-1 w-full rounded-lg bg-white/5 border border-white/10 p-2 text-white text-sm" /></label>
-          <label className="block text-xs text-slate-400">Duration<select value={depositTerm} onChange={e => setDepositTerm(Number(e.target.value))} className="mt-1 w-full rounded-lg bg-[#181b24] border border-white/10 p-2 text-white text-sm">{[7,14,28,56].map(n => <option key={n} value={n}>{n} days</option>)}</select></label>
-          <button onClick={() => up(g => E.createFixedDeposit(g, amount(depositAmount), depositTerm))} disabled={amount(depositAmount)<=0 || amount(depositAmount)>bank.savings} className="w-full rounded-lg bg-teal-700 disabled:opacity-40 py-2 text-sm font-semibold">Open fixed deposit</button>
-          {bank.fixedDeposits.map(fd => <div key={fd.id} className="text-xs rounded-lg bg-white/5 p-2 text-slate-300">{naira(fd.amount)} · matures Day {fd.maturityDay} · {fd.ratePct}% return</div>)}
-        </section>
-        <section className="rounded-xl border border-white/10 p-3 space-y-2">
-          <h3 className="font-semibold text-white">Savings goal</h3>
-          <label className="block text-xs text-slate-400">Goal name<input value={goalName} onChange={e => setGoalName(e.target.value)} maxLength={60} className="mt-1 w-full rounded-lg bg-white/5 border border-white/10 p-2 text-white text-sm" /></label>
-          <label className="block text-xs text-slate-400">Target amount<input type="number" min="0" step="10000" value={goalAmount} onChange={e => setGoalAmount(e.target.value)} className="mt-1 w-full rounded-lg bg-white/5 border border-white/10 p-2 text-white text-sm" /></label>
-          <button onClick={() => up(g => E.setSavingsGoal(g, goalName, amount(goalAmount)))} className="w-full rounded-lg bg-slate-700 py-2 text-sm">Save goal</button>
-          <div className="text-xs text-slate-400">{naira(bank.savings + bank.rentVault)} reserved of {naira(bank.savingsGoalAmount)} target</div>
-        </section>
-        <section><div className="text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1">Transactions</div>{lines.length === 0 && <p className="text-sm text-slate-500">Nothing yet.</p>}<div className="divide-y divide-white/5">{lines.slice(0, 40).map((l, i) => <div key={i} className="flex items-center justify-between gap-2 py-2"><div className="min-w-0"><div className="text-sm text-white truncate">{l.label}</div><div className="text-[10px] text-slate-500">Day {l.day}{l.t >= 0 ? ' · ' + E.clockText(l.t) : ''}</div></div><div className={l.amount >= 0 ? 'text-sm font-semibold shrink-0 text-emerald-300' : 'text-sm font-semibold shrink-0 text-slate-200'}>{l.amount >= 0 ? '+' : ''}{naira(l.amount)}</div></div>)}</div></section>
+        </div>
+
+        <div className="grid grid-cols-4 gap-2">
+          {([
+            { id: 'transfer', label: 'Transfer', icon: '⇄' },
+            { id: 'savings', label: 'Save', icon: '◈' },
+            { id: 'loans', label: 'Borrow', icon: '₦' },
+            { id: 'activity', label: 'Statement', icon: '↕' },
+          ] as const).map(action => (
+            <button key={action.id} onClick={() => setTab(action.id)} className="flex flex-col items-center gap-2 rounded-xl border border-white/10 bg-[#111f1c] px-1 py-3 text-center hover:bg-[#172a25]">
+              <span className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-500/15 text-lg text-emerald-200">{action.icon}</span><span className="text-[10px] font-semibold text-slate-200">{action.label}</span>
+            </button>
+          ))}
+        </div>
+
+        <div className="flex gap-1.5 overflow-x-auto rounded-xl border border-white/[0.06] bg-[#0c1916] p-1.5">
+          {tabs.map(item => <button key={item.id} onClick={() => setTab(item.id)} className={'flex min-w-0 flex-1 items-center justify-center gap-1.5 whitespace-nowrap rounded-lg px-2 py-2.5 text-[11px] font-semibold transition ' + (tab === item.id ? 'bg-emerald-600 text-white shadow' : 'text-slate-400 hover:bg-white/[0.05] hover:text-white')}><span>{item.icon}</span><span>{item.label}</span></button>)}
+        </div>
+
+        {tab === 'overview' && (
+          <div className="space-y-3">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="rounded-2xl border border-white/10 bg-[#111f1c] p-3"><div className="text-xs text-slate-400">Outstanding liabilities</div><div className={'mt-2 text-lg font-bold tabular-nums ' + (E.totalLiabilities(s) > 0 ? 'text-rose-200' : 'text-white')}>{moneyText(E.totalLiabilities(s))}</div><div className="mt-1 text-[10px] text-slate-500">Loans + unpaid rent</div></div>
+              <div className="rounded-2xl border border-white/10 bg-[#111f1c] p-3"><div className="text-xs text-slate-400">Savings goal</div><div className="mt-2 truncate text-sm font-semibold text-white">{bank.savingsGoalName || 'Business goal'}</div><div className="mt-1 text-xs text-emerald-300">{goalProgress}% funded</div><div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/10"><div className="h-full rounded-full bg-emerald-400" style={{ width: goalProgress + '%' }} /></div><div className="mt-1 text-[10px] text-slate-500">{moneyText(reserved)} of {moneyText(bank.savingsGoalAmount)}</div></div>
+            </div>
+            <section className={sectionClass}><div className="flex items-center justify-between gap-2"><h3 className={headingClass}>Recent transactions</h3><button onClick={() => setTab('activity')} className="text-xs font-semibold text-emerald-300">View statement →</button></div>{lines.length ? transactionRows(lines, 4) : <div className="rounded-xl bg-white/[0.03] p-4 text-center text-sm text-slate-500">Your transactions will appear here.</div>}</section>
+          </div>
+        )}
+
+        {tab === 'transfer' && (
+          <div className="space-y-3">
+            <section className={sectionClass}><div><h3 className={headingClass}>Move money</h3><p className="mt-1 text-xs text-slate-400">Transfer between your own business accounts. These movements do not count as income or expenses.</p></div>
+              <label className="block text-xs text-slate-400">Transfer amount (₦)<input type="number" min="500" step="500" value={transferAmount} onChange={e => setTransferAmount(e.target.value)} className={inputClass} /></label>
+              <div className="grid grid-cols-2 gap-2">
+                <button onClick={() => up(g => E.transferBank(g, 'savings', amount(transferAmount)))} disabled={amount(transferAmount) <= 0 || s.cash < amount(transferAmount)} className="rounded-xl bg-emerald-700 px-3 py-3 text-xs font-semibold text-white disabled:opacity-35">Deposit to savings</button>
+                <button onClick={() => up(g => E.transferBank(g, 'rentVault', amount(transferAmount)))} disabled={amount(transferAmount) <= 0 || s.cash < amount(transferAmount)} className="rounded-xl bg-teal-700 px-3 py-3 text-xs font-semibold text-white disabled:opacity-35">Deposit to Rent Vault</button>
+                <button onClick={() => up(g => E.transferBank(g, 'current', amount(transferAmount), 'rentVault'))} disabled={amount(transferAmount) <= 0 || bank.rentVault < amount(transferAmount)} className="rounded-xl bg-white/[0.07] px-3 py-3 text-xs font-semibold text-white disabled:opacity-35">Withdraw from Rent Vault</button>
+                <button onClick={() => up(g => E.transferBank(g, 'current', amount(transferAmount), 'savings'))} disabled={amount(transferAmount) <= 0 || bank.savings < amount(transferAmount)} className="rounded-xl bg-white/[0.07] px-3 py-3 text-xs font-semibold text-white disabled:opacity-35">Withdraw from savings</button>
+              </div>
+            </section>
+            <div className="rounded-xl border border-white/[0.08] p-3 text-xs text-slate-400">Available current balance: <b className="text-white">{moneyText(s.cash)}</b></div>
+          </div>
+        )}
+
+        {tab === 'savings' && (
+          <div className="space-y-3">
+            <section className={sectionClass}>
+              <div className="flex items-start justify-between gap-3"><div><h3 className={headingClass}>Rent Vault</h3><p className="mt-1 text-xs text-slate-400">Keep next week's rent separate from spending money.</p></div><div className="text-right"><div className="text-lg font-bold text-white tabular-nums">{moneyText(bank.rentVault)}</div><div className="text-[10px] text-emerald-300">{bank.rentVaultRatePct}% weekly interest</div></div></div>
+              <div className="rounded-xl bg-[#0a1513] p-3"><div className="flex items-center justify-between gap-2 text-xs"><span className="text-slate-400">Next rent bill</span><b className="text-white">{moneyText(s.listing.rent)}</b></div><div className="mt-2 flex items-center justify-between gap-2 text-xs"><span className="text-slate-400">Currently covered</span><b className={bank.rentVault >= s.listing.rent ? 'text-emerald-300' : 'text-amber-200'}>{Math.min(100, Math.round(bank.rentVault / Math.max(1, s.listing.rent) * 100))}%</b></div><div className="mt-2 h-2 overflow-hidden rounded-full bg-white/10"><div className={'h-full rounded-full ' + (bank.rentVault >= s.listing.rent ? 'bg-emerald-400' : 'bg-amber-300')} style={{ width: Math.min(100, bank.rentVault / Math.max(1, s.listing.rent) * 100) + '%' }} /></div></div>
+              <label className="block text-xs text-slate-400">Rent saving mode<select value={bank.rentMode} onChange={e => up(g => E.setRentSaving(g, e.target.value as 'manual' | 'automatic'))} className={inputClass}><option value="manual">Manual — I choose when to save</option><option value="automatic">Automatic — save from eligible earnings</option></select></label>
+              {bank.rentMode === 'automatic' && <div className="rounded-xl bg-[#0a1513] p-3"><div className="flex items-center justify-between text-xs"><span className="text-slate-300">Daily eligible earnings</span><b className="text-emerald-300">{bank.autoRentPercent}%</b></div><input aria-label="Automatic rent savings percentage" type="range" min="0" max="80" step="5" value={bank.autoRentPercent} onChange={e => up(g => E.setRentSaving(g, 'automatic', Number(e.target.value)))} className="mt-3 w-full accent-emerald-400" /><p className="mt-2 text-[11px] leading-relaxed text-slate-500">This saves a percentage of positive earnings after recorded operating costs. Money in the vault still belongs to you.</p></div>}
+              {s.lateRent && <div className="rounded-xl border border-rose-400/20 bg-rose-950/25 p-3 text-xs text-rose-100">Rent arrears: {moneyText(s.lateRent.amount)} · deadline Day {s.lateRent.due}</div>}
+            </section>
+            <section className={sectionClass}><div><h3 className={headingClass}>Fixed deposits</h3><p className="mt-1 text-xs text-slate-400">Lock part of general savings until maturity for a higher return.</p></div>
+              <div className="grid grid-cols-2 gap-3"><label className="block text-xs text-slate-400">Amount (₦)<input type="number" min="1000" step="1000" value={depositAmount} onChange={e => setDepositAmount(e.target.value)} className={inputClass} /></label><label className="block text-xs text-slate-400">Term<select value={depositTerm} onChange={e => setDepositTerm(Number(e.target.value))} className={inputClass}>{[7,14,28,56].map(n => <option key={n} value={n}>{n} days</option>)}</select></label></div>
+              <button onClick={() => up(g => E.createFixedDeposit(g, amount(depositAmount), depositTerm))} disabled={amount(depositAmount) <= 0 || amount(depositAmount) > bank.savings} className="w-full rounded-xl bg-teal-700 py-3 text-sm font-semibold text-white disabled:opacity-35">Open fixed deposit</button>
+              {bank.fixedDeposits.length ? <div className="space-y-2">{bank.fixedDeposits.map(fd => <div key={fd.id} className="flex items-center justify-between gap-3 rounded-xl bg-[#0a1513] p-3"><div><div className="text-sm font-semibold text-white">{moneyText(fd.amount)}</div><div className="mt-1 text-[11px] text-slate-400">Matures Day {fd.maturityDay}</div></div><div className="text-right"><div className="text-xs text-emerald-300">{fd.ratePct}% return</div><div className="text-[10px] text-slate-500">{fd.maturityDay <= s.day ? 'Matured' : (fd.maturityDay - s.day) + ' days left'}</div></div></div>)}</div> : <div className="rounded-xl bg-white/[0.03] p-3 text-xs text-slate-500">No fixed deposits yet.</div>}
+            </section>
+            <section className={sectionClass}><div><h3 className={headingClass}>Savings goal</h3><p className="mt-1 text-xs text-slate-400">Give your next business milestone a target.</p></div>
+              <label className="block text-xs text-slate-400">Goal name<input value={goalName} onChange={e => setGoalName(e.target.value)} maxLength={60} className={inputClass} /></label>
+              <label className="block text-xs text-slate-400">Target amount (₦)<input type="number" min="0" step="10000" value={goalAmount} onChange={e => setGoalAmount(e.target.value)} className={inputClass} /></label>
+              <button onClick={() => up(g => E.setSavingsGoal(g, goalName, amount(goalAmount)))} className="w-full rounded-xl bg-white/[0.07] py-3 text-sm font-semibold text-white hover:bg-white/10">Save goal</button>
+              <div className="rounded-xl bg-[#0a1513] p-3"><div className="flex items-center justify-between text-xs"><span className="text-slate-400">{moneyText(reserved)} saved across savings and Rent Vault</span><b className="text-emerald-300">{goalProgress}%</b></div><div className="mt-2 h-2 overflow-hidden rounded-full bg-white/10"><div className="h-full rounded-full bg-emerald-400" style={{ width: goalProgress + '%' }} /></div><div className="mt-2 text-[10px] text-slate-500">Fixed deposits are separate until maturity.</div></div>
+            </section>
+          </div>
+        )}
+
+        {tab === 'loans' && (
+          <div className="space-y-3">
+            <section className={sectionClass}><div><h3 className={headingClass}>Business financing</h3><p className="mt-1 text-xs text-slate-400">Borrow for the business, then repay from future cash flow.</p></div>
+              <div className="rounded-xl border border-emerald-400/15 bg-emerald-950/25 p-3"><div className="text-xs text-emerald-100/70">Available borrowing limit</div><div className="mt-1 text-2xl font-bold text-white tabular-nums">{moneyText(E.maximumLoan(s))}</div><div className="mt-1 text-[11px] text-amber-200">Quoted rate: 3.2% per week</div></div>
+              <label className="block text-xs text-slate-400">Loan amount (₦)<input type="number" min="10000" step="10000" value={loanAmount} onChange={e => setLoanAmount(e.target.value)} className={inputClass} /></label>
+              <label className="block text-xs text-slate-400">Repayment term<select value={loanTerm} onChange={e => setLoanTerm(Number(e.target.value))} className={inputClass}>{[4,8,12,24].map(n => <option key={n} value={n}>{n} weeks</option>)}</select></label>
+              <button onClick={() => up(g => E.takeBusinessLoan(g, amount(loanAmount), loanTerm))} disabled={amount(loanAmount) <= 0 || amount(loanAmount) > E.maximumLoan(s)} className="w-full rounded-xl bg-emerald-700 py-3 text-sm font-semibold text-white disabled:opacity-35">Apply for business loan</button>
+            </section>
+            <section className={sectionClass}><div className="flex items-center justify-between"><h3 className={headingClass}>Outstanding loans</h3><span className="rounded-full bg-white/[0.06] px-2 py-1 text-[10px] text-slate-400">{bank.loans.length} active</span></div>
+              {bank.loans.length ? <div className="space-y-2">{bank.loans.map(loan => <div key={loan.id} className="rounded-xl border border-white/[0.06] bg-[#0a1513] p-3"><div className="flex items-start justify-between gap-3"><div><div className="text-sm font-semibold text-white">{moneyText(loan.balance)} remaining</div><div className="mt-1 text-[11px] text-slate-400">{moneyText(loan.weeklyPayment)} scheduled weekly payment</div></div><span className={'rounded-full px-2 py-1 text-[10px] ' + (loan.missedPayments ? 'bg-rose-500/15 text-rose-200' : 'bg-emerald-500/10 text-emerald-200')}>{loan.missedPayments ? loan.missedPayments + ' missed' : 'On track'}</span></div><div className="mt-2 text-[11px] text-slate-500">Next payment: Day {loan.nextPaymentDay} · {loan.termWeeks}-week term</div><button disabled={s.cash < loan.balance} onClick={() => up(g => E.repayBusinessLoan(g, loan.id, loan.balance))} className="mt-3 w-full rounded-lg bg-white/[0.07] px-3 py-2 text-xs font-semibold text-white disabled:opacity-35">Repay full balance · {moneyText(loan.balance)}</button></div>)}</div> : <div className="rounded-xl bg-white/[0.03] p-4 text-center"><div className="text-sm text-slate-300">No outstanding business loans</div><div className="mt-1 text-xs text-slate-500">Your borrowing and repayment history will show here.</div></div>}
+            </section>
+          </div>
+        )}
+
+        {tab === 'activity' && (
+          <section className={sectionClass}><div className="flex items-start justify-between gap-2"><div><h3 className={headingClass}>Account statement</h3><p className="mt-1 text-xs text-slate-400">Money moving in and out of your business accounts.</p></div><span className="rounded-full bg-white/[0.06] px-2 py-1 text-[10px] text-slate-400">{filteredLines.length} shown</span></div>
+            <div className="flex gap-1.5 rounded-xl bg-[#0a1513] p-1">{([{id:'all',label:'All'},{id:'in',label:'Money in'},{id:'out',label:'Money out'}] as const).map(f => <button key={f.id} onClick={() => setActivityFilter(f.id)} className={'flex-1 rounded-lg px-2 py-2 text-xs font-semibold ' + (activityFilter === f.id ? 'bg-emerald-700 text-white' : 'text-slate-400 hover:text-white')}>{f.label}</button>)}</div>
+            {filteredLines.length ? transactionRows(filteredLines) : <div className="rounded-xl bg-white/[0.03] p-4 text-center text-sm text-slate-500">No transactions in this view yet.</div>}
+          </section>
+        )}
       </div>
     </AppFrame>
   );
 };
-
 const Forbes: React.FC<{ s: GameState }> = ({ s }) => {
   const rows = E.currentWealthRows(s).sort((a, b) => b.netWorth - a.netWorth);
   const history = s.wealthHistory || [];
