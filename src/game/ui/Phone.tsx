@@ -240,8 +240,16 @@ const rivalProfile = (r: Rival, s: GameState) => {
   const currentLadder = ladder(s);
   const ownRank = currentLadder.findIndex((row) => row.id === r.id) + 1;
   const divineRank = currentLadder.findIndex((row) => row.you) + 1;
+  const previousSnapshot = (s.dailyRanking || []).slice(-1)[0];
+  const previousOwnRank = previousSnapshot ? previousSnapshot.order.indexOf(r.id) + 1 : 0;
+  const previousDivineRank = previousSnapshot ? previousSnapshot.order.indexOf('you') + 1 : 0;
   const rankContext = ownRank > 0 && divineRank > 0
-    ? 'Current public Top 20 snapshot: ' + r.owner + ' is ranked #' + ownRank + ' of ' + currentLadder.length + '; Divine is ranked #' + divineRank + '. React to this only when the topic makes it natural, and do not claim either rank changed during this conversation.'
+    ? [
+        'Current calculated ladder position: ' + r.owner + ' is ranked #' + ownRank + ' of ' + currentLadder.length + '; Divine is ranked #' + divineRank + '. React to this only when the topic makes it natural.',
+        previousSnapshot && previousSnapshot.day < s.day && previousOwnRank > 0 && previousDivineRank > 0
+          ? 'Compared with the last recorded daily ladder on in-game day ' + previousSnapshot.day + ', ' + r.owner + ' was previously #' + previousOwnRank + ' and Divine was previously #' + previousDivineRank + '. These numbers can ground a natural reaction to competitive progress, but do not claim an unrecorded action or force the subject into every reply.'
+          : ''
+      ].filter(Boolean).join(' ')
     : '';
   return [
     r.owner + ' owns ' + r.shop + ' in ' + r.area + '.',
