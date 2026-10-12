@@ -341,7 +341,7 @@ export function investInExpansion(s0: GameState, investment: ExpansionInvestment
   const charged = ledger({ ...s0, businessExpansion: expansion, brand }, -option.cost, 'Business expansion: ' + option.title);
   return {
     ...charged,
-    today: { ...charged.today, costs: charged.today.costs + option.cost, events: [...charged.today.events, option.title + ' funded for ' + option.cost.toLocaleString('en-NG') + ' naira.'] },
+    today: { ...charged.today, events: [...charged.today.events, option.title + ' funded for ' + option.cost.toLocaleString('en-NG') + ' naira. The investment is recorded as a business asset rather than a daily operating expense.'] },
     gist: [{ id: 'expansion-' + investment + '-' + s0.day, day: s0.day, title: option.title + ' at Asanwa Boutique', body: 'Divine invested ' + option.cost.toLocaleString('en-NG') + ' naira in business expansion. The move can improve long-term revenue, but the business must still cover its running costs.', about: 'you', hot: true }, ...(s0.gist || [])].slice(0, 40),
   };
 }
@@ -397,10 +397,12 @@ export function netWorthPlayer(s: GameState): number {
   }, 0);
   const deposits = bank.fixedDeposits.reduce((sum, deposit) => sum + deposit.amount, 0);
   const debt = bank.loans.reduce((sum, loan) => sum + loan.balance, 0);
+  const expansion = s.businessExpansion || initialBusinessExpansion();
+  const expansionAssets = expansion.branches.reduce((sum, branch) => sum + Math.max(0, branch.assetValue), 0) + (expansion.wholesaleActive ? 4_500_000 : 0) + expansion.departments.length * 650_000 + expansion.designerCollections * 1_250_000;
   const weekly = playerWeekTotals(s);
   const goodwill = Math.max(0, weekly.profit) * 5 + Math.max(0, s.followers || 0) * 5 +
     brandPower(getBrandMetrics(s), s.followers || 0, s.tier) * 100;
-  return Math.round(s.cash + bank.savings + bank.rentVault + deposits + inventory + fixtures + goodwill - debt);
+  return Math.round(s.cash + bank.savings + bank.rentVault + deposits + inventory + fixtures + expansionAssets + goodwill - debt);
 }
 
 export function netWorthRival(r: Rival): number {
@@ -408,7 +410,7 @@ export function netWorthRival(r: Rival): number {
   const costs = (r.weekCosts || []).reduce((sum, amount) => sum + amount, 0);
   const profit = revenue - costs;
   const metrics = r.brand || brandFromLegacy(r.rep, r.followers, r.tier);
-  const assets = Number.isFinite(r.assetValue) ? (r.assetValue || 0) : TIER_ASSETS[r.tier] || TIER_ASSETS[0];
+  const assets = (Number.isFinite(r.assetValue) ? (r.assetValue || 0) : TIER_ASSETS[r.tier] || TIER_ASSETS[0]) + Math.max(0, r.branches || 0) * 3_500_000 + (r.wholesaleActive ? 4_500_000 : 0) + (r.departments || []).length * 650_000;
   const goodwill = Math.max(0, profit) * 7 + Math.max(0, r.followers || 0) * 5 + brandPower(metrics, r.followers || 0, r.tier) * 100;
   return Math.round(r.cash + Math.max(0, r.savings || 0) + assets + goodwill - Math.max(0, r.debt || 0));
 }
