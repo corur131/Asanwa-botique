@@ -11,7 +11,7 @@ import type { CartLine } from '../engine';
 import { GROUP, ladder } from '../rivals';
 import { TIERS } from '../economy';
 
-export type AppId = 'home' | 'chats' | 'market' | 'bank' | 'property' | 'gidigram' | 'staff' | 'top20' | 'gist' | 'weather';
+export type AppId = 'home' | 'chats' | 'market' | 'bank' | 'property' | 'gidigram' | 'staff' | 'top20' | 'forbes' | 'promotion' | 'gist' | 'weather';
 
 const APPS: { id: Exclude<AppId, 'home'>; name: string; bg: string; glyph: string }[] = [
   { id: 'chats', name: 'WhatsApp', bg: 'bg-[#25D366]', glyph: '✆' },
@@ -21,6 +21,8 @@ const APPS: { id: Exclude<AppId, 'home'>; name: string; bg: string; glyph: strin
   { id: 'property', name: 'Lagos Lets', bg: 'bg-gradient-to-br from-sky-500 to-indigo-700', glyph: '⌂' },
   { id: 'staff', name: 'Staff', bg: 'bg-gradient-to-br from-slate-500 to-slate-800', glyph: '☺' },
   { id: 'top20', name: 'Top 20', bg: 'bg-gradient-to-br from-amber-400 to-yellow-700', glyph: '🏆' },
+  { id: 'forbes', name: 'Forbes', bg: 'bg-gradient-to-br from-zinc-700 to-zinc-950', glyph: '₦' },
+  { id: 'promotion', name: 'Promotion', bg: 'bg-gradient-to-br from-fuchsia-600 to-purple-800', glyph: '📣' },
   { id: 'gist', name: 'GistLagos', bg: 'bg-gradient-to-br from-red-500 to-rose-800', glyph: '☕' },
   { id: 'weather', name: 'Lagos Weather', bg: 'bg-gradient-to-br from-sky-400 to-blue-700', glyph: '🌦️' },
 ];
@@ -73,7 +75,9 @@ export const Phone: React.FC<PhoneProps> = (p) => {
           {app === 'home' && <Home s={s} unread={unread} open={setApp} />}
           {app === 'chats' && <Chats {...p} />}
           {app === 'market' && <MarketApp s={s} cart={p.cart} setCart={p.setCart} onPay={() => { p.up((g) => E.buyCart(g, p.cart)); p.setCart(() => []); }} onBuyDrop={(n) => p.up((g) => E.buyDrop(g, n))} />}
-          {app === 'bank' && <Bank s={s} />}
+          {app === 'bank' && <Bank s={s} up={p.up} />}
+          {app === 'forbes' && <Forbes s={s} />}
+          {app === 'promotion' && <PromotionApp s={s} up={p.up} />}
           {app === 'property' && (
             <AppFrame title="Lagos Lets" sub="Shops for rent this week" tone="bg-gradient-to-r from-sky-600 to-indigo-700">
               <div className="p-3">
@@ -654,38 +658,119 @@ const Chats: React.FC<PhoneProps> = ({ s, up, chat, setChat, staff }) => {
 // ---------------------------------------------------------------------------
 // Bank
 // ---------------------------------------------------------------------------
-const Bank: React.FC<{ s: GameState }> = ({ s }) => {
+
+const Bank: React.FC<{ s: GameState; up: PhoneProps['up'] }> = ({ s, up }) => {
   const lines = s.ledger || [];
+  const bank = s.bank || { savings: 0, rentVault: 0, rentMode: 'manual' as const, autoRentPercent: 20, savingsRatePct: 0.65, rentVaultRatePct: 0.25, fixedDeposits: [], loans: [], savingsGoalName: 'Next shop upgrade', savingsGoalAmount: 1000000 };
+  const [transferAmount, setTransferAmount] = useState('25000');
+  const [loanAmount, setLoanAmount] = useState('100000');
+  const [loanTerm, setLoanTerm] = useState(8);
+  const [depositAmount, setDepositAmount] = useState('25000');
+  const [depositTerm, setDepositTerm] = useState(28);
+  const [goalName, setGoalName] = useState(bank.savingsGoalName);
+  const [goalAmount, setGoalAmount] = useState(String(bank.savingsGoalAmount));
   const weekIn = lines.filter((l) => E.week(l.day) === E.week(s.day) && l.amount > 0).reduce((a, l) => a + l.amount, 0);
   const weekOut = lines.filter((l) => E.week(l.day) === E.week(s.day) && l.amount < 0).reduce((a, l) => a + l.amount, 0);
-  const d = E.daysToRent(s.day);
+  const dueDays = E.daysToRent(s.day);
+  const amount = (v: string) => Math.max(0, Math.round(Number(v) || 0));
   return (
-    <AppFrame title="KoboBank" sub="Divine Styles · Current account" tone="bg-gradient-to-r from-emerald-700 to-teal-800">
+    <AppFrame title="KoboBank" sub="Current · Savings · Rent Vault · Business loans" tone="bg-gradient-to-r from-emerald-700 to-teal-800">
       <div className="p-4 bg-gradient-to-b from-teal-900/60 to-transparent">
-        <div className="text-xs text-emerald-200/80">Available balance</div>
-        <div className={`text-3xl font-bold ${s.cash < 0 ? 'text-rose-300' : 'text-white'}`}>{naira(s.cash)}</div>
+        <div className="text-xs text-emerald-200/80">Current account · available to spend</div>
+        <div className={s.cash < 0 ? 'text-3xl font-bold text-rose-300' : 'text-3xl font-bold text-white'}>{naira(s.cash)}</div>
         <div className="grid grid-cols-2 gap-2 mt-3 text-xs">
           <div className="rounded-xl bg-white/5 p-2.5"><div className="text-slate-400">In this week</div><div className="text-emerald-300 font-semibold">{naira(weekIn)}</div></div>
           <div className="rounded-xl bg-white/5 p-2.5"><div className="text-slate-400">Out this week</div><div className="text-rose-300 font-semibold">{naira(weekOut)}</div></div>
+          <div className="rounded-xl bg-white/5 p-2.5"><div className="text-slate-400">General savings</div><div className="text-white font-semibold">{naira(bank.savings)}</div><div className="text-[10px] text-emerald-200">{bank.savingsRatePct}% weekly interest</div></div>
+          <div className="rounded-xl bg-white/5 p-2.5"><div className="text-slate-400">Rent Vault</div><div className="text-white font-semibold">{naira(bank.rentVault)}</div><div className="text-[10px] text-emerald-200">{bank.rentVaultRatePct}% weekly interest</div></div>
         </div>
-        <div className={`mt-2 rounded-xl p-2.5 text-xs ${s.lateRent ? 'bg-rose-900/50 text-rose-200' : 'bg-white/5 text-slate-300'}`}>
-          {s.lateRent ? `Rent is late. Clear it by the end of day ${s.lateRent.due}.` : `Rent ${naira(s.listing.rent)} goes out ${d === 0 ? 'tonight' : `in ${d} day${d > 1 ? 's' : ''}`} to ${s.listing.landlord}.`}
+        <div className={s.lateRent ? 'mt-2 rounded-xl p-2.5 text-xs bg-rose-900/50 text-rose-200' : 'mt-2 rounded-xl p-2.5 text-xs bg-white/5 text-slate-300'}>
+          {s.lateRent ? 'Rent is late. Clear it by the end of day ' + s.lateRent.due + '.' : 'Rent ' + naira(s.listing.rent) + ' goes out ' + (dueDays === 0 ? 'tonight' : 'in ' + dueDays + ' days') + ' to ' + s.listing.landlord + '. Rent Vault is used first.'}
         </div>
       </div>
-      <div className="px-4 pb-4">
-        <div className="text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1">Transactions</div>
-        {lines.length === 0 && <p className="text-sm text-slate-500">Nothing yet.</p>}
-        <div className="divide-y divide-white/5">
-          {lines.slice(0, 80).map((l, i) => (
-            <div key={i} className="flex items-center justify-between gap-2 py-2">
-              <div className="min-w-0">
-                <div className="text-sm text-white truncate">{l.label}</div>
-                <div className="text-[10px] text-slate-500">Day {l.day}{l.t >= 0 ? ` · ${E.clockText(l.t)}` : ''}</div>
-              </div>
-              <div className={`text-sm font-semibold shrink-0 ${l.amount >= 0 ? 'text-emerald-300' : 'text-slate-200'}`}>{l.amount >= 0 ? '+' : ''}{naira(l.amount)}</div>
-            </div>
-          ))}
-        </div>
+      <div className="px-4 pb-4 space-y-4">
+        <section className="rounded-xl border border-white/10 p-3 space-y-2">
+          <h3 className="font-semibold text-white">Move money between accounts</h3>
+          <label className="block text-xs text-slate-400">Amount (₦)<input type="number" min="500" step="500" value={transferAmount} onChange={e => setTransferAmount(e.target.value)} className="mt-1 w-full rounded-lg bg-white/5 border border-white/10 p-2 text-white text-sm" /></label>
+          <div className="grid grid-cols-3 gap-2">
+            <button onClick={() => up(g => E.transferBank(g, 'savings', amount(transferAmount)))} disabled={amount(transferAmount) <= 0 || s.cash < amount(transferAmount)} className="rounded-lg bg-emerald-700 disabled:opacity-40 py-2 text-xs font-semibold">To savings</button>
+            <button onClick={() => up(g => E.transferBank(g, 'rentVault', amount(transferAmount)))} disabled={amount(transferAmount) <= 0 || s.cash < amount(transferAmount)} className="rounded-lg bg-teal-700 disabled:opacity-40 py-2 text-xs font-semibold">To Rent Vault</button>
+            <button onClick={() => up(g => E.transferBank(g, 'current', amount(transferAmount)))} disabled={amount(transferAmount) <= 0 || bank.rentVault < amount(transferAmount)} className="rounded-lg bg-slate-700 disabled:opacity-40 py-2 text-xs font-semibold">Withdraw vault</button>
+          </div>
+        </section>
+        <section className="rounded-xl border border-white/10 p-3 space-y-2">
+          <h3 className="font-semibold text-white">Rent Vault settings</h3>
+          <label className="block text-xs text-slate-400">Saving mode
+            <select value={bank.rentMode} onChange={e => up(g => E.setRentSaving(g, e.target.value as 'manual' | 'automatic'))} className="mt-1 w-full rounded-lg bg-[#181b24] border border-white/10 p-2 text-white text-sm">
+              <option value="manual">Manual — I transfer money myself</option><option value="automatic">Automatic — save from eligible daily earnings</option>
+            </select>
+          </label>
+          {bank.rentMode === 'automatic' && <><div className="flex items-center justify-between text-xs"><span className="text-slate-300">Daily positive net operating earnings</span><b>{bank.autoRentPercent}%</b></div><input type="range" min="0" max="80" step="5" value={bank.autoRentPercent} onChange={e => up(g => E.setRentSaving(g, 'automatic', Number(e.target.value)))} className="w-full" /><p className="text-[11px] text-slate-500">Savings use positive daily earnings after recorded operating costs. Funds reserved here still belong to you.</p></>}
+        </section>
+        <section className="rounded-xl border border-white/10 p-3 space-y-2">
+          <h3 className="font-semibold text-white">Business loan</h3>
+          <div className="text-xs text-slate-400">Current eligible limit: <b className="text-emerald-200">{naira(E.maximumLoan(s))}</b> · quoted rate 3.2% per week.</div>
+          <label className="block text-xs text-slate-400">Amount<input type="number" min="10000" step="10000" value={loanAmount} onChange={e => setLoanAmount(e.target.value)} className="mt-1 w-full rounded-lg bg-white/5 border border-white/10 p-2 text-white text-sm" /></label>
+          <label className="block text-xs text-slate-400">Repayment term<select value={loanTerm} onChange={e => setLoanTerm(Number(e.target.value))} className="mt-1 w-full rounded-lg bg-[#181b24] border border-white/10 p-2 text-white text-sm">{[4,8,12,24].map(n => <option key={n} value={n}>{n} weeks</option>)}</select></label>
+          <button onClick={() => up(g => E.takeBusinessLoan(g, amount(loanAmount), loanTerm))} disabled={amount(loanAmount) <= 0 || amount(loanAmount) > E.maximumLoan(s)} className="w-full rounded-lg bg-emerald-700 disabled:opacity-40 py-2 text-sm font-semibold">Apply for loan</button>
+          {bank.loans.length > 0 && <div className="pt-2 space-y-2"><div className="text-xs font-bold uppercase tracking-wide text-slate-400">Outstanding loans</div>{bank.loans.map(loan => <div key={loan.id} className="rounded-lg bg-white/5 p-2 flex items-center gap-2"><div className="flex-1 min-w-0"><div className="text-sm text-white">{naira(loan.balance)} outstanding</div><div className="text-[11px] text-slate-400">{naira(loan.weeklyPayment)} weekly · next due Day {loan.nextPaymentDay} · {loan.missedPayments} missed</div></div><button disabled={s.cash < loan.balance} onClick={() => up(g => E.repayBusinessLoan(g, loan.id, loan.balance))} className="rounded-lg bg-white/10 disabled:opacity-40 px-2 py-1.5 text-[11px]">Repay</button></div>)}</div>}
+        </section>
+        <section className="rounded-xl border border-white/10 p-3 space-y-2">
+          <h3 className="font-semibold text-white">Fixed-term savings</h3>
+          <div className="text-xs text-slate-400">Move general savings into a fixed deposit until maturity.</div>
+          <label className="block text-xs text-slate-400">Deposit amount<input type="number" min="1000" step="1000" value={depositAmount} onChange={e => setDepositAmount(e.target.value)} className="mt-1 w-full rounded-lg bg-white/5 border border-white/10 p-2 text-white text-sm" /></label>
+          <label className="block text-xs text-slate-400">Duration<select value={depositTerm} onChange={e => setDepositTerm(Number(e.target.value))} className="mt-1 w-full rounded-lg bg-[#181b24] border border-white/10 p-2 text-white text-sm">{[7,14,28,56].map(n => <option key={n} value={n}>{n} days</option>)}</select></label>
+          <button onClick={() => up(g => E.createFixedDeposit(g, amount(depositAmount), depositTerm))} disabled={amount(depositAmount)<=0 || amount(depositAmount)>bank.savings} className="w-full rounded-lg bg-teal-700 disabled:opacity-40 py-2 text-sm font-semibold">Open fixed deposit</button>
+          {bank.fixedDeposits.map(fd => <div key={fd.id} className="text-xs rounded-lg bg-white/5 p-2 text-slate-300">{naira(fd.amount)} · matures Day {fd.maturityDay} · {fd.ratePct}% return</div>)}
+        </section>
+        <section className="rounded-xl border border-white/10 p-3 space-y-2">
+          <h3 className="font-semibold text-white">Savings goal</h3>
+          <label className="block text-xs text-slate-400">Goal name<input value={goalName} onChange={e => setGoalName(e.target.value)} maxLength={60} className="mt-1 w-full rounded-lg bg-white/5 border border-white/10 p-2 text-white text-sm" /></label>
+          <label className="block text-xs text-slate-400">Target amount<input type="number" min="0" step="10000" value={goalAmount} onChange={e => setGoalAmount(e.target.value)} className="mt-1 w-full rounded-lg bg-white/5 border border-white/10 p-2 text-white text-sm" /></label>
+          <button onClick={() => up(g => E.setSavingsGoal(g, goalName, amount(goalAmount)))} className="w-full rounded-lg bg-slate-700 py-2 text-sm">Save goal</button>
+          <div className="text-xs text-slate-400">{naira(bank.savings + bank.rentVault)} reserved of {naira(bank.savingsGoalAmount)} target</div>
+        </section>
+        <section><div className="text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1">Transactions</div>{lines.length === 0 && <p className="text-sm text-slate-500">Nothing yet.</p>}<div className="divide-y divide-white/5">{lines.slice(0, 40).map((l, i) => <div key={i} className="flex items-center justify-between gap-2 py-2"><div className="min-w-0"><div className="text-sm text-white truncate">{l.label}</div><div className="text-[10px] text-slate-500">Day {l.day}{l.t >= 0 ? ' · ' + E.clockText(l.t) : ''}</div></div><div className={l.amount >= 0 ? 'text-sm font-semibold shrink-0 text-emerald-300' : 'text-sm font-semibold shrink-0 text-slate-200'}>{l.amount >= 0 ? '+' : ''}{naira(l.amount)}</div></div>)}</div></section>
+      </div>
+    </AppFrame>
+  );
+};
+
+const Forbes: React.FC<{ s: GameState }> = ({ s }) => {
+  const rows = E.currentWealthRows(s).sort((a, b) => b.netWorth - a.netWorth);
+  const history = s.wealthHistory || [];
+  return (
+    <AppFrame title="Lagos Fashion Rich List" sub="In-game wealth estimates · weekly changes" tone="bg-gradient-to-r from-zinc-700 to-zinc-950">
+      <div className="p-3 space-y-3">
+        <div className="rounded-xl border border-white/10 bg-white/5 p-3"><div className="text-xs uppercase tracking-wider text-amber-200">Your estimated net worth</div><div className="text-2xl font-bold text-white mt-1">{naira(E.netWorthPlayer(s))}</div><div className="text-xs text-slate-400 mt-1">Cash, accounts, inventory, fixtures and modeled goodwill, minus outstanding loans.</div></div>
+        {rows.map((row, index) => {
+          const latest = [...history].reverse().find(item => item.ownerId === row.ownerId && item.day <= s.day);
+          const change = latest ? latest.wealthChange : 0;
+          const previousRank = latest?.previousRank || 0;
+          const movement = previousRank > 0 ? previousRank - (latest?.rank || index + 1) : 0;
+          return <div key={row.ownerId} className="rounded-xl border border-white/10 p-3 flex gap-3 items-start"><div className="w-8 text-center text-lg font-bold text-amber-300">#{latest?.rank || index + 1}</div><div className="flex-1 min-w-0"><div className="font-semibold text-white">{row.owner}</div><div className="text-xs text-slate-400">{row.shop} · {TIERS[row.tier]?.name || 'Fashion business'}</div><div className="text-base font-bold text-white mt-1">{naira(row.netWorth)}</div><div className={change > 0 ? 'text-xs mt-1 text-emerald-300' : change < 0 ? 'text-xs mt-1 text-rose-300' : 'text-xs mt-1 text-slate-400'}>{latest ? (change >= 0 ? '+' : '') + naira(change) + ' since last snapshot' : 'First recorded estimate'}{movement ? ' · ' + (movement > 0 ? 'up ' : 'down ') + Math.abs(movement) + ' place(s)' : ''}</div><div className="grid grid-cols-2 gap-2 mt-2 text-[11px]"><div className="rounded-lg bg-white/5 p-2"><div className="text-slate-400">Weekly revenue</div><div className="text-white font-semibold">{naira(row.revenue)}</div></div><div className="rounded-lg bg-white/5 p-2"><div className="text-slate-400">Profit / loss</div><div className={row.profit >= 0 ? 'text-emerald-300' : 'text-rose-300'}>{naira(row.profit)}</div></div></div><div className="text-[11px] text-slate-400 mt-2">{row.followers.toLocaleString('en-NG')} followers · Brand Power {row.brandPower.toLocaleString('en-NG')}</div></div></div>;
+        })}
+        <div className="rounded-xl border border-amber-400/20 bg-amber-400/5 p-3"><div className="font-semibold text-amber-100">Deborah's fashion empire</div><div className="text-xs text-slate-300 mt-1">Her exact business name and private financial figures are not yet modeled, so the game does not invent a precise fortune.</div></div>
+        <div className="text-[10px] text-slate-500">Estimates are in-game values, not real-world valuations. Snapshots are saved weekly.</div>
+      </div>
+    </AppFrame>
+  );
+};
+
+const PromotionApp: React.FC<{ s: GameState; up: PhoneProps['up'] }> = ({ s, up }) => {
+  const [mode, setMode] = useState<'period' | 'always'>(s.promotion?.mode || 'period');
+  const levels = E.availablePromotionLevels(s.tier);
+  const [level, setLevel] = useState<NonNullable<GameState['promotion']>['level']>(s.promotion?.level || 'local');
+  const chosen = levels.includes(level) ? level : (levels[0] || 'local');
+  const bounds = E.promotionBudgetBounds(s.tier, chosen);
+  const [budget, setBudget] = useState(String(bounds.min));
+  const [duration, setDuration] = useState(48);
+  const active = s.promotion?.active ? s.promotion : null;
+  return (
+    <AppFrame title="Promotion Centre" sub="Paid campaigns · simulated business hours" tone="bg-gradient-to-r from-fuchsia-700 to-purple-900">
+      <div className="p-3 space-y-3">
+        <div className="rounded-xl border border-white/10 bg-white/5 p-3"><div className="flex items-center justify-between gap-2"><span className="text-white font-semibold">Campaign status</span><span className={active ? 'text-emerald-300 text-xs font-bold' : 'text-slate-400 text-xs'}>{active ? 'ACTIVE' : 'OFF'}</span></div>{active && <div className="grid grid-cols-2 gap-2 mt-2 text-xs"><div className="rounded-lg bg-black/15 p-2"><div className="text-slate-400">Level / spend</div><div className="text-white font-semibold">{active.level} · {naira(active.hourlyBudget)}/hour</div></div><div className="rounded-lg bg-black/15 p-2"><div className="text-slate-400">Campaign spend</div><div className="text-white font-semibold">{naira(active.totalSpent)}</div></div><div className="rounded-lg bg-black/15 p-2"><div className="text-slate-400">Estimated reach</div><div className="text-white font-semibold">{active.estimatedReach.toLocaleString('en-NG')}</div></div><div className="rounded-lg bg-black/15 p-2"><div className="text-slate-400">Remaining time</div><div className="text-white font-semibold">{active.mode === 'always' ? 'Until stopped' : (active.hoursRemaining || 0) + ' hours'}</div></div></div>}{active && <button onClick={() => up(g => E.stopPromotion(g))} className="mt-3 w-full rounded-lg bg-rose-800 py-2 font-semibold text-white">Stop promotion</button>}</div>
+        <div className="rounded-xl border border-white/10 p-3 space-y-3"><h3 className="font-semibold text-white">Create a campaign</h3><label className="block text-xs text-slate-400">Campaign duration<select value={mode} onChange={e => setMode(e.target.value as 'period' | 'always')} className="mt-1 w-full rounded-lg bg-[#181b24] border border-white/10 p-2 text-white text-sm"><option value="period">Fixed period — stop automatically</option><option value="always">Always-on — until stopped</option></select></label><label className="block text-xs text-slate-400">Promotion level<select value={chosen} onChange={e => setLevel(e.target.value as NonNullable<GameState['promotion']>['level'])} className="mt-1 w-full rounded-lg bg-[#181b24] border border-white/10 p-2 text-white text-sm">{levels.map(l => <option key={l} value={l}>{({local:'Local Buzz',citywide:'Citywide Campaign',premium:'Premium Campaign',luxury:'Luxury Spotlight'} as Record<string,string>)[l]}</option>)}</select></label><label className="block text-xs text-slate-400">Budget per business hour (₦)<input type="number" value={budget} min={bounds.min} max={bounds.max} step="500" onChange={e => setBudget(e.target.value)} className="mt-1 w-full rounded-lg bg-white/5 border border-white/10 p-2 text-white text-sm"/><span className="block text-[10px] text-slate-500 mt-1">This tier allows {naira(bounds.min)}–{naira(bounds.max)} per hour. The shop runs 12 business hours per in-game day.</span></label>{mode === 'period' && <label className="block text-xs text-slate-400">Duration<select value={duration} onChange={e => setDuration(Number(e.target.value))} className="mt-1 w-full rounded-lg bg-[#181b24] border border-white/10 p-2 text-white text-sm">{[8,24,48,72,120,168].map(n => <option key={n} value={n}>{n} simulated hours</option>)}</select></label>}<button disabled={!!active || s.cash < bounds.min} onClick={() => up(g => E.startPromotion(g, mode, chosen, Math.max(0,Number(budget)||0), duration))} className="w-full rounded-lg bg-fuchsia-700 disabled:opacity-40 py-2 font-semibold text-white">Start promotion</button><p className="text-[11px] text-slate-500">Reach estimates are not guaranteed sales. Promotion is charged at closing and stops if the account cannot cover it.</p></div>
       </div>
     </AppFrame>
   );
@@ -762,7 +847,7 @@ const Gidigram: React.FC<{ s: GameState; profile: string | null; setProfile: (id
       <div className="px-4 pb-3 text-sm text-white">
         <div className="font-semibold">Divine Styles · Asanwa Boutique</div>
         <div className="text-slate-300 text-[13px]">Stylist 💇🏾‍♀️ Native & English wear 👗 {s.listing.area}, Lagos 📍</div>
-        <div className="text-[11px] text-slate-500 mt-1">More followers bring more customers to the shop (+{Math.round((E.followerTraffic(s.followers || 0) - 1) * 100)}% now). Post your best looks after a sale, up to 3 a day.</div>
+        <div className="text-[11px] text-slate-500 mt-1">Your audience brings more potential customers (+{Math.round((E.followerTraffic(s.followers || 0) - 1) * 100)}% traffic now). Engagement and audience fit improve the value of your followers.</div><div className="mt-2 rounded-xl border border-pink-400/20 bg-pink-500/5 p-2"><div className="text-[10px] uppercase tracking-wide text-pink-200">Unlocked by your audience</div><div className="text-[11px] text-slate-300 mt-1">{E.unlocksForFollowers(s.followers || 0).length ? E.unlocksForFollowers(s.followers || 0).join(" · ") : "Reach 1,000 followers to attract your first micro-influencer sponsorships."}</div></div>
       </div>
       {posts.length === 0 ? (
         <p className="px-4 py-8 text-center text-sm text-slate-500">No posts yet. After a look scores 70 or more, tap "Post to Gidigram".</p>
@@ -839,7 +924,7 @@ const Top20: React.FC<{ s: GameState; open: (id: string) => void }> = ({ s, open
   const last = recentDays.length > 1 ? recentDays[0] : (s.ranking || []).slice(-1)[0];
   return (
     <AppFrame title="Top 20 Boutiques" sub={`Lagos · live now · next list on day ${s.day + ((7 - (s.day % 7)) % 7 || 7)}`} tone="bg-gradient-to-r from-amber-600 to-yellow-700">
-      <div className="px-3 py-2 text-[11px] text-slate-400">Recent takings, reputation, followers and shop size decide the race. ▲/▼ shows movement since the previous in-game day; the official list is published weekly.</div>
+      <div className="px-3 py-2 text-[11px] text-slate-400">Weekly takings, Brand Power, followers, shop scale and market momentum decide this race. Forbes separately ranks estimated net worth.</div>
       <div className="divide-y divide-white/5">
         {rows.map((r, i) => {
           const before = last ? last.order.indexOf(r.id) + 1 : 0;
@@ -852,7 +937,7 @@ const Top20: React.FC<{ s: GameState; open: (id: string) => void }> = ({ s, open
                 <span className="block text-sm text-white font-semibold truncate">{r.name}{r.you ? ' (you)' : ''}{r.main ? ' ●' : ''}</span>
                 <span className="block text-[11px] text-slate-400 truncate">{r.owner} · {TIERS[r.tier].name}, {r.area}</span>
               </span>
-              <span className="text-[11px] text-slate-400 shrink-0">rep {Math.round(r.rep)}</span>
+              <span className="text-[11px] text-slate-400 shrink-0">Power {r.brandPower.toLocaleString("en-NG")}</span>
             </button>
           );
         })}
