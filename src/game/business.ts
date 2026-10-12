@@ -321,6 +321,24 @@ export function recordWeeklyWealth(s0: GameState): GameState {
   return { ...s0, wealthHistory: [...(s0.wealthHistory || []), ...snapshots].slice(-1500) };
 }
 
+export function closeBrandDay(s0: GameState): GameState {
+  const old = getBrandMetrics(s0);
+  const followerLift = Math.min(1.2, Math.log10(Math.max(1, s0.followers || 0) + 1) / 8);
+  const campaignLift = s0.promotion?.active ? ({ local: 0.4, citywide: 0.7, premium: 1.1, luxury: 1.6 }[s0.promotion.level]) : 0;
+  const best = s0.today?.bestScore || 0;
+  const served = s0.today?.served || 0;
+  const lost = (s0.today?.lost || 0) + (s0.today?.walkedOut || 0);
+  const customerSignal = served - lost * 0.55;
+  const brand: BrandMetrics = {
+    awareness: clamp(old.awareness + 0.05 + followerLift * 0.12 + campaignLift + (s0.posts || []).filter((p) => p.day === s0.day).length * 0.35, 5, 100),
+    prestige: clamp(old.prestige + (best - 65) * 0.018 + (s0.tier >= 3 ? 0.12 : 0) - (best > 0 && best < 50 ? 0.3 : 0), 5, 100),
+    trendInfluence: clamp(old.trendInfluence + (s0.posts || []).filter((p) => p.day === s0.day).length * 0.7 + campaignLift * 0.4 - 0.12, 5, 100),
+    loyalty: clamp(old.loyalty + (best >= 82 ? 0.35 : best > 0 && best < 58 ? -0.45 : 0) + clamp(customerSignal / 18, -0.35, 0.4), 5, 100),
+    reliability: clamp(old.reliability + (lost === 0 && served > 0 ? 0.15 : lost > served ? -0.25 : 0), 5, 100),
+  };
+  return { ...s0, brand };
+}
+
 export function unlocksForFollowers(followers: number): string[] {
   const unlocks: string[] = [];
   if (followers >= 1_000) unlocks.push('Micro-influencer sponsorships');
