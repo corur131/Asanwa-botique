@@ -206,7 +206,7 @@ export const MarketApp: React.FC<{ s: GameState; cart: CartLine[]; setCart: (f: 
               <div>
                 <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1">Second colour (print, lace, trim)</div>
                 <div className="flex flex-wrap gap-1.5">
-                  {colourList.map((c) => <button key={c.color} title={'name' in c ? c.name : c.label} onClick={() => setColor2(c.color)} className={`w-6 h-6 rounded-full border-2 ${color2 === c.color ? 'border-orange-400 scale-110' : 'border-white/20'}`} style={{ background: c.color }} />)}
+                  {colourList.map((c) => <button key={c.color} title={c.name} onClick={() => setColor2(c.color)} className={`w-6 h-6 rounded-full border-2 ${color2 === c.color ? 'border-orange-400 scale-110' : 'border-white/20'}`} style={{ background: c.color }} />)}
                 </div>
               </div>
             )}
