@@ -43,7 +43,7 @@ const ROSTER: Seed[] = [
 ];
 
 /** Daily takings before rent at skill 1 and average reputation, by shop size. Tuned in tools/rivalsim. */
-const DAILY = [24_000, 75_000, 165_000, 340_000, 600_000];
+const DAILY = [120_000, 400_000, 1_000_000, 2_500_000, 5_000_000];
 /** Share of takings spent restocking, by shop size: big shops carry dearer stock. */
 const STOCK_SHARE = [0.45, 0.5, 0.55, 0.6, 0.62];
 /** Weekly wages for their staff. */
@@ -215,7 +215,7 @@ export function simulateRivals(s0: GameState): GameState {
   const rankById = new Map(currentOrder.map((id, index) => [id, index + 1] as const));
   const youRank = rankById.get('you') || 20;
   const rivals: Rival[] = [];
-  const news: { kind: 'up' | 'down' | 'viral' | 'scandal' | 'campaign'; r: Rival }[] = [];
+  const news: { kind: 'up' | 'down' | 'viral' | 'scandal' | 'campaign' | 'celebrity'; r: Rival; spend?: number }[] = [];
   const growthNotes: { owner: string; shop: string; detail: string }[] = [];
   for (const r0 of s.rivals) {
     const r = { ...r0, week: [...r0.week], weekCosts: [...(r0.weekCosts || [])] };
@@ -299,6 +299,30 @@ export function simulateRivals(s0: GameState): GameState {
       r.rep = clamp(r.rep + rand(0.2, 0.8), 5, 99);
       if (r.main) news.push({ kind: 'campaign', r });
     }
+    // Celebrity clients are a real, recurring source of prestige sales for rivals too.
+    // Higher-tier and more visible boutiques attract them more often, but any rival can land one.
+    const celebrityChanceByTier = [0.12, 0.19, 0.27, 0.36, 0.45];
+    const celebrityChance = clamp(celebrityChanceByTier[r.tier] + Math.min(0.06, r.followers / 2_000_000), 0.08, 0.5);
+    if (chance(celebrityChance)) {
+      const celebritySpendBase = [400_000, 1_200_000, 3_500_000, 9_000_000, 18_000_000][r.tier];
+      const celebritySpend = Math.round(celebritySpendBase * rand(0.7, 2.2) * (0.8 + r.skill * 0.2));
+      const celebrityGoodsCost = Math.round(celebritySpend * clamp(stockShare * rand(0.82, 1.05), 0.3, 0.78));
+      const celebrityServiceCost = Math.round(celebritySpend * rand(0.025, 0.06));
+      const celebrityCosts = celebrityGoodsCost + celebrityServiceCost;
+      r.week[r.week.length - 1] = (r.week[r.week.length - 1] || 0) + celebritySpend;
+      r.cash += celebritySpend - celebrityCosts;
+      r.weekCosts[r.weekCosts.length - 1] = (r.weekCosts[r.weekCosts.length - 1] || 0) + celebrityCosts;
+      dailyCosts += celebrityCosts;
+      r.rep = clamp(r.rep + rand(0.8, 2.2), 5, 99);
+      r.followers += Math.round(rand(250, 1_800) * (r.tier + 1) + celebritySpend / 100_000 * rand(2, 8));
+      r.brand = {
+        ...(r.brand || brandFromLegacy(r.rep, r.followers, r.tier)),
+        awareness: clamp((r.brand || brandFromLegacy(r.rep, r.followers, r.tier)).awareness + rand(0.8, 2.1), 5, 100),
+        prestige: clamp((r.brand || brandFromLegacy(r.rep, r.followers, r.tier)).prestige + rand(0.4, 1.4), 5, 100),
+        trendInfluence: clamp((r.brand || brandFromLegacy(r.rep, r.followers, r.tier)).trendInfluence + rand(0.5, 1.7), 5, 100),
+      };
+      news.push({ kind: 'celebrity', r, spend: celebritySpend });
+    }
     // Bad weeks still hurt: theft, a landlord's surprise charge or a dead generator.
     if (chance(0.025)) { const incidentCost = Math.round(takings * rand(2, 4)); r.cash -= incidentCost; r.weekCosts[r.weekCosts.length - 1] = (r.weekCosts[r.weekCosts.length - 1] || 0) + incidentCost; }
     if (dayEvent === 'viral') {
@@ -355,6 +379,7 @@ export function simulateRivals(s0: GameState): GameState {
       r.moved = today;
       news.push({ kind: 'up', r });
     }
+    r.profitHistory = [...(r.profitHistory || []), (r.week[r.week.length - 1] || 0) - (r.weekCosts[r.weekCosts.length - 1] || 0)].slice(-28);
     r.broke = r.cash < 0 ? r.broke + 1 : 0;
     if (r.broke >= 10 && r.tier > 0) {
       r.tier -= 1;
@@ -377,7 +402,15 @@ export function simulateRivals(s0: GameState): GameState {
   // news about other shops
   for (const n of news) {
     const r = n.r;
-    if (n.kind === 'up') {
+    if (n.kind === 'celebrity') {
+      const spend = n.spend || 0;
+      const headline = `${r.shop} welcomes a celebrity client ✨`;
+      const detail = `${r.owner} hosted a celebrity shopping visit today. The client spent ${'₦' + spend.toLocaleString('en-NG')} on a luxury wardrobe; stock and service costs were deducted, and the visit lifted the boutique's profile.`;
+      s = gist(s, headline, detail, r.id, true);
+      s = say(s, 'GistLagos', `🚨 CELEBRITY SIGHTING: ${r.shop} (${r.owner}) just welcomed a celebrity shopper. Reported spend: ₦${spend.toLocaleString('en-NG')}. Lagos fashion is getting competitive!`, { chat: GROUP, tone: 'good' });
+      s = rivalPost(s, r, `A special guest came through today ✨ Celebrity client, luxury pieces, and a very good day at ${r.shop}. Thank you for the love! #CelebrityStyle #LagosFashion`);
+      if (r.main) s = inGroup(s, r, `Celebrity client in my shop today 😌✨ The industry is watching.`, { tone: 'good' });
+    } else if (n.kind === 'up') {
       s = gist(s, `${r.shop} moves to a ${TIERS[r.tier].name}!`, `${r.owner} has upgraded. Sources say the rent is not small.`, r.id);
       if (r.main) {
         s = talk(s, r, pick([`Guess who just signed for a ${TIERS[r.tier].name}? 😌🔑`, `New shop, new level. ${TIERS[r.tier].name} babyyyy 🎉`, `God did! We have moved to a ${TIERS[r.tier].name} 🙏🏾`]), 'brag');

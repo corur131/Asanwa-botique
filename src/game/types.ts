@@ -181,6 +181,8 @@ export interface Rival {
   week: number[];
   /** Modeled operating costs for each matching day in week. */
   weekCosts?: number[];
+  /** Daily operating profit history used to keep business valuation from overreacting to one-off celebrity sales. */
+  profitHistory?: number[];
   /** Business assets, retained earnings and debt are modeled separately from shop takings. */
   savings?: number;
   debt?: number;
@@ -781,6 +783,8 @@ export interface GameState {
   sponsorshipOffers?: SponsorshipOffer[];
   lastSponsorshipDay?: number;
   rivals: Rival[];
+  /** Versioned one-time rival economy catch-up for existing saves. */
+  rivalEconomyVersion?: number;
   /** Official weekly ladder: ids in order ('you' is Divine). */
   ranking: { week: number; order: string[] }[];
   /** Recent daily ladder snapshots, separate from the official weekly history. */

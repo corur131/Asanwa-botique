@@ -983,7 +983,7 @@ const Forbes: React.FC<{ s: GameState }> = ({ s }) => {
   return (
     <AppFrame title="Lagos Fashion Rich List" sub="In-game wealth estimates · weekly changes" tone="bg-gradient-to-r from-zinc-700 to-zinc-950">
       <div className="p-3 space-y-3">
-        <div className="rounded-xl border border-white/10 bg-white/5 p-3"><div className="text-xs uppercase tracking-wider text-amber-200">Your estimated net worth</div><div className="text-2xl font-bold text-white mt-1">{naira(E.netWorthPlayer(s))}</div><div className="text-xs text-slate-400 mt-1">Cash, accounts, inventory, fixtures and modeled goodwill, minus outstanding loans.</div></div>
+        <div className="rounded-xl border border-white/10 bg-white/5 p-3"><div className="text-xs uppercase tracking-wider text-amber-200">Your estimated net worth</div><div className="text-2xl font-bold text-white mt-1">{naira(E.netWorthPlayer(s))}</div><div className="text-xs text-slate-400 mt-1">Cash and bank accounts + stock at cost + fixtures and expansion assets + brand/follower value + 3× average weekly profit over up to 28 days − loans, rent arrears and unpaid bills. This is an estimate, not spendable cash.</div></div>
         {rows.map((row, index) => {
           const latest = [...history].reverse().find(item => item.ownerId === row.ownerId && item.day <= s.day);
           const change = latest ? latest.wealthChange : 0;
