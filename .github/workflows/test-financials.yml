@@ -2,7 +2,7 @@ name: Financial regression tests
 
 on:
   push:
-    branches: ['feature/**', 'audit/**']
+    branches: ['main', 'feature/**', 'audit/**']
   pull_request:
     branches: [main, 'audit/**']
   workflow_dispatch:
