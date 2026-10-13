@@ -74,7 +74,7 @@ export function money(s: GameState, amount: number, label: string): GameState {
       entries.unshift({ day: s.day, t, label: 'Operating payables settled', amount: -settlement, category: 'operating' });
     }
   }
-  return { ...s, cash, operatingPayables, ledger: [...entries, ...(s.ledger || [])].slice(0, 150) };
+  return { ...s, cash, operatingPayables, ledger: [...entries, ...(s.ledger || [])].slice(0, 500) };
 }
 
 // ---------------------------------------------------------------------------
@@ -566,6 +566,7 @@ export function settle(c: Customer, score: ScoreBreakdown, price: number, suppli
 export function applyLook(s0: GameState, c: Customer, choice: StyleChoice, st0: Settlement, score: ScoreBreakdown): GameState {
   let st = st0;
   if (s0.listing.signature && !c.celebrity) st = { ...st, tip: Math.max(st.tip, Math.round(st.paid * 0.12 / 100) * 100) };
+  // Apply tip bonuses before calculating the day report so reported income matches the actual receipt.
   // styling wears Divine out: a full look more than a quick hair or makeup job
   const s = s0.serving === c.id ? spendEnergy(s0, c.service ? ENERGY.service : ENERGY.fullLook) : s0;
   const sold = st.outcome === 'paid' || st.outcome === 'bargained';
@@ -582,6 +583,9 @@ export function applyLook(s0: GameState, c: Customer, choice: StyleChoice, st0: 
   } else if (st.becameRegular) {
     const r: Regular = { id: `r${Date.now().toString(36)}${Math.floor(Math.random() * 99)}`, name: c.name, look: c.look, cls: c.cls, male: c.male, visits: 1, loyalty: 20, bestScore: score.total, tasteKnown: false, favColor: c.taste.favColor, favName: c.taste.favName };
     regulars = [...regulars, r].slice(-30);
+  }
+  if ((st.outcome === 'paid' || st.outcome === 'bargained') && st.tip && stats(s0).tipBonus) {
+    st = { ...st, tip: Math.round((st.tip * (1 + stats(s0).tipBonus)) / 100) * 100 };
   }
   const today: DayLog = {
     ...s.today,
@@ -602,9 +606,18 @@ export function applyLook(s0: GameState, c: Customer, choice: StyleChoice, st0: 
     today,
     stats: { ...s.stats, served: s.stats.served + (sold ? 1 : 0), totalEarned: s.stats.totalEarned + (sold ? st.paid + st.tip - st.cost : 0), bestScore: Math.max(s.stats.bestScore, score.total) },
   };
-  if (sold && st.tip && stats(s).tipBonus) st = { ...st, tip: Math.round((st.tip * (1 + stats(s).tipBonus)) / 100) * 100 };
   if (sold) {
-    next = money(next, st.paid + st.tip, `${c.name}${c.service ? ` (${c.service === 'makeup' ? 'makeup' : c.service === 'both' ? 'hair & makeup' : 'hair'})` : ''}${st.tip ? ', with tip' : ''}`);
+    const receipt = st.paid + st.tip;
+    const payablesBefore = Math.max(0, next.operatingPayables || 0);
+    const receiptLabel = c.celebrity ? `Celebrity payment: ${c.name}` : `${c.name}${c.service ? ` (${c.service === 'makeup' ? 'makeup' : c.service === 'both' ? 'hair & makeup' : 'hair'})` : ''}${st.tip ? ', with tip' : ''}`;
+    next = money(next, receipt, receiptLabel);
+    const payablesSettled = Math.min(receipt, payablesBefore);
+    if (c.celebrity) {
+      const cashAdded = Math.max(0, receipt - payablesSettled);
+      const detail = payablesSettled > 0 ? `${naira(payablesSettled)} went toward unpaid operating bills; ` : '';
+      const balanceDetail = cashAdded > 0 ? `${naira(cashAdded)} was added to business cash.` : payablesSettled > 0 ? 'No extra cash remained from this receipt.' : 'Check the business statement for the receipt.';
+      next = { ...next, today: { ...next.today, events: [...next.today.events, `${c.name}'s ${naira(receipt)} payment was recorded. ${detail}${balanceDetail}`] } };
+    }
     next = money(next, -st.cost, 'Hair and makeup supplies');
   }
   if (c.influencer && score.total >= 80) next = { ...next, followers: (next.followers || 0) + Math.round(60 + Math.random() * 120) };
@@ -1007,7 +1020,7 @@ export function settleLateRent(s0: GameState): GameState {
   if (vaultPaid > 0) {
     next = {
       ...next,
-      ledger: [{ day: next.day, t: -1, label: 'Overdue rent paid from Rent Vault', amount: -vaultPaid }, ...(next.ledger || [])].slice(0, 150),
+      ledger: [{ day: next.day, t: -1, label: 'Overdue rent paid from Rent Vault', amount: -vaultPaid }, ...(next.ledger || [])].slice(0, 500),
     };
   }
   if (cashPaid > 0) next = money(next, -cashPaid, 'Overdue rent payment');
@@ -1036,7 +1049,7 @@ export function payRent(s: GameState): GameState {
   if (vaultPaid > 0) {
     next = {
       ...next,
-      ledger: [{ day: next.day, t: -1, label: 'Rent paid from Rent Vault', amount: -vaultPaid }, ...(next.ledger || [])].slice(0, 150),
+      ledger: [{ day: next.day, t: -1, label: 'Rent paid from Rent Vault', amount: -vaultPaid }, ...(next.ledger || [])].slice(0, 500),
     };
   }
   if (cashPaid > 0) next = money(next, -cashPaid, 'Rent');
