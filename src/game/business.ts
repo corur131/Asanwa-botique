@@ -780,7 +780,7 @@ export function netWorthPlayer(s: GameState): number {
   const expansion = s.businessExpansion || initialBusinessExpansion();
   const departmentInventory = (expansion.departmentOperations || []).reduce((sum, department) => sum + Math.max(0, department.inventoryValue || 0), 0);
   const wholesaleInventory = Math.max(0, expansion.wholesaleOperation?.inventoryValue || 0);
-  const expansionAssets = expansion.branches.reduce((sum, branch) => sum + Math.max(0, branch.assetValue), 0) + (expansion.wholesaleActive ? 4_500_000 : 0) + expansion.departments.length * 650_000 + expansion.designerCollections * 1_250_000 + departmentInventory + wholesaleInventory;
+  const expansionAssets = expansion.branches.reduce((sum, branch) => sum + Math.max(0, branch.assetValue), 0) + (expansion.wholesaleActive ? 4_500_000 : 0) + expansion.departments.length * 650_000 + expansion.designerCollections * 1_250_000 + departmentInventory + wholesaleInventory + Math.max(0, expansion.expansionCredit || 0);
   const weekly = playerWeekTotals(s);
   const goodwill = Math.max(0, weekly.profit) * 5 + Math.max(0, s.followers || 0) * 5 +
     brandPower(getBrandMetrics(s), s.followers || 0, s.tier) * 100;
