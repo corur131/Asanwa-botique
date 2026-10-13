@@ -316,6 +316,7 @@ export function simulateRivals(s0: GameState): GameState {
     // Only one capital project can be bought per rival per week, and a rent reserve is protected.
     const departmentNames = r.departments || [];
     const reserve = TIERS[r.tier].rent * 3;
+    let expansionInvestmentMade = false;
     if (today % 7 === hash(r.id) % 7 && today - r.moved > 14 && r.cash > reserve + 1_250_000) {
       const canOpenBranch = r.tier >= 3 && branchCount < 3 && r.cash > reserve + 12_000_000;
       const canOpenWholesale = r.tier >= 2 && !r.wholesaleActive && r.cash > reserve + 8_000_000;
@@ -329,22 +330,25 @@ export function simulateRivals(s0: GameState): GameState {
       if (canOpenBranch && chance(0.5)) {
         r.cash -= 7_500_000;
         r.branches = branchCount + 1;
+        expansionInvestmentMade = true;
         r.assetValue = Math.max(0, (r.assetValue || 0) + 2_500_000);
         growthNotes.push({ owner: r.owner, shop: r.shop, detail: 'opened branch ' + r.branches + ' and committed ₦7,500,000 to its setup' });
       } else if (canOpenWholesale && chance(0.55)) {
         r.cash -= 5_000_000;
         r.wholesaleActive = true;
+        expansionInvestmentMade = true;
         growthNotes.push({ owner: r.owner, shop: r.shop, detail: 'launched wholesale operations with a ₦5,000,000 stock and fulfilment investment' });
       } else if (canOpenDepartment && chance(0.7)) {
         r.cash -= departmentCost;
         r.departments = [...departmentNames, preferredDepartment];
+        expansionInvestmentMade = true;
         growthNotes.push({ owner: r.owner, shop: r.shop, detail: 'opened its ' + preferredDepartment + ' department for ₦' + departmentCost.toLocaleString('en-NG') });
       }
     }
     // move up when they can afford it; get thrown down when broke too long
     const next = TIERS[r.tier + 1];
     const appetite = 1.1 + (hash(r.id) % 6) * 0.1;
-    if (next && r.cash > next.moveIn * appetite + next.rent * 3 && today - r.moved > 14) {
+    if (next && !expansionInvestmentMade && r.cash > next.moveIn * appetite + next.rent * 3 && today - r.moved > 14) {
       r.cash -= next.moveIn;
       r.tier += 1;
       r.stars = r.skill > 1.05 ? 3 : 2;
