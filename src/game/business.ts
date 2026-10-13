@@ -628,7 +628,7 @@ export function investInExpansion(s0: GameState, investment: ExpansionInvestment
       brand = { ...brand, prestige: clamp(brand.prestige + 3.5, 5, 100), trendInfluence: clamp(brand.trendInfluence + 5, 5, 100) };
       break;
   }
-  const charged = ledger({ ...s0, businessExpansion: expansion, brand }, -effectiveCost, 'Business expansion: ' + option.title, 'operating');
+  const charged = ledger({ ...s0, businessExpansion: expansion, brand }, -effectiveCost, 'Business expansion: ' + option.title);
   return {
     ...charged,
     today: { ...charged.today, events: [...charged.today.events, option.title + ' funded for ' + effectiveCost.toLocaleString('en-NG') + ' naira. Earned event credit of ' + creditUsed.toLocaleString('en-NG') + ' naira was applied. The investment is recorded as a business asset rather than a daily operating expense.'] },
@@ -698,7 +698,7 @@ export function processExpansionAtClose(s0: GameState): GameState {
       const affordableUnits = Math.min(requestedUnits, Math.floor(Math.max(0, s.cash) / Math.max(1, d.unitCost)));
       if (affordableUnits > 0) {
         const purchaseCost = affordableUnits * d.unitCost;
-        s = ledger(s, -purchaseCost, d.name + ' inventory restock', 'operating');
+        s = ledger(s, -purchaseCost, d.name + ' inventory restock');
         d.inventoryUnits += affordableUnits;
         d.inventoryValue += purchaseCost;
       }
@@ -736,7 +736,7 @@ export function processExpansionAtClose(s0: GameState): GameState {
       const affordableUnits = Math.min(requestedUnits, Math.floor(Math.max(0, s.cash) / Math.max(1, w.unitCost)));
       if (affordableUnits > 0) {
         const purchaseCost = affordableUnits * w.unitCost;
-        s = ledger(s, -purchaseCost, 'Wholesale inventory restock', 'operating');
+        s = ledger(s, -purchaseCost, 'Wholesale inventory restock');
         w.inventoryUnits += affordableUnits;
         w.inventoryValue += purchaseCost;
       }
