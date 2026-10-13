@@ -28,7 +28,6 @@ import {
   startPromotion,
   processPromotionAtClose,
 } from './business';
-import { money } from './engine';
 
 function state(overrides: Partial<GameState> = {}): GameState {
   return {
