@@ -4,6 +4,50 @@ import type { Listing, Placed } from './shop';
 
 export type CustomerClass = 'poor' | 'middle' | 'rich';
 
+/** A serialisable cart line, also used by saved shopper orders. */
+export interface ShopperOrderLine {
+  key: string;
+  kind: StockKind;
+  itemId: string;
+  fabric?: FabricId;
+  color: string;
+  color2: string;
+  pattern: number;
+  pieces: number;
+}
+
+/** Aggregated, real item-level demand from completed sales. */
+export interface ProductSalesRecord {
+  day: number;
+  designKey: string;
+  kind: StockKind;
+  itemId: string;
+  fabric: FabricId;
+  color: string;
+  color2: string;
+  pattern: number;
+  customerClass: CustomerClass;
+  /** Number of pieces sold for this exact design/class/day grouping. */
+  units: number;
+  tier: number;
+}
+
+export type ShopperMission = 'restock' | 'variety' | 'richCustomers' | 'contract';
+export type ShopperJobStatus = 'ready' | 'cancelled' | 'purchased';
+
+export interface ShopperJob {
+  id: string;
+  mission: ShopperMission;
+  budget: number;
+  estimatedTotal: number;
+  status: ShopperJobStatus;
+  createdDay: number;
+  completedDay: number;
+  items: ShopperOrderLine[];
+  summary: string;
+  contractBrief?: string;
+}
+
 /** What an item in stock is. Clothes use the wardrobe slots; the rest are accessory kinds. */
 export type StockKind = 'top' | 'bottom' | 'dress' | 'outer' | 'shoes' | 'bag' | 'headwear' | 'necklace' | 'wrist' | 'glasses' | 'earrings' | 'hair';
 
@@ -617,6 +661,12 @@ export interface GameState {
   /** Unpaid operating costs when a recurring bill exceeds available cash; included in liabilities. */
   operatingPayables?: number;
   stock: Design[];
+  /** Saved Yaba Mart cart; survives app changes and reloads. */
+  marketCart?: ShopperOrderLine[];
+  /** Item-level sales used to train tier-aware shopper recommendations. */
+  productSales?: ProductSalesRecord[];
+  /** Shopper orders and their statuses are part of the saved game. */
+  shopperJobs?: ShopperJob[];
   regulars: Regular[];
   staff: StaffMember[];
   hireOkDay: number;
