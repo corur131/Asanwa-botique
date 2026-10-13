@@ -20,7 +20,6 @@ export const ShopperApp: React.FC<{
   const [latestJobId, setLatestJobId] = useState<string | null>(null);
   const recentJobs = [...(s.shopperJobs || [])].slice(-5).reverse();
   const latestJob = recentJobs.find((job) => job.id === latestJobId) || recentJobs[0];
-  const selectedMission = SHOPPER_MISSIONS.find((m) => m.id === mission) || SHOPPER_MISSIONS[0];
 
   const sendShopper = () => {
     const result = prepareShopperOrder(s, mission, budget, brief);
