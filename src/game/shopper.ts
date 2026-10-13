@@ -193,7 +193,7 @@ export function prepareShopperOrder(
         const line = candidateLine(entry, s, mission, records, variant, target - Math.max(0, variant.pieces));
         const unitCost = pieceCost(entry, isClothing(entry.kind) ? line.fabric : undefined);
         if (!Number.isFinite(unitCost) || unitCost <= 0) continue;
-        if (mission !== 'contract' && unitCost * MARKUP > priceCeiling) continue;
+        if (unitCost * MARKUP > priceCeiling) continue;
         candidates.push({
           entry, line, unitCost,
           score: 3 + productDemand * 2 + recentUnits * 2 + (variant.pieces <= 0 ? 6 : variant.pieces === 1 ? 3 : 0),
