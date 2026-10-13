@@ -170,7 +170,7 @@ function ledger(s: GameState, amount: number, label: string, category?: 'transfe
       }
     }
   }
-  return { ...s, cash, operatingPayables, ledger: [...entries, ...(s.ledger || [])].slice(0, 150) };
+  return { ...s, cash, operatingPayables, ledger: [...entries, ...(s.ledger || [])].slice(0, 500) };
 }
 
 export function transferBank(s0: GameState, pocket: BankPocket, amount: number, source: 'savings' | 'rentVault' = 'rentVault'): GameState {
@@ -422,7 +422,7 @@ export function processFixedDepositMaturities(s0: GameState): GameState {
   if (maturity.length) {
     const returned = maturity.reduce((sum, deposit) => sum + roundMoney(deposit.amount * (1 + deposit.ratePct / 100)), 0);
     bank = { ...bank, savings: bank.savings + returned, fixedDeposits: bank.fixedDeposits.filter((deposit) => deposit.maturityDay > s.day) };
-    s = { ...s, bank, ledger: [{ day: s.day, t: -1, label: 'Fixed deposit maturity + interest', amount: returned }, ...(s.ledger || [])].slice(0, 150) };
+    s = { ...s, bank, ledger: [{ day: s.day, t: -1, label: 'Fixed deposit maturity + interest', amount: returned }, ...(s.ledger || [])].slice(0, 500) };
   }
   return s;
 }
@@ -442,7 +442,7 @@ export function processBankWeekly(s0: GameState): GameState {
       ...(savingsInterest ? [{ day: s.day, t: -1, label: 'Savings interest', amount: savingsInterest }] : []),
       ...(rentInterest ? [{ day: s.day, t: -1, label: 'Rent Vault interest', amount: rentInterest }] : []),
     ];
-    s = { ...s, bank, ledger: [...entries, ...(s.ledger || [])].slice(0, 150) };
+    s = { ...s, bank, ledger: [...entries, ...(s.ledger || [])].slice(0, 500) };
   }
   bank = s.bank || bank;
   for (const loan0 of [...bank.loans]) {
@@ -483,7 +483,7 @@ export function processBankWeekly(s0: GameState): GameState {
         ...(penalty ? [{ day: s.day, t: -1, label: 'Missed loan payment fee', amount: -penalty }] : []),
         ...(interest ? [{ day: s.day, t: -1, label: 'Missed loan interest', amount: -interest }] : []),
       ];
-      s = { ...s, bank: { ...currentBank, loans, creditProfile: creditProfileNext }, today: { ...s.today, costs: s.today.costs + interest + penalty, events: [...s.today.events, 'A missed loan payment added ' + interest.toLocaleString('en-NG') + ' naira in interest and ' + penalty.toLocaleString('en-NG') + ' naira in late fees.'] }, ledger: [...missedEntries, ...(s.ledger || [])].slice(0, 150) };
+      s = { ...s, bank: { ...currentBank, loans, creditProfile: creditProfileNext }, today: { ...s.today, costs: s.today.costs + interest + penalty, events: [...s.today.events, 'A missed loan payment added ' + interest.toLocaleString('en-NG') + ' naira in interest and ' + penalty.toLocaleString('en-NG') + ' naira in late fees.'] }, ledger: [...missedEntries, ...(s.ledger || [])].slice(0, 500) };
       s = { ...s, messages: [{ id: (s.msgSeq || 0) + 1, day: s.day, from: 'KoboBank', text: formalCollectionsNotice ? 'FORMAL COLLECTIONS NOTICE: Your account has reached five consecutive missed payments and has been referred to KoboBank collections. Limited recovery from available business cash may begin, while protecting ₦25,000 for operating needs. Please clear the arrears or use an eligible repayment option.' : (nextMissed >= 3 ? 'Your KoboBank loan is now in DEFAULT. New borrowing is blocked until this loan is cleared. Your credit score has fallen sharply.' : 'A scheduled loan payment was missed. A capped late fee was added and your credit score has fallen.'), tone: 'danger' as const, t: -1 }, ...(s.messages || [])].slice(0, 160), msgSeq: (s.msgSeq || 0) + 1 };
       bank = s.bank || currentBank;
       // Persistent, limited collections begin at five consecutive missed payments.
@@ -494,7 +494,7 @@ export function processBankWeekly(s0: GameState): GameState {
         const collection = Math.min(availableForCollection, currentLoan ? currentLoan.balance : 0, Math.max(5_000, roundMoney(((currentLoan?.balance || 0) * 0.03))));
         if (collection > 0 && currentLoan) {
           const afterCollectionLoans = (s.bank || bank).loans.map((item) => item.id === loan.id ? { ...item, balance: Math.max(0, item.balance - collection), arrearsBalance: Math.max(0, (item.arrearsBalance || 0) - collection), collectionsStarted: true } : item).filter((item) => item.balance > 0);
-          s = { ...s, cash: s.cash - collection, bank: { ...(s.bank || bank), loans: afterCollectionLoans }, ledger: [{ day: s.day, t: -1, label: 'KoboBank debt recovery', amount: -collection }, ...(s.ledger || [])].slice(0, 150), messages: [{ id: (s.msgSeq || 0) + 1, day: s.day, from: 'KoboBank', text: 'FORMAL COLLECTIONS NOTICE: Your loan has been referred to KoboBank collections after five or more consecutive missed payments. ' + collection.toLocaleString('en-NG') + ' naira was recovered from available business cash; the ₦25,000 operating buffer was protected. Contact the in-game bank options to clear the arrears or request an eligible plan.', tone: 'danger' as const, t: -1 }, ...(s.messages || [])].slice(0, 160), msgSeq: (s.msgSeq || 0) + 1, today: { ...s.today, events: [...s.today.events, 'Debt recovery collected ' + collection.toLocaleString('en-NG') + ' naira while protecting a 25,000 naira operating buffer.'] } };
+          s = { ...s, cash: s.cash - collection, bank: { ...(s.bank || bank), loans: afterCollectionLoans }, ledger: [{ day: s.day, t: -1, label: 'KoboBank debt recovery', amount: -collection }, ...(s.ledger || [])].slice(0, 500), messages: [{ id: (s.msgSeq || 0) + 1, day: s.day, from: 'KoboBank', text: 'FORMAL COLLECTIONS NOTICE: Your loan has been referred to KoboBank collections after five or more consecutive missed payments. ' + collection.toLocaleString('en-NG') + ' naira was recovered from available business cash; the ₦25,000 operating buffer was protected. Contact the in-game bank options to clear the arrears or request an eligible plan.', tone: 'danger' as const, t: -1 }, ...(s.messages || [])].slice(0, 160), msgSeq: (s.msgSeq || 0) + 1, today: { ...s.today, events: [...s.today.events, 'Debt recovery collected ' + collection.toLocaleString('en-NG') + ' naira while protecting a 25,000 naira operating buffer.'] } };
           bank = s.bank || bank;
         }
       }
