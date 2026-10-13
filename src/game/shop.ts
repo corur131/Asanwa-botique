@@ -28,12 +28,17 @@ const AREAS: [string, string][][] = [
   [['Bode Thomas St', 'Surulere'], ['Opebi Road', 'Ikeja'], ['Ikeja City Mall row', 'Ikeja'], ['Admiralty Way', 'Lekki Phase 1']],
   [['Admiralty Way', 'Lekki Phase 1'], ['Awolowo Road', 'Ikoyi'], ['Bourdillon Road', 'Ikoyi'], ['Adeola Odeku St', 'Victoria Island']],
   [['Ozumba Mbadiwe Ave', 'Victoria Island'], ['Kingsway Road', 'Ikoyi'], ['Akin Adesola St', 'Victoria Island'], ['Banana Island Road', 'Ikoyi']],
+  [['Gerrard Road', 'Ikoyi'], ['Osborne Foreshore', 'Ikoyi'], ['Eko Atlantic Boulevard', 'Victoria Island'], ['Adetokunbo Ademola', 'Victoria Island']],
+  [['Banana Island Estate', 'Ikoyi'], ['Pinnacle Avenue', 'Eko Atlantic'], ['Queens Drive', 'Ikoyi'], ['Ocean View', 'Victoria Island']],
 ];
 const LANDLORDS = [
   ['Mama Bisi', 'Pastor Emeka', 'Iya Tolu', 'Mr Danjuma'],
   ['Mr Okafor', 'Madam Grace', 'Baba Sule', 'Mrs Coker'],
   ['Alhaji Bello', 'Barrister Eze', 'Mrs Lawal', 'Engr. Ade'],
   ['Chief Adeyemi', 'Otunba Ajayi', 'Dr. (Mrs) Bakare', 'Alhaja Shitta'],
+  ['Senator Adeleke', 'Chief (Mrs) Balogun', 'Dr. Danjuma', 'Otunba Oshinowo'],
+  ['High Chief Olumide', 'Sir Emeka', 'Oloye (Mrs) Tinubu', 'Alhaji Dangote'],
+  ['The Asanwa Trust', 'Imperial Holdings', 'Crown Properties', 'Golden Estates'],
 ];
 const STAR_RENT = [0, 0.75, 1, 1.33, 1.75];
 const STAR_GRACE = [0, 14, 7, 2, 0];
@@ -72,7 +77,7 @@ export function listingsFor(tier: number, week: number): Listing[] {
     };
   }).concat({
     id: `signature-${tier}-${week}`, tier, area: tier >= 3 ? 'Victoria Island' : tier === 2 ? 'Lekki Phase 1' : 'Ikeja',
-    street: ['','Allen Avenue Signature Maison','Lekki Signature Atelier','Ikoyi Grand Maison','Banana Island Crown House'][tier],
+    street: ['','Allen Avenue Signature Maison','Lekki Signature Atelier','Ikoyi Grand Maison','Banana Island Crown House','Eko Atlantic Penthouse','Ikoyi Presidential Suite'][tier] || 'Luxury Reserve',
     stars: 4, signature: true,
     rent: Math.round(t.rent * 2.7 / 5_000) * 5_000,
     moveIn: Math.round(t.moveIn * 3.2 / 5_000) * 5_000,
@@ -107,6 +112,8 @@ export const ROOMS: RoomStyle[] = [
   { w: 9, d: 6, wall: '#F2C8CC', wallLow: '#D9A3AA', floor: '#B98A5E', floor2: '#A97A50', trim: '#F4E4C8', kind: 'boutique', height: 3, finish: 2 },
   { w: 11, d: 8, wall: '#F4F0EA', wallLow: '#E2D8CA', floor: '#ECE6DC', floor2: '#DCD3C6', trim: '#C9A163', kind: 'marble', height: 3.2, finish: 2 },
   { w: 13, d: 9, wall: '#1E1B22', wallLow: '#141217', floor: '#F2EDE6', floor2: '#1E1B22', trim: '#D4AF37', kind: 'flagship', height: 3.6, finish: 2 },
+  { w: 18, d: 13, wall: '#0E151A', wallLow: '#070C10', floor: '#141E24', floor2: '#1E252B', trim: '#A0B2C4', kind: 'flagship', height: 4.2, finish: 2 },
+  { w: 22, d: 16, wall: '#1C0D11', wallLow: '#11070A', floor: '#2A171D', floor2: '#1B0E13', trim: '#D6A5A5', kind: 'flagship', height: 4.5, finish: 2 },
 ];
 
 /** Floor size by shop size and stars: better listings are bigger. */
@@ -116,6 +123,8 @@ const SIZES: [number, number][][] = [
   [[10, 6], [11, 7], [12, 7], [12, 8]],
   [[12, 8], [13, 8], [14, 9], [14, 10]],
   [[14, 9], [15, 10], [16, 10], [17, 11]],
+  [[17, 11], [18, 12], [20, 13], [22, 14]],
+  [[20, 14], [23, 15], [26, 16], [28, 18]],
 ];
 
 // Signature is a different class of property, not a slightly larger standard
@@ -126,6 +135,8 @@ const SIGNATURE_SIZES: [number, number][] = [
   [20, 13],
   [25, 17],
   [30, 20],
+  [36, 24],
+  [42, 28],
 ];
 
 function shade(hex: string, toward: string, k: number) {
@@ -157,6 +168,10 @@ export function roomOf(l: Pick<Listing, 'tier' | 'stars'> & Partial<Pick<Listing
     { wall: '#173F34', wallLow: '#0A2924', floor: '#C7B995', floor2: '#F0E6D0', trim: '#D9B965' },
     // Level 4: the flagship—deep aubergine, pale marble, and heirloom gold.
     { wall: '#241824', wallLow: '#111017', floor: '#E8E3DD', floor2: '#F7F3EB', trim: '#F0CF78' },
+    // Level 5: Luxury Maison—charcoal and midnight blue with brushed steel and glass.
+    { wall: '#181C25', wallLow: '#0A0C12', floor: '#E6E8ED', floor2: '#0F121A', trim: '#7F93A3' },
+    // Level 6: Fashion Empire House—rich obsidian, oxblood, and rose gold.
+    { wall: '#120F10', wallLow: '#090506', floor: '#F5EAEB', floor2: '#0F090A', trim: '#E0A39F' },
   ][l.tier];
   return {
     ...base,
@@ -447,6 +462,35 @@ export function cellsBlocked(items: Placed[], tier: RoomKey, except?: string): b
     const { w, d } = footprint(p);
     for (let z = p.z; z < p.z + d; z++) for (let x = p.x; x < p.x + w; x++) if (g[z] && x < r.w) g[z][x] = true;
   }
+
+  // Add hardcoded physical blocks for internal architecture of Signature levels 5 and 6
+  if (r.signature) {
+    const t = typeof tier === 'number' ? tier : tier.tier;
+    if (t === 5) {
+      // Main showroom dividing wall (arched double-doorway in center)
+      const wallZ = Math.floor(r.d * 0.5);
+      for (let x = 0; x < Math.floor(r.w * 0.35 + (r.w * 0.7) / 2 - 2); x++) if (g[wallZ] && x < r.w) g[wallZ][x] = true;
+      for (let x = Math.floor(r.w * 0.85 - (r.w * 0.3) / 2 + 2); x < r.w; x++) if (g[wallZ] && x < r.w) g[wallZ][x] = true;
+      // VIP consultation room partition
+      const vipX = Math.floor(r.w * 0.7);
+      for (let z = Math.floor(r.d * 0.75 - (r.d * 0.5) / 2); z < Math.floor(r.d * 0.75 + (r.d * 0.5) / 2); z++) {
+        if (g[z] && vipX < r.w) g[z][vipX] = true;
+      }
+    }
+    if (t === 6) {
+      // Grand showroom partition
+      const wallZ = Math.floor(r.d * 0.4);
+      for (let x = 0; x < Math.floor(r.w * 0.3 + (r.w * 0.6) / 2 - 3); x++) if (g[wallZ] && x < r.w) g[wallZ][x] = true;
+      for (let x = Math.floor(r.w * 0.8 - (r.w * 0.4) / 2 + 3); x < r.w; x++) if (g[wallZ] && x < r.w) g[wallZ][x] = true;
+      // Private VIP suite and staff office separation
+      const vipX = Math.floor(r.w * 0.6);
+      for (let z = Math.floor(r.d * 0.7 - (r.d * 0.6) / 2); z < Math.floor(r.d * 0.7 + (r.d * 0.6) / 2); z++) {
+        if (z === Math.floor(r.d * 0.7)) continue; // door gap
+        if (g[z] && vipX < r.w) g[z][vipX] = true;
+      }
+    }
+  }
+
   return g;
 }
 
@@ -549,17 +593,31 @@ export function autoPlace(items: Placed[], tier: RoomKey): Placed[] {
   return out;
 }
 
-export type MoveEquipmentPlan = 'arrange' | 'store' | 'sell';
+export type MoveEquipmentPlan = 'arrange' | 'store' | 'sell' | 'furnished';
+
+/** Generate a furnished layout based on the tier. Matches a rival's tier-appropriate generated layout. */
+export function generateFurnishedLayout(tierKey: RoomKey): Placed[] {
+  // Use a pseudo-rival with the player's tier to get a layout, avoiding circular dependency issues
+  // Normally we would just use `zonedLayout` from `layouts.ts` directly, but we can recreate a simple
+  // layout here or fetch one. Since `layouts.ts` imports from `shop.ts`, we must be careful of circularity.
+  // Actually, we'll let engine.ts handle the generation, here we just return empty if it's 'furnished'
+  // and handle the generation in engine.ts which imports both.
+  return [];
+}
 
 /** Apply the player's chosen equipment plan. Shop finishes stay with the old premises. */
-export function prepareFurnitureForMove(items: Placed[], tier: RoomKey, plan: MoveEquipmentPlan): { furniture: Placed[]; saleProceeds: number } {
+export function prepareFurnitureForMove(items: Placed[], tier: RoomKey, plan: MoveEquipmentPlan, furnishedItems?: Placed[]): { furniture: Placed[]; saleProceeds: number } {
   const equipment = items.filter((item) => furnitureById(item.id).mount !== 'finish');
   if (plan === 'sell') {
     const saleProceeds = equipment.reduce((sum, item) => sum + Math.round(furnitureById(item.id).price * 0.4), 0);
     return { furniture: [], saleProceeds };
   }
-  if (plan === 'store') {
-    return { furniture: equipment.map((item) => ({ ...item, placed: false, x: 0, z: 0 })), saleProceeds: 0 };
+  if (plan === 'store' || plan === 'furnished') {
+    const stored = equipment.map((item) => ({ ...item, placed: false, x: 0, z: 0 }));
+    if (plan === 'furnished' && furnishedItems) {
+      return { furniture: [...stored, ...furnishedItems], saleProceeds: 0 };
+    }
+    return { furniture: stored, saleProceeds: 0 };
   }
   return { furniture: autoPlace(equipment, tier), saleProceeds: 0 };
 }

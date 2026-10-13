@@ -23,6 +23,8 @@ export const TIERS: ShopTier[] = [
   { name: 'Boutique', slots: 50, rent: 330_000, moveIn: 500_000, customers: 16, mix: [0.42, 0.46, 0.12], staff: 2, running: 6_000, luxury: true, blurb: 'A bright boutique in Surulere with a big mirror wall.' },
   { name: 'Big boutique', slots: 75, rent: 600_000, moveIn: 3_000_000, customers: 21, mix: [0.32, 0.5, 0.18], staff: 4, running: 12_000, luxury: true, blurb: 'Two floors on Admiralty Way, Lekki.' },
   { name: 'Flagship', slots: 105, rent: 850_000, moveIn: 8_500_000, customers: 27, mix: [0.25, 0.5, 0.25], staff: 6, running: 25_000, luxury: true, blurb: 'The flagship store on Victoria Island. Celebrities come here.' },
+  { name: 'Luxury Maison', slots: 140, rent: 30_000_000, moveIn: 60_000_000, customers: 34, mix: [0.15, 0.45, 0.4], staff: 8, running: 120_000, luxury: true, blurb: 'A dedicated luxury maison in Ikoyi. Exclusive clients only.' },
+  { name: 'Fashion Empire House', slots: 180, rent: 75_000_000, moveIn: 150_000_000, customers: 43, mix: [0.05, 0.35, 0.6], staff: 10, running: 300_000, luxury: true, blurb: 'The crown jewel of Lagos fashion. The ultimate fashion empire house on Banana Island.' },
 ];
 
 /** The shop is open 8am–8pm: 720 game minutes, one per real second. */

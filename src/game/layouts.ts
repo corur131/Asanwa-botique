@@ -158,20 +158,44 @@ export function zonedLayout(r: Rival, listing: Listing, day: number): Placed[] {
   for (const [x, z] of corners) if (decor.length && rand() < fill) put(decor[di++ % decor.length], x, z);
   const rug = pickFrom(kit.rug);
   if (rug && tier >= 1) put(rug, Math.floor(W / 2) - 1, Math.max(1, Math.floor(D / 2) + (tier >= 2 ? 1 : 0)));
-  // a fan or standing AC and a water dispenser where they fit
-  for (const id of [tier >= 2 ? 'standingAc' : 'fan', 'waterDispenser', 'speaker']) {
-    for (let t = 0; t < 12; t++) if (put(id, Math.floor(rand() * W), 1 + Math.floor(rand() * (D - 3)))) break;
+  // Dynamic scaling for cooling and amenities based on tier
+  const coolingItems: string[] = [];
+  if (tier >= 5) {
+    coolingItems.push('standingAc', 'standingAc', 'standingAc', 'fan', 'fan');
+  } else if (tier >= 3) {
+    coolingItems.push('standingAc', 'standingAc', 'fan');
+  } else if (tier >= 2) {
+    coolingItems.push('standingAc', 'fan');
+  } else {
+    coolingItems.push('fan');
   }
 
-  // ceiling lights
+  // High-density item placement for top tiers
+  const utilityItems = [...coolingItems, 'waterDispenser', 'speaker'];
+  if (tier >= 4) utilityItems.push('speaker', 'waterDispenser'); // Extra speakers and dispensers for luxury spaces
+
+  for (const id of utilityItems) {
+    for (let t = 0; t < 15; t++) if (put(id, Math.floor(rand() * W), 1 + Math.floor(rand() * (D - 3)))) break;
+  }
+
+  // ceiling lights - significantly more density for higher tiers
   const lights = kit.lights.filter(ok);
-  const nCeil = Math.min(ceilingCapacity(listing), 2 + tier * 2);
+  const nCeil = Math.min(ceilingCapacity(listing), tier >= 5 ? 12 : tier >= 4 ? 8 : 2 + tier * 2);
   for (let i = 0; i < nCeil && lights.length; i++) put(lights[i % lights.length], 0, 0);
 
-  // yard: power by size
-  if (tier >= 1) put(tier >= 2 ? 'generator' : 'smallGen', 0, 0);
-  else put('smallGen', 0, 0);
-  for (let i = 0; i < Math.min(4, tier); i++) put('inverter', i + 1, 0);
+  // yard: power by size - scaled drastically for tier 5 and 6
+  if (tier >= 5) {
+    put('bigGen', 0, 0);
+    put('generator', 2, 0);
+  } else if (tier >= 2) {
+    put('generator', 0, 0);
+  } else if (tier >= 1) {
+    put('smallGen', 0, 0);
+  }
+
+  const inverters = tier >= 5 ? 8 : Math.min(4, tier);
+  for (let i = 0; i < inverters; i++) put('inverter', i + 1, 0);
+
   return items;
 }
 

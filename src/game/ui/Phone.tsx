@@ -63,7 +63,7 @@ export interface PhoneProps {
   cart: CartLine[];
   setCart: (f: (c: CartLine[]) => CartLine[]) => void;
   onClose: () => void;
-  onMove: (l: Listing, plan: 'arrange' | 'store' | 'sell') => void;
+  onMove: (l: Listing, plan: 'arrange' | 'store' | 'sell' | 'furnished') => void;
   staff: StaffActions;
   /** Walk into a rival's shop. */
   onVisit: (rivalId: string) => void;

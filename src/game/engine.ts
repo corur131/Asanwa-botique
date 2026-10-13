@@ -481,13 +481,16 @@ export function openShop(s0: GameState): GameState {
   }
   const arrivals = Array.from({ length: n }, () => ({ at: arrivalMinute(), c: makeCustomer(s, mix) }));
   // Premium access scales with property tier. These are the scheduled visit
-  // days within each 14-day cycle (2, 3, 4, 5, and 6 visits, respectively).
+  // days within each 14-day cycle. Tiers 5 and 6 (Luxury Maison, Fashion Empire House)
+  // have the absolute highest celebrity spawn rates.
   const celebrityDaysByTier: number[][] = [
     [2, 9],
     [1, 5, 10],
     [0, 4, 7, 11],
     [1, 4, 7, 10, 13],
-    [0, 2, 4, 7, 9, 12],
+    [0, 2, 4, 7, 9, 12], // Level 4 (Flagship)
+    [0, 2, 4, 6, 8, 10, 12], // Level 5 (Luxury Maison)
+    [0, 1, 3, 5, 7, 9, 11, 13], // Level 6 (Fashion Empire House) - 8 visits per fortnight
   ];
   const fortnightDay = (s.day - 1) % 14;
   const celebrityScheduled = (celebrityDaysByTier[s.tier] || []).includes(fortnightDay);
@@ -1412,24 +1415,39 @@ export function listingsNow(s: GameState): Listing[] {
   return listingsFor(s.tier + 1, week(s.day));
 }
 
-export function moveTo(s0: GameState, l0: Listing, equipmentPlan: 'arrange' | 'store' | 'sell' = 'arrange'): GameState {
+import { zonedLayout } from './layouts';
+
+export function moveTo(s0: GameState, l0: Listing, equipmentPlan: 'arrange' | 'store' | 'sell' | 'furnished' = 'arrange'): GameState {
   const fight = contestFor(s0, l0);
   const l = fight ? { ...l0, moveIn: l0.moveIn + fight.extra } : l0;
-  const move = prepareFurnitureForMove(s0.furniture, l, equipmentPlan);
-  if ((l.tier !== s0.tier + 1 && !(l.signature && l.tier === s0.tier && !s0.listing.signature)) || s0.cash + move.saleProceeds < l.moveIn) return s0;
+
+  let furnishedItems: Placed[] | undefined;
+  let furnishedPrice = 0;
+  if (equipmentPlan === 'furnished') {
+    // Generate a layout using the logic for rivals, matching player's new tier
+    // A temporary pseudo-rival to pass into zonedLayout
+    const tempRival = { id: 'player_furnish', tier: l.tier, speciality: 'everyday' as any };
+    furnishedItems = zonedLayout(tempRival as any, l, s0.day);
+    furnishedPrice = Math.round(l.moveIn * 0.4); // Furnished package costs 40% of move-in cost extra
+  }
+
+  const move = prepareFurnitureForMove(s0.furniture, l, equipmentPlan, furnishedItems);
+  if ((l.tier !== s0.tier + 1 && !(l.signature && l.tier === s0.tier && !s0.listing.signature)) || s0.cash + move.saleProceeds < l.moveIn + furnishedPrice) return s0;
   const s = fight ? wonListing(s0, l0) : s0;
   const tier = l.tier;
   const t = TIERS[tier];
   let next: GameState = { ...s, tier, listing: l, furniture: move.furniture, movedDay: s.day, grace: l.grace };
   // Credit sale proceeds before charging move-in so the transaction never creates a temporary payable.
   if (move.saleProceeds > 0) next = money(next, move.saleProceeds, 'Sold shop equipment during move');
-  next = money(next, -l.moveIn, `Move-in: ${l.street}`);
+  next = money(next, -(l.moveIn + furnishedPrice), `Move-in: ${l.street}${equipmentPlan === 'furnished' ? ' (with furnished package)' : ''}`);
   next = fitDisplay(next);
   const equipmentMessage = equipmentPlan === 'store'
     ? ' I have put your reusable equipment in storage; the new shop starts empty, and you can bring items out from Build mode.'
     : equipmentPlan === 'sell'
       ? ` I sold your reusable shop equipment for ${naira(move.saleProceeds)} at the usual 40% resale value. Your clothing stock and business records are still yours.`
-      : ' I arranged your equipment around the new floor plan. You can still drag pieces to different areas in Build mode.';
+      : equipmentPlan === 'furnished'
+        ? ' The shop has been professionally furnished. Your old items are safe in storage.'
+        : ' I arranged your equipment around the new floor plan. You can still drag pieces to different areas in Build mode.';
   next = msg(next, 'Deborah', `We moved! Welcome to your ${t.name} on ${l.street}, ${l.area}. Rent is ${naira(l.rent)} a week and the landlord is ${l.landlord}. The shop holds up to ${t.slots} designs.${equipmentMessage} It will be quiet for two weeks while people find us.`, 'good');
   next = reactToMove(next, !fight);
   if (t.staff && !s.staff.length) next = msg(next, 'Deborah', `You can hire staff now! Trainees are cheap and loyal; experts are good from day one but they leave for money.`, 'info');

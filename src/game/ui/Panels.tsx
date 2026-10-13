@@ -278,9 +278,9 @@ export const FurniturePanel: React.FC<{ s: GameState; a: FurnitureActions; selec
 // ---------------------------------------------------------------------------
 // Moving: four listings at the next size
 // ---------------------------------------------------------------------------
-export const MovePanel: React.FC<{ s: GameState; onMove: (l: Listing, plan: 'arrange' | 'store' | 'sell') => void }> = ({ s, onMove }) => {
+export const MovePanel: React.FC<{ s: GameState; onMove: (l: Listing, plan: 'arrange' | 'store' | 'sell' | 'furnished') => void }> = ({ s, onMove }) => {
   const [pick, setPick] = useState<Listing | null>(null);
-  const [movePlan, setMovePlan] = useState<'arrange' | 'store' | 'sell'>('arrange');
+  const [movePlan, setMovePlan] = useState<'arrange' | 'store' | 'sell' | 'furnished'>('arrange');
   const resaleValue = s.furniture.filter((p) => furnitureById(p.id).mount !== 'finish').reduce((sum, p) => sum + Math.round(furnitureById(p.id).price * 0.4), 0);
   const next = TIERS[s.tier + 1];
   const weekNo = Math.floor((s.day - 1) / 7);
@@ -354,18 +354,20 @@ export const MovePanel: React.FC<{ s: GameState; onMove: (l: Listing, plan: 'arr
               { id: 'arrange' as const, title: '1. Move in and arrange', description: 'Bring your equipment into the new shop. The game will spread it across the usable floor and walls; you can still move individual pieces in Build mode.' },
               { id: 'store' as const, title: '2. Move everything into storage', description: 'Keep all reusable equipment, but start with an empty shop. Bring items out later from the Stored tab in Build mode.' },
               { id: 'sell' as const, title: '3. Sell all equipment', description: `Sell reusable furniture and equipment at the usual 40% resale value and receive ${naira(resaleValue)}. Your clothing stock and business records remain yours.` },
+              { id: 'furnished' as const, title: '4. Ready-furnished, professionally arranged', description: `Move into a tier-appropriate, fully furnished layout (costs ${naira(Math.round(pick.moveIn * 0.4))} extra). Premium properties include high-density luxury items, extra cooling, and upgraded work materials. Your existing equipment will be safely stored.` }
             ]).map((option) => (
               <button key={option.id} type="button" onClick={() => setMovePlan(option.id)} className={`w-full rounded-xl border p-3 text-left transition-colors ${movePlan === option.id ? 'border-amber-400 bg-amber-500/10' : 'border-white/10 bg-white/5 hover:border-white/25'}`}>
                 <div className="text-sm font-semibold text-white">{option.title}</div>
                 <p className="mt-1 text-xs leading-relaxed text-slate-300">{option.description}</p>
                 {option.id === 'sell' && <div className="mt-2 text-sm font-bold text-emerald-300">Estimated payout: {naira(resaleValue)}</div>}
+                {option.id === 'furnished' && <div className="mt-2 text-sm font-bold text-amber-300">Furnishing package: {naira(Math.round(pick.moveIn * 0.4))}</div>}
               </button>
             ))}
             <p className="text-[11px] text-slate-500">Paint and flooring belong to the old premises and are not carried over or included in the sale. Equipment prices use the existing 40% resale rule.</p>
           </section>
           <div className="flex gap-2 justify-end">
             <Btn onClick={() => setPick(null)}>Not yet</Btn>
-            <Btn tone="gold" disabled={s.cash + (movePlan === 'sell' ? resaleValue : 0) < pick.moveIn + (contestFor(s, pick)?.extra || 0)} onClick={() => { onMove(pick, movePlan); setPick(null); }}>{s.cash + (movePlan === 'sell' ? resaleValue : 0) < pick.moveIn + (contestFor(s, pick)?.extra || 0) ? `Need ${Math.max(0, pick.moveIn + (contestFor(s, pick)?.extra || 0) - (movePlan === 'sell' ? resaleValue : 0))} after equipment sale` : movePlan === 'sell' ? 'Sell equipment and move' : movePlan === 'store' ? 'Store equipment and move' : 'Arrange equipment and move'}</Btn>
+            <Btn tone="gold" disabled={s.cash + (movePlan === 'sell' ? resaleValue : 0) < pick.moveIn + (contestFor(s, pick)?.extra || 0) + (movePlan === 'furnished' ? Math.round(pick.moveIn * 0.4) : 0)} onClick={() => { onMove(pick, movePlan as any); setPick(null); }}>{s.cash + (movePlan === 'sell' ? resaleValue : 0) < pick.moveIn + (contestFor(s, pick)?.extra || 0) + (movePlan === 'furnished' ? Math.round(pick.moveIn * 0.4) : 0) ? `Need ${naira(Math.max(0, pick.moveIn + (contestFor(s, pick)?.extra || 0) + (movePlan === 'furnished' ? Math.round(pick.moveIn * 0.4) : 0) - (s.cash + (movePlan === 'sell' ? resaleValue : 0))))}` : movePlan === 'sell' ? 'Sell equipment and move' : movePlan === 'store' ? 'Store equipment and move' : movePlan === 'furnished' ? 'Buy furnished package and move' : 'Arrange equipment and move'}</Btn>
           </div>
         </Modal>
       )}

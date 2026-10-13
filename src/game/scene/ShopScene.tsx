@@ -155,10 +155,10 @@ export function Room({ r, tier, painted }: { r: RoomStyle; tier: number; painted
   }, [r]);
   const door = Math.floor(r.w / 2);
   const ridges = r.kind === 'container' && !r.signature;
-  const signatureGold = tier === 0 ? '#78C8D5' : tier === 1 ? '#A8BCFF' : tier === 2 ? '#FFD54A' : tier === 3 ? '#D6B86C' : '#F0CD78';
-  const signatureAccent = tier === 0 ? '#315E67' : tier === 1 ? '#2D306E' : tier === 2 ? '#936013' : tier === 3 ? '#173D32' : '#281B2D';
-  const signatureInset = tier === 0 ? '#EAFBFD' : tier === 1 ? '#F4F6FF' : tier === 2 ? '#FFF2B2' : tier === 3 ? '#E1D4B9' : '#E9E1D6';
-  const runwayColor = tier === 0 ? '#8FCED7' : tier === 1 ? '#5B56AA' : tier === 2 ? '#E7C23D' : tier === 3 ? '#1B4A3D' : '#4B1425';
+  const signatureGold = tier === 0 ? '#78C8D5' : tier === 1 ? '#A8BCFF' : tier === 2 ? '#FFD54A' : tier === 3 ? '#D6B86C' : tier === 4 ? '#F0CD78' : tier === 5 ? '#809AA8' : '#CF827E';
+  const signatureAccent = tier === 0 ? '#315E67' : tier === 1 ? '#2D306E' : tier === 2 ? '#936013' : tier === 3 ? '#173D32' : tier === 4 ? '#281B2D' : tier === 5 ? '#0A0E14' : '#140608';
+  const signatureInset = tier === 0 ? '#EAFBFD' : tier === 1 ? '#F4F6FF' : tier === 2 ? '#FFF2B2' : tier === 3 ? '#E1D4B9' : tier === 4 ? '#E9E1D6' : tier === 5 ? '#434A59' : '#30181A';
+  const runwayColor = tier === 0 ? '#8FCED7' : tier === 1 ? '#5B56AA' : tier === 2 ? '#E7C23D' : tier === 3 ? '#1B4A3D' : tier === 4 ? '#4B1425' : tier === 5 ? '#1C2638' : '#3B1A22';
   const carpetWidth = Math.min(3.2, Math.max(2.25, r.w * 0.095));
   const portalCenter = door + 0.5;
   const portalLeft = portalCenter - carpetWidth / 2 - 0.18;
@@ -352,6 +352,41 @@ export function Room({ r, tier, painted }: { r: RoomStyle; tier: number; painted
               </mesh>
             );
           })}
+
+          {tier === 5 && (
+            <>
+              {/* Luxury Maison - connected rooms with dark steel partitions */}
+              {/* Main showroom dividing wall leaving an arched double-doorway */}
+              <B p={[r.w * 0.35, H / 2, r.d * 0.5]} s={[r.w * 0.7, H, 0.15]} c={signatureAccent} m={0.3} />
+              <B p={[r.w * 0.85, H / 2, r.d * 0.5]} s={[r.w * 0.3, H, 0.15]} c={signatureAccent} m={0.3} />
+              {/* VIP consultation room partition */}
+              <B p={[r.w * 0.7, H / 2, r.d * 0.75]} s={[0.15, H, r.d * 0.5]} c={signatureAccent} m={0.3} />
+              {/* Neon accent strips */}
+              <B p={[r.w * 0.35, H * 0.85, r.d * 0.5 + 0.08]} s={[r.w * 0.6, 0.05, 0.02]} c="#2A3B4C" e="#5C8EB8" ei={0.8} />
+              <B p={[r.w * 0.85, H * 0.85, r.d * 0.5 + 0.08]} s={[r.w * 0.2, 0.05, 0.02]} c="#2A3B4C" e="#5C8EB8" ei={0.8} />
+              <B p={[r.w * 0.7 - 0.08, H * 0.85, r.d * 0.75]} s={[0.02, 0.05, r.d * 0.4]} c="#2A3B4C" e="#5C8EB8" ei={0.8} />
+            </>
+          )}
+
+          {tier === 6 && (
+            <>
+              {/* Fashion Empire House - grandiose partitions, private suites */}
+              {/* Grand showroom partition */}
+              <B p={[r.w * 0.3, H / 2, r.d * 0.4]} s={[r.w * 0.6, H, 0.2]} c={signatureAccent} m={0.4} />
+              <B p={[r.w * 0.8, H / 2, r.d * 0.4]} s={[r.w * 0.4, H, 0.2]} c={signatureAccent} m={0.4} />
+              {/* Private VIP suite and staff office separation */}
+              <B p={[r.w * 0.6, H / 2, r.d * 0.7]} s={[0.2, H, r.d * 0.6]} c={signatureAccent} m={0.4} />
+              {/* Grand runway in the center room */}
+              <B p={[r.w * 0.5, 0.05, r.d * 0.7]} s={[2.5, 0.1, r.d * 0.5]} c="#3B1A22" e="#6B2A3B" ei={0.2} m={0.2} />
+              {/* Rose gold geometric ceiling fixtures */}
+              {Array.from({ length: 8 }, (_, i) => (
+                <mesh key={'empire-ceiling-' + i} position={[r.w * (0.2 + (i % 4) * 0.2), H - 0.15, r.d * (i < 4 ? 0.2 : 0.6)]} rotation={[Math.PI / 2, 0, Math.PI / 4]}>
+                  <torusGeometry args={[0.8, 0.03, 4, 4]} />
+                  <meshStandardMaterial color="#E0A39F" metalness={0.9} roughness={0.1} emissive="#C27A75" emissiveIntensity={0.5} />
+                </mesh>
+              ))}
+            </>
+          )}
         </>
       )}
       {ridges &&
