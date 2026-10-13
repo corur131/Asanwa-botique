@@ -16,6 +16,8 @@ import {
   type Placed,
 } from './shop';
 import { TIERS } from './economy';
+import { DIVINE_CONFIG } from '../constants/presets';
+import { fromData, newGame, moveTo } from './engine';
 
 function ownedStarterEquipment(): Placed[] {
   return STARTER_FURNITURE.map((item) => ({ ...item, uid: newUid() }));
@@ -118,4 +120,42 @@ test('ready-furnished move charges its displayed package cost and preserves owne
   assert.ok(preserved.every((item) => !item.placed), 'old equipment must be retained in storage, not deleted or sold');
   assert.ok(result.furniture.some((item) => !ownedUids.has(item.uid) && item.placed), 'the shop must contain newly purchased arranged package items');
   assert.ok(result.packageCost > 0);
+});
+
+test('a saved five-tier-era flagship still loads with cash, stock, furniture and rivals preserved', () => {
+  const fresh = newGame(DIVINE_CONFIG);
+  const oldSave = {
+    ...fresh,
+    tier: 4,
+    listing: listingsFor(4, 0).find((listing) => !listing.signature && listing.stars === 2)!,
+    cash: 18_765_432,
+    stock: fresh.stock.map((item, index) => ({ ...item, pieces: index + 3 })),
+    furniture: ownedStarterEquipment(),
+  };
+  const loaded = fromData(oldSave);
+  assert.ok(loaded, 'existing save should be accepted');
+  assert.equal(loaded.version, 5);
+  assert.equal(loaded.tier, 4);
+  assert.equal(loaded.cash, oldSave.cash);
+  assert.deepEqual(loaded.stock, oldSave.stock);
+  assert.deepEqual(loaded.furniture, oldSave.furniture);
+  assert.equal(loaded.rivals.length, oldSave.rivals.length);
+});
+
+test('moving into a ready-furnished shop charges the package once and keeps prior equipment', () => {
+  const fresh = newGame(DIVINE_CONFIG);
+  const owned = fresh.furniture.filter((item) => furnitureById(item.id).mount !== 'finish');
+  const ownedUids = new Set(owned.map((item) => item.uid));
+  const destination = listingsFor(1, 0).find((listing) => !listing.signature && listing.stars === 2)!;
+  const packagePrice = readyFurnishedCost(destination);
+  const startingCash = 20_000_000;
+  const before = { ...fresh, cash: startingCash };
+  const after = moveTo(before, destination, 'furnished');
+  assert.equal(after.tier, 1, 'move should complete');
+  assert.equal(after.cash, startingCash - destination.moveIn - packagePrice - (after.listing.moveIn - destination.moveIn));
+  const retained = after.furniture.filter((item) => ownedUids.has(item.uid));
+  assert.equal(retained.length, owned.length);
+  assert.ok(retained.every((item) => !item.placed));
+  assert.ok(after.furniture.some((item) => !ownedUids.has(item.uid) && item.placed));
+  assert.ok(after.ledger.some((line) => line.label === 'Ready-furnished shop package' && line.amount === -packagePrice));
 });
