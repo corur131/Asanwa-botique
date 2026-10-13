@@ -58,23 +58,42 @@ export function ensureBusinessState(s: GameState): GameState {
   })) };
   const businessExpansion = s.businessExpansion || initialBusinessExpansion();
   const brand = getBrandMetrics(s);
-  const rivals = (s.rivals || []).map((r) => ({
-    ...r,
-    brand: r.brand || brandFromLegacy(r.rep, r.followers || 0, r.tier || 0),
-    savings: Number.isFinite(r.savings) ? Math.max(0, r.savings || 0) : 0,
-    debt: Number.isFinite(r.debt) ? Math.max(0, r.debt || 0) : 0,
-    assetValue: Number.isFinite(r.assetValue) ? Math.max(0, r.assetValue || 0) : TIER_ASSETS[r.tier] || TIER_ASSETS[0],
-    weekCosts: Array.isArray(r.weekCosts) ? r.weekCosts.slice(-7) : Array.from({ length: Math.min(7, (r.week || []).length) }, (_, i) => {
-      const takings = (r.week || []).slice(-7)[i] || 0;
-      return Math.round(takings * 0.62 + (TIERS[r.tier]?.running || 1500));
-    }),
-  }));
+  const rivals = (s.rivals || []).map((r) => {
+    const week = (r.week || []).slice(-7);
+    const weekCosts = Array.isArray(r.weekCosts) ? r.weekCosts.slice(-7) : Array.from({ length: Math.min(7, week.length) }, (_, i) =>
+      Math.round((week[i] || 0) * 0.62 + (TIERS[r.tier]?.running || 1500)));
+    return {
+      ...r,
+      brand: r.brand || brandFromLegacy(r.rep, r.followers || 0, r.tier || 0),
+      savings: Number.isFinite(r.savings) ? Math.max(0, r.savings || 0) : 0,
+      debt: Number.isFinite(r.debt) ? Math.max(0, r.debt || 0) : 0,
+      assetValue: Number.isFinite(r.assetValue) ? Math.max(0, r.assetValue || 0) : TIER_ASSETS[r.tier] || TIER_ASSETS[0],
+      weekCosts,
+      profitHistory: Array.isArray(r.profitHistory) ? r.profitHistory.slice(-28) : week.map((takings, i) => takings - (weekCosts[i] || 0)),
+    };
+  });
+  const rivalEconomyVersion = Math.max(0, Number(s.rivalEconomyVersion) || 0);
+  // Existing saves get a one-time capital catch-up so the established rivals can compete immediately.
+  // Brand-new games are deliberately excluded from the grant.
+  if (rivalEconomyVersion < 1 && (s.day > 7 || (s.history || []).length > 0)) {
+    const targetLiquidity = [8_000_000, 18_000_000, 45_000_000, 100_000_000, 220_000_000];
+    for (const r of rivals) {
+      const target = targetLiquidity[clamp(r.tier || 0, 0, 4)];
+      const current = Math.max(0, r.cash || 0) + Math.max(0, r.savings || 0);
+      const gap = Math.max(0, target - current);
+      if (gap > 0) {
+        r.cash += Math.round(gap * 0.75);
+        r.savings = Math.max(0, r.savings || 0) + (gap - Math.round(gap * 0.75));
+      }
+    }
+  }
   const inheritedCashDeficit = Math.max(0, -(Number.isFinite(s.cash) ? s.cash : 0));
   return {
     ...s,
     cash: Math.max(0, Number.isFinite(s.cash) ? s.cash : 0),
     operatingPayables: Math.max(0, s.operatingPayables || 0) + inheritedCashDeficit,
     bank, businessExpansion, brand, rivals,
+    rivalEconomyVersion: 1,
     wealthHistory: Array.isArray(s.wealthHistory) ? s.wealthHistory : [],
     sponsorshipOffers: Array.isArray(s.sponsorshipOffers) ? s.sponsorshipOffers : [],
   };
@@ -807,6 +826,19 @@ export function totalLiabilities(s: Pick<GameState, 'bank' | 'lateRent' | 'opera
   return Math.round(loans + rentOwed + operatingPayables);
 }
 
+function sustainableWeeklyProfit(days: { income: number; costs: number }[]): number {
+  const recent = days.slice(-28);
+  if (!recent.length) return 0;
+  const total = recent.reduce((sum, day) => sum + (day.income || 0) - (day.costs || 0), 0);
+  return Math.max(0, (total / recent.length) * 7);
+}
+
+function sustainableRivalWeeklyProfit(profitHistory: number[]): number {
+  const recent = profitHistory.slice(-28);
+  if (!recent.length) return 0;
+  return Math.max(0, recent.reduce((sum, profit) => sum + profit, 0) / recent.length * 7);
+}
+
 export function netWorthPlayer(s: GameState): number {
   const inventory = (s.stock || []).reduce((sum, d) => sum + Math.max(0, d.cost) * Math.max(0, d.pieces), 0);
   const fixtures = (s.furniture || []).reduce((sum, item) => {
@@ -819,8 +851,8 @@ export function netWorthPlayer(s: GameState): number {
   const legacyDepartmentAssets = Math.max(0, expansion.departments.length - departmentOperations.length) * 650_000;
   const wholesaleInventory = Math.max(0, expansion.wholesaleOperation?.inventoryValue || 0);
   const expansionAssets = expansion.branches.reduce((sum, branch) => sum + Math.max(0, branch.assetValue), 0) + (expansion.wholesaleActive ? 4_500_000 : 0) + departmentAssets + legacyDepartmentAssets + expansion.designerCollections * EXPANSION_COSTS.designer + departmentInventory + wholesaleInventory + Math.max(0, expansion.expansionCredit || 0);
-  const weekly = playerWeekTotals(s);
-  const goodwill = Math.max(0, weekly.profit) * 5 + Math.max(0, s.followers || 0) * 5 +
+  const sustainableProfit = sustainableWeeklyProfit(s.history || []);
+  const goodwill = sustainableProfit * 3 + Math.max(0, s.followers || 0) * 5 +
     brandPower(getBrandMetrics(s), s.followers || 0, s.tier) * 100;
   return Math.round(financialAssets(s) + inventory + fixtures + expansionAssets + goodwill - totalLiabilities(s));
 }
@@ -828,10 +860,13 @@ export function netWorthPlayer(s: GameState): number {
 export function netWorthRival(r: Rival): number {
   const revenue = (r.week || []).reduce((sum, amount) => sum + amount, 0);
   const costs = (r.weekCosts || []).reduce((sum, amount) => sum + amount, 0);
-  const profit = revenue - costs;
+  const profitHistory = Array.isArray(r.profitHistory) && r.profitHistory.length
+    ? r.profitHistory
+    : (r.week || []).map((amount, index) => amount - ((r.weekCosts || [])[index] || 0));
+  const sustainableProfit = sustainableRivalWeeklyProfit(profitHistory);
   const metrics = r.brand || brandFromLegacy(r.rep, r.followers, r.tier);
   const assets = (Number.isFinite(r.assetValue) ? (r.assetValue || 0) : TIER_ASSETS[r.tier] || TIER_ASSETS[0]) + Math.max(0, r.branches || 0) * 3_500_000 + (r.wholesaleActive ? 4_500_000 : 0) + (r.departments || []).length * 650_000;
-  const goodwill = Math.max(0, profit) * 7 + Math.max(0, r.followers || 0) * 5 + brandPower(metrics, r.followers || 0, r.tier) * 100;
+  const goodwill = sustainableProfit * 3 + Math.max(0, r.followers || 0) * 5 + brandPower(metrics, r.followers || 0, r.tier) * 100;
   return Math.round(r.cash + Math.max(0, r.savings || 0) + assets + goodwill - Math.max(0, r.debt || 0));
 }
 
