@@ -4,12 +4,12 @@ import { furnitureById } from './shop';
 
 const clamp = (value: number, min: number, max: number) => Math.max(min, Math.min(max, value));
 const roundMoney = (value: number) => Math.max(0, Math.round(value));
-const TIER_ASSETS = [90_000, 300_000, 1_100_000, 4_500_000, 12_000_000];
+const TIER_ASSETS = [90_000, 300_000, 1_100_000, 4_500_000, 12_000_000, 45_000_000, 120_000_000];
 const PROMOTION_UNLOCK_TIER: Record<PromotionLevel, number> = { local: 0, citywide: 1, premium: 2, luxury: 4 };
 const PROMOTION_LEVELS: PromotionLevel[] = ['local', 'citywide', 'premium', 'luxury'];
 const PROMOTION_MIN: Record<PromotionLevel, number> = { local: 500, citywide: 2_000, premium: 7_500, luxury: 20_000 };
 const PROMOTION_MAX: Record<PromotionLevel, number> = { local: 3_000, citywide: 12_000, premium: 45_000, luxury: 150_000 };
-const TIER_BUDGET_CAP = [2_000, 8_000, 30_000, 70_000, 150_000];
+const TIER_BUDGET_CAP = [2_000, 8_000, 30_000, 70_000, 150_000, 350_000, 750_000];
 
 export function initialBusinessExpansion(): BusinessExpansionState {
   return { branches: [], departments: [], departmentOperations: [], wholesaleActive: false, wholesaleOperation: undefined, designerCollections: 0, expansionCredit: 0 };
@@ -106,7 +106,7 @@ export function availablePromotionLevels(tier: number): PromotionLevel[] {
   return PROMOTION_LEVELS.filter((level) => PROMOTION_UNLOCK_TIER[level] <= tier);
 }
 export function promotionBudgetBounds(tier: number, level: PromotionLevel): { min: number; max: number } {
-  const max = Math.max(PROMOTION_MIN[level], Math.min(PROMOTION_MAX[level], TIER_BUDGET_CAP[clamp(tier, 0, 4)]));
+  const max = Math.max(PROMOTION_MIN[level], Math.min(PROMOTION_MAX[level], TIER_BUDGET_CAP[clamp(tier, 0, TIER_BUDGET_CAP.length - 1)]));
   return { min: Math.min(PROMOTION_MIN[level], max), max };
 }
 export function promotionTrafficBoost(s: GameState): number {
@@ -324,7 +324,7 @@ export function maximumLoan(s: GameState): number {
   const activeDebt = bank.loans.reduce((sum, loan) => sum + Math.max(0, loan.balance), 0);
   // A current default blocks fresh borrowing until the player clears the defaulted loan.
   if (profile.score < 450 || bank.loans.some((loan) => loan.defaulted || (loan.missedPayments || 0) >= 3 || (loan.arrearsBalance || 0) > 0)) return 0;
-  const maxByTier = [300_000, 1_500_000, 6_000_000, 25_000_000, 75_000_000][clamp(s.tier, 0, 4)];
+  const maxByTier = [300_000, 1_500_000, 6_000_000, 25_000_000, 75_000_000, 250_000_000, 600_000_000][clamp(s.tier, 0, 6)];
   const weeklyRevenue = (s.history || []).slice(-7).reduce((sum, day) => sum + day.income, 0);
   const netWorth = Math.max(0, netWorthPlayer(s));
   const affordabilityLimit = Math.max(100_000, weeklyRevenue * 2 + Math.max(0, s.cash) * 0.25 + netWorth * 0.05);
