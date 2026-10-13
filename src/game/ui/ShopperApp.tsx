@@ -13,7 +13,8 @@ export const ShopperApp: React.FC<{
   openMarket: () => void;
 }> = ({ s, up, cart, openMarket }) => {
   const available = shopperAvailableBudget(s, cart);
-  const [mission, setMission] = useState<ShopperMission>('restock');
+  // If this save has not recorded item-level demand yet, start with variety; restocking becomes smarter as new sales are recorded.
+  const [mission, setMission] = useState<ShopperMission>(() => (s.productSales || []).length ? 'restock' : 'variety');
   const [budget, setBudget] = useState<number>(() => Math.min(500_000, available));
   const [brief, setBrief] = useState('');
   const [error, setError] = useState('');
@@ -54,6 +55,7 @@ export const ShopperApp: React.FC<{
           <div>
             <div className="font-semibold text-sm">1. Give your shopper a mission</div>
             <div className="text-[11px] text-slate-400 mt-0.5">Recommendations change with your boutique level, customer mix and recorded product sales.</div>
+            {!(s.productSales || []).length && <div className="text-[11px] text-amber-200/90 mt-1">This save has no item-by-item sales history yet. The shopper starts by adding variety and learns which products sell as new sales are recorded.</div>}
           </div>
           <div className="space-y-1.5">
             {SHOPPER_MISSIONS.map((option) => (
