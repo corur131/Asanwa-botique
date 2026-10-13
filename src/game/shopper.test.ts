@@ -314,3 +314,22 @@ test('rich-customer mission honours exact price bands for matching styles alread
     return shopperPriceBandMatches(entry, 'millionCouture', line.fabric);
   }), 'the old rich-customer spending ceiling must not filter a selected million-naira item');
 });
+
+
+test('when both exact price bands are selected, the shopper includes products from both if unlocked items exist', () => {
+  const s = game({ cash: 100_000_000, tier: 4, stock: [], marketCart: [], productSales: [] });
+  const preferences: ShopperBuyingPreference[] = [
+    { audience: 'women', category: 'dress', ranks: [], priceBands: ['veryExpensive', 'millionCouture'] },
+  ];
+  const result = prepareShopperOrder(s, 'variety', 50_000_000, '', undefined, '', preferences);
+  assert.ok(result.job, result.error);
+  const entries = result.job.items.map((line) =>
+    MARKET.find((entry) => entry.kind === line.kind && entry.id === line.itemId)!,
+  );
+  assert.ok(entries.some((entry, index) =>
+    shopperPriceBandMatches(entry, 'veryExpensive', result.job!.items[index].fabric)),
+  'the order must include a ₦500k–₦999,999 product when both bands are selected');
+  assert.ok(entries.some((entry, index) =>
+    shopperPriceBandMatches(entry, 'millionCouture', result.job!.items[index].fabric)),
+  'the order must also include a ₦1m+ product rather than filling only from the lower band');
+});
