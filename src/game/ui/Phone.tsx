@@ -3,7 +3,7 @@ import { CharacterSvg } from '../../components/renderer/renderCharacter';
 import { getDeborahConfig, MALE_CONFIG } from '../../constants/presets';
 import { naira } from '../economy';
 import * as E from '../engine';
-import { Listing } from '../shop';
+import { Listing, MoveEquipmentPlan } from '../shop';
 import { CharacterMemory, CollaborationReply, GameState, Message, Post, Rival } from '../types';
 import { MarketApp } from './MarketApp';
 import { ShopperApp } from './ShopperApp';
@@ -63,7 +63,7 @@ export interface PhoneProps {
   cart: CartLine[];
   setCart: (f: (c: CartLine[]) => CartLine[]) => void;
   onClose: () => void;
-  onMove: (l: Listing, plan: 'arrange' | 'store' | 'sell') => void;
+  onMove: (l: Listing, plan: MoveEquipmentPlan) => void;
   staff: StaffActions;
   /** Walk into a rival's shop. */
   onVisit: (rivalId: string) => void;
