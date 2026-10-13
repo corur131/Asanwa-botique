@@ -201,8 +201,9 @@ export function Room({ r, tier, painted }: { r: RoomStyle; tier: number; painted
                 ? [(start + end + 1) / 2, 0.78, partition.at + 0.5]
                 : [partition.at + 0.5, 0.78, (start + end + 1) / 2];
               const lowerSize: [number, number, number] = horizontal ? [length, 1.56, 0.12] : [0.12, 1.56, length];
-              const glassPosition: [number, number, number] = [p[0], 2.38, p[2]];
-              const glassSize: [number, number, number] = horizontal ? [Math.max(0.2, length - 0.08), 1.55, 0.065] : [0.065, 1.55, Math.max(0.2, length - 0.08)];
+              const glassHeight = Math.max(1.5, H - 1.72);
+              const glassPosition: [number, number, number] = [p[0], 1.56 + glassHeight / 2, p[2]];
+              const glassSize: [number, number, number] = horizontal ? [Math.max(0.2, length - 0.08), glassHeight, 0.065] : [0.065, glassHeight, Math.max(0.2, length - 0.08)];
               const capPosition: [number, number, number] = horizontal ? [p[0], 1.58, p[2]] : [p[0], 1.58, p[2]];
               const capSize: [number, number, number] = horizontal ? [length, 0.06, 0.16] : [0.16, 0.06, length];
               const brass = r.kind === 'empire' ? '#E4C56E' : '#C6A66D';
@@ -227,6 +228,29 @@ export function Room({ r, tier, painted }: { r: RoomStyle; tier: number; painted
       <B p={[r.w + 0.06, 0.3, r.d / 2]} s={[0.12, 0.6, r.d + 0.12]} c={r.wall} o={r.signature && tier === 0 ? 0.38 : undefined} />
       <B p={[door / 2, 0.3, r.d + 0.06]} s={[door, 0.6, 0.12]} c={r.wall} />
       <B p={[door + 1 + (r.w - door - 1) / 2, 0.3, r.d + 0.06]} s={[r.w - door - 1, 0.6, 0.12]} c={r.wall} />
+      {/* New tiers have their own visible shopfront architecture as well as bespoke interiors. */}
+      {r.kind === 'maison' && !r.signature && (
+        <>
+          <B p={[portalCenter - 1.72, H * 0.53, r.d + 0.18]} s={[0.18, H + 0.22, 0.2]} c="#C6A66D" m={0.78} r={0.2} />
+          <B p={[portalCenter + 1.72, H * 0.53, r.d + 0.18]} s={[0.18, H + 0.22, 0.2]} c="#C6A66D" m={0.78} r={0.2} />
+          <B p={[portalCenter, H + 0.08, r.d + 0.18]} s={[3.7, 0.2, 0.22]} c="#D9C8AC" r={0.28} />
+          <B p={[portalCenter, H - 0.18, r.d + 0.32]} s={[3.55, 0.06, 0.55]} c="#C6A66D" m={0.75} r={0.2} />
+          <B p={[portalCenter - 2.8, H * 0.48, r.d + 0.12]} s={[1.45, H * 0.78, 0.08]} c="#DCE8E7" m={0.12} r={0.2} o={0.38} />
+          <B p={[portalCenter + 2.8, H * 0.48, r.d + 0.12]} s={[1.45, H * 0.78, 0.08]} c="#DCE8E7" m={0.12} r={0.2} o={0.38} />
+        </>
+      )}
+      {r.kind === 'empire' && !r.signature && (
+        <>
+          <B p={[portalCenter - 2.18, H * 0.54, r.d + 0.2]} s={[0.28, H + 0.35, 0.28]} c="#6B5438" m={0.84} r={0.22} />
+          <B p={[portalCenter + 2.18, H * 0.54, r.d + 0.2]} s={[0.28, H + 0.35, 0.28]} c="#6B5438" m={0.84} r={0.22} />
+          <B p={[portalCenter, H + 0.13, r.d + 0.2]} s={[4.75, 0.3, 0.3]} c="#E4C56E" m={0.85} r={0.18} />
+          <B p={[portalCenter, H - 0.15, r.d + 0.4]} s={[4.55, 0.08, 0.72]} c="#2A2432" m={0.3} r={0.18} />
+          <B p={[portalCenter - 3.2, H * 0.5, r.d + 0.13]} s={[1.65, H * 0.82, 0.1]} c="#C1B0CC" m={0.18} r={0.16} o={0.32} />
+          <B p={[portalCenter + 3.2, H * 0.5, r.d + 0.13]} s={[1.65, H * 0.82, 0.1]} c="#C1B0CC" m={0.18} r={0.16} o={0.32} />
+          <B p={[portalCenter, H + 0.31, r.d + 0.25]} s={[5.2, 0.08, 1.0]} c="#171521" r={0.18} />
+          <B p={[portalCenter, H + 0.36, r.d + 0.25]} s={[5.25, 0.035, 0.98]} c="#E4C56E" m={0.82} />
+        </>
+      )}
       {/* trim */}
       <B p={[r.w / 2, H - 0.05, 0.01]} s={[r.w, 0.1, 0.03]} c={r.trim} m={r.signature || r.kind === 'marble' || r.kind === 'flagship' || r.kind === 'maison' || r.kind === 'empire' ? 0.8 : 0} />
       <B p={[0.01, H - 0.05, r.d / 2]} s={[0.03, 0.1, r.d]} c={r.trim} m={r.signature || r.kind === 'marble' || r.kind === 'flagship' ? 0.8 : 0} />
