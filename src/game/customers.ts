@@ -221,8 +221,9 @@ const CELEBRITY_POOLS: { name: string; male: boolean; rank: string }[][] = [
   ],
 ];
 
-export function makeCelebrityCustomer(state: GameState): Customer {
-  const tier = Math.max(0, Math.min(4, state.tier));
+export function makeCelebrityCustomer(state: GameState, celebrityTier: number): Customer {
+  // Celebrity tier is its own five-level scale; shop level only controls eligibility.
+  const tier = Math.max(0, Math.min(4, Math.floor(Number.isFinite(celebrityTier) ? celebrityTier : 0)));
   const profile = pick(CELEBRITY_POOLS[tier]);
   let base = makeCustomer(state, [0, 0, 1]);
   // The visual avatar is randomly generated, while the public figure is a fictional guest-event portrayal.
