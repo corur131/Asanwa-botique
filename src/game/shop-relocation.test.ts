@@ -98,6 +98,28 @@ test('seven tiers are defined and Levels 6–7 have dedicated architectural room
   assert.ok((empire.partitions || []).length >= 7, 'Level 7 needs a more elaborate room layout');
 });
 
+test('Signature Level 6 and 7 properties have their own architecture, palette, and floorplan', () => {
+  const signature6 = roomOf(listingsFor(5, 0).find((listing) => listing.signature)!);
+  const signature7 = roomOf(listingsFor(6, 0).find((listing) => listing.signature)!);
+  const standard6 = roomOf(listingsFor(5, 0).find((listing) => !listing.signature && listing.stars === 2)!);
+  const standard7 = roomOf(listingsFor(6, 0).find((listing) => !listing.signature && listing.stars === 2)!);
+
+  assert.equal(signature6.signatureTheme, 'botanical-atrium');
+  assert.equal(signature7.signatureTheme, 'cobalt-gallery');
+  for (const [signature, standard] of [[signature6, standard6], [signature7, standard7]] as const) {
+    assert.notEqual(signature.wall, standard.wall, 'Signature properties must not reuse the regular upper-wall colour');
+    assert.notEqual(signature.wallLow, standard.wallLow, 'Signature properties must have different lower-wall treatment');
+    assert.notEqual(signature.floor, standard.floor, 'Signature properties must have a distinct floor finish');
+    assert.notEqual(signature.trim, standard.trim, 'Signature properties must have a distinct architectural accent');
+    assert.notDeepEqual(signature.partitions, standard.partitions, 'Signature properties must not reuse the ordinary room layout');
+    assert.ok(signature.signature, 'Signature styling should remain marked on the room');
+  }
+  assert.notEqual(signature6.wall, signature7.wall, 'Level 6 and Level 7 Signature properties need different palettes');
+  assert.notEqual(signature6.floor2, signature7.floor2, 'Level 6 and Level 7 Signature properties need different floor patterns');
+  assert.ok((signature6.partitions || []).length > 0);
+  assert.ok((signature7.partitions || []).length > 0);
+});
+
 test('partition doorways keep every room in Level 6 and Level 7 connected to the entrance', () => {
   for (const tier of [5, 6]) {
     for (const listing of listingsFor(tier, 0)) {

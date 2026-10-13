@@ -104,6 +104,8 @@ export interface RoomStyle {
   partitions?: RoomPartition[];
   /** Signature properties get unique architectural details in the 3D room. */
   signature?: boolean;
+  /** Architectural identity of the premium Level 6/7 Signature homes; independent of room size/tier. */
+  signatureTheme?: 'botanical-atrium' | 'cobalt-gallery';
 }
 
 export interface RoomPartition {
@@ -174,6 +176,39 @@ function partitionLayout(tier: number, w: number, d: number): RoomPartition[] {
   return [];
 }
 
+/** Premium Signature homes use deliberately different circulation, not the same floorplan scaled up. */
+function signaturePartitionLayout(tier: number, w: number, d: number): RoomPartition[] {
+  const cell = (value: number, min: number, max: number) => Math.max(min, Math.min(max, Math.round(value)));
+  if (tier === 5) {
+    // Botanical conservatory: an open central promenade, a rear glass studio, and two garden wings.
+    const rear = cell(d * 0.31, 3, d - 6);
+    const mid = cell(d * 0.60, rear + 3, d - 3);
+    const left = cell(w * 0.30, 3, w - 5);
+    const right = cell(w * 0.70, left + 2, w - 3);
+    return [
+      { axis: 'horizontal', at: rear, start: 1, end: w - 2, openings: [cell(w * 0.22, 2, w - 3), cell(w * 0.50, 2, w - 3), cell(w * 0.78, 2, w - 3)] },
+      { axis: 'vertical', at: left, start: 1, end: rear - 1, openings: [cell(rear * 0.52, 2, rear - 2)] },
+      { axis: 'vertical', at: right, start: 1, end: rear - 1, openings: [cell(rear * 0.52, 2, rear - 2)] },
+      { axis: 'horizontal', at: mid, start: 1, end: cell(w * 0.86, 1, w - 3), openings: [cell(w * 0.40, 2, w - 3), cell(w * 0.69, 2, w - 3)] },
+    ];
+  }
+  if (tier === 6) {
+    // Cobalt gallery: a broad runway, side galleries and two shallow viewing suites.
+    const runway = cell(d * 0.43, 4, d - 4);
+    const left = cell(w * 0.25, 4, w - 6);
+    const right = cell(w * 0.75, left + 3, w - 3);
+    const rear = cell(d * 0.72, runway + 2, d - 2);
+    return [
+      { axis: 'horizontal', at: runway, start: left + 1, end: right - 1, openings: [cell(w * 0.50, left + 2, right - 2)] },
+      { axis: 'vertical', at: left, start: 2, end: rear - 1, openings: [cell(d * 0.56, 3, rear - 2)] },
+      { axis: 'vertical', at: right, start: 2, end: rear - 1, openings: [cell(d * 0.56, 3, rear - 2)] },
+      { axis: 'horizontal', at: rear, start: 1, end: left - 1, openings: [cell(left * 0.5, 2, left - 2)] },
+      { axis: 'horizontal', at: rear, start: right + 1, end: w - 2, openings: [cell((right + w) / 2, right + 2, w - 3)] },
+    ];
+  }
+  return partitionLayout(tier, w, d);
+}
+
 function shade(hex: string, toward: string, k: number) {
   const a = parseInt(hex.slice(1), 16);
   const b = parseInt(toward.slice(1), 16);
@@ -199,8 +234,8 @@ export function roomOf(l: Pick<Listing, 'tier' | 'stars'> & Partial<Pick<Listing
     { wall: '#FFF3C2', wallLow: '#B47A16', floor: '#E4BD3F', floor2: '#FFF2A9', trim: '#FFD54A' },
     { wall: '#173F34', wallLow: '#0A2924', floor: '#C7B995', floor2: '#F0E6D0', trim: '#D9B965' },
     { wall: '#241824', wallLow: '#111017', floor: '#E8E3DD', floor2: '#F7F3EB', trim: '#F0CF78' },
-    { wall: '#D8D1C6', wallLow: '#928675', floor: '#D5C8B4', floor2: '#FBF7EF', trim: '#D7B879' },
-    { wall: '#171521', wallLow: '#383042', floor: '#DCD2C1', floor2: '#F7F0E5', trim: '#E4C56E' },
+    { wall: '#123D36', wallLow: '#082A27', floor: '#D8D0B8', floor2: '#1B4D41', trim: '#D28A5F' },
+    { wall: '#F2EEE6', wallLow: '#294A80', floor: '#F2EBDC', floor2: '#405C92', trim: '#CF7052' },
   ][safeTier];
   return {
     ...base, w, d, finish,
@@ -211,7 +246,8 @@ export function roomOf(l: Pick<Listing, 'tier' | 'stars'> & Partial<Pick<Listing
     trim: l.signature ? signaturePalette.trim : base.trim,
     height: base.height + (finish - 2) * 0.1 + (l.signature ? 0.9 + safeTier * 0.18 : 0),
     signature: !!l.signature,
-    partitions: partitionLayout(safeTier, w, d),
+    signatureTheme: l.signature && safeTier === 5 ? 'botanical-atrium' : l.signature && safeTier === 6 ? 'cobalt-gallery' : undefined,
+    partitions: l.signature && safeTier >= 5 ? signaturePartitionLayout(safeTier, w, d) : partitionLayout(safeTier, w, d),
   };
 }
 

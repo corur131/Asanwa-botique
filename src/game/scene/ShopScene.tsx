@@ -143,9 +143,9 @@ function RoomFloorTiles({ r }: { r: RoomStyle }) {
   const geometry = useMemo(() => new THREE.BoxGeometry(0.98, 0.05, 0.98), []);
   const material = useMemo(() => new THREE.MeshStandardMaterial({
     color: '#FFFFFF',
-    roughness: r.signature ? 0.18 : ['marble', 'flagship', 'maison', 'empire'].includes(r.kind) ? 0.25 : 0.9,
-    metalness: r.signature ? 0.08 : ['flagship', 'maison', 'empire'].includes(r.kind) ? 0.1 : 0,
-  }), [r.signature, r.kind]);
+    roughness: r.signatureTheme === 'botanical-atrium' ? 0.42 : r.signatureTheme === 'cobalt-gallery' ? 0.22 : r.signature ? 0.18 : ['marble', 'flagship', 'maison', 'empire'].includes(r.kind) ? 0.25 : 0.9,
+    metalness: r.signatureTheme === 'botanical-atrium' ? 0.025 : r.signatureTheme === 'cobalt-gallery' ? 0.12 : r.signature ? 0.08 : ['flagship', 'maison', 'empire'].includes(r.kind) ? 0.1 : 0,
+  }), [r.signature, r.signatureTheme, r.kind]);
   useEffect(() => () => geometry.dispose(), [geometry]);
   useEffect(() => () => material.dispose(), [material]);
   useLayoutEffect(() => {
@@ -179,10 +179,10 @@ export function Room({ r, tier, painted }: { r: RoomStyle; tier: number; painted
   const H = r.height;
   const door = Math.floor(r.w / 2);
   const ridges = r.kind === 'container' && !r.signature;
-  const signatureGold = ['#78C8D5', '#A8BCFF', '#FFD54A', '#D6B86C', '#F0CD78', '#D7B879', '#E4C56E'][tier] || '#F0CD78';
-  const signatureAccent = ['#315E67', '#2D306E', '#936013', '#173D32', '#281B2D', '#6A5440', '#171521'][tier] || '#281B2D';
-  const signatureInset = ['#EAFBFD', '#F4F6FF', '#FFF2B2', '#E1D4B9', '#E9E1D6', '#FBF7EF', '#F7F0E5'][tier] || '#E9E1D6';
-  const runwayColor = ['#8FCED7', '#5B56AA', '#E7C23D', '#1B4A3D', '#4B1425', '#D5C8B4', '#31263B'][tier] || '#4B1425';
+  const signatureGold = r.signatureTheme === 'botanical-atrium' ? '#D28A5F' : r.signatureTheme === 'cobalt-gallery' ? '#CF7052' : ['#78C8D5', '#A8BCFF', '#FFD54A', '#D6B86C', '#F0CD78', '#D7B879', '#E4C56E'][tier] || '#F0CD78';
+  const signatureAccent = r.signatureTheme === 'botanical-atrium' ? '#0B2A28' : r.signatureTheme === 'cobalt-gallery' ? '#294A80' : ['#315E67', '#2D306E', '#936013', '#173D32', '#281B2D', '#6A5440', '#171521'][tier] || '#281B2D';
+  const signatureInset = r.signatureTheme === 'botanical-atrium' ? '#B8D0B8' : r.signatureTheme === 'cobalt-gallery' ? '#F8F2E8' : ['#EAFBFD', '#F4F6FF', '#FFF2B2', '#E1D4B9', '#E9E1D6', '#FBF7EF', '#F7F0E5'][tier] || '#E9E1D6';
+  const runwayColor = r.signatureTheme === 'botanical-atrium' ? '#244C40' : r.signatureTheme === 'cobalt-gallery' ? '#294A80' : ['#8FCED7', '#5B56AA', '#E7C23D', '#1B4A3D', '#4B1425', '#D5C8B4', '#31263B'][tier] || '#4B1425';
   const carpetWidth = Math.min(3.2, Math.max(2.25, r.w * 0.095));
   const portalCenter = door + 0.5;
   const portalLeft = portalCenter - carpetWidth / 2 - 0.18;
@@ -230,11 +230,11 @@ export function Room({ r, tier, painted }: { r: RoomStyle; tier: number; painted
               const glassSize: [number, number, number] = horizontal ? [Math.max(0.2, length - 0.08), glassHeight, 0.065] : [0.065, glassHeight, Math.max(0.2, length - 0.08)];
               const capPosition: [number, number, number] = horizontal ? [p[0], 1.58, p[2]] : [p[0], 1.58, p[2]];
               const capSize: [number, number, number] = horizontal ? [length, 0.06, 0.16] : [0.16, 0.06, length];
-              const brass = r.kind === 'empire' ? '#E4C56E' : '#C6A66D';
+              const brass = r.signatureTheme === 'botanical-atrium' ? '#D28A5F' : r.signatureTheme === 'cobalt-gallery' ? '#CF7052' : r.kind === 'empire' ? '#E4C56E' : '#C6A66D';
               return (
                 <React.Fragment key={'partition-run-' + runIndex}>
-                  <B p={p} s={lowerSize} c={r.kind === 'empire' ? '#292331' : '#CFC3B1'} r={0.62} />
-                  <B p={glassPosition} s={glassSize} c={r.kind === 'empire' ? '#B8A8C9' : '#DCE8E7'} r={0.22} m={0.12} o={0.34} />
+                  <B p={p} s={lowerSize} c={r.signatureTheme === 'botanical-atrium' ? '#1E4A40' : r.signatureTheme === 'cobalt-gallery' ? '#D7DFEE' : r.kind === 'empire' ? '#292331' : '#CFC3B1'} r={0.62} />
+                  <B p={glassPosition} s={glassSize} c={r.signatureTheme === 'botanical-atrium' ? '#9FD6C6' : r.signatureTheme === 'cobalt-gallery' ? '#7FA4E0' : r.kind === 'empire' ? '#B8A8C9' : '#DCE8E7'} r={0.22} m={0.12} o={0.34} />
                   <B p={capPosition} s={capSize} c={brass} m={0.78} r={0.26} />
                 </React.Fragment>
               );
@@ -413,7 +413,7 @@ export function Room({ r, tier, painted }: { r: RoomStyle; tier: number; painted
           })}
         </>
       )}
-      {r.signature && (
+      {r.signature && !r.signatureTheme && (
         <>
           {/* Grand entrance portal: the Signature shop reads as a destination from the doorway. */}
           <B p={[portalLeft, H / 2, r.d + 0.1]} s={[0.26, H + 0.08, 0.24]} c={signatureGold} m={0.82} e={signatureGold} ei={0.16} />
@@ -508,6 +508,148 @@ export function Room({ r, tier, painted }: { r: RoomStyle; tier: number; painted
           })}
         </>
       )}
+      {r.signatureTheme === 'botanical-atrium' && (
+        <>
+          {/* SIGNATURE LEVEL 6 — BOTANICAL ATRIUM
+              A conservatory rather than the regular Maison: forest-jade walls, copper frames,
+              glass bays, a planted wall, leafy corners and an open glass-roof promenade. */}
+          {Array.from({ length: 7 }, (_, i) => {
+            const x = r.w * (0.08 + i * 0.14);
+            const paneW = r.w * 0.105;
+            return (
+              <React.Fragment key={'atrium-back-bay-' + i}>
+                <B p={[x, H * 0.53, 0.035]} s={[paneW, H * 0.60, 0.035]} c="#A9DED0" r={0.22} o={0.28} />
+                <B p={[x - paneW / 2, H * 0.53, 0.08]} s={[0.09, H * 0.67, 0.09]} c="#C77E56" m={0.62} r={0.28} />
+                <B p={[x + paneW / 2, H * 0.53, 0.08]} s={[0.09, H * 0.67, 0.09]} c="#C77E56" m={0.62} r={0.28} />
+                <B p={[x, H * 0.23, 0.08]} s={[paneW, 0.08, 0.09]} c="#C77E56" m={0.62} r={0.28} />
+                <B p={[x, H * 0.83, 0.08]} s={[paneW, 0.08, 0.09]} c="#C77E56" m={0.62} r={0.28} />
+              </React.Fragment>
+            );
+          })}
+          {Array.from({ length: 5 }, (_, i) => {
+            const z = r.d * (0.12 + i * 0.18);
+            return (
+              <React.Fragment key={'atrium-side-bay-' + i}>
+                <B p={[0.035, H * 0.54, z]} s={[0.035, H * 0.58, r.d * 0.105]} c="#A9DED0" r={0.22} o={0.24} />
+                <B p={[0.09, H * 0.54, z - r.d * 0.0525]} s={[0.09, H * 0.65, 0.08]} c="#C77E56" m={0.62} r={0.28} />
+                <B p={[0.09, H * 0.54, z + r.d * 0.0525]} s={[0.09, H * 0.65, 0.08]} c="#C77E56" m={0.62} r={0.28} />
+              </React.Fragment>
+            );
+          })}
+          {/* Copper-framed living planters are built into the rear wall rather than added as shop furniture. */}
+          {[0.16, 0.38, 0.62, 0.84].map((fraction, i) => {
+            const x = r.w * fraction;
+            return (
+              <React.Fragment key={'atrium-planter-' + i}>
+                <B p={[x, 0.43, 0.32]} s={[2.9, 0.46, 0.58]} c="#77513F" r={0.64} />
+                <B p={[x, 0.68, 0.32]} s={[2.94, 0.055, 0.61]} c="#C77E56" m={0.5} r={0.32} />
+                {[0, 1, 2, 3, 4].map((leaf, j) => (
+                  <mesh key={'atrium-leaf-' + j} position={[x + (j - 2) * 0.36, 1.05 + (j % 2) * 0.15, 0.32]} rotation={[0.1, j * 0.55, (j - 2) * 0.12]}>
+                    <sphereGeometry args={[0.27, 9, 7]} />
+                    <meshStandardMaterial color={j % 2 ? '#6BA581' : '#9ABF86'} roughness={0.78} />
+                  </mesh>
+                ))}
+                <mesh position={[x, 0.91, 0.32]}>
+                  <cylinderGeometry args={[0.055, 0.08, 0.6, 8]} />
+                  <meshStandardMaterial color="#8E7250" roughness={0.8} />
+                </mesh>
+              </React.Fragment>
+            );
+          })}
+          {/* Roof glazing with slim copper ribs and warm concealed perimeter light. */}
+          {Array.from({ length: 7 }, (_, i) => (
+            <React.Fragment key={'atrium-roof-bay-' + i}>
+              <B p={[r.w / 2, H + 0.015, 0.65 + i * ((r.d - 1.3) / 7)]} s={[r.w - 0.5, 0.024, (r.d - 1.3) / 7 - 0.045]} c="#B7E4D7" r={0.22} o={0.14} />
+              <B p={[r.w / 2, H + 0.055, 0.65 + i * ((r.d - 1.3) / 7)]} s={[r.w - 0.4, 0.055, 0.055]} c="#C77E56" m={0.7} r={0.24} />
+            </React.Fragment>
+          ))}
+          {Array.from({ length: 9 }, (_, i) => (
+            <B key={'atrium-roof-rib-' + i} p={[0.6 + i * ((r.w - 1.2) / 8), H + 0.05, r.d / 2]} s={[0.055, 0.05, r.d - 0.5]} c="#C77E56" m={0.7} r={0.24} />
+          ))}
+          <B p={[r.w / 2, H - 0.16, 0.13]} s={[r.w - 1, 0.045, 0.055]} c="#F5D8A5" e="#F5D8A5" ei={0.85} r={0.35} />
+          <B p={[0.13, H - 0.16, r.d / 2]} s={[0.055, 0.045, r.d - 1]} c="#F5D8A5" e="#F5D8A5" ei={0.7} r={0.35} />
+          {/* Natural-stone island medallion and restrained copper edge lines. */}
+          <mesh position={[r.w * 0.70, 0.025, r.d * 0.58]} rotation={[-Math.PI / 2, 0, 0]}>
+            <torusGeometry args={[Math.min(2.3, r.d * 0.09), 0.045, 8, 48]} />
+            <meshStandardMaterial color="#D28A5F" metalness={0.62} roughness={0.32} />
+          </mesh>
+          <mesh position={[r.w * 0.70, 0.028, r.d * 0.58]} rotation={[-Math.PI / 2, 0, 0]}>
+            <torusGeometry args={[Math.min(1.68, r.d * 0.065), 0.025, 8, 48]} />
+            <meshStandardMaterial color="#244C40" roughness={0.38} />
+          </mesh>
+        </>
+      )}
+
+      {r.signatureTheme === 'cobalt-gallery' && (
+        <>
+          {/* SIGNATURE LEVEL 7 — COBALT GALLERY
+              Bright limestone, cobalt wainscoting, warm walnut/coral slats, sculptural frames and
+              an oversized contemporary art wall. This is intentionally unlike the dark Empire House. */}
+          {Array.from({ length: 18 }, (_, i) => {
+            const x = 0.65 + i * ((r.w - 1.3) / 17);
+            return (
+              <React.Fragment key={'cobalt-walnut-slat-' + i}>
+                <B p={[x, H * 0.58, 0.065]} s={[0.075, H * 0.64, 0.07]} c={i % 3 === 0 ? '#B86C4E' : '#765340'} r={0.62} m={0.1} />
+                <B p={[x + 0.10, H * 0.58, 0.055]} s={[0.022, H * 0.61, 0.07]} c="#F4EBDD" r={0.4} />
+              </React.Fragment>
+            );
+          })}
+          {/* Clerestory windows near the ceiling, with terracotta surrounds. */}
+          {Array.from({ length: 7 }, (_, i) => {
+            const x = r.w * (0.08 + i * 0.14);
+            const paneW = r.w * 0.105;
+            return (
+              <React.Fragment key={'cobalt-high-window-' + i}>
+                <B p={[x, H * 0.87, 0.035]} s={[paneW, 0.48, 0.035]} c="#7FA4E0" r={0.22} o={0.48} />
+                <B p={[x - paneW / 2, H * 0.87, 0.075]} s={[0.075, 0.58, 0.07]} c="#CF7052" m={0.36} />
+                <B p={[x + paneW / 2, H * 0.87, 0.075]} s={[0.075, 0.58, 0.07]} c="#CF7052" m={0.36} />
+              </React.Fragment>
+            );
+          })}
+          {/* One large abstract artwork — rust frame, warm-white ground, cobalt and coral geometry. */}
+          <B p={[r.w / 2, H * 0.54, 0.15]} s={[r.w * 0.32, H * 0.56, 0.14]} c="#CF7052" m={0.24} r={0.48} />
+          <B p={[r.w / 2, H * 0.54, 0.235]} s={[r.w * 0.305, H * 0.535, 0.055]} c="#F7F1E7" r={0.8} />
+          <B p={[r.w * 0.46, H * 0.56, 0.27]} s={[r.w * 0.12, H * 0.36, 0.025]} c="#294A80" r={0.35} rot={[0, 0, -0.38]} />
+          <B p={[r.w * 0.57, H * 0.53, 0.285]} s={[r.w * 0.085, H * 0.31, 0.03]} c="#CF7052" r={0.35} rot={[0, 0, 0.42]} />
+          <B p={[r.w * 0.51, H * 0.48, 0.30]} s={[r.w * 0.14, 0.12, 0.035]} c="#D6B76B" m={0.56} />
+          {/* Floating rectangular light frames instead of chandelier rings. */}
+          {[0.74, 0.48].map((scale, i) => {
+            const frameW = r.w * scale;
+            const frameD = r.d * (scale === 0.74 ? 0.64 : 0.42);
+            const z = r.d / 2;
+            const y = H + 0.025 + i * 0.035;
+            const color = i === 0 ? '#294A80' : '#CF7052';
+            return (
+              <React.Fragment key={'cobalt-ceiling-frame-' + i}>
+                <B p={[r.w / 2, y, z - frameD / 2]} s={[frameW, 0.055, 0.07]} c={color} m={0.6} e={color} ei={0.28} />
+                <B p={[r.w / 2, y, z + frameD / 2]} s={[frameW, 0.055, 0.07]} c={color} m={0.6} e={color} ei={0.28} />
+                <B p={[r.w / 2 - frameW / 2, y, z]} s={[0.07, 0.055, frameD]} c={color} m={0.6} e={color} ei={0.28} />
+                <B p={[r.w / 2 + frameW / 2, y, z]} s={[0.07, 0.055, frameD]} c={color} m={0.6} e={color} ei={0.28} />
+              </React.Fragment>
+            );
+          })}
+          {/* Architectural sconces cast a warm line onto the cobalt lower wall. */}
+          {Array.from({ length: 8 }, (_, i) => {
+            const x = r.w * (0.08 + i * 0.12);
+            return (
+              <React.Fragment key={'cobalt-sconce-' + i}>
+                <B p={[x, H * 0.34, 0.10]} s={[0.14, 0.62, 0.12]} c="#CF7052" m={0.4} />
+                <B p={[x, H * 0.34, 0.18]} s={[0.055, 0.42, 0.045]} c="#FFE1AC" e="#FFD79B" ei={1.0} r={0.3} />
+              </React.Fragment>
+            );
+          })}
+          {/* A blue gallery runner with terracotta edging and hand-laid geometric tile markers. */}
+          <B p={[r.w / 2, 0.018, r.d / 2]} s={[Math.max(3.2, r.w * 0.16), 0.025, r.d - 0.9]} c="#294A80" r={0.34} />
+          <B p={[r.w / 2 - r.w * 0.085, 0.034, r.d / 2]} s={[0.045, 0.02, r.d - 1.1]} c="#CF7052" m={0.36} e="#CF7052" ei={0.16} />
+          <B p={[r.w / 2 + r.w * 0.085, 0.034, r.d / 2]} s={[0.045, 0.02, r.d - 1.1]} c="#CF7052" m={0.36} e="#CF7052" ei={0.16} />
+          {Array.from({ length: 12 }, (_, i) => {
+            const x = r.w * (0.08 + (i % 6) * 0.168);
+            const z = i < 6 ? 1.0 : r.d - 1.0;
+            return <B key={'cobalt-floor-marker-' + i} p={[x, 0.015, z]} s={[0.26, 0.025, 0.26]} c={i % 2 ? '#CF7052' : '#D8BE8D'} r={0.38} />;
+          })}
+        </>
+      )}
+
       {ridges &&
         Array.from({ length: Math.floor(r.w / 0.25) }, (_, i) => <B key={`rb${i}`} p={[0.12 + i * 0.25, H / 2, 0.01]} s={[0.05, H, 0.03]} c={painted ? r.wallLow : '#4E6670'} m={0.3} r={0.6} />)}
       {ridges &&
@@ -527,7 +669,7 @@ export function Room({ r, tier, painted }: { r: RoomStyle; tier: number; painted
         </>
       )}
       {r.kind === 'flagship' && <B p={[r.w / 2, 1.6, 0.02]} s={[r.w - 0.4, 0.03, 0.01]} c={r.trim} m={0.9} e={r.trim} ei={0.3} />}
-      {r.kind === 'maison' && (
+      {r.kind === 'maison' && !r.signatureTheme && (
         <>
           {/* Maison: layered travertine and champagne-brass couture gallery. */}
           <B p={[r.w / 2, H * 0.53, 0.025]} s={[r.w * 0.62, H * 0.66, 0.055]} c="#B5A58D" r={0.48} />
@@ -539,7 +681,7 @@ export function Room({ r, tier, painted }: { r: RoomStyle; tier: number; painted
           <B p={[r.w / 2, H - 0.18, r.d * 0.52]} s={[r.w * 0.84, 0.045, 0.045]} c="#E8D9B9" m={0.68} e="#E8D9B9" ei={0.2} />
         </>
       )}
-      {r.kind === 'empire' && (
+      {r.kind === 'empire' && !r.signatureTheme && (
         <>
           {/* Empire House: dark stone, monumental bronze portal and a dramatic couture wall. */}
           <B p={[r.w / 2, H * 0.54, 0.025]} s={[r.w * 0.73, H * 0.72, 0.07]} c="#33283B" r={0.32} m={0.2} />
@@ -1174,9 +1316,9 @@ export default function ShopScene(p: SceneProps) {
   };
   return (
     <div style={{ position: 'relative', width: '100%', height: '100%', touchAction: 'none' }}>
-      <Canvas onCreated={handleCanvasCreated} shadows={r.w * r.d <= 220} dpr={[1, 1.25]} camera={{ fov: 32, position: [cx + dist * 0.75, dist * 0.95, cz + dist * 1.05], near: 0.1, far: 200 }} style={{ background: p.night ? 'linear-gradient(#0b0d1a,#1a1630)' : 'linear-gradient(#24305a,#3a4a7a)' }}>
-        <ambientLight intensity={p.night ? 0.35 : p.dark ? 0.14 : 0.6} />
-        <hemisphereLight args={['#FFF4E0', '#3A3A50', p.night ? 0.3 : p.dark ? 0.12 : 0.55]} />
+      <Canvas onCreated={handleCanvasCreated} shadows={r.w * r.d <= 220} dpr={[1, 1.25]} camera={{ fov: 32, position: [cx + dist * 0.75, dist * 0.95, cz + dist * 1.05], near: 0.1, far: 200 }} style={{ background: r.signatureTheme === 'botanical-atrium' ? 'linear-gradient(#9DCDBF,#263D35)' : r.signatureTheme === 'cobalt-gallery' ? 'linear-gradient(#C9D6ED,#37496D)' : p.night ? 'linear-gradient(#0b0d1a,#1a1630)' : 'linear-gradient(#24305a,#3a4a7a)' }}>
+        <ambientLight color={r.signatureTheme === 'botanical-atrium' ? '#D5F1E0' : r.signatureTheme === 'cobalt-gallery' ? '#DEE8FF' : '#FFFFFF'} intensity={p.night ? 0.35 : p.dark ? 0.14 : r.signatureTheme ? 0.68 : 0.6} />
+        <hemisphereLight args={[r.signatureTheme === 'botanical-atrium' ? '#E0F3DD' : r.signatureTheme === 'cobalt-gallery' ? '#E5EBFF' : '#FFF4E0', r.signatureTheme === 'botanical-atrium' ? '#23483A' : r.signatureTheme === 'cobalt-gallery' ? '#354668' : '#3A3A50', p.night ? 0.3 : p.dark ? 0.12 : r.signatureTheme ? 0.6 : 0.55]} />
         <directionalLight position={[cx + 6, 12, cz + 8]} intensity={p.night ? 0.4 : p.dark ? 0.35 : 1.2} castShadow={r.w * r.d <= 220} shadow-mapSize={[512, 512]} shadow-camera-left={-12} shadow-camera-right={12} shadow-camera-top={12} shadow-camera-bottom={-12} />
         <OrbitControls makeDefault target={[cx, 0.6, cz]} enablePan={free} enableRotate={!top} minPolarAngle={top ? 0 : free ? 0.05 : 0.45} maxPolarAngle={top ? 0.02 : free ? 1.52 : view === 'front' ? 1.45 : 1.2} minDistance={dist * 0.35} maxDistance={dist * 2} />
         <CameraRig view={view} r={r} />
@@ -1235,9 +1377,9 @@ export function RoomPreview({ tier, stars, signature }: { tier: number; stars: n
   const dist = Math.max(r.w, r.d) * 0.78 + 1.6;
   return (
     <Canvas dpr={[1, 1.25]} camera={{ fov: 32, position: [r.w / 2 + dist * 0.75, dist * 0.95, r.d / 2 + dist * 1.05], near: 0.1, far: 200 }} style={{ background: 'linear-gradient(#24305a,#3a4a7a)' }}>
-      <ambientLight intensity={0.6} />
-      <hemisphereLight args={['#FFF4E0', '#3A3A50', 0.55]} />
-      <directionalLight position={[r.w / 2 + 6, 12, r.d / 2 + 8]} intensity={1.2} />
+      <ambientLight color={r.signatureTheme === 'botanical-atrium' ? '#D5F1E0' : r.signatureTheme === 'cobalt-gallery' ? '#DEE8FF' : '#FFFFFF'} intensity={r.signatureTheme ? 0.68 : 0.6} />
+      <hemisphereLight args={[r.signatureTheme === 'botanical-atrium' ? '#E0F3DD' : r.signatureTheme === 'cobalt-gallery' ? '#E5EBFF' : '#FFF4E0', r.signatureTheme === 'botanical-atrium' ? '#23483A' : r.signatureTheme === 'cobalt-gallery' ? '#354668' : '#3A3A50', r.signatureTheme ? 0.6 : 0.55]} />
+      <directionalLight position={[r.w / 2 + 6, 12, r.d / 2 + 8]} intensity={r.signatureTheme === 'botanical-atrium' ? 1.1 : r.signatureTheme === 'cobalt-gallery' ? 1.0 : 1.2} />
       <OrbitControls target={[r.w / 2, 0.6, r.d / 2]} enablePan={false} autoRotate autoRotateSpeed={0.6} minPolarAngle={0.45} maxPolarAngle={1.2} minDistance={dist * 0.45} maxDistance={dist * 1.8} />
       <Room r={r} tier={tier} />
     </Canvas>
