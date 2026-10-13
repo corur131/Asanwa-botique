@@ -39,8 +39,7 @@ export const PATIENCE: Record<CustomerClass, number> = { poor: 150, middle: 120,
 /** Minutes a staff member takes for one customer at a level. */
 export const staffMinutes = (level: number) => Math.max(30, 90 - 6 * level);
 
-// PREVIEW TEST ONLY: start with ₦10 billion on this feature branch to test shop-tier features.
-export const START_CASH = 10_000_000_000;
+export const START_CASH = 10_000_200_000; // 10 billion added for testing
 export const MARKUP = 1.35;
 export const PIECES_PER_DESIGN = 1;
 export const DIVINE_CAPACITY = 8;
