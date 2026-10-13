@@ -109,7 +109,6 @@ export default function GameApp({ onLab, initial, storageKey, cloud, notice }: {
   const [chat, setChat] = useState<string | null>(null);
   const [profile, setProfile] = useState<string | null>(null);
   const [touring, setTouring] = useState<string | null>(null);
-  const [cart, setCart] = useState<E.CartLine[]>([]);
   const [paused, setPaused] = useState(false);
   const [timeSpeed, setTimeSpeed] = useState<2 | 5 | 10>(2);
   const [hidden, setHidden] = useState(false);
@@ -238,6 +237,12 @@ export default function GameApp({ onLab, initial, storageKey, cloud, notice }: {
   if (!s) return <NewGame onStart={(cfg) => { const g = E.newGame(cfg); seenMsg.current = g.msgSeq; setManualTarget(null); setSitting(null); setLocalAct(null); setS(g); }} onLab={onLab} />;
 
   const up = (f: (g: GameState) => GameState) => setS((g) => (g ? f(g) : g));
+  // Yaba Mart cart lives in GameState so it is saved locally and synchronised with the account.
+  const cart: E.CartLine[] = s.marketCart || [];
+  const setCart = (f: (c: E.CartLine[]) => E.CartLine[]) => setS((g) => {
+    if (!g) return g;
+    return { ...g, marketCart: f(g.marketCart || []) };
+  });
   const t = TIERS[s.tier];
   const st = E.stats(s);
   const current = E.visitor(s, s.serving)?.c;
