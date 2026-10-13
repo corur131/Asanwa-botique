@@ -18,6 +18,8 @@ import {
   takeBusinessLoan,
   transferBank,
   investInExpansion,
+  financeExpansionPurchase,
+  expansionOptions,
 } from './business';
 
 function state(overrides: Partial<GameState> = {}): GameState {
@@ -493,4 +495,69 @@ test('new branch names follow the correct sequence without skipping a number', (
     'Asanwa Boutique Branch 2',
     'Asanwa Boutique Branch 3',
   ]);
+});
+
+test('KoboBank directly finances an eligible expansion shortfall and the loan is recorded as a liability', () => {
+  const history = Array.from({ length: 7 }, (_, index) => ({
+    day: index + 1, served: 4, walkedOut: 0, lost: 0, income: 300_000, costs: 100_000,
+    tips: 0, bestScore: 80, repChange: 0, staffServed: 0, events: [],
+  }));
+  const before = state({
+    day: 14, tier: 2, cash: 700_000, history,
+    businessExpansion: { branches: [], departments: [], wholesaleActive: false, designerCollections: 0 },
+  });
+  const option = expansionOptions(before).find((item) => item.id === 'accessories');
+  assert.ok(option?.available);
+  assert.equal(option?.financeable, true);
+  const after = financeExpansionPurchase(before, 'accessories');
+  assert.equal(after.businessExpansion?.departments.includes('Accessories'), true);
+  assert.equal(after.bank?.loans.length, 1);
+  assert.equal(after.bank?.loans[0].principal, 550_000);
+  assert.equal(after.cash, 0);
+  assert.equal(after.businessExpansion?.expansionCredit || 0, 0);
+});
+
+test('department sales consume inventory, record operating performance, and do not process twice in one day', () => {
+  let before = state({
+    day: 14, tier: 2, cash: 20_000_000,
+    businessExpansion: { branches: [], departments: [], wholesaleActive: false, designerCollections: 0 },
+  });
+  before = investInExpansion(before, 'accessories');
+  const after = processExpansionAtClose(before);
+  const department = after.businessExpansion?.departmentOperations?.[0];
+  assert.ok(department);
+  assert.equal(department?.lastDay, 14);
+  assert.ok((department?.lastDayRevenue || 0) > 0);
+  assert.ok((department?.daysTrading || 0) === 1);
+  assert.ok((department?.inventoryUnits || 0) <= (department?.targetUnits || 0));
+  assert.equal(processExpansionAtClose(after), after);
+});
+
+test('wholesale operation tracks order fulfilment, inventory value, and idempotent daily closing', () => {
+  let before = state({
+    day: 14, tier: 3, cash: 30_000_000,
+    businessExpansion: { branches: [], departments: [], wholesaleActive: false, designerCollections: 0 },
+  });
+  before = investInExpansion(before, 'wholesale');
+  const after = processExpansionAtClose(before);
+  const wholesale = after.businessExpansion?.wholesaleOperation;
+  assert.ok(wholesale);
+  assert.equal(wholesale?.lastDay, 14);
+  assert.ok((wholesale?.lastDayRevenue || 0) > 0);
+  assert.ok((wholesale?.ordersFulfilled || 0) >= 1);
+  assert.ok((wholesale?.inventoryValue || 0) >= 0);
+  assert.equal(processExpansionAtClose(after), after);
+});
+
+test('expansion credit is applied once and cannot make an investment exceed available funding', () => {
+  const before = state({
+    day: 14, tier: 2, cash: 1_000_000,
+    businessExpansion: { branches: [], departments: [], wholesaleActive: false, designerCollections: 0, expansionCredit: 400_000 },
+  });
+  const option = expansionOptions(before).find((item) => item.id === 'accessories');
+  assert.equal(option?.cashRequired, 850_000);
+  const after = investInExpansion(before, 'accessories');
+  assert.equal(after.businessExpansion?.departments.includes('Accessories'), true);
+  assert.equal(after.businessExpansion?.expansionCredit, 0);
+  assert.equal(after.cash, 150_000);
 });
