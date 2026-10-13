@@ -73,6 +73,7 @@ const timeText = (s: GameState) => (s.phase === 'shop' ? E.clockText(s.clock) : 
 
 export const Phone: React.FC<PhoneProps> = (p) => {
   const { s, app, setApp } = p;
+  const [marketStartView, setMarketStartView] = useState<'list' | 'cart'>('list');
   const unread = E.unreadCount(s);
   const back = () => {
     if (app === 'chats' && p.chat) p.setChat(null);
@@ -96,9 +97,9 @@ export const Phone: React.FC<PhoneProps> = (p) => {
           </span>
         </div>
         <div className="flex-1 min-h-0 flex flex-col bg-[#111]">
-          {app === 'home' && <Home s={s} unread={unread} open={setApp} />}
+          {app === 'home' && <Home s={s} unread={unread} open={(target) => { if (target === 'market') setMarketStartView('list'); setApp(target); }} />}
           {app === 'chats' && <Chats {...p} />}
-          {app === 'market' && <MarketApp s={s} cart={p.cart} setCart={p.setCart} onPay={() => {
+          {app === 'market' && <MarketApp key={marketStartView} initialView={marketStartView} s={s} cart={p.cart} setCart={p.setCart} onPay={() => {
             const before = s;
             const after = E.buyCart(before, p.cart);
             if (after === before) return false;
@@ -106,7 +107,7 @@ export const Phone: React.FC<PhoneProps> = (p) => {
             p.setCart(() => []);
             return true;
           }} onBuyDrop={(n) => p.up((g) => E.buyDrop(g, n))} />}
-          {app === 'shopper' && <ShopperApp s={s} up={p.up} cart={p.cart} openMarket={() => setApp('market')} />}
+          {app === 'shopper' && <ShopperApp s={s} up={p.up} cart={p.cart} openMarket={() => { setMarketStartView('cart'); setApp('market'); }} />}
           {app === 'bank' && <Bank s={s} up={p.up} />}
           {app === 'forbes' && <Forbes s={s} />}
           {app === 'promotion' && <PromotionApp s={s} up={p.up} />}
@@ -133,7 +134,7 @@ export const Phone: React.FC<PhoneProps> = (p) => {
         {/* home bar */}
         <div className="flex items-center justify-around bg-black py-2 shrink-0 text-white/80 text-sm">
           <button className="px-4 py-1 hover:text-white" onClick={back} aria-label="Back">‹ Back</button>
-          <button className="w-28 h-1.5 rounded-full bg-white/80 hover:bg-white" onClick={() => { p.setChat(null); setApp('home'); }} aria-label="Home" />
+          <button className="w-28 h-1.5 rounded-full bg-white/80 hover:bg-white" onClick={() => { p.setChat(null); setMarketStartView('list'); setApp('home'); }} aria-label="Home" />
           <button className="px-4 py-1 hover:text-white" onClick={p.onClose}>Close</button>
         </div>
       </div>
