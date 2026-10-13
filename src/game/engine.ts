@@ -158,7 +158,13 @@ function makePoliticianContractOffer(s: GameState): PoliticianContract | null {
       entry,
       unitCost: pieceCost(entry, isClothing(entry.kind) ? entry.fabric || 'plain' : undefined),
     }))
-    .filter((row) => row.unitCost > 0 && row.unitCost * MARKUP <= rule.retailCeiling)
+    .filter((row) => {
+      if (row.unitCost <= 0 || row.unitCost * MARKUP > rule.retailCeiling) return false;
+      const held = (s.stock || []).filter((design) => design.kind === row.entry.kind && design.itemId === row.entry.id)
+        .reduce((sum, design) => sum + Math.max(0, design.pieces), 0);
+      // Keep contracts meaningful even for a new kiosk: offers require at least a little new sourcing.
+      return held < rule.minQty;
+    })
     .sort((a, b) => a.unitCost - b.unitCost || a.entry.label.localeCompare(b.entry.label));
   if (!eligible.length) return null;
 
