@@ -760,6 +760,7 @@ const Bank: React.FC<{ s: GameState; up: PhoneProps['up'] }> = ({ s, up }) => {
   const [tab, setTab] = useState<'overview' | 'transfer' | 'savings' | 'loans' | 'activity'>('overview');
   const [activityFilter, setActivityFilter] = useState<'all' | 'in' | 'out'>('all');
   const [transferAmount, setTransferAmount] = useState('25000');
+  const [rentPaymentAmount, setRentPaymentAmount] = useState(String(Math.max(0, s.listing.rent - (s.rentPrepaid || 0)) + (s.lateRent?.amount || 0)));
   const [loanAmount, setLoanAmount] = useState('100000');
   const [loanTerm, setLoanTerm] = useState(8);
   const [repaymentAmounts, setRepaymentAmounts] = useState<Record<string, string>>({});
@@ -771,6 +772,8 @@ const Bank: React.FC<{ s: GameState; up: PhoneProps['up'] }> = ({ s, up }) => {
   const weekOut = lines.filter(l => l.category !== 'transfer' && E.week(l.day) === E.week(s.day) && l.amount < 0).reduce((a, l) => a + l.amount, 0);
   const dueDays = E.daysToRent(s.day);
   const amount = (v: string) => Math.max(0, Math.round(Number(v) || 0));
+  const rentPayment = amount(rentPaymentAmount);
+  const maximumRentPayment = Math.max(0, (s.lateRent?.amount || 0) + Math.max(0, Math.round(s.listing.rent) - Math.max(0, s.rentPrepaid || 0)));
   const reserved = Math.max(0, bank.savings) + Math.max(0, bank.rentVault);
   const goalProgress = bank.savingsGoalAmount > 0 ? Math.min(100, Math.round(reserved / bank.savingsGoalAmount * 100)) : 100;
   const filteredLines = lines.slice(0, 500).filter(l => activityFilter === 'all' || (activityFilter === 'in' ? l.amount > 0 : l.amount < 0));
@@ -832,10 +835,28 @@ const Bank: React.FC<{ s: GameState; up: PhoneProps['up'] }> = ({ s, up }) => {
         <div className={'rounded-2xl border p-3 ' + (s.lateRent ? 'border-rose-500/30 bg-rose-950/30' : 'border-amber-300/15 bg-[#1b2016]')}>
           <div className="flex items-start gap-3">
             <div className={'w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ' + (s.lateRent ? 'bg-rose-500/15 text-rose-200' : 'bg-amber-400/10 text-amber-200')}>{s.lateRent ? '!' : '⌂'}</div>
-            <div className="min-w-0 flex-1"><div className="text-sm font-semibold text-white">{s.lateRent ? 'Rent payment needs attention' : 'Upcoming rent'}</div><div className="mt-1 text-xs leading-relaxed text-slate-300">{s.lateRent ? 'You owe ' + moneyText(s.lateRent.amount) + '. Clear the balance by the end of Day ' + s.lateRent.due + '.' : moneyText(s.listing.rent) + ' due ' + (dueDays === 0 ? 'tonight' : 'in ' + dueDays + ' days') + ' to ' + s.listing.landlord + '. Rent Vault is used first.'}</div></div>
+            <div className="min-w-0 flex-1"><div className="text-sm font-semibold text-white">{s.lateRent ? 'Rent payment needs attention' : 'Upcoming rent'}</div><div className="mt-1 text-xs leading-relaxed text-slate-300">{s.lateRent ? 'You owe ' + moneyText(s.lateRent.amount) + '. Clear the balance by the end of Day ' + s.lateRent.due + '.' : moneyText(s.listing.rent) + ' due ' + (dueDays === 0 ? 'tonight' : 'in ' + dueDays + ' days') + ' to ' + s.listing.landlord + '. Advance rent credit is applied first, then Rent Vault and current cash.' + ((s.rentPrepaid || 0) > 0 ? ' Advance rent already paid: ' + moneyText(s.rentPrepaid || 0) + '.' : '')}</div></div>
             <button onClick={() => setTab('savings')} className="shrink-0 rounded-lg bg-white/[0.06] px-2.5 py-1.5 text-[11px] font-semibold text-emerald-200">Manage</button>
           </div>
         </div>
+
+        <section className={sectionClass}>
+          <div>
+            <h3 className={headingClass}>Pay landlord now</h3>
+            <p className="mt-1 text-xs leading-relaxed text-slate-400">Pay directly from your current account before rent is due. Any advance payment is credited to your next rent bill, so you will not be charged for it twice.</p>
+          </div>
+          <label className="block text-xs text-slate-400">Amount to pay (₦)
+            <input aria-label="Amount to pay landlord" type="number" min="1" step="500" max={Math.min(Math.max(0, s.cash), maximumRentPayment)} value={rentPaymentAmount} onChange={e => setRentPaymentAmount(e.target.value)} className={inputClass} />
+          </label>
+          <button onClick={() => up(g => E.payRentEarly(g, rentPayment))} disabled={rentPayment <= 0 || rentPayment > s.cash || rentPayment > maximumRentPayment} className="w-full rounded-xl bg-emerald-700 py-3 text-sm font-semibold text-white disabled:opacity-35">
+            Pay landlord now · {moneyText(rentPayment)}
+          </button>
+          <div className="flex flex-wrap justify-between gap-2 text-[11px] text-slate-400">
+            <span>Available cash: {moneyText(s.cash)}</span>
+            <span>Rent already prepaid: {moneyText(Math.max(0, s.rentPrepaid || 0))}</span>
+          </div>
+          {s.lateRent && <p className="text-[11px] text-amber-200">Your payment clears overdue rent first. Any amount left is credited toward upcoming rent.</p>}
+        </section>
 
         <div className="grid grid-cols-4 gap-2">
           {([

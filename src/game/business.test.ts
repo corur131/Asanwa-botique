@@ -4,7 +4,7 @@ import type { Customer, GameState, Message } from './types';
 import { initRivals, simulateRivals } from './rivals';
 import { judge } from './encounters';
 import { answerInvite } from './encounters';
-import { money, payRent, settleLateRent, demote, closeShop, cashFlowSummary } from './engine';
+import { money, payRent, payRentEarly, settleLateRent, demote, closeShop, cashFlowSummary } from './engine';
 import {
   financialAssets,
   creditHistoryReport,
@@ -427,6 +427,88 @@ test('short rent becomes one visible liability and later partial settlement redu
   assert.equal(partiallySettled.lateRent!.amount, 3_000);
   assert.equal(totalLiabilities(partiallySettled), 3_000);
   assert.equal(partiallySettled.today.costs, 10_000, 'clearing arrears must not charge the original rent again');
+});
+
+test('paying the landlord early credits the next rent bill without a second cash charge', () => {
+  const before = state({
+    day: 5,
+    cash: 120_000,
+    listing: { rent: 100_000, landlord: 'Test Landlord' } as GameState['listing'],
+    lateRent: null,
+    rentPrepaid: 0,
+    bank: { ...initialBankState(), savings: 0, rentVault: 15_000, fixedDeposits: [], loans: [] },
+    today: { day: 5, served: 0, walkedOut: 0, lost: 0, income: 0, costs: 0, tips: 0, bestScore: 0, repChange: 0, staffServed: 0, events: [] },
+  });
+  const paidEarly = payRentEarly(before, 100_000);
+  assert.equal(paidEarly.cash, 20_000);
+  assert.equal(paidEarly.rentPrepaid, 100_000);
+  assert.equal(paidEarly.today.costs, 100_000);
+  assert.equal(paidEarly.ledger?.[0]?.label, 'Advance rent paid to Test Landlord');
+
+  const dueDay = {
+    ...paidEarly,
+    day: 7,
+    today: { ...paidEarly.today, day: 7, costs: 0, events: [] },
+  };
+  const due = payRent(dueDay);
+  assert.equal(due.cash, 20_000, 'rent already paid early must not be charged from cash again');
+  assert.equal(due.bank!.rentVault, 15_000, 'Rent Vault is not touched when advance credit covers the bill');
+  assert.equal(due.rentPrepaid, 0);
+  assert.equal(due.lateRent, null);
+  assert.equal(due.today.costs, 0, 'the same rent expense must not be counted twice');
+});
+
+test('partial early rent payment is deducted from the scheduled bill before Rent Vault and cash', () => {
+  const before = state({
+    day: 5,
+    cash: 200_000,
+    listing: { rent: 100_000, landlord: 'Test Landlord' } as GameState['listing'],
+    lateRent: null,
+    bank: { ...initialBankState(), savings: 0, rentVault: 20_000, fixedDeposits: [], loans: [] },
+    today: { day: 5, served: 0, walkedOut: 0, lost: 0, income: 0, costs: 0, tips: 0, bestScore: 0, repChange: 0, staffServed: 0, events: [] },
+  });
+  const paidEarly = payRentEarly(before, 40_000);
+  assert.equal(paidEarly.cash, 160_000);
+  assert.equal(paidEarly.rentPrepaid, 40_000);
+  assert.equal(paidEarly.today.costs, 40_000);
+
+  const due = payRent({
+    ...paidEarly,
+    day: 7,
+    today: { ...paidEarly.today, day: 7, costs: 0, events: [] },
+  });
+  assert.equal(due.rentPrepaid, 0);
+  assert.equal(due.bank!.rentVault, 0);
+  assert.equal(due.cash, 120_000);
+  assert.equal(due.today.costs, 60_000);
+  assert.equal(due.ledger!.filter(line => /rent/i.test(line.label)).reduce((sum, line) => sum + line.amount, 0), -100_000);
+});
+
+test('direct landlord payment clears overdue rent first and credits only the extra amount as advance rent', () => {
+  const before = state({
+    day: 10,
+    cash: 80_000,
+    listing: { rent: 100_000, landlord: 'Test Landlord' } as GameState['listing'],
+    lateRent: { amount: 20_000, due: 12 },
+    rentPrepaid: 0,
+    today: { day: 10, served: 0, walkedOut: 0, lost: 0, income: 0, costs: 7_000, tips: 0, bestScore: 0, repChange: 0, staffServed: 0, events: [] },
+  });
+  const paid = payRentEarly(before, 50_000);
+  assert.equal(paid.cash, 30_000);
+  assert.equal(paid.lateRent, null);
+  assert.equal(paid.rentPrepaid, 30_000);
+  assert.equal(paid.today.costs, 37_000, 'only the advance portion is a new cost today');
+});
+
+test('direct landlord payment refuses a payment larger than cash or the rent balance', () => {
+  const before = state({
+    cash: 20_000,
+    listing: { rent: 100_000, landlord: 'Test Landlord' } as GameState['listing'],
+    lateRent: null,
+    rentPrepaid: 10_000,
+  });
+  assert.equal(payRentEarly(before, 25_000), before);
+  assert.equal(payRentEarly(before, 95_000), before, 'cannot prepay more than the remaining rent balance');
 });
 
 test('net worth falls by the value of newly recorded rent arrears', () => {
