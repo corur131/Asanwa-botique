@@ -325,7 +325,7 @@ const rivalProfile = (r: Rival, s: GameState) => {
       : r.aggression >= 0.4
         ? 'competitive and capable of a sharp response, but not automatically looking for a fight.'
         : 'usually measured and professional; competes more through the business than personal attacks.'),
-    'Current position: ' + (TIERS[r.tier]?.name || 'fashion') + ' tier, Brand Power ' + E.brandPower(r.brand || E.getBrandMetrics(s), r.followers, r.tier).toLocaleString('en-NG') + ', awareness ' + Math.round(r.brand?.awareness || 0) + ', ' + r.followers.toLocaleString('en-NG') + ' followers.',
+    'Current position: ' + (TIERS[r.tier]?.name || 'fashion') + ' tier, Brand Power ' + E.brandPower(r.brand || E.getBrandMetrics(s), r.followers, r.tier).toLocaleString('en-NG') + ', awareness ' + Math.round(r.brand?.awareness || 0) + ', ' + Math.max(0, Number(r.followers) || 0).toLocaleString('en-NG') + ' followers.',
     'Available business cash for feasibility checks only: ' + naira(Math.max(0, r.cash)) + '. Do not mention this figure unless discussing a collaboration budget.',
     rankContext,
     r.main
@@ -753,7 +753,7 @@ const BusinessExpansionApp: React.FC<{ s: GameState; up: PhoneProps['up'] }> = (
           </div>;
         })}</section>}
         {expansion.departments.length > 0 && <section className="rounded-xl border border-white/10 p-3 space-y-2"><h3 className="text-white font-semibold">Department performance & inventory</h3>{(expansion.departmentOperations || []).map(department => { const profit = (department.cumulativeRevenue || 0) - (department.cumulativeCosts || 0); return <div key={department.name} className="rounded-lg bg-white/5 p-3"><div className="font-semibold text-white text-sm">{department.name}</div><div className="grid grid-cols-2 gap-2 mt-2"><div className="rounded bg-black/15 p-2"><div className="text-[10px] text-slate-400">Stock on hand</div><div className="text-xs text-white">{department.inventoryUnits} / {department.targetUnits} units</div><div className="text-[10px] text-slate-500">Inventory value {naira(department.inventoryValue)}</div></div><div className="rounded bg-black/15 p-2"><div className="text-[10px] text-slate-400">Latest day profit/loss</div><div className={'text-xs font-semibold ' + ((department.lastDayProfit || 0) >= 0 ? 'text-emerald-300' : 'text-rose-300')}>{naira(department.lastDayProfit || 0)}</div><div className="text-[10px] text-slate-500">Latest sales {naira(department.lastDayRevenue || 0)}</div></div><div className="rounded bg-black/15 p-2"><div className="text-[10px] text-slate-400">Lifetime sales</div><div className="text-xs text-white">{naira(department.cumulativeRevenue)}</div></div><div className="rounded bg-black/15 p-2"><div className="text-[10px] text-slate-400">Lifetime operating result</div><div className={'text-xs font-semibold ' + (profit >= 0 ? 'text-emerald-300' : 'text-rose-300')}>{naira(profit)}</div></div></div><div className="text-[10px] text-slate-500 mt-2">{department.daysTrading} trading days · unit cost {naira(department.unitCost)} · selling price {naira(department.unitPrice)}</div></div>; })}</section>}
-        {expansion.wholesaleActive && <section className="rounded-xl border border-indigo-400/20 bg-indigo-500/5 p-3 space-y-2"><h3 className="text-white font-semibold">Wholesale inventory upgrades</h3><p className="text-xs text-slate-400">Each upgrade doubles stock capacity and buys the added inventory. More stock lets you fulfil larger orders, but sales still depend on demand.</p>{(() => { const q = E.wholesaleUpgradeQuote(s); return <><div className="flex items-center justify-between text-xs"><span className="text-slate-400">Upgrade level</span><span className="text-white font-semibold">{q.level} / 3</span></div><div className="flex items-center justify-between text-xs"><span className="text-slate-400">Next stock capacity</span><span className="text-white font-semibold">{q.nextCapacity.toLocaleString('en-NG')} units</span></div>{q.available ? <button disabled={s.cash < q.cost} onClick={() => up(g => E.upgradeWholesaleInventory(g))} className="w-full rounded-lg bg-indigo-700 disabled:opacity-40 py-2 text-sm font-semibold text-white">Upgrade + stock · {naira(q.cost)}</button> : <div className="text-xs text-slate-500">{q.level >= 3 ? 'Maximum warehouse upgrade reached.' : 'Invest in wholesale first to unlock upgrades.'}</div>}</>; })()}</section>}
+        {expansion.wholesaleActive && <section className="rounded-xl border border-indigo-400/20 bg-indigo-500/5 p-3 space-y-2"><h3 className="text-white font-semibold">Wholesale inventory upgrades</h3><p className="text-xs text-slate-400">Each upgrade doubles stock capacity and buys the added inventory. More stock lets you fulfil larger orders, but sales still depend on demand.</p>{(() => { const q = E.wholesaleUpgradeQuote(s); return <><div className="flex items-center justify-between text-xs"><span className="text-slate-400">Upgrade level</span><span className="text-white font-semibold">{q.level} / 3</span></div><div className="flex items-center justify-between text-xs"><span className="text-slate-400">Next stock capacity</span><span className="text-white font-semibold">{Math.max(0, Number(q.nextCapacity) || 0).toLocaleString('en-NG')} units</span></div>{q.available ? <button disabled={s.cash < q.cost} onClick={() => up(g => E.upgradeWholesaleInventory(g))} className="w-full rounded-lg bg-indigo-700 disabled:opacity-40 py-2 text-sm font-semibold text-white">Upgrade + stock · {naira(q.cost)}</button> : <div className="text-xs text-slate-500">{q.level >= 3 ? 'Maximum warehouse upgrade reached.' : 'Invest in wholesale first to unlock upgrades.'}</div>}</>; })()}</section>}
         {expansion.wholesaleActive && <section className="rounded-xl border border-white/10 p-3 space-y-2"><h3 className="text-white font-semibold">Wholesale order book</h3>{(() => { const w = expansion.wholesaleOperation; if (!w) return <p className="text-xs text-slate-400">Wholesale inventory initializes at the next closing cycle.</p>; const profit = w.cumulativeRevenue - w.cumulativeCosts; return <><div className="grid grid-cols-2 gap-2"><div className="rounded-lg bg-white/5 p-2"><div className="text-[10px] text-slate-400">Inventory</div><div className="text-sm font-bold text-white">{w.inventoryUnits} / {w.targetUnits} units</div><div className="text-[10px] text-slate-500">{naira(w.inventoryValue)} at cost</div></div><div className="rounded-lg bg-white/5 p-2"><div className="text-[10px] text-slate-400">Latest day profit/loss</div><div className={'text-sm font-bold ' + ((w.lastDayProfit || 0) >= 0 ? 'text-emerald-300' : 'text-rose-300')}>{naira(w.lastDayProfit || 0)}</div><div className="text-[10px] text-slate-500">Sales {naira(w.lastDayRevenue || 0)}</div></div><div className="rounded-lg bg-white/5 p-2"><div className="text-[10px] text-slate-400">Orders fulfilled</div><div className="text-sm font-bold text-white">{w.ordersFulfilled}</div></div><div className="rounded-lg bg-white/5 p-2"><div className="text-[10px] text-slate-400">Orders with stock-outs</div><div className="text-sm font-bold text-white">{w.ordersMissed}</div></div></div><div className="text-[11px] text-slate-400">Lifetime sales {naira(w.cumulativeRevenue)} · lifetime operating result <span className={profit >= 0 ? 'text-emerald-300' : 'text-rose-300'}>{naira(profit)}</span></div></>; })()}</section>}
         <section className="space-y-2"><h3 className="text-white font-semibold px-1">Invest in your next stage</h3>
           {options.map(option => <div key={option.id} className="rounded-xl border border-white/10 p-3 space-y-2">
@@ -1042,7 +1042,7 @@ const PostCard: React.FC<{ p: Post }> = ({ p }) => {
       </div>
       <div className="px-3 pt-2 text-sm text-white">
         <div className="flex gap-4 text-lg mb-1"><span>♥</span><span>💬</span><span>➤</span></div>
-        <div className="font-semibold">{p.likes.toLocaleString('en-NG')} likes</div>
+        <div className="font-semibold">{Math.max(0, Number(p.likes) || 0).toLocaleString('en-NG')} likes</div>
         <div><b>divine.styles</b> {p.caption} <span className="text-sky-300">@{p.name.toLowerCase()}</span></div>
         {comments.map((c, i) => <div key={i} className="text-[13px] text-slate-300"><b className="text-white">{c.who}</b> {c.text}</div>)}
         <div className="text-[11px] text-emerald-300 mt-1">+{p.gained} new followers from this post</div>
@@ -1069,7 +1069,7 @@ const Gidigram: React.FC<{ s: GameState; profile: string | null; setProfile: (id
                 <span className="block text-sm text-white font-semibold truncate">{r.handle} {r.main && <span className="text-[10px] text-pink-300">● rival</span>}</span>
                 <span className="block text-[11px] text-slate-400 truncate">{r.shop} · {r.area}</span>
               </span>
-              <span className="text-[11px] text-slate-300 shrink-0">{r.followers.toLocaleString('en-NG')}</span>
+              <span className="text-[11px] text-slate-300 shrink-0">{Math.max(0, Number(r.followers) || 0).toLocaleString('en-NG')}</span>
             </button>
           ))}
         </div>
@@ -1129,7 +1129,7 @@ const RivalPage: React.FC<{ s: GameState; r: Rival; back: () => void; onVisit: (
           <span className="w-16 h-16 rounded-full overflow-hidden bg-[#2a1f2e] ring-2 ring-pink-500 shrink-0"><CharacterSvg config={r.look} idPrefix={`rp-${r.id}`} camera="portrait" /></span>
           <div className="grid grid-cols-3 flex-1 text-center text-white">
             <div><div className="font-bold">{posts.length + 30}</div><div className="text-[11px] text-slate-400">posts</div></div>
-            <div><div className="font-bold">{r.followers.toLocaleString('en-NG')}</div><div className="text-[11px] text-slate-400">followers</div></div>
+            <div><div className="font-bold">{Math.max(0, Number(r.followers) || 0).toLocaleString('en-NG')}</div><div className="text-[11px] text-slate-400">followers</div></div>
             <div><div className="font-bold">#{rank}</div><div className="text-[11px] text-slate-400">Top 20</div></div>
           </div>
         </div>
@@ -1146,7 +1146,7 @@ const RivalPage: React.FC<{ s: GameState; r: Rival; back: () => void; onVisit: (
             <div key={p.id} className="border-b border-white/10 pb-3">
               <div className="aspect-[4/5] bg-gradient-to-b from-[#2a1f2e] to-[#141018] overflow-hidden"><CharacterSvg config={p.look} idPrefix={`rpp-${p.id}`} camera="full" /></div>
               <div className="px-3 pt-2 text-sm text-white">
-                <div className="font-semibold">{p.likes.toLocaleString('en-NG')} likes</div>
+                <div className="font-semibold">{Math.max(0, Number(p.likes) || 0).toLocaleString('en-NG')} likes</div>
                 <div><b>{r.handle}</b> {p.caption}</div>
                 {p.shade && <div className="text-[11px] text-rose-300 mt-0.5">Everyone in the comments thinks this is about you 👀</div>}
                 <div className="text-[10px] text-slate-500">Day {p.day}</div>
@@ -1179,7 +1179,7 @@ const Top20: React.FC<{ s: GameState; open: (id: string) => void }> = ({ s, open
                 <span className="block text-sm text-white font-semibold truncate">{r.name}{r.you ? ' (you)' : ''}{r.main ? ' ●' : ''}</span>
                 <span className="block text-[11px] text-slate-400 truncate">{r.owner} · {TIERS[r.tier].name}, {r.area}</span>
               </span>
-              <span className="text-[11px] text-slate-400 shrink-0">Power {r.brandPower.toLocaleString("en-NG")}</span>
+              <span className="text-[11px] text-slate-400 shrink-0">Power {Math.max(0, Number(r.brandPower) || 0).toLocaleString("en-NG")}</span>
             </button>
           );
         })}
