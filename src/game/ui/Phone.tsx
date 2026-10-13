@@ -6,16 +6,18 @@ import * as E from '../engine';
 import { Listing } from '../shop';
 import { CharacterMemory, CollaborationReply, GameState, Message, Post, Rival } from '../types';
 import { MarketApp } from './MarketApp';
+import { ShopperApp } from './ShopperApp';
 import { MovePanel, StaffActions, StaffPanel } from './Panels';
 import type { CartLine } from '../engine';
 import { GROUP, ladder } from '../rivals';
 import { TIERS } from '../economy';
 
-export type AppId = 'home' | 'chats' | 'market' | 'bank' | 'property' | 'gidigram' | 'staff' | 'top20' | 'forbes' | 'promotion' | 'empire' | 'gist' | 'weather';
+export type AppId = 'home' | 'chats' | 'market' | 'shopper' | 'bank' | 'property' | 'gidigram' | 'staff' | 'top20' | 'forbes' | 'promotion' | 'empire' | 'gist' | 'weather';
 
 const APPS: { id: Exclude<AppId, 'home'>; name: string; bg: string; glyph: string }[] = [
   { id: 'chats', name: 'WhatsApp', bg: 'bg-[#25D366]', glyph: '✆' },
   { id: 'market', name: 'Yaba Mart', bg: 'bg-gradient-to-br from-orange-400 to-rose-500', glyph: '🛍' },
+  { id: 'shopper', name: 'Shopper', bg: 'bg-gradient-to-br from-violet-600 to-indigo-700', glyph: '🛒' },
   { id: 'gidigram', name: 'Gidigram', bg: 'bg-gradient-to-tr from-yellow-400 via-pink-500 to-purple-600', glyph: '◎' },
   { id: 'bank', name: 'KoboBank', bg: 'bg-gradient-to-br from-emerald-600 to-teal-800', glyph: '₦' },
   { id: 'property', name: 'Lagos Lets', bg: 'bg-gradient-to-br from-sky-500 to-indigo-700', glyph: '⌂' },
@@ -33,6 +35,7 @@ const AppLogo: React.FC<{ id: Exclude<AppId, 'home'> }> = ({ id }) => {
   const marks: Record<Exclude<AppId, 'home'>, React.ReactNode> = {
     chats: <><path d="M8 10.5A5.5 5.5 0 0 1 13.5 5h21A5.5 5.5 0 0 1 40 10.5v14a5.5 5.5 0 0 1-5.5 5.5H21l-9 7v-7.7a5.5 5.5 0 0 1-4-5.3z" fill="currentColor" opacity=".18" stroke="none"/><path d="M17 15h14M17 21h10" {...common}/><path d="M22 10.5c-1.2 4.7 3.2 10.5 8 11.5" {...common}/></>,
     market: <><path d="M10 18h28l-2 21H12z" fill="currentColor" opacity=".18" stroke="none"/><path d="M10 18h28l-2 21H12zM17 18v-4a7 7 0 0 1 14 0v4" {...common}/><path d="M18 25h12" {...common}/></>,
+    shopper: <><path d="M8 18h32l-3 22H11z" fill="currentColor" opacity=".18" stroke="none"/><path d="M8 18h32l-3 22H11zM16 18v-4a8 8 0 0 1 16 0v4" {...common}/><path d="m16 28 5 5 11-11" {...common}/></>,
     gidigram: <><rect x="7" y="10" width="34" height="28" rx="7" fill="currentColor" opacity=".18" stroke="none"/><rect x="7" y="10" width="34" height="28" rx="7" {...common}/><circle cx="24" cy="24" r="8" {...common}/><circle cx="34" cy="16.5" r="2" fill="currentColor" stroke="none"/></>,
     bank: <><path d="M5 17 24 7l19 10z" fill="currentColor" opacity=".22" stroke="none"/><path d="M5 17 24 7l19 10M7 40h34M10 20v16M19 20v16M29 20v16M38 20v16M5 40h38" {...common}/></>,
     property: <><path d="m5 23 19-16 19 16v17H5z" fill="currentColor" opacity=".2" stroke="none"/><path d="m5 23 19-16 19 16M9 21v19h30V21M19 40V27h10v13" {...common}/><path d="M32 13V8h5v9" {...common}/></>,
@@ -95,7 +98,15 @@ export const Phone: React.FC<PhoneProps> = (p) => {
         <div className="flex-1 min-h-0 flex flex-col bg-[#111]">
           {app === 'home' && <Home s={s} unread={unread} open={setApp} />}
           {app === 'chats' && <Chats {...p} />}
-          {app === 'market' && <MarketApp s={s} cart={p.cart} setCart={p.setCart} onPay={() => { p.up((g) => E.buyCart(g, p.cart)); p.setCart(() => []); }} onBuyDrop={(n) => p.up((g) => E.buyDrop(g, n))} />}
+          {app === 'market' && <MarketApp s={s} cart={p.cart} setCart={p.setCart} onPay={() => {
+            const before = s;
+            const after = E.buyCart(before, p.cart);
+            if (after === before) return false;
+            p.up(() => after);
+            p.setCart(() => []);
+            return true;
+          }} onBuyDrop={(n) => p.up((g) => E.buyDrop(g, n))} />}
+          {app === 'shopper' && <ShopperApp s={s} up={p.up} cart={p.cart} openMarket={() => setApp('market')} />}
           {app === 'bank' && <Bank s={s} up={p.up} />}
           {app === 'forbes' && <Forbes s={s} />}
           {app === 'promotion' && <PromotionApp s={s} up={p.up} />}
