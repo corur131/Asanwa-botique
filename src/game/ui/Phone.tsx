@@ -773,7 +773,7 @@ const Bank: React.FC<{ s: GameState; up: PhoneProps['up'] }> = ({ s, up }) => {
   const amount = (v: string) => Math.max(0, Math.round(Number(v) || 0));
   const reserved = Math.max(0, bank.savings) + Math.max(0, bank.rentVault);
   const goalProgress = bank.savingsGoalAmount > 0 ? Math.min(100, Math.round(reserved / bank.savingsGoalAmount * 100)) : 100;
-  const filteredLines = lines.slice(0, 100).filter(l => activityFilter === 'all' || (activityFilter === 'in' ? l.amount > 0 : l.amount < 0));
+  const filteredLines = lines.slice(0, 500).filter(l => activityFilter === 'all' || (activityFilter === 'in' ? l.amount > 0 : l.amount < 0));
   const tabs: { id: typeof tab; label: string; icon: string }[] = [
     { id: 'overview', label: 'Home', icon: '⌂' },
     { id: 'transfer', label: 'Transfer', icon: '⇄' },
@@ -931,7 +931,7 @@ const Bank: React.FC<{ s: GameState; up: PhoneProps['up'] }> = ({ s, up }) => {
         )}
 
         {tab === 'activity' && (
-          <section className={sectionClass}><div className="flex items-start justify-between gap-2"><div><h3 className={headingClass}>Account statement</h3><p className="mt-1 text-xs text-slate-400">Money moving in and out of your business accounts.</p></div><span className="rounded-full bg-white/[0.06] px-2 py-1 text-[10px] text-slate-400">{filteredLines.length} shown</span></div>
+          <section className={sectionClass}><div className="flex items-start justify-between gap-2"><div><h3 className={headingClass}>Account statement</h3><p className="mt-1 text-xs text-slate-400">Money moving in and out of your business accounts. Up to 500 recent transactions are retained.</p></div><span className="rounded-full bg-white/[0.06] px-2 py-1 text-[10px] text-slate-400">{filteredLines.length} shown</span></div>
             <div className="flex gap-1.5 rounded-xl bg-[#0a1513] p-1">{([{id:'all',label:'All'},{id:'in',label:'Money in'},{id:'out',label:'Money out'}] as const).map(f => <button key={f.id} onClick={() => setActivityFilter(f.id)} className={'flex-1 rounded-lg px-2 py-2 text-xs font-semibold ' + (activityFilter === f.id ? 'bg-emerald-700 text-white' : 'text-slate-400 hover:text-white')}>{f.label}</button>)}</div>
             {filteredLines.length ? transactionRows(filteredLines) : <div className="rounded-xl bg-white/[0.03] p-4 text-center text-sm text-slate-500">No transactions in this view yet.</div>}
           </section>
