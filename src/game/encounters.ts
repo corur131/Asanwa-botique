@@ -88,7 +88,10 @@ function addExpansionEventReward(s0: GameState, creditAmount: number, brandBoost
   const current = s0.businessExpansion || { branches: [], departments: [], departmentOperations: [], wholesaleActive: false, designerCollections: 0, expansionCredit: 0 };
   const balance = Math.max(0, current.expansionCredit || 0);
   const credit = Math.min(1_500_000, balance + Math.max(0, Math.round(creditAmount)));
-  const oldBrand = s0.brand || { awareness: clamp(18 + Math.log10(Math.max(1, s0.followers || 0) + 1) * 10 + s0.tier * 4, 5, 100), prestige: clamp(15 + (s0.rep || 35) * 0.52 + s0.tier * 3, 5, 100), trendInfluence: 20, loyalty: clamp(24 + (s0.rep || 35) * 0.46, 5, 100), reliability: 50 };
+  const tier = Number.isFinite(s0.tier) ? s0.tier : 0;
+  const reputation = Number.isFinite(s0.rep) ? s0.rep : 35;
+  const followers = Number.isFinite(s0.followers) ? Math.max(0, s0.followers) : 0;
+  const oldBrand = s0.brand || { awareness: clamp(18 + Math.log10(followers + 1) * 10 + tier * 4, 5, 100), prestige: clamp(15 + reputation * 0.52 + tier * 3, 5, 100), trendInfluence: 20, loyalty: clamp(24 + reputation * 0.46, 5, 100), reliability: 50 };
   const brand = {
     awareness: clamp(oldBrand.awareness + (brandBoost.awareness || 0), 5, 100),
     prestige: clamp(oldBrand.prestige + (brandBoost.prestige || 0), 5, 100),
