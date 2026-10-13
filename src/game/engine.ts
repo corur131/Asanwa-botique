@@ -2060,12 +2060,17 @@ export function fromData(raw: unknown): GameState | null {
 /** Add a one-time testing balance only when a preview build explicitly enables it. */
 export function previewCashGrant(s: GameState, grantId: string, amount: number): GameState {
   if (!grantId.trim() || !Number.isSafeInteger(amount) || amount <= 0) return s;
-  return adminGrant(s, {
-    id: 'preview-cash-' + grantId,
-    kind: 'add',
-    amount,
-    reason: 'Preview testing balance',
-  });
+  const id = 'preview-cash-' + grantId;
+  if ((s.appliedGrants || []).includes(id)) return s;
+  // Testing cash must remain spendable; unlike business receipts, it must not be consumed
+  // automatically by old operating payables before the player can test expensive features.
+  const next: GameState = {
+    ...s,
+    cash: Math.max(0, s.cash) + amount,
+    appliedGrants: [...(s.appliedGrants || []), id].slice(-100),
+    ledger: [{ day: s.day, t: -1, label: 'Preview testing balance', amount, category: 'operating' }, ...(s.ledger || [])].slice(0, 500),
+  };
+  return msg(next, 'Asanwa HQ', `${naira(amount)} has been added to your preview balance for feature testing.`, 'good');
 }
 
 export function adminGrant(s: GameState, g: { id: string; kind: 'add' | 'set'; amount: number; reason: string }): GameState {
