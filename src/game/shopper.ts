@@ -66,6 +66,23 @@ export function shopperEntryMatchesPreferences(
   });
 }
 
+/** Return keys for each selected strict price band this exact product/fabric qualifies for. */
+function matchingPriceBandPreferenceKeys(
+  entry: MarketEntry,
+  preferences: ShopperBuyingPreference[],
+  fabric?: MarketEntry['fabric'],
+): string[] {
+  return [...new Set(preferences.flatMap((preference) => {
+    const genderMatches = entry.for === 'both' ||
+      (preference.audience === 'women' ? entry.for === 'f' : entry.for === 'm');
+    const category = SHOPPER_PREFERENCE_CATEGORIES.find((row) => row.id === preference.category);
+    if (!genderMatches || !category?.kinds.includes(entry.kind)) return [];
+    return (preference.priceBands || [])
+      .filter((band) => shopperPriceBandMatches(entry, band, fabric))
+      .map((band) => `${preference.audience}|${preference.category}|${band}`);
+  }))];
+}
+
 export const SHOPPER_MISSIONS: { id: ShopperMission; label: string; description: string }[] = [
   { id: 'restock', label: 'Restock bestsellers', description: 'Replenish popular products that are running low or have sold out.' },
   { id: 'variety', label: 'Add variety', description: 'Fill gaps in your assortment with distinct styles rather than near-duplicates.' },
@@ -389,6 +406,7 @@ export function prepareShopperOrder(
   const pickedProducts = new Set<string>();
   const pickedKinds = new Map<string, number>();
   const pickedGroups = new Map<string, number>();
+  const coveredPriceBandKeys = new Set<string>();
   let spent = 0;
   const lineLimit = mission === 'contract' && selectedContract
     ? selectedContract.requirements.length
@@ -415,7 +433,11 @@ export function prepareShopperOrder(
         const groupPicks = pickedGroups.get(group) || 0;
         const diversityPenalty = mission === 'restock' ? 0
           : Math.min(7, Math.log1p(kindStock) * 1.3) + kindPicks * 3 + groupPicks * 2.5;
-        const adjustedScore = candidate.score - diversityPenalty;
+        const bandKeys = hasBuyingPreferences
+          ? matchingPriceBandPreferenceKeys(candidate.entry, activePreferences, candidate.line.fabric)
+          : [];
+        const uncoveredBandBonus = bandKeys.filter((key) => !coveredPriceBandKeys.has(key)).length * 1_000;
+        const adjustedScore = candidate.score - diversityPenalty + uncoveredBandBonus;
         if (adjustedScore > bestScore) {
           bestScore = adjustedScore;
           bestIndex = i;
@@ -437,6 +459,9 @@ export function prepareShopperOrder(
     }
     const line = { ...candidate.line, pieces: quantity };
     chosen.push(line);
+    for (const key of matchingPriceBandPreferenceKeys(candidate.entry, activePreferences, line.fabric)) {
+      coveredPriceBandKeys.add(key);
+    }
     pickedProducts.add(productKey);
     const kind = candidate.entry.kind;
     const group = candidate.entry.group.toLowerCase();
