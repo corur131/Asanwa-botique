@@ -2068,7 +2068,7 @@ export function previewCashGrant(s: GameState, grantId: string, amount: number):
     ...s,
     cash: Math.max(0, s.cash) + amount,
     appliedGrants: [...(s.appliedGrants || []), id].slice(-100),
-    ledger: [{ day: s.day, t: -1, label: 'Preview testing balance', amount, category: 'operating' }, ...(s.ledger || [])].slice(0, 500),
+    ledger: [{ day: s.day, t: -1, label: 'Preview testing balance', amount, category: 'operating' as const }, ...(s.ledger || [])].slice(0, 500),
   };
   return msg(next, 'Asanwa HQ', `${naira(amount)} has been added to your preview balance for feature testing.`, 'good');
 }
