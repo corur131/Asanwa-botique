@@ -251,7 +251,7 @@ export function shopBonus(s: GameState, c: Customer, choice: StyleChoice): { bon
 
 export function openShop(s0: GameState): GameState {
   const today = s0.today?.day === s0.day
-    ? { ...s0.today, openingCash: typeof s0.today.openingCash === 'number' && Number.isFinite(s0.today.openingCash) ? s0.today.openingCash : s0.cash }
+    ? { ...s0.today }
     : emptyLog(s0.day, s0.cash);
   let s: GameState = { ...s0, phase: 'shop', weather: weatherForDay(s0.day, s0.seed), ...freshDay, today };
   let slow = s.slowWeek;
