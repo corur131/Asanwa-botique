@@ -73,17 +73,20 @@ export function ensureBusinessState(s: GameState): GameState {
     };
   });
   const rivalEconomyVersion = Math.max(0, Number(s.rivalEconomyVersion) || 0);
-  // Existing saves get a one-time capital catch-up so the established rivals can compete immediately.
-  // Brand-new games are deliberately excluded from the grant.
-  if (rivalEconomyVersion < 1 && (s.day > 7 || (s.history || []).length > 0)) {
-    const targetLiquidity = [8_000_000, 18_000_000, 45_000_000, 100_000_000, 220_000_000];
+  // Second one-time capital boost for established saves that already received v1.
+  // Targets are calibrated to the uploaded Day 31 save: the player holds about ₦594m in liquid accounts.
+  // This gives the leading rival ₦475m liquid capital, tier-3 boutiques ₦275m, tier-2 ₦140m,
+  // tier-1 ₦65m, and tier-0 shops ₦28m. New games are excluded and the version makes this idempotent.
+  if (rivalEconomyVersion < 2 && (s.day > 7 || (s.history || []).length > 0)) {
+    const targetLiquidity = [28_000_000, 65_000_000, 140_000_000, 275_000_000, 475_000_000];
     for (const r of rivals) {
       const target = targetLiquidity[clamp(r.tier || 0, 0, 4)];
       const current = Math.max(0, r.cash || 0) + Math.max(0, r.savings || 0);
       const gap = Math.max(0, target - current);
       if (gap > 0) {
-        r.cash += Math.round(gap * 0.75);
-        r.savings = Math.max(0, r.savings || 0) + (gap - Math.round(gap * 0.75));
+        const cashTopUp = Math.round(gap * 0.75);
+        r.cash += cashTopUp;
+        r.savings = Math.max(0, r.savings || 0) + gap - cashTopUp;
       }
     }
   }
@@ -93,7 +96,7 @@ export function ensureBusinessState(s: GameState): GameState {
     cash: Math.max(0, Number.isFinite(s.cash) ? s.cash : 0),
     operatingPayables: Math.max(0, s.operatingPayables || 0) + inheritedCashDeficit,
     bank, businessExpansion, brand, rivals,
-    rivalEconomyVersion: 1,
+    rivalEconomyVersion: 2,
     wealthHistory: Array.isArray(s.wealthHistory) ? s.wealthHistory : [],
     sponsorshipOffers: Array.isArray(s.sponsorshipOffers) ? s.sponsorshipOffers : [],
   };
