@@ -5,7 +5,7 @@ import { canBuy, entryFor, HAIR_SWATCHES, isClothing, MARKET, pieceCost } from '
 import type { MarketEntry } from './market';
 import type {
   CustomerClass, GameState, ProductSalesRecord, ShopperBuyingPreference, ShopperDressRank,
-  ShopperJob, ShopperMission, ShopperOrderLine, ShopperProductCategory,
+  ShopperJob, ShopperMission, ShopperOrderLine, ShopperPriceBand, ShopperProductCategory,
 } from './types';
 
 const CLASS_ORDER: CustomerClass[] = ['poor', 'middle', 'rich'];
@@ -37,14 +37,32 @@ export function shopperDressRank(entry: MarketEntry): ShopperDressRank {
   return Math.max(wardrobeRank, productRank) as ShopperDressRank;
 }
 
-export function shopperEntryMatchesPreferences(entry: MarketEntry, preferences: ShopperBuyingPreference[]): boolean {
+/** Price bands use the actual per-piece catalogue purchase cost, including clothing fabric cost. */
+export function shopperPriceBandMatches(
+  entry: MarketEntry,
+  band: ShopperPriceBand,
+  fabric?: MarketEntry['fabric'],
+): boolean {
+  const unitCost = pieceCost(entry, isClothing(entry.kind) ? (fabric || entry.fabric || 'plain') : undefined);
+  if (band === 'veryExpensive') return unitCost >= 500_000 && unitCost < 1_000_000;
+  return unitCost >= 1_000_000;
+}
+
+export function shopperEntryMatchesPreferences(
+  entry: MarketEntry,
+  preferences: ShopperBuyingPreference[],
+  fabric?: MarketEntry['fabric'],
+): boolean {
   if (!preferences.length) return true;
   return preferences.some((preference) => {
     const genderMatches = entry.for === 'both' ||
       (preference.audience === 'women' ? entry.for === 'f' : entry.for === 'm');
     const category = SHOPPER_PREFERENCE_CATEGORIES.find((row) => row.id === preference.category);
-    return genderMatches && !!category?.kinds.includes(entry.kind) &&
-      preference.ranks.includes(shopperDressRank(entry));
+    const matchesRank = preference.ranks.includes(shopperDressRank(entry));
+    const matchesPriceBand = (preference.priceBands || []).some((band) =>
+      shopperPriceBandMatches(entry, band, fabric),
+    );
+    return genderMatches && !!category?.kinds.includes(entry.kind) && (matchesRank || matchesPriceBand);
   });
 }
 
@@ -164,6 +182,8 @@ interface Candidate {
   unitCost: number;
   score: number;
   suggestedPieces: number;
+  /** Contract requirements are sourced in their listed order, regardless of sales scoring. */
+  contractOrder?: number;
 }
 
 function toLine(entry: MarketEntry, opts: { fabric?: string; color: string; color2: string; pattern: number; pieces: number }): ShopperOrderLine {
@@ -260,7 +280,11 @@ export function prepareShopperOrder(
 
   for (const entry of MARKET) {
     if (!canBuy(entry, s.tier)) continue;
-    if (mission !== 'contract' && hasBuyingPreferences && !shopperEntryMatchesPreferences(entry, activePreferences)) continue;
+    const productKey = [entry.kind, entry.id].join('|');
+    const variants = existingByProduct.get(productKey) || [];
+    if (mission !== 'contract' && hasBuyingPreferences &&
+      !shopperEntryMatchesPreferences(entry, activePreferences) &&
+      !variants.some((variant) => shopperEntryMatchesPreferences(entry, activePreferences, variant.fabric))) continue;
     // Rich-customer mode defaults to the same highest dressing rank that scores as luxury.
     // Explicit category/rank selections replace this default, rather than being softened.
     if (mission === 'richCustomers' && !hasBuyingPreferences && shopperDressRank(entry) !== 2) continue;
@@ -268,11 +292,10 @@ export function prepareShopperOrder(
     const retail = pieceCost(entry, isClothing(entry.kind) ? entry.fabric || 'plain' : undefined) * MARKUP;
     if (mission !== 'contract' && mission !== 'richCustomers' && !hasBuyingPreferences && retail > priceCeiling) continue;
 
-    const productKey = [entry.kind, entry.id].join('|');
-    const variants = existingByProduct.get(productKey) || [];
     const productDemand = demandScore(records, entry, s, mission);
     if (mission === 'contract' && selectedContract) {
-      const requirement = selectedContract.requirements.find((row) => row.kind === entry.kind && row.itemId === entry.id);
+      const requirementIndex = selectedContract.requirements.findIndex((row) => row.kind === entry.kind && row.itemId === entry.id);
+      const requirement = selectedContract.requirements[requirementIndex];
       if (!requirement) continue;
       const inStock = s.stock.filter((row) => row.kind === requirement.kind && row.itemId === requirement.itemId)
         .reduce((sum, row) => sum + Math.max(0, row.pieces), 0);
@@ -287,6 +310,7 @@ export function prepareShopperOrder(
         entry, line, unitCost,
         score: 1000 + productDemand + (inStock <= 0 ? 3 : 0),
         suggestedPieces: missing,
+        contractOrder: requirementIndex,
       });
       continue;
     }
@@ -300,6 +324,7 @@ export function prepareShopperOrder(
         const target = Math.min(8, Math.max(2, Math.ceil(recentUnits * 0.6)));
         if (variant.pieces >= target) continue;
         const line = candidateLine(entry, s, mission, records, variant, target - Math.max(0, variant.pieces));
+        if (hasBuyingPreferences && !shopperEntryMatchesPreferences(entry, activePreferences, line.fabric)) continue;
         const unitCost = pieceCost(entry, isClothing(entry.kind) ? line.fabric : undefined);
         if (!Number.isFinite(unitCost) || unitCost <= 0) continue;
         if (unitCost * MARKUP > priceCeiling) continue;
@@ -314,10 +339,11 @@ export function prepareShopperOrder(
 
     // Premium sourcing can replenish a luxury style once it sells out. Otherwise, variety
     // and premium missions add catalogue styles the boutique has not stocked before.
-    if (mission === 'richCustomers' && variants.length) {
+    if (mission === 'richCustomers' && variants.length && !hasBuyingPreferences) {
       for (const variant of variants) {
         if (variant.pieces > 0) continue;
         const line = candidateLine(entry, s, mission, records, variant, 1);
+        if (hasBuyingPreferences && !shopperEntryMatchesPreferences(entry, activePreferences, line.fabric)) continue;
         const unitCost = pieceCost(entry, isClothing(entry.kind) ? line.fabric : undefined);
         if (!Number.isFinite(unitCost) || unitCost <= 0 || unitCost * MARKUP > priceCeiling) continue;
         const preferenceScore = shopperPreferenceScore(entry, shoppingExamples);
@@ -328,8 +354,9 @@ export function prepareShopperOrder(
       continue;
     }
 
-    if (variants.length) continue;
+    if (variants.length && !(mission === 'richCustomers' && hasBuyingPreferences)) continue;
     const line = candidateLine(entry, s, mission, records, undefined, 1);
+    if (hasBuyingPreferences && !shopperEntryMatchesPreferences(entry, activePreferences, line.fabric)) continue;
     const unitCost = pieceCost(entry, isClothing(entry.kind) ? line.fabric : undefined);
     if (!Number.isFinite(unitCost) || unitCost <= 0) continue;
     const missingKindBonus = (representedKinds.get(entry.kind) || 0) === 0 ? 5 : 0;
@@ -350,43 +377,62 @@ export function prepareShopperOrder(
 
   // Keep the assortment limited by boutique tier, but allow premium quantities to scale
   // with the chosen budget instead of capping every catalogue style at one piece.
-  candidates.sort((a, b) => b.score - a.score || a.unitCost - b.unitCost || a.entry.label.localeCompare(b.entry.label));
+  if (mission === 'contract' && selectedContract) {
+    candidates.sort((a, b) => (a.contractOrder ?? 0) - (b.contractOrder ?? 0));
+  } else {
+    candidates.sort((a, b) => b.score - a.score || a.unitCost - b.unitCost || a.entry.label.localeCompare(b.entry.label));
+  }
   const remainingCandidates = [...candidates];
   const chosen: ShopperOrderLine[] = [];
   const pickedProducts = new Set<string>();
   const pickedKinds = new Map<string, number>();
   const pickedGroups = new Map<string, number>();
   let spent = 0;
+  const lineLimit = mission === 'contract' && selectedContract
+    ? selectedContract.requirements.length
+    : maxLines;
 
   // Re-rank after each pick. Variety and premium missions gently penalise overrepresented
   // kinds and catalogue groups, so the shopper does not fill the cart with near-copies.
-  while (chosen.length < maxLines && remainingCandidates.length) {
+  while (chosen.length < lineLimit && remainingCandidates.length) {
     let bestIndex = -1;
-    let bestScore = Number.NEGATIVE_INFINITY;
-    for (let i = 0; i < remainingCandidates.length; i++) {
-      const candidate = remainingCandidates[i];
-      const key = [candidate.entry.kind, candidate.entry.id].join('|');
-      if (pickedProducts.has(key)) continue;
-      const kind = candidate.entry.kind;
-      const group = candidate.entry.group.toLowerCase();
-      const kindStock = representedKinds.get(kind) || 0;
-      const kindPicks = pickedKinds.get(kind) || 0;
-      const groupPicks = pickedGroups.get(group) || 0;
-      const diversityPenalty = mission === 'restock' ? 0
-        : Math.min(7, Math.log1p(kindStock) * 1.3) + kindPicks * 3 + groupPicks * 2.5;
-      const adjustedScore = candidate.score - diversityPenalty;
-      if (adjustedScore > bestScore) {
-        bestScore = adjustedScore;
-        bestIndex = i;
+    if (mission === 'contract' && selectedContract) {
+      bestIndex = remainingCandidates.findIndex((candidate) =>
+        !pickedProducts.has([candidate.entry.kind, candidate.entry.id].join('|')),
+      );
+    } else {
+      let bestScore = Number.NEGATIVE_INFINITY;
+      for (let i = 0; i < remainingCandidates.length; i++) {
+        const candidate = remainingCandidates[i];
+        const key = [candidate.entry.kind, candidate.entry.id].join('|');
+        if (pickedProducts.has(key)) continue;
+        const kind = candidate.entry.kind;
+        const group = candidate.entry.group.toLowerCase();
+        const kindStock = representedKinds.get(kind) || 0;
+        const kindPicks = pickedKinds.get(kind) || 0;
+        const groupPicks = pickedGroups.get(group) || 0;
+        const diversityPenalty = mission === 'restock' ? 0
+          : Math.min(7, Math.log1p(kindStock) * 1.3) + kindPicks * 3 + groupPicks * 2.5;
+        const adjustedScore = candidate.score - diversityPenalty;
+        if (adjustedScore > bestScore) {
+          bestScore = adjustedScore;
+          bestIndex = i;
+        }
       }
     }
     if (bestIndex < 0) break;
     const candidate = remainingCandidates.splice(bestIndex, 1)[0];
     const productKey = [candidate.entry.kind, candidate.entry.id].join('|');
     const remaining = budget - spent;
-    if (remaining < candidate.unitCost) continue;
+    if (remaining < candidate.unitCost) {
+      if (mission === 'contract' && selectedContract) break;
+      continue;
+    }
     const quantity = Math.min(candidate.suggestedPieces, Math.floor(remaining / candidate.unitCost));
-    if (quantity < 1) continue;
+    if (quantity < 1) {
+      if (mission === 'contract' && selectedContract) break;
+      continue;
+    }
     const line = { ...candidate.line, pieces: quantity };
     chosen.push(line);
     pickedProducts.add(productKey);
@@ -399,7 +445,7 @@ export function prepareShopperOrder(
 
   if (!chosen.length) {
     if (selectedContract) {
-      return { state: s, error: 'Your current stock and existing cart already cover the contract goods, or there is no remaining quantity within this budget. Check out any pending cart items, then deliver the contract in the Contracts app.' };
+      return { state: s, error: 'There is no missing contract quantity left to buy, or your budget cannot cover the next required item. The shopper did not add substitutes or extra products. Check existing stock and cart, or increase the budget.' };
     }
     return { state: s, error: mission === 'contract'
       ? 'I could not match that brief to affordable, unlocked Yaba Mart products. Try simpler product or category words.'
@@ -417,7 +463,7 @@ export function prepareShopperOrder(
     ? ` I prioritised catalogue items matching “${shoppingExamples.trim().slice(0, 120)}”.`
     : '';
   const filterNote = hasBuyingPreferences
-    ? ` Applied ${activePreferences.length} strict category/rank filters.`
+    ? ` Applied ${activePreferences.length} strict category, dressing-rank and/or per-piece price filters.`
     : mission === 'richCustomers' ? ' Limited this order to the game’s luxury dressing rank.' : '';
   const summary = `Shopper returned on day ${s.day}: ${chosen.length} product lines, ${chosen.reduce((sum, line) => sum + line.pieces, 0)} pieces, estimated total ₦${spent.toLocaleString('en-NG')}. I ${descriptions[mission]}.${exampleNote}${filterNote}${selectedContract ? ` Contract deadline: Day ${selectedContract.deadlineDay}. ` : ' '}Review everything in Yaba Mart before checkout.`;
   const job: ShopperJob = {
@@ -425,7 +471,9 @@ export function prepareShopperOrder(
     createdDay: s.day, completedDay: s.day, items: chosen, summary,
     ...(mission === 'contract' ? { contractBrief: (selectedContract?.brief || contractBrief).trim().slice(0, 240) } : {}),
     ...(selectedContract ? { contractId: selectedContract.id } : {}),
-    ...(hasBuyingPreferences ? { preferences: activePreferences.map((row) => ({ ...row, ranks: [...row.ranks] })) } : {}),
+    ...(hasBuyingPreferences ? { preferences: activePreferences.map((row) => ({
+      ...row, ranks: [...row.ranks], ...(row.priceBands ? { priceBands: [...row.priceBands] } : {}),
+    })) } : {}),
   };
   const newCart = mergeIntoCart(s.marketCart || [], chosen);
   const msgSeq = (s.msgSeq || 0) + 1;
@@ -436,7 +484,9 @@ export function prepareShopperOrder(
   const state: GameState = {
     ...s,
     marketCart: newCart,
-    shopperPreferences: activePreferences.length ? activePreferences.map((row) => ({ ...row, ranks: [...row.ranks] })) : (s.shopperPreferences || []),
+    shopperPreferences: activePreferences.length ? activePreferences.map((row) => ({
+      ...row, ranks: [...row.ranks], ...(row.priceBands ? { priceBands: [...row.priceBands] } : {}),
+    })) : (s.shopperPreferences || []),
     shopperJobs: [...(s.shopperJobs || []), job].slice(-20),
     msgSeq,
     messages: [...(s.messages || []), message].slice(-500),
