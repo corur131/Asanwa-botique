@@ -853,7 +853,7 @@ export default function GameApp({ onLab, initial, storageKey, cloud, notice }: {
               <p className="text-rose-200 mb-2">This deletes the current game on this device. Download a backup first if you want to keep it.</p>
               <div className="flex gap-2">
                 <Btn size="sm" onClick={() => setConfirmNew(false)}>Cancel</Btn>
-                <Btn size="sm" tone="danger" onClick={() => { E.clearSave(storageKey); setS(null); setMenu(false); setConfirmNew(false); setCart([]); }}>Delete and start over</Btn>
+                <Btn size="sm" tone="danger" onClick={() => { E.clearSave(storageKey); setS(null); setMenu(false); setConfirmNew(false); }}>Delete and start over</Btn>
               </div>
             </div>
           )}
