@@ -133,4 +133,4 @@ test('shopper examples guide the proposed cart toward the requested catalogue pr
   assert.ok(result.job.items.some((line) => line.kind === target!.kind && line.itemId === target!.id),
     'shopper should prioritise the exact requested example when that catalogue entry is available');
   assert.ok(result.job.summary.includes(target!.label), 'order summary should remember what examples were requested');
-}});
+});
