@@ -41,8 +41,8 @@ test('tier-aware shopper orders only use unlocked catalogue items and stay withi
   assert.equal(result.state.shopperJobs?.at(-1)?.id, result.job.id, 'the order is saved in GameState');
   assert.equal(result.state.msgSeq, (s.msgSeq || 0) + 1, 'a return notification is recorded');
   const roundTrip = fromData(JSON.parse(JSON.stringify(result.state)));
-  assert.deepEqual(roundTrip?.marketCart, result.state.marketCart, 'cart survives save serialisation');
-  assert.deepEqual(roundTrip?.shopperJobs, result.state.shopperJobs, 'shopper order survives save serialisation');
+  assert.deepEqual(roundTrip?.marketCart, JSON.parse(JSON.stringify(result.state.marketCart)), 'cart survives save serialisation');
+  assert.deepEqual(roundTrip?.shopperJobs, JSON.parse(JSON.stringify(result.state.shopperJobs)), 'shopper order survives save serialisation');
 });
 
 test('restock mission reacts to recorded recent sales and low inventory', () => {
