@@ -160,7 +160,7 @@ export function judge(s0: GameState, c: Customer, score: number): GameState {
   const won = score > k.rivalScore;
   s = { ...s, events: (s.events || []).map((x) => (x.id === k.eventId ? { ...x, status: won ? ('won' as const) : ('lost' as const) } : x)) };
   if (won) {
-    s = { ...s, cash: s.cash + k.prize, rep: clamp(s.rep + 3, 0, 100), followers: (s.followers || 0) + (e?.followers || 100), ledger: [{ day: s.day, t: Math.floor(s.clock), label: `${k.title} prize`, amount: k.prize }, ...(s.ledger || [])].slice(0, 150) };
+    s = { ...s, cash: s.cash + k.prize, rep: clamp(s.rep + 3, 0, 100), followers: (s.followers || 0) + (e?.followers || 100), ledger: [{ day: s.day, t: Math.floor(s.clock), label: `${k.title} prize`, amount: k.prize }, ...(s.ledger || [])].slice(0, 500) };
     s = addExpansionEventReward(s, Math.min(500_000, Math.round(k.prize * 0.15)), { awareness: 2, prestige: 2, trendInfluence: 1.5, loyalty: 0.75 }, 'Fashion event victory');
     s = gist(s, `Divine beats ${r?.owner || 'her rival'} at the ${k.title}!`, `The judges scored Asanwa Boutique ${score} to ${k.rivalScore}. ${r?.owner.split(' ')[0]} left without taking pictures 👀`, 'you', true);
     if (r) {
@@ -227,7 +227,7 @@ export function buyDrop(s: GameState, pieces: number): GameState {
     cash: s.cash - cost,
     stock: [...s.stock, { ...design, displayed: shown < room }],
     drop: { ...d, left: d.left - pieces, buyers: [...d.buyers, 'you'] },
-    ledger: [{ day: s.day, t: s.phase === 'shop' ? Math.floor(s.clock) : -1, label: `Hot drop: ${d.label} ×${pieces}`, amount: -cost }, ...(s.ledger || [])].slice(0, 150),
+    ledger: [{ day: s.day, t: s.phase === 'shop' ? Math.floor(s.clock) : -1, label: `Hot drop: ${d.label} ×${pieces}`, amount: -cost }, ...(s.ledger || [])].slice(0, 500),
   };
 }
 
