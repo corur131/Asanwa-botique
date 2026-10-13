@@ -180,11 +180,12 @@ export default function GameApp({ onLab, initial, storageKey, cloud, notice }: {
     let last = performance.now();
     const id = window.setInterval(() => {
       const now = performance.now();
-      const dt = Math.max(0, Math.min(5, (now - last) / 1000));
+      const dt = Math.max(0, Math.min(2, (now - last) / 1000));
       last = now;
       // The multiplier advances walk-ins, patience, staff work, errands and the shop clock together.
+      // Tick more frequently at higher speeds so customer/business simulation updates smoothly instead of jumping.
       setS((g) => (g ? E.tick(g, dt * timeSpeed) : g));
-    }, 500);
+    }, Math.max(50, 500 / timeSpeed));
     return () => window.clearInterval(id);
   }, [running, timeSpeed]);
 
