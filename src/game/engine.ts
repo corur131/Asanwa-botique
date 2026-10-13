@@ -35,7 +35,7 @@ export function cashFlowSummary(s: GameState) {
   const bank = s.bank || initialBankState();
   const fixedDeposits = (bank.fixedDeposits || []).reduce((total, deposit) => total + Math.max(0, deposit.amount || 0), 0);
   const recentMovements = (s.ledger || []).filter((line) => line.day === s.day && (
-    line.category === 'transfer' || line.t < 0 || /move-in|furniture|starter stock|inventory|rent|promotion|debt recovery|fixed deposit|savings|vault|loan|wholesale/i.test(line.label)
+    line.category === 'transfer' || line.t < 0 || /move-in|furniture|starter stock|inventory|rent|promotion|debt recovery|fixed deposit|savings|vault|loan|wholesale|payables settled|unpaid operating cost/i.test(line.label)
   )).sort((a, b) => Math.abs(b.amount) - Math.abs(a.amount)).slice(0, 8);
   return {
     openingCash, cash, operatingResult, cashChange, otherMovement,
