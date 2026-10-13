@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import type { GameState } from './types';
+import type { GameState, Message } from './types';
+import { answerInvite } from './encounters';
 import { money, payRent, settleLateRent, demote, closeShop } from './engine';
 import {
   financialAssets,
@@ -560,4 +561,21 @@ test('expansion credit is applied once and cannot make an investment exceed avai
   assert.equal(after.businessExpansion?.departments.includes('Accessories'), true);
   assert.equal(after.businessExpansion?.expansionCredit, 0);
   assert.equal(after.cash, 150_000);
+});
+
+test('accepting a fashion invitation creates expansion credit and improves brand awareness', () => {
+  const invitation = {
+    id: 77, day: 10, from: 'Fashion Host', text: 'You are invited', tone: 'info',
+    chat: 'Fashion Host', ctx: { kind: 'invite', eventId: 'event-credit-test' },
+  } as Message;
+  const before = state({
+    day: 10,
+    messages: [invitation],
+    events: [{ id: 'event-credit-test', title: 'Pop-up Style-off', host: 'Fashion Host', day: 12, rivalId: 'missing-rival', prize: 100_000, followers: 100, status: 'invited' }],
+    businessExpansion: { branches: [], departments: [], wholesaleActive: false, designerCollections: 0 },
+  });
+  const after = answerInvite(before, invitation, 'accept');
+  assert.equal(after.events.find((event) => event.id === 'event-credit-test')?.status, 'accepted');
+  assert.equal(after.businessExpansion?.expansionCredit, 25_000);
+  assert.ok((after.brand?.awareness || 0) > 0);
 });
