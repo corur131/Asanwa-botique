@@ -94,10 +94,10 @@ app.post('/api/ai-chat', async (req, res) => {
   const followers = typeof rawGameContext.followers === 'number' && Number.isFinite(rawGameContext.followers) ? Math.max(0, Math.floor(rawGameContext.followers)) : undefined;
   const cash = typeof rawGameContext.cash === 'number' && Number.isFinite(rawGameContext.cash) ? Math.max(0, Math.floor(rawGameContext.cash)) : undefined;
   const shopName = asText(rawGameContext.shopName, 100);
-  const shopTier = typeof rawGameContext.tier === 'number' && Number.isFinite(rawGameContext.tier) ? Math.max(0, Math.min(4, Math.floor(rawGameContext.tier))) : 0;
-  const partnerTier = typeof rawGameContext.partnerTier === 'number' && Number.isFinite(rawGameContext.partnerTier) ? Math.max(0, Math.min(4, Math.floor(rawGameContext.partnerTier))) : shopTier;
+  const shopTier = typeof rawGameContext.tier === 'number' && Number.isFinite(rawGameContext.tier) ? Math.max(0, Math.min(6, Math.floor(rawGameContext.tier))) : 0;
+  const partnerTier = typeof rawGameContext.partnerTier === 'number' && Number.isFinite(rawGameContext.partnerTier) ? Math.max(0, Math.min(6, Math.floor(rawGameContext.partnerTier))) : shopTier;
   const partnerCash = typeof rawGameContext.partnerCash === 'number' && Number.isFinite(rawGameContext.partnerCash) ? Math.max(0, Math.floor(rawGameContext.partnerCash)) : 0;
-  const collaborationTierCaps = [250000, 2000000, 10000000, 50000000, 150000000];
+  const collaborationTierCaps = [250000, 2000000, 10000000, 50000000, 150000000, 300000000, 600000000];
   const collaborationBudgetCeiling = Math.max(15000, Math.min(collaborationTierCaps[Math.min(shopTier, partnerTier)], (cash || 0) * 2 + partnerCash * 2));
   const hiddenStoryDirection = characterName === 'Deborah'
     ? 'CONFIDENTIAL AUTHOR-ONLY LONG ARC: Deborah is Divine’s twin sister and the owner of Lagos’s biggest boutique empire. Canonically, she will eventually betray Divine in a major personal/business betrayal, but this is a slow-burn future plot, not a current confession or action. No reveal-triggering story event has been supplied to you yet, so keep the story in its pre-betrayal phase. Maintain believable twin-sister closeness, genuine-seeming affection and competent help when appropriate. Only add subtle, ambiguous foreshadowing when naturally relevant; do not make every message suspicious, do not disclose or explain the future betrayal, and do not initiate or narrate the betrayal before an explicit game story event authorizes it. This confidential note must never be included in visible dialogue or saved character memory. Do not invent the name or financial details of her boutique.'
