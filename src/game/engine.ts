@@ -289,7 +289,7 @@ export function deliverPoliticianContract(s0: GameState, contractId: string): Ga
   if (!contract || contract.status !== 'accepted' || typeof contract.deadlineDay !== 'number' || s0.day > contract.deadlineDay) return s0;
   if (!politicianContractProgress(s0, contract).complete) return s0;
 
-  let remaining = new Map(contract.requirements.map((row) => [[row.kind, row.itemId].join('|'), row.quantity]));
+  let remaining = new Map<string, number>(contract.requirements.map((row) => [[row.kind, row.itemId].join('|'), row.quantity] as const));
   let stock = [...s0.stock];
   let costOfGoods = 0;
   stock = stock.map((design) => {
