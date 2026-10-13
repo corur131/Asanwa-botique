@@ -4,6 +4,80 @@ import type { Listing, Placed } from './shop';
 
 export type CustomerClass = 'poor' | 'middle' | 'rich';
 
+/** A serialisable cart line, also used by saved shopper orders. */
+export interface ShopperOrderLine {
+  key: string;
+  kind: StockKind;
+  itemId: string;
+  fabric?: FabricId;
+  color: string;
+  color2: string;
+  pattern: number;
+  pieces: number;
+}
+
+/** Aggregated, real item-level demand from completed sales. */
+export interface ProductSalesRecord {
+  day: number;
+  designKey: string;
+  kind: StockKind;
+  itemId: string;
+  fabric: FabricId;
+  color: string;
+  color2: string;
+  pattern: number;
+  customerClass: CustomerClass;
+  /** Number of pieces sold for this exact design/class/day grouping. */
+  units: number;
+  tier: number;
+}
+
+export type ShopperMission = 'restock' | 'variety' | 'richCustomers' | 'contract';
+export type ShopperJobStatus = 'ready' | 'cancelled' | 'purchased';
+
+export interface ShopperJob {
+  id: string;
+  mission: ShopperMission;
+  budget: number;
+  estimatedTotal: number;
+  status: ShopperJobStatus;
+  createdDay: number;
+  completedDay: number;
+  items: ShopperOrderLine[];
+  summary: string;
+  contractBrief?: string;
+  contractId?: string;
+}
+
+export type PoliticianContractStatus = 'offered' | 'accepted' | 'fulfilled' | 'failed' | 'declined' | 'expired';
+
+export interface PoliticianContractRequirement {
+  kind: StockKind;
+  itemId: string;
+  label: string;
+  quantity: number;
+  /** Wholesale cost per piece at the time this contract was offered, for a transparent estimate. */
+  unitCost: number;
+}
+
+export interface PoliticianContract {
+  id: string;
+  client: string;
+  title: string;
+  brief: string;
+  offeredDay: number;
+  offerExpiresDay: number;
+  deadlineDays: number;
+  deadlineDay?: number;
+  acceptedDay?: number;
+  completedDay?: number;
+  status: PoliticianContractStatus;
+  requirements: PoliticianContractRequirement[];
+  reward: number;
+  failurePenalty: number;
+  penaltyCharged?: number;
+}
+
 /** What an item in stock is. Clothes use the wardrobe slots; the rest are accessory kinds. */
 export type StockKind = 'top' | 'bottom' | 'dress' | 'outer' | 'shoes' | 'bag' | 'headwear' | 'necklace' | 'wrist' | 'glasses' | 'earrings' | 'hair';
 
@@ -617,6 +691,14 @@ export interface GameState {
   /** Unpaid operating costs when a recurring bill exceeds available cash; included in liabilities. */
   operatingPayables?: number;
   stock: Design[];
+  /** Saved Yaba Mart cart; survives app changes and reloads. */
+  marketCart?: ShopperOrderLine[];
+  /** Item-level sales used to train tier-aware shopper recommendations. */
+  productSales?: ProductSalesRecord[];
+  /** Shopper orders and their statuses are part of the saved game. */
+  shopperJobs?: ShopperJob[];
+  /** Government/office clothing contracts, offer history and deadlines. */
+  politicianContracts?: PoliticianContract[];
   regulars: Regular[];
   staff: StaffMember[];
   hireOkDay: number;

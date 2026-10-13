@@ -1,7 +1,7 @@
 import { CharacterConfig } from '../types/character';
 import { generateRandomCustomer } from '../utils/randomizer';
-import { DIVINE_CAPACITY, HOUR_WEIGHTS, PATIENCE, SHOP_MINUTES, staffMinutes, NEW_SHOP_RAMP_DAYS, NEW_SHOP_START, SERVICE_FEE, SLOW_WEEK_CHANCE, STAFF, STAFF_CAPACITY, START_CASH, SUPPLIES_SHARE, MARKUP, TIERS, naira } from './economy';
-import { canBuy, entryFor, isClothing, makeDesign, pieceCost, productKey } from './market';
+import { DIVINE_CAPACITY, HOUR_WEIGHTS, PATIENCE, SHOP_MINUTES, staffMinutes, NEW_SHOP_RAMP_DAYS, NEW_SHOP_START, SERVICE_FEE, SLOW_WEEK_CHANCE, STAFF, STAFF_CAPACITY, START_CASH, SUPPLIES_SHARE, MARKUP, TIERS, FABRIC_COST, naira } from './economy';
+import { canBuy, entryFor, HAIR_SWATCHES, isClothing, makeDesign, pieceCost, productKey, MARKET } from './market';
 import { FabricId } from '../types/character';
 import { answerRival, competition, initRivals, poacher, reactToMove, simulateRivals } from './rivals';
 import { answerInvite, contestFor, contestModel, dropStep, judge, planDrop, planEvents, planTips, visitStep, wonListing } from './encounters';
@@ -10,11 +10,11 @@ import { answerConvo, startGist } from './convos';
 import { ENERGY, busyNow, divineBonus, energyOf, energyStep, exhausted, payBills, spendEnergy } from './life';
 import { makeCustomer, makeCelebrityCustomer } from './customers';
 import { buildLook, hairGroup, lookCost, scoreLook } from './scoring';
-import { FEMALE_HAIR, MAKEUP_LOOKS } from '../constants/catalog';
+import { FABRIC_COLORS, FEMALE_HAIR, MAKEUP_LOOKS } from '../constants/catalog';
 import { colourName } from './colours';
 import { FURNITURE, KIOSK_LISTING, Listing, Placed, STARTER_FURNITURE, autoPlace, prepareFurnitureForMove,
   findSpot, canPlace, turn, Rot, ceilingCapacity, ceilingUsed, yardCapacity, yardUsed, cheapestListing, furnitureById, listingsFor, newUid, prestigeRichShift, prestigeTraffic, shopStats, usesFloor, wallCapacity, wallUsed } from './shop';
-import { CharacterMemory, CollaborationEvent, CollaborationReply, Customer, DayLog, Departure, Design, ReplyChoice, GameState, LedgerLine, Message, Regular, ScoreBreakdown, Settlement, SponsorshipOffer, StaffMember, StaffProfession, StyleChoice } from './types';
+import { CharacterMemory, CollaborationEvent, CollaborationReply, Customer, DayLog, Departure, Design, ReplyChoice, GameState, LedgerLine, Message, PoliticianContract, PoliticianContractRequirement, Regular, ScoreBreakdown, Settlement, SponsorshipOffer, StaffMember, StaffProfession, StyleChoice } from './types';
 import { closeBrandDay, ensureBusinessState, getBrandMetrics, initialBankState, processBankWeekly, processFixedDepositMaturities, processPromotionAtClose, processExpansionAtClose, promotionTrafficBoost, recordWeeklyWealth, saveRentAtClose } from './business';
 
 export { brandPower, currentWealthRows, financialAssets, getBrandMetrics, creditProfile, creditRating, creditHistoryReport, premiumLoanEligible, takePremiumBusinessLoan, renegotiateBusinessLoan, loanRateForScore, maximumLoan, netWorthPlayer, netWorthRival, playerWeekTotals, totalLiabilities, unlocksForFollowers, availablePromotionLevels, promotionBudgetBounds, promotionTrafficBoost, startPromotion, stopPromotion, wholesaleUpgradeQuote, upgradeWholesaleInventory, transferBank, setRentSaving, setSavingsGoal, createFixedDeposit, takeBusinessLoan, repayBusinessLoan, arrangeBusinessLoanRepayment, expansionOptions, investInExpansion, financeExpansionPurchase } from './business';
@@ -124,6 +124,211 @@ export function rivalDefaults() {
 
 const freshDay = { clock: 0, arrivals: [], inShop: [], serving: null, left: [], outages: [] as GameState['outages'], shouts: [] as GameState['shouts'] };
 
+const CONTRACT_TIER_RULES = [
+  { retailCeiling: 18_000, lines: 1, minQty: 2, maxQty: 3, deadlineDays: 5 },
+  { retailCeiling: 60_000, lines: 1, minQty: 3, maxQty: 5, deadlineDays: 6 },
+  { retailCeiling: 100_000, lines: 2, minQty: 4, maxQty: 6, deadlineDays: 7 },
+  { retailCeiling: 200_000, lines: 2, minQty: 6, maxQty: 9, deadlineDays: 8 },
+  { retailCeiling: 300_000, lines: 3, minQty: 8, maxQty: 12, deadlineDays: 10 },
+] as const;
+
+const CONTRACT_CLIENTS = [
+  'Hon. Amaka Okafor',
+  'Hon. Tunde Adebayo',
+  'Councillor Kemi Lawal',
+  'Office of Senator Ibrahim',
+  'Lagos Constituency Liaison Office',
+  'Hon. Chuka Nwosu',
+] as const;
+
+const CONTRACT_TITLES = [
+  'Community outreach wardrobe',
+  'Formal delegation clothing order',
+  'Constituency cultural reception',
+  'Executive appreciation event',
+  'Public service gala collection',
+] as const;
+
+/** Generate a real catalogue-backed offer, never free-form or AI-invented products. */
+function makePoliticianContractOffer(s: GameState): PoliticianContract | null {
+  const rule = CONTRACT_TIER_RULES[clamp(Math.floor(s.tier || 0), 0, CONTRACT_TIER_RULES.length - 1)];
+  const eligible = MARKET
+    .filter((entry) => canBuy(entry, s.tier) && ['top', 'bottom', 'dress', 'outer', 'shoes', 'bag', 'headwear'].includes(entry.kind))
+    .map((entry) => ({
+      entry,
+      unitCost: pieceCost(entry, isClothing(entry.kind) ? entry.fabric || 'plain' : undefined),
+    }))
+    .filter((row) => {
+      if (row.unitCost <= 0 || row.unitCost * MARKUP > rule.retailCeiling) return false;
+      const held = (s.stock || []).filter((design) => design.kind === row.entry.kind && design.itemId === row.entry.id)
+        .reduce((sum, design) => sum + Math.max(0, design.pieces), 0);
+      // Keep contracts meaningful even for a new kiosk: offers require at least a little new sourcing.
+      return held < rule.minQty;
+    })
+    .sort((a, b) => a.unitCost - b.unitCost || a.entry.label.localeCompare(b.entry.label));
+  if (!eligible.length) return null;
+
+  const lineCount = Math.min(rule.lines, eligible.length);
+  const start = Math.abs(Math.floor((s.seed || 0) + s.day * 19)) % eligible.length;
+  const requirements: PoliticianContractRequirement[] = [];
+  const seen = new Set<string>();
+  for (let i = 0; i < eligible.length && requirements.length < lineCount; i++) {
+    const row = eligible[(start + i * 7) % eligible.length];
+    const key = row.entry.kind + '|' + row.entry.id;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    const quantity = rule.minQty + (Math.abs(Math.floor((s.seed || 0) / (i + 1) + s.day * (i + 5))) % (rule.maxQty - rule.minQty + 1));
+    requirements.push({
+      kind: row.entry.kind,
+      itemId: row.entry.id,
+      label: row.entry.label,
+      quantity,
+      unitCost: row.unitCost,
+    });
+  }
+  if (!requirements.length) return null;
+
+  const goodsCost = requirements.reduce((sum, row) => sum + row.unitCost * row.quantity, 0);
+  const reward = Math.ceil((goodsCost * 1.65) / 1_000) * 1_000;
+  const titleIndex = Math.min(CONTRACT_TITLES.length - 1, Math.floor(s.tier || 0));
+  const client = CONTRACT_CLIENTS[Math.abs(Math.floor((s.seed || 0) + s.day * 13)) % CONTRACT_CLIENTS.length];
+  const title = CONTRACT_TITLES[titleIndex];
+  const labels = requirements.map((row) => row.label);
+  const brief = `Supply ${requirements.reduce((sum, row) => sum + row.quantity, 0)} pieces for ${title.toLowerCase()}. Required catalogue goods: ${labels.join(', ')}. Every line must be delivered before the agreed deadline.`;
+  const id = `politician-${s.day}-${Math.abs(Math.floor((s.seed || 0) + s.day * 997)).toString(36)}`;
+  return {
+    id, client, title, brief, offeredDay: s.day, offerExpiresDay: s.day + 2,
+    deadlineDays: rule.deadlineDays, status: 'offered', requirements, reward,
+    failurePenalty: Math.max(1_000, Math.ceil((reward * 0.1) / 1_000) * 1_000),
+  };
+}
+
+/**
+ * Expire stale offers and fail overdue accepted contracts at the start of a new
+ * in-game day. It also keeps at most one live offer/accepted contract at a time.
+ */
+export function ensurePoliticianContractOffer(s0: GameState, force = false): GameState {
+  let s = s0;
+  let contracts = [...(s.politicianContracts || [])];
+  for (const old of [...contracts]) {
+    if (old.status === 'offered' && s.day > old.offerExpiresDay) {
+      contracts = contracts.map((row) => row.id === old.id ? { ...row, status: 'expired' as const, completedDay: s.day } : row);
+      s = { ...s, politicianContracts: contracts };
+      s = msg(s, old.client, `The offer for “${old.title}” has expired. No fee was charged. I will send another opportunity later.`, 'warn');
+    } else if (old.status === 'accepted' && typeof old.deadlineDay === 'number' && s.day > old.deadlineDay) {
+      const lateFee = old.failurePenalty;
+      contracts = contracts.map((row) => row.id === old.id ? { ...row, status: 'failed' as const, completedDay: s.day, penaltyCharged: lateFee } : row);
+      s = {
+        ...s,
+        politicianContracts: contracts,
+        rep: clamp(s.rep - 4, 0, 100),
+        followers: Math.max(0, Math.floor((s.followers || 0) * 0.98)),
+        today: {
+          ...s.today,
+          costs: (s.today?.costs || 0) + lateFee,
+          events: [...(s.today?.events || []), `Failed politician contract “${old.title}”: ${naira(lateFee)} late fee assessed and shop reputation reduced.`],
+        },
+      };
+      s = money(s, -lateFee, `Politician contract late fee: ${old.title}`);
+      s = msg(s, old.client, `The delivery deadline for “${old.title}” was missed. The contract is now failed. A ${naira(lateFee)} late fee was assessed, and your shop's reputation has fallen. Complete future orders before their deadline.`, 'danger');
+    }
+  }
+  contracts = [...(s.politicianContracts || contracts)];
+  const hasLive = contracts.some((row) => row.status === 'offered' || row.status === 'accepted');
+  const lastActivityDay = contracts.reduce((latest, row) => Math.max(latest, row.completedDay || row.offeredDay), 0);
+  if (hasLive || (!force && contracts.length > 0 && s.day < lastActivityDay + 3)) {
+    return contracts.length ? { ...s, politicianContracts: contracts.slice(-20) } : s;
+  }
+  const offer = makePoliticianContractOffer(s);
+  if (!offer) return s;
+  s = { ...s, politicianContracts: [...contracts, offer].slice(-20) };
+  s = msg(s, offer.client,
+    `NEW CLOTHING CONTRACT OFFER: “${offer.title}”. Estimated payment on complete delivery: ${naira(offer.reward)}. The offer expires after Day ${offer.offerExpiresDay}. Open the Contracts app to inspect the required goods, accept or decline, and source stock through your Yaba Mart Shopper.`,
+    'good');
+  return s;
+}
+
+/** Accepting locks in a deadline; the offer itself never charges the player. */
+export function acceptPoliticianContract(s0: GameState, contractId: string): GameState {
+  const contract = (s0.politicianContracts || []).find((row) => row.id === contractId);
+  if (!contract || contract.status !== 'offered' || s0.day > contract.offerExpiresDay) return s0;
+  if ((s0.politicianContracts || []).some((row) => row.status === 'accepted')) {
+    return msg(s0, 'Yaba Mart Contracts', 'You already have an accepted politician contract. Deliver it before taking on another.');
+  }
+  const accepted: PoliticianContract = { ...contract, status: 'accepted', acceptedDay: s0.day, deadlineDay: s0.day + contract.deadlineDays };
+  const s = {
+    ...s0,
+    politicianContracts: (s0.politicianContracts || []).map((row) => row.id === contractId ? accepted : row),
+    today: { ...s0.today, events: [...(s0.today?.events || []), `Accepted “${contract.title}” from ${contract.client}; delivery is due by Day ${accepted.deadlineDay}.`] },
+  };
+  return msg(s, contract.client, `Agreement confirmed. Please deliver all requested pieces by the end of Day ${accepted.deadlineDay}. The promised payment of ${naira(contract.reward)} is released only after delivery is verified.`, 'good');
+}
+
+/** Declining an offer has no financial penalty and frees the next offer after a short cooldown. */
+export function declinePoliticianContract(s0: GameState, contractId: string): GameState {
+  const contract = (s0.politicianContracts || []).find((row) => row.id === contractId);
+  if (!contract || contract.status !== 'offered') return s0;
+  const contracts = (s0.politicianContracts || []).map((row) =>
+    row.id === contractId ? { ...row, status: 'declined' as const, completedDay: s0.day } : row);
+  return msg({ ...s0, politicianContracts: contracts }, contract.client,
+    `Thank you for considering “${contract.title}”. I understand you cannot take it on right now. There is no fee for declining.`, 'info');
+}
+
+/** How many required pieces are currently in inventory (cart contents do not count until checkout). */
+export function politicianContractProgress(s: GameState, contract: PoliticianContract) {
+  const requirements = contract.requirements.map((requirement) => {
+    const available = (s.stock || []).filter((d) => d.kind === requirement.kind && d.itemId === requirement.itemId)
+      .reduce((sum, d) => sum + Math.max(0, d.pieces), 0);
+    return { ...requirement, available: Math.min(requirement.quantity, available), remaining: Math.max(0, requirement.quantity - available) };
+  });
+  return {
+    requirements,
+    complete: requirements.every((row) => row.remaining === 0),
+    totalRequired: requirements.reduce((sum, row) => sum + row.quantity, 0),
+    totalAvailable: requirements.reduce((sum, row) => sum + row.available, 0),
+  };
+}
+
+/** Deliver only when every required SKU/quantity exists; the exact inventory is removed. */
+export function deliverPoliticianContract(s0: GameState, contractId: string): GameState {
+  const contract = (s0.politicianContracts || []).find((row) => row.id === contractId);
+  if (!contract || contract.status !== 'accepted' || typeof contract.deadlineDay !== 'number' || s0.day > contract.deadlineDay) return s0;
+  if (!politicianContractProgress(s0, contract).complete) return s0;
+
+  let remaining = new Map<string, number>(contract.requirements.map((row) => [[row.kind, row.itemId].join('|'), row.quantity] as const));
+  let stock = [...s0.stock];
+  let costOfGoods = 0;
+  stock = stock.map((design) => {
+    const key = [design.kind, design.itemId].join('|');
+    const needed = remaining.get(key) || 0;
+    if (needed <= 0 || design.pieces <= 0) return design;
+    const used = Math.min(design.pieces, needed);
+    remaining.set(key, needed - used);
+    costOfGoods += used * design.cost;
+    return { ...design, pieces: design.pieces - used };
+  });
+  if ([...remaining.values()].some((n) => n > 0)) return s0;
+
+  const updatedContract = { ...contract, status: 'fulfilled' as const, completedDay: s0.day };
+  let s: GameState = {
+    ...s0,
+    stock,
+    politicianContracts: (s0.politicianContracts || []).map((row) => row.id === contractId ? updatedContract : row),
+    rep: clamp(s0.rep + 3, 0, 100),
+    followers: (s0.followers || 0) + Math.max(80, 80 * (s0.tier + 1)),
+    stats: { ...s0.stats, totalEarned: (s0.stats?.totalEarned || 0) + contract.reward - costOfGoods },
+    today: {
+      ...s0.today,
+      income: (s0.today?.income || 0) + contract.reward,
+      costs: (s0.today?.costs || 0) + costOfGoods,
+      events: [...(s0.today?.events || []), `Contract delivered: “${contract.title}” for ${contract.client}. Payment ${naira(contract.reward)}; inventory cost recognised ${naira(costOfGoods)}.`],
+    },
+  };
+  s = money(s, contract.reward, `Politician contract payment: ${contract.title}`);
+  s = msg(s, contract.client, `Delivery accepted. All requested goods for “${contract.title}” have been checked in. ${naira(contract.reward)} has been paid to your business, and your record with our office has improved. Thank you.`, 'good');
+  return refreshEveningHistory(s);
+}
+
 export function newGame(divine: CharacterConfig): GameState {
   const stock = STARTER.map(([kind, id, c, c2, pat]) => {
     const e = entryFor(kind as never, id)!;
@@ -174,6 +379,7 @@ export function newGame(divine: CharacterConfig): GameState {
   s = { ...s, today: { ...s.today, openingCash: s.cash } };
   s = msg(s, 'Deborah', `Sis! The kiosk is ready. I helped you stock it with ${naira(spent)} of clothes from Yaba market. You have ${naira(s.cash)} left. Rent is ${naira(TIERS[0].rent)} every 7 days. The place is small and rough, but we'll fix it up as the money comes.`, 'good');
   s = msg(s, 'Deborah', `The shop opens 8am to 8pm. Customers come in all day, busiest at lunch and after work. If you're slow, they get tired of waiting and leave, so move fast! Some only want hair or makeup, no clothes.`, 'info');
+  s = ensurePoliticianContractOffer(s, true);
   return s;
 }
 
@@ -598,10 +804,31 @@ export function applyLook(s0: GameState, c: Customer, choice: StyleChoice, st0: 
   // Apply every tip modifier before the day log, lifetime earnings, and bank receipt are updated.
   if (sold && st.tip && stats(s).tipBonus) st = { ...st, tip: Math.round((st.tip * (1 + stats(s).tipBonus)) / 100) * 100 };
   let stock = s.stock;
+  let productSales = [...(s.productSales || [])];
   const lookOut = sold ? buildLook(c, choice, s.stock) : c.look;
   if (sold) {
     const used = new Set(Object.entries(choice).filter(([k]) => !['hair', 'hairColor', 'makeup', 'makeupLook', 'beard'].includes(k)).map(([, v]) => v as string));
     stock = s.stock.map((d) => (used.has(d.uid) ? { ...d, pieces: d.pieces - 1 } : d));
+
+    // Record real product demand, not just daily revenue. Repeated sales in the same
+    // day are aggregated by exact variant, customer class and shop tier.
+    for (const uid of used) {
+      const design = s.stock.find((d) => d.uid === uid);
+      if (!design) continue;
+      const designKey = [design.kind, design.itemId, design.fabric, design.color, design.color2, design.pattern].join('|');
+      const at = productSales.findIndex((row) => row.day === s.day && row.designKey === designKey && row.customerClass === c.cls && row.tier === s.tier);
+      if (at >= 0) {
+        productSales[at] = { ...productSales[at], units: productSales[at].units + 1 };
+      } else {
+        productSales.push({
+          day: s.day, designKey, kind: design.kind, itemId: design.itemId,
+          fabric: design.fabric, color: design.color, color2: design.color2,
+          pattern: design.pattern, customerClass: c.cls, units: 1, tier: s.tier,
+        });
+      }
+    }
+    // Keep a generous rolling window so the save does not grow forever.
+    productSales = productSales.filter((row) => row.day >= s.day - 179).slice(-5000);
   }
   let regulars = s.regulars;
   if (c.regularId) {
@@ -626,6 +853,7 @@ export function applyLook(s0: GameState, c: Customer, choice: StyleChoice, st0: 
     ...s,
     rep: clamp(s.rep + (st.repDelta > 0 ? st.repDelta * (1 + coolNow(s) * 0.6) : st.repDelta), 0, 100),
     stock,
+    productSales,
     regulars,
     today,
     stats: { ...s.stats, served: s.stats.served + (sold ? 1 : 0), totalEarned: s.stats.totalEarned + (sold ? st.paid + st.tip - st.cost : 0), bestScore: Math.max(s.stats.bestScore, score.total) },
@@ -784,7 +1012,8 @@ export function closeShop(s0: GameState): GameState {
 }
 
 export function nextMorning(s: GameState): GameState {
-  return planDrop({ ...s, day: s.day + 1, weather: weatherForDay(s.day + 1, s.seed), phase: 'morning', ...freshDay, busy: null, energy: ENERGY.max, today: emptyLog(s.day + 1, s.cash) });
+  const next = planDrop({ ...s, day: s.day + 1, weather: weatherForDay(s.day + 1, s.seed), phase: 'morning', ...freshDay, busy: null, energy: ENERGY.max, today: emptyLog(s.day + 1, s.cash) });
+  return ensurePoliticianContractOffer(next);
 }
 
 /** Add a message to a specific WhatsApp thread without invoking a model call. */
@@ -1419,6 +1648,67 @@ export function cartLineCost(l: CartLine) {
 }
 export const cartTotal = (lines: CartLine[]) => lines.reduce((a, l) => a + cartLineCost(l), 0);
 
+export interface CartValidation {
+  ok: boolean;
+  total: number;
+  errors: string[];
+}
+
+/** Validate the entire order before any cash or inventory is changed. */
+export function validateCart(s: GameState, lines: CartLine[]): CartValidation {
+  const errors: string[] = [];
+  if (!Array.isArray(lines) || lines.length === 0) errors.push('Your cart is empty.');
+  if (Array.isArray(lines) && lines.length > 250) errors.push('Your cart contains too many separate lines.');
+  const seen = new Set<string>();
+  let total = 0;
+  for (const line of Array.isArray(lines) ? lines : []) {
+    if (!line || typeof line !== 'object') {
+      errors.push('The cart contains an invalid item.');
+      continue;
+    }
+    const entry = entryFor(line.kind, line.itemId);
+    if (!entry) {
+      errors.push('A cart item is not in the official Yaba Mart catalogue.');
+      continue;
+    }
+    if (!canBuy(entry, s.tier)) {
+      errors.push(`${entry.label} is locked at your current boutique level.`);
+      continue;
+    }
+    if (!Number.isInteger(line.pieces) || line.pieces < 1 || line.pieces > 500) {
+      errors.push(`${entry.label} has an invalid quantity. Quantities must be between 1 and 500 per line.`);
+      continue;
+    }
+    const palette = line.kind === 'hair' ? HAIR_SWATCHES.map((swatch) => swatch.color) : FABRIC_COLORS;
+    if (!palette.includes(line.color) || !palette.includes(line.color2)) {
+      errors.push(`${entry.label} has a colour that is not offered by the official market palette.`);
+      continue;
+    }
+    if (!Number.isInteger(line.pattern) || line.pattern < 0 || line.pattern > 32) {
+      errors.push(`${entry.label} has an invalid pattern.`);
+      continue;
+    }
+    if (line.kind === 'hair' && HAIR_SWATCHES[line.pattern]?.color !== line.color) {
+      errors.push(`${entry.label} has a hair colour/pattern combination that is not offered by the market.`);
+      continue;
+    }
+    const fabric = line.fabric || 'plain';
+    if (isClothing(line.kind) && !Object.prototype.hasOwnProperty.call(FABRIC_COST, fabric)) {
+      errors.push(`${entry.label} has an invalid fabric selection.`);
+      continue;
+    }
+    const canonicalKey = [line.kind, line.itemId, line.fabric || '', line.color, line.color2, line.pattern].join('|');
+    if (seen.has(canonicalKey)) {
+      errors.push(`Duplicate cart lines found for ${entry.label}. Combine duplicate quantities before checkout.`);
+      continue;
+    }
+    seen.add(canonicalKey);
+    total += pieceCost(entry, isClothing(line.kind) ? fabric as FabricId : undefined) * line.pieces;
+  }
+  if (errors.length === 0 && s.cash < total) errors.push('There is not enough available cash to pay for this cart.');
+  return { ok: errors.length === 0, total, errors };
+}
+
 const sameDesign = (d: Design, l: CartLine) => d.kind === l.kind && d.itemId === l.itemId && (!isClothing(l.kind) || d.fabric === (l.fabric || d.fabric)) && d.color === l.color && (!isClothing(l.kind) || (d.color2 === l.color2 && d.pattern === l.pattern));
 
 /** Number of new rack styles a cart introduces; extra colours do not consume more display slots. */
@@ -1437,7 +1727,8 @@ export const cartNewDesigns = (s: GameState, lines: CartLine[]) => {
 
 /** Pay for everything in the cart. Matching designs already in stock get topped up. */
 export function buyCart(s0: GameState, lines: CartLine[]): GameState {
-  if (s0.cash < cartTotal(lines)) return s0;
+  const validation = validateCart(s0, lines);
+  if (!validation.ok) return s0;
   let s = s0;
   for (const l of lines) {
     const e = entryFor(l.kind, l.itemId);
@@ -1446,7 +1737,27 @@ export function buyCart(s0: GameState, lines: CartLine[]): GameState {
     if (have) s = restock(s, have.uid, l.pieces);
     else s = buyDesign(s, makeDesign(e, { fabric: l.fabric, color: l.color, color2: l.color2, pattern: l.pattern, pieces: l.pieces }));
   }
-  return s;
+
+  // Mark a shopper order purchased only when its complete proposed quantity was
+  // actually present in this successful checkout. Keep quantities separate so
+  // two similar pending orders cannot both claim the same cart pieces.
+  const purchasedCounts = new Map<string, number>();
+  for (const line of lines) {
+    const key = [line.kind, line.itemId, line.fabric || '', line.color, line.color2, line.pattern].join('|');
+    purchasedCounts.set(key, (purchasedCounts.get(key) || 0) + line.pieces);
+  }
+  const shopperJobs = (s.shopperJobs || []).map((job) => {
+    if (job.status !== 'ready') return job;
+    const needed = new Map<string, number>();
+    for (const line of job.items) {
+      needed.set(line.key, (needed.get(line.key) || 0) + line.pieces);
+    }
+    const complete = [...needed.entries()].every(([key, amount]) => (purchasedCounts.get(key) || 0) >= amount);
+    if (!complete) return job;
+    for (const [key, amount] of needed) purchasedCounts.set(key, Math.max(0, (purchasedCounts.get(key) || 0) - amount));
+    return { ...job, status: 'purchased' as const };
+  });
+  return { ...s, shopperJobs };
 }
 
 /** Sell old stock back to the market at half price. */

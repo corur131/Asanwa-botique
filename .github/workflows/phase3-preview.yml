@@ -25,6 +25,8 @@ jobs:
         run: npm run build
         env:
           VITE_AI_API_BASE_URL: https://asanwa-botique.onrender.com
+          # Keep PR preview saves in browser-local fake cloud, never the live Firebase database.
+          VITE_FAKE_CLOUD: '1'
       - name: Check deploy key
         id: key
         env:

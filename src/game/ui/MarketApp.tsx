@@ -52,8 +52,8 @@ const Chip: React.FC<{ on?: boolean; onClick: () => void; children: React.ReactN
   <button onClick={onClick} className={`shrink-0 px-3 py-1.5 rounded-full text-xs font-semibold border ${on ? 'bg-orange-500 border-orange-500 text-white' : 'border-white/15 text-slate-200 bg-white/5'}`}>{children}</button>
 );
 
-export const MarketApp: React.FC<{ s: GameState; cart: CartLine[]; setCart: (f: (c: CartLine[]) => CartLine[]) => void; onPay: () => void; onBuyDrop: (n: number) => void }> = ({ s, cart, setCart, onPay, onBuyDrop }) => {
-  const [view, setView] = useState<'list' | 'item' | 'cart'>('list');
+export const MarketApp: React.FC<{ s: GameState; cart: CartLine[]; setCart: (f: (c: CartLine[]) => CartLine[]) => void; onPay: () => boolean; onBuyDrop: (n: number) => void; initialView?: 'list' | 'cart' }> = ({ s, cart, setCart, onPay, onBuyDrop, initialView = 'list' }) => {
+  const [view, setView] = useState<'list' | 'item' | 'cart'>(initialView);
   const [cat, setCat] = useState<MarketCategory>('clothes');
   const [who, setWho] = useState<'f' | 'm'>('f');
   const [origin, setOrigin] = useState<'all' | 'native' | 'english'>('all');
@@ -128,7 +128,7 @@ export const MarketApp: React.FC<{ s: GameState; cart: CartLine[]; setCart: (f: 
             </div>
             <div className="flex gap-2 pt-1">
               <button className="rounded-full border border-white/20 text-slate-200 text-sm px-4 py-2.5" onClick={() => setCart(() => [])}>Clear</button>
-              <button className="flex-1 rounded-full bg-orange-500 text-white font-bold py-2.5 disabled:opacity-40" disabled={s.cash < total} onClick={() => { onPay(); setFlash(`Paid ${naira(total)}. It's in the shop.`); setView('list'); setTimeout(() => setFlash(''), 2500); }}>
+              <button className="flex-1 rounded-full bg-orange-500 text-white font-bold py-2.5 disabled:opacity-40" disabled={s.cash < total} onClick={() => { const paid = onPay(); setFlash(paid ? `Paid ${naira(total)}. It's in the shop.` : 'Checkout was blocked. Check your funds and cart items, then try again.'); if (paid) setView('list'); setTimeout(() => setFlash(''), 3500); }}>
                 {s.cash < total ? 'Not enough money' : `Pay ${naira(total)}`}
               </button>
             </div>
