@@ -262,7 +262,7 @@ export function refuel(s: GameState, litres: number | 'full', uid?: string): Gam
   const next: GameState = {
     ...s,
     cash: s.cash - cost,
-    ledger: [line, ...(s.ledger || [])].slice(0, 150),
+    ledger: [line, ...(s.ledger || [])].slice(0, 500),
     power: { ...s.power, fuel: primary ? total : s.power.fuel, generatorFuel: { ...(s.power?.generatorFuel || {}), [target]: total } },
     today: { ...s.today, fuel: (s.today.fuel || 0) + cost, litres: (s.today.litres || 0) + l, costs: s.today.costs + cost },
   };

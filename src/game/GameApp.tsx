@@ -1009,7 +1009,8 @@ const WaitChip: React.FC<{ v: Visitor; clock: number; disabled: boolean; onClick
 
 const Evening: React.FC<{ s: GameState; onSleep: () => void; onPhone: () => void; onBuild: () => void; unread: number }> = ({ s, onSleep, onPhone, onBuild, unread }) => {
   const d = s.today;
-  const net = d.income - d.costs;
+  const flow = E.cashFlowSummary(s);
+  const net = flow.operatingResult;
   const todays = s.messages.filter((m) => m.day === s.day);
   return (
     <div className="p-4 max-w-2xl mx-auto space-y-3">
@@ -1020,7 +1021,7 @@ const Evening: React.FC<{ s: GameState; onSleep: () => void; onPhone: () => void
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
         {[
           ['Served', `${d.served}`],
-          ['Money in', naira(d.income)],
+          ['Business income', naira(d.income)],
           ['Left unserved', `${d.lost}`],
           ['Best look', d.bestScore ? `${d.bestScore}` : '–'],
         ].map(([k, v]) => (
@@ -1032,13 +1033,31 @@ const Evening: React.FC<{ s: GameState; onSleep: () => void; onPhone: () => void
       </div>
       <Card title="Today" className="bg-[#15171f]/95">
         <ul className="text-sm text-slate-300 space-y-1">
-          <li>Net today: <b className={net >= 0 ? 'text-emerald-300' : 'text-rose-300'}>{naira(net)}</b> (stock and furniture you bought this morning are already out of your cash)</li>
+          <li>Operating result: <b className={net >= 0 ? 'text-emerald-300' : 'text-rose-300'}>{naira(net)}</b> — today's recorded business income minus recorded costs. This is not the same as the change in your cash balance.</li>
           {d.tips > 0 && <li>Tips: {naira(d.tips)}</li>}
           {d.staffServed > 0 && <li>Your staff styled {d.staffServed} customer{d.staffServed > 1 ? 's' : ''}.</li>}
           {d.walkedOut > 0 && <li className="text-rose-300">{d.walkedOut} customer{d.walkedOut > 1 ? 's' : ''} didn't buy.</li>}
           <li>Brand Power {brandPower(getBrandMetrics(s), s.followers || 0, s.tier).toLocaleString("en-NG")} · {Math.round(s.followers || 0).toLocaleString("en-NG")} social followers</li>
           {d.events.map((e, i) => <li key={i}>{e}</li>)}
         </ul>
+      </Card>
+      <Card title="Cash flow · where your money went" className="bg-[#15171f]/95">
+        <div className="grid grid-cols-2 gap-2 text-sm">
+          <div className="rounded-lg border border-white/10 bg-black/15 p-3"><div className="text-[11px] text-slate-400">Cash at start of day</div><div className="mt-1 font-semibold text-white">{flow.openingCash === null ? 'Not recorded' : naira(flow.openingCash)}</div></div>
+          <div className="rounded-lg border border-white/10 bg-black/15 p-3"><div className="text-[11px] text-slate-400">Cash now</div><div className="mt-1 font-semibold text-white">{naira(flow.cash)}</div></div>
+          <div className="rounded-lg border border-white/10 bg-black/15 p-3"><div className="text-[11px] text-slate-400">Change in cash since morning</div><div className={'mt-1 font-semibold ' + (flow.cashChange !== null && flow.cashChange >= 0 ? 'text-emerald-300' : 'text-rose-300')}>{flow.cashChange === null ? 'Not available for this saved day' : (flow.cashChange > 0 ? '+' : '') + naira(flow.cashChange)}</div></div>
+          <div className="rounded-lg border border-white/10 bg-black/15 p-3"><div className="text-[11px] text-slate-400">Other cash movements</div><div className={'mt-1 font-semibold ' + (flow.otherMovement !== null && flow.otherMovement >= 0 ? 'text-emerald-300' : 'text-rose-300')}>{flow.otherMovement === null ? 'Not available' : (flow.otherMovement > 0 ? '+' : '') + naira(flow.otherMovement)}</div></div>
+        </div>
+        <p className="text-xs leading-relaxed text-slate-400">The calculation reconciles: starting cash + operating result + other cash movements = cash now. Other movements can include shop move-in fees, stock or furniture purchases, savings transfers, loan repayments and banking activity that is not part of today's recorded operating result.</p>
+        <div className="rounded-lg border border-emerald-400/15 bg-emerald-950/20 p-3 space-y-2">
+          <div className="text-xs font-semibold text-emerald-100">Money still held in KoboBank</div>
+          <div className="flex justify-between gap-3 text-sm"><span className="text-slate-300">Savings</span><b className="text-white">{naira(flow.savings)}</b></div>
+          <div className="flex justify-between gap-3 text-sm"><span className="text-slate-300">Rent Vault</span><b className="text-white">{naira(flow.rentVault)}</b></div>
+          <div className="flex justify-between gap-3 text-sm"><span className="text-slate-300">Fixed deposits (locked)</span><b className="text-white">{naira(flow.fixedDeposits)}</b></div>
+          <p className="text-[11px] text-slate-400">Money transferred to Savings or the Rent Vault has left your spending cash, but it has not been spent. It is still part of your money.</p>
+        </div>
+        {flow.openingCash === null && <p className="text-xs text-amber-200">This save was created before daily opening cash was tracked. Starting with the next morning, the report will reconcile the cash movement exactly.</p>}
+        {flow.recentMovements.length > 0 && <div className="space-y-2"><div className="text-xs font-semibold text-slate-200">Other account movements recorded today</div><div className="divide-y divide-white/[0.06]">{flow.recentMovements.map((line, i) => <div key={line.day + '-' + line.t + '-' + line.label + '-' + i} className="flex items-center justify-between gap-3 py-2 text-xs"><span className="min-w-0 text-slate-300">{line.label}</span><b className={line.amount >= 0 ? 'shrink-0 text-emerald-300' : 'shrink-0 text-rose-300'}>{line.amount > 0 ? '+' : ''}{naira(line.amount)}</b></div>)}</div></div>}
       </Card>
       {todays.length > 0 && (
         <Card title="Messages" className="bg-[#15171f]/95">

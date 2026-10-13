@@ -309,7 +309,7 @@ export function payBills(s0: GameState): GameState {
     if (!b.amount) continue;
     total += b.amount;
     const line = { day: s.day, t: -1, label: b.label, amount: -b.amount };
-    s = { ...s, cash: s.cash - b.amount, ledger: [line, ...(s.ledger || [])].slice(0, 150) };
+    s = { ...s, cash: s.cash - b.amount, ledger: [line, ...(s.ledger || [])].slice(0, 500) };
   }
   s = { ...s, meter: { kwh: 0 }, today: { ...s.today, costs: s.today.costs + total, events: [...s.today.events, `Paid ${naira(total)} in weekly bills.`] } };
   return text(s, 'Bills', `This week's bills:\n${bills.map((b) => `• ${b.label}: ${naira(b.amount)}`).join('\n')}\nTotal: ${naira(total)}. Paid from your account.`);
