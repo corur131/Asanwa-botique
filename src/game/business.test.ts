@@ -4,7 +4,7 @@ import type { Customer, GameState, Message } from './types';
 import { initRivals, simulateRivals } from './rivals';
 import { judge } from './encounters';
 import { answerInvite } from './encounters';
-import { money, payRent, settleLateRent, demote, closeShop } from './engine';
+import { money, payRent, settleLateRent, demote, closeShop, cashFlowSummary } from './engine';
 import {
   financialAssets,
   creditHistoryReport,
@@ -53,6 +53,38 @@ function state(overrides: Partial<GameState> = {}): GameState {
 test('closing an already-closed day is a no-op and cannot charge obligations twice', () => {
   const alreadyClosed = state({ phase: 'evening', day: 7, cash: 100_000 });
   assert.equal(closeShop(alreadyClosed), alreadyClosed);
+});
+
+test('daily cash-flow report reconciles opening cash, operating result and other movements', () => {
+  const before = state({
+    cash: 25_000,
+    today: { day: 10, income: 120_000, costs: 20_000, openingCash: 100_000, events: [] } as GameState['today'],
+    bank: { ...initialBankState(), savings: 40_000, rentVault: 15_000, fixedDeposits: [{ id: 'fd-test', amount: 10_000, ratePct: 1, openedDay: 1, maturityDay: 20 }] },
+  });
+  const report = cashFlowSummary(before);
+  assert.equal(report.openingCash, 100_000);
+  assert.equal(report.cash, 25_000);
+  assert.equal(report.operatingResult, 100_000);
+  assert.equal(report.cashChange, -75_000);
+  assert.equal(report.otherMovement, -175_000);
+  assert.equal(report.openingCash! + report.operatingResult + report.otherMovement!, report.cash);
+  assert.equal(report.savings, 40_000);
+  assert.equal(report.rentVault, 15_000);
+  assert.equal(report.fixedDeposits, 10_000);
+});
+
+test('older saves without an opening-cash snapshot do not invent a cash-change figure', () => {
+  const report = cashFlowSummary(state({ today: { day: 10, income: 4_000, costs: 1_000, events: [] } as GameState['today'] }));
+  assert.equal(report.openingCash, null);
+  assert.equal(report.cashChange, null);
+  assert.equal(report.otherMovement, null);
+});
+
+test('KoboBank ledger retains more than the former 150-entry limit', () => {
+  let current = state({ ledger: [] });
+  for (let i = 0; i < 200; i++) current = money(current, 100, 'Test receipt ' + i);
+  assert.equal(current.ledger.length, 200);
+  assert.equal(current.ledger[0].label, 'Test receipt 199');
 });
 
 test('moving money from cash to savings does not change total financial assets', () => {
