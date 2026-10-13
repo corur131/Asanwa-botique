@@ -489,6 +489,8 @@ export interface DepartmentOperation {
   targetUnits: number;
   inventoryUnits: number;
   inventoryValue: number;
+  /** Non-inventory fixtures/brand assets for valuation reconciliation. */
+  assetValue?: number;
   unitCost: number;
   unitPrice: number;
   cumulativeRevenue: number;
