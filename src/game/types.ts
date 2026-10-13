@@ -46,6 +46,7 @@ export interface ShopperJob {
   items: ShopperOrderLine[];
   summary: string;
   contractBrief?: string;
+  contractId?: string;
 }
 
 export type PoliticianContractStatus = 'offered' | 'accepted' | 'fulfilled' | 'failed' | 'declined' | 'expired';
