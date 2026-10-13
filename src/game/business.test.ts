@@ -555,7 +555,7 @@ test('rivals announce celebrity visits in news, chat, and their social feed', ()
   const base = state({
     day: 31, history: [], ranking: [], dailyRanking: [],
     listing: { area: 'Yaba' } as GameState['listing'],
-    today: { day: 31, bestScore: 0, events: [] } as GameState['today'],
+    today: { day: 31, bestScore: 0, events: [] } as unknown as GameState['today'],
     rivals: initRivals(), messages: [], gist: [], rivalPosts: [],
   });
   try {
