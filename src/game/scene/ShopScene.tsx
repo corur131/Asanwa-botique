@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { OrbitControls } from '@react-three/drei';
 import * as THREE from 'three';
@@ -133,26 +133,50 @@ export function spots(s: GameState) {
   return { door, outside, style, divine, wait, seatWait, seatSpots: seatWaitPool, staff, staffClient, street };
 }
 
+/** Render the whole floor as one instanced draw instead of hundreds of separate meshes.
+ * Large rooms otherwise create hundreds to 1,200 floor draw calls and repeatedly rebuild them as
+ * the game clock advances. Per-instance colours preserve the tiled finish without that overhead.
+ */
+function RoomFloorTiles({ r }: { r: RoomStyle }) {
+  const mesh = useRef<THREE.InstancedMesh>(null);
+  const count = r.w * r.d;
+  const geometry = useMemo(() => new THREE.BoxGeometry(0.98, 0.05, 0.98), []);
+  const material = useMemo(() => new THREE.MeshStandardMaterial({
+    color: '#FFFFFF',
+    roughness: r.signature ? 0.18 : ['marble', 'flagship', 'maison', 'empire'].includes(r.kind) ? 0.25 : 0.9,
+    metalness: r.signature ? 0.08 : ['flagship', 'maison', 'empire'].includes(r.kind) ? 0.1 : 0,
+  }), [r.signature, r.kind]);
+  useEffect(() => () => geometry.dispose(), [geometry]);
+  useEffect(() => () => material.dispose(), [material]);
+  useLayoutEffect(() => {
+    const instanced = mesh.current;
+    if (!instanced) return;
+    const dummy = new THREE.Object3D();
+    const a = new THREE.Color(r.floor);
+    const b = new THREE.Color(r.floor2);
+    let index = 0;
+    for (let z = 0; z < r.d; z++) {
+      for (let x = 0; x < r.w; x++) {
+        dummy.position.set(x + 0.5, -0.025, z + 0.5);
+        dummy.updateMatrix();
+        instanced.setMatrixAt(index, dummy.matrix);
+        const alternate = r.signature
+          ? (Math.floor(x / 2) + Math.floor(z / 2)) % 2 === 1
+          : (x + z) % 2 === 1;
+        instanced.setColorAt(index, alternate ? a : b);
+        index++;
+      }
+    }
+    instanced.count = count;
+    instanced.instanceMatrix.needsUpdate = true;
+    if (instanced.instanceColor) instanced.instanceColor.needsUpdate = true;
+    instanced.computeBoundingSphere();
+  }, [count, r.w, r.d, r.floor, r.floor2, r.signature]);
+  return <instancedMesh ref={mesh} args={[geometry, material, count]} receiveShadow={count <= 220} castShadow={false} />;
+}
+
 export function Room({ r, tier, painted }: { r: RoomStyle; tier: number; painted?: boolean }) {
   const H = r.height;
-  const tiles = useMemo(() => {
-    const out: React.ReactNode[] = [];
-    for (let z = 0; z < r.d; z++)
-      for (let x = 0; x < r.w; x++)
-        out.push(
-          <mesh key={`${x}-${z}`} position={[x + 0.5, -0.025, z + 0.5]} receiveShadow>
-            <boxGeometry args={[0.98, 0.05, 0.98]} />
-            <meshStandardMaterial
-              color={r.signature
-                ? (Math.floor(x / 2) + Math.floor(z / 2)) % 2 ? r.floor : r.floor2
-                : (x + z) % 2 ? r.floor : r.floor2}
-              roughness={r.signature ? 0.18 : r.kind === 'marble' || r.kind === 'flagship' || r.kind === 'maison' || r.kind === 'empire' ? 0.25 : 0.9}
-              metalness={r.signature ? 0.08 : r.kind === 'flagship' || r.kind === 'maison' || r.kind === 'empire' ? 0.1 : 0}
-            />
-          </mesh>,
-        );
-    return out;
-  }, [r]);
   const door = Math.floor(r.w / 2);
   const ridges = r.kind === 'container' && !r.signature;
   const signatureGold = ['#78C8D5', '#A8BCFF', '#FFD54A', '#D6B86C', '#F0CD78', '#D7B879', '#E4C56E'][tier] || '#F0CD78';
@@ -178,7 +202,7 @@ export function Room({ r, tier, painted }: { r: RoomStyle; tier: number; painted
         <planeGeometry args={[r.w + 6, 2.2]} />
         <meshStandardMaterial color="#9A968A" roughness={1} />
       </mesh>
-      {tiles}
+      <RoomFloorTiles r={r} />
       {/* Actual internal partitions for the Level 6 Maison and Level 7 Empire House.
           The grid definition and this geometry share the same doorway openings. */}
       {(r.partitions || []).map((partition, partitionIndex) => {
@@ -249,6 +273,74 @@ export function Room({ r, tier, painted }: { r: RoomStyle; tier: number; painted
           <B p={[portalCenter + 3.2, H * 0.5, r.d + 0.13]} s={[1.65, H * 0.82, 0.1]} c="#C1B0CC" m={0.18} r={0.16} o={0.32} />
           <B p={[portalCenter, H + 0.31, r.d + 0.25]} s={[5.2, 0.08, 1.0]} c="#171521" r={0.18} />
           <B p={[portalCenter, H + 0.36, r.d + 0.25]} s={[5.25, 0.035, 0.98]} c="#E4C56E" m={0.82} />
+        </>
+      )}
+      {r.kind === 'maison' && !r.signature && (
+        <>
+          {/* Quiet luxury: ivory wall panels, champagne-brass fluting, warm ceiling coves,
+              framed fashion art, and a pale, clearly laid-out aisle. */}
+          {Array.from({ length: 13 }, (_, i) => {
+            const x = 1.05 + i * (Math.max(0, r.w - 2.1) / 12);
+            return <B key={'maison-flute-' + i} p={[x, H * 0.54, 0.055]} s={[0.035, H * 0.76, 0.06]} c={i % 3 === 0 ? '#C6A66D' : '#E8DFD1'} m={i % 3 === 0 ? 0.72 : 0.12} r={0.3} />;
+          })}
+          {[0.13, 0.31, 0.69, 0.87].map((fraction, i) => {
+            const x = r.w * fraction;
+            return (
+              <React.Fragment key={'maison-gallery-' + i}>
+                <B p={[x, H * 0.59, 0.075]} s={[1.75, 2.05, 0.08]} c="#C6A66D" m={0.64} r={0.32} />
+                <B p={[x, H * 0.59, 0.125]} s={[1.58, 1.88, 0.035]} c={i % 2 ? '#33483F' : '#E8E0D5'} r={0.7} />
+                <B p={[x, H * 0.30, 0.15]} s={[1.18, 0.05, 0.035]} c="#E9D8B6" m={0.36} />
+              </React.Fragment>
+            );
+          })}
+          <B p={[r.w / 2, 0.018, r.d / 2 + 0.2]} s={[2.15, 0.025, r.d - 1.2]} c="#BCA782" r={0.72} />
+          <B p={[r.w / 2 - 1.13, 0.027, r.d / 2 + 0.2]} s={[0.045, 0.018, r.d - 1.2]} c="#C6A66D" m={0.8} e="#C6A66D" ei={0.12} />
+          <B p={[r.w / 2 + 1.13, 0.027, r.d / 2 + 0.2]} s={[0.045, 0.018, r.d - 1.2]} c="#C6A66D" m={0.8} e="#C6A66D" ei={0.12} />
+          {Array.from({ length: 5 }, (_, i) => (
+            <B key={'maison-ceiling-cove-' + i} p={[r.w * (0.18 + i * 0.16), H - 0.1, r.d / 2]} s={[0.045, 0.035, r.d - 1]} c="#F7E7C8" e="#F7E7C8" ei={0.55} r={0.4} />
+          ))}
+          {[r.w * 0.18, r.w * 0.82].map((x, i) => (
+            <group key={'maison-art-light-' + i} position={[x, H - 0.28, 0.12]}>
+              <B p={[0, 0, 0]} s={[1.15, 0.045, 0.06]} c="#FFF1D4" e="#FFF1D4" ei={0.7} />
+              <B p={[0, -0.1, 0]} s={[0.06, 0.18, 0.055]} c="#C6A66D" m={0.7} />
+            </group>
+          ))}
+        </>
+      )}
+      {r.kind === 'empire' && !r.signature && (
+        <>
+          {/* A genuinely different house: dark jewel-tone panels, illuminated centre runway,
+              monumental gold emblem and a geometric, lit ceiling grid. */}
+          <B p={[r.w / 2, 0.022, r.d / 2 + 0.6]} s={[3.7, 0.035, r.d - 1.25]} c="#241D2C" r={0.35} />
+          <B p={[r.w / 2 - 1.92, 0.034, r.d / 2 + 0.6]} s={[0.055, 0.025, r.d - 1.25]} c="#E4C56E" m={0.82} e="#E4C56E" ei={0.48} />
+          <B p={[r.w / 2 + 1.92, 0.034, r.d / 2 + 0.6]} s={[0.055, 0.025, r.d - 1.25]} c="#E4C56E" m={0.82} e="#E4C56E" ei={0.48} />
+          <B p={[r.w / 2, 2.65, 0.12]} s={[5.8, 2.45, 0.12]} c="#171521" r={0.28} />
+          <B p={[r.w / 2, 2.65, 0.2]} s={[5.35, 2.16, 0.055]} c="#E4C56E" m={0.8} r={0.22} />
+          <B p={[r.w / 2, 2.65, 0.245]} s={[5.12, 1.95, 0.05]} c="#2D2435" r={0.35} />
+          <B p={[r.w / 2, 2.65, 0.29]} s={[1.15, 1.15, 0.065]} c="#E4C56E" m={0.82} r={0.2} rot={[0, 0, Math.PI / 4]} />
+          <B p={[r.w / 2, 2.65, 0.335]} s={[0.67, 0.67, 0.075]} c="#1A1722" m={0.36} r={0.24} rot={[0, 0, Math.PI / 4]} />
+          {Array.from({ length: 12 }, (_, i) => {
+            const x = 1.2 + i * (Math.max(0, r.w - 2.4) / 11);
+            return (
+              <React.Fragment key={'empire-gold-flute-' + i}>
+                <B p={[x, H * 0.53, 0.075]} s={[0.045, H * 0.76, 0.06]} c="#E4C56E" m={0.78} r={0.22} />
+                <B p={[x + 0.08, H * 0.53, 0.07]} s={[0.05, H * 0.72, 0.06]} c="#403449" r={0.3} />
+              </React.Fragment>
+            );
+          })}
+          {Array.from({ length: 6 }, (_, i) => (
+            <B key={'empire-ceiling-longitudinal-' + i} p={[r.w * (0.12 + i * 0.152), H - 0.08, r.d / 2]} s={[0.065, 0.04, r.d - 0.8]} c="#C9A75D" m={0.82} e="#C9A75D" ei={0.35} r={0.28} />
+          ))}
+          {Array.from({ length: 6 }, (_, i) => (
+            <B key={'empire-ceiling-crossbeam-' + i} p={[r.w / 2, H - 0.065, r.d * (0.13 + i * 0.145)]} s={[r.w - 0.8, 0.045, 0.055]} c="#7D6A9B" m={0.4} e="#8C76B6" ei={0.28} r={0.3} />
+          ))}
+          {[0.2, 0.4, 0.6, 0.8].map((fraction, i) => (
+            <React.Fragment key={'empire-showroom-gallery-' + i}>
+              <B p={[r.w * fraction, H * 0.58, 0.08]} s={[1.65, 2.45, 0.085]} c="#E4C56E" m={0.76} r={0.24} />
+              <B p={[r.w * fraction, H * 0.58, 0.135]} s={[1.46, 2.25, 0.045]} c={i % 2 ? '#362940' : '#172C3C'} r={0.35} />
+              <B p={[r.w * fraction, H * 0.58, 0.17]} s={[0.12, 1.7, 0.025]} c="#C9A75D" m={0.82} e="#C9A75D" ei={0.4} />
+            </React.Fragment>
+          ))}
         </>
       )}
       {/* trim */}
@@ -936,10 +1028,22 @@ function CameraRig({ view, r }: { view: View; r: RoomStyle }) {
 
 export default function ShopScene(p: SceneProps) {
   const { s } = p;
+  const [graphicsLost, setGraphicsLost] = useState(false);
+  const handleCanvasCreated = useCallback(({ gl }: { gl: THREE.WebGLRenderer }) => {
+    const canvas = gl.domElement;
+    const lost = (event: Event) => {
+      event.preventDefault();
+      setGraphicsLost(true);
+    };
+    const restored = () => setGraphicsLost(false);
+    canvas.addEventListener('webglcontextlost', lost);
+    canvas.addEventListener('webglcontextrestored', restored);
+  }, []);
   const view = p.view || 'angle';
-  const r = room(s.listing);
+  // Keep the room model stable while the simulation clock updates every fraction of a second.
+  const r = useMemo(() => room(s.listing), [s.listing.tier, s.listing.stars, s.listing.signature]);
   const fin = finishes(s.furniture);
-  const dressed: RoomStyle = { ...r, ...(fin.paint?.paint ? { wall: fin.paint.paint[0], wallLow: fin.paint.paint[1] } : {}), ...(fin.floor?.floorTiles ? { floor: fin.floor.floorTiles[0], floor2: fin.floor.floorTiles[1] } : {}) };
+  const dressed: RoomStyle = useMemo(() => ({ ...r, ...(fin.paint?.paint ? { wall: fin.paint.paint[0], wallLow: fin.paint.paint[1] } : {}), ...(fin.floor?.floorTiles ? { floor: fin.floor.floorTiles[0], floor2: fin.floor.floorTiles[1] } : {}) }), [r, fin.paint, fin.floor]);
   const blocked = useMemo(() => cellsBlocked(s.furniture, s.listing), [s.furniture, s.listing]);
   const sp = useMemo(() => spots(s), [s.furniture, s.listing]); // eslint-disable-line react-hooks/exhaustive-deps
   const cx = r.w / 2;
@@ -1069,11 +1173,11 @@ export default function ShopScene(p: SceneProps) {
     ];
   };
   return (
-    <div style={{ width: '100%', height: '100%', touchAction: 'none' }}>
-      <Canvas shadows dpr={[1, 1.75]} camera={{ fov: 32, position: [cx + dist * 0.75, dist * 0.95, cz + dist * 1.05], near: 0.1, far: 200 }} style={{ background: p.night ? 'linear-gradient(#0b0d1a,#1a1630)' : 'linear-gradient(#24305a,#3a4a7a)' }}>
+    <div style={{ position: 'relative', width: '100%', height: '100%', touchAction: 'none' }}>
+      <Canvas onCreated={handleCanvasCreated} shadows={r.w * r.d <= 220} dpr={[1, 1.25]} camera={{ fov: 32, position: [cx + dist * 0.75, dist * 0.95, cz + dist * 1.05], near: 0.1, far: 200 }} style={{ background: p.night ? 'linear-gradient(#0b0d1a,#1a1630)' : 'linear-gradient(#24305a,#3a4a7a)' }}>
         <ambientLight intensity={p.night ? 0.35 : p.dark ? 0.14 : 0.6} />
         <hemisphereLight args={['#FFF4E0', '#3A3A50', p.night ? 0.3 : p.dark ? 0.12 : 0.55]} />
-        <directionalLight position={[cx + 6, 12, cz + 8]} intensity={p.night ? 0.4 : p.dark ? 0.35 : 1.2} castShadow shadow-mapSize={[1024, 1024]} shadow-camera-left={-12} shadow-camera-right={12} shadow-camera-top={12} shadow-camera-bottom={-12} />
+        <directionalLight position={[cx + 6, 12, cz + 8]} intensity={p.night ? 0.4 : p.dark ? 0.35 : 1.2} castShadow={r.w * r.d <= 220} shadow-mapSize={[512, 512]} shadow-camera-left={-12} shadow-camera-right={12} shadow-camera-top={12} shadow-camera-bottom={-12} />
         <OrbitControls makeDefault target={[cx, 0.6, cz]} enablePan={free} enableRotate={!top} minPolarAngle={top ? 0 : free ? 0.05 : 0.45} maxPolarAngle={top ? 0.02 : free ? 1.52 : view === 'front' ? 1.45 : 1.2} minDistance={dist * 0.35} maxDistance={dist * 2} />
         <CameraRig view={view} r={r} />
         <Room r={dressed} tier={s.tier} painted={!!fin.paint} />
@@ -1112,6 +1216,15 @@ export default function ShopScene(p: SceneProps) {
           <meshBasicMaterial visible={false} />
         </mesh>
       </Canvas>
+      {graphicsLost && (
+        <div role="alert" className="absolute inset-0 z-50 flex items-center justify-center bg-[#10111a]/95 p-6 text-center text-white">
+          <div className="max-w-md space-y-3 rounded-2xl border border-white/15 bg-[#191b27] p-6 shadow-2xl">
+            <h3 className="text-lg font-bold">Shop graphics paused</h3>
+            <p className="text-sm text-slate-300">Your game is saved separately from the 3D picture. The browser ran out of graphics resources or reset the graphics context.</p>
+            <button className="rounded-xl bg-amber-400 px-4 py-2 font-semibold text-black" onClick={() => window.location.reload()}>Reload shop safely</button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -1121,7 +1234,7 @@ export function RoomPreview({ tier, stars, signature }: { tier: number; stars: n
   const r = room({ tier, stars, signature });
   const dist = Math.max(r.w, r.d) * 0.78 + 1.6;
   return (
-    <Canvas dpr={[1, 1.5]} camera={{ fov: 32, position: [r.w / 2 + dist * 0.75, dist * 0.95, r.d / 2 + dist * 1.05], near: 0.1, far: 200 }} style={{ background: 'linear-gradient(#24305a,#3a4a7a)' }}>
+    <Canvas dpr={[1, 1.25]} camera={{ fov: 32, position: [r.w / 2 + dist * 0.75, dist * 0.95, r.d / 2 + dist * 1.05], near: 0.1, far: 200 }} style={{ background: 'linear-gradient(#24305a,#3a4a7a)' }}>
       <ambientLight intensity={0.6} />
       <hemisphereLight args={['#FFF4E0', '#3A3A50', 0.55]} />
       <directionalLight position={[r.w / 2 + 6, 12, r.d / 2 + 8]} intensity={1.2} />

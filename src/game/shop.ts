@@ -614,8 +614,39 @@ const READY_FURNISHED_KITS: Record<number, string[]> = {
   2: ['goldRail', 'islandTable', 'glassCabinet', 'goldMirror', 'premiumFitting', 'sofa', 'trackLights', 'palm', 'goldWallpaper', 'marbleFloor'],
   3: ['goldRail', 'glassCabinet', 'displayWall', 'goldMirror', 'premiumFitting', 'velvetSofa', 'chandelier', 'windowPodium', 'jewelCounter', 'goldWallpaper', 'marbleFloor'],
   4: ['goldRail', 'glassCabinet', 'displayWall', 'mirrorWall', 'premiumFitting', 'velvetSofa', 'chandelier', 'windowPodium', 'jewelCounter', 'palm', 'goldWallpaper', 'marbleFloor'],
-  5: ['goldRail', 'goldRail', 'glassCabinet', 'displayWall', 'mirrorWall', 'premiumFitting', 'fittingRoom', 'velvetSofa', 'chandelier', 'windowPodium', 'jewelCounter', 'palm', 'goldWallpaper', 'marbleFloor', 'ledStrip'],
-  6: ['goldRail', 'goldRail', 'glassCabinet', 'displayWall', 'mirrorWall', 'premiumFitting', 'premiumFitting', 'fittingRoom', 'velvetSofa', 'chandelier', 'windowPodium', 'jewelCounter', 'palm', 'flowers', 'goldWallpaper', 'marbleFloor', 'ledStrip', 'bagWall', 'trackLights'],
+  // Level 6: Luxury Maison — tailored rails, VIP fitting, beauty stations, lounge seating,
+  // practical climate control, abundant warm lighting and restrained ivory/brass finishes.
+  5: [
+    'goldRail', 'goldRail', 'goldRail', 'glassCabinet', 'glassCabinet',
+    'displayWall', 'displayWall', 'mirrorWall', 'premiumFitting', 'fittingRoom', 'fittingRoom',
+    'velvetSofa', 'velvetSofa', 'jewelCounter', 'jewelCounter', 'archMirror',
+    'vanity', 'salonChair', 'makeupStation', 'boutiqueDesk', 'posTerminal',
+    'ceilingFan', 'ceilingFan', 'ceilingFan', 'ac', 'ac', 'standingAc', 'rechargeableFan', 'generator',
+    'chandelier', 'chandelier', 'trackLights', 'trackLights', 'ceilingSpots',
+    'ledStrip', 'ledStrip', 'ledStrip', 'ledStrip',
+    'bagWall', 'bagWall', 'neon', 'wallArt', 'wallArt', 'palm', 'palm', 'flowers',
+    'diffuser', 'waterDispenser', 'fireExtinguisher', 'paintWhite', 'herringbone',
+  ],
+  // Level 7: Fashion Empire House — a flagship showroom, several climate units, premium workrooms,
+  // an extensive media wall and a dramatic midnight/navy-and-gold visual treatment.
+  6: [
+    'goldRail', 'goldRail', 'goldRail', 'goldRail',
+    'glassCabinet', 'glassCabinet', 'glassCabinet', 'displayWall', 'displayWall', 'displayWall',
+    'mirrorWall', 'mirrorWall', 'premiumFitting', 'premiumFitting',
+    'fittingRoom', 'fittingRoom', 'fittingRoom', 'velvetSofa', 'velvetSofa', 'velvetSofa',
+    'jewelCounter', 'jewelCounter', 'jewelCounter', 'archMirror', 'archMirror',
+    'vanity', 'vanity', 'salonChair', 'salonChair', 'makeupStation', 'makeupStation',
+    'boutiqueDesk', 'posTerminal',
+    'ceilingFan', 'ceilingFan', 'ceilingFan', 'ceilingFan',
+    'ac', 'ac', 'ac', 'standingAc', 'standingAc', 'rechargeableFan', 'rechargeableFan', 'generator',
+    'chandelier', 'chandelier', 'chandelier', 'trackLights', 'trackLights', 'ceilingSpots', 'ceilingSpots',
+    'ledStrip', 'ledStrip', 'ledStrip', 'ledStrip', 'ledStrip', 'ledStrip',
+    'bagWall', 'bagWall', 'bagWall', 'neon', 'neon', 'wallArt', 'wallArt', 'wallArt',
+    'flowerWall', 'cctv', 'fireExtinguisher',
+    'palm', 'palm', 'palm', 'flowers', 'flowers', 'diffuser', 'diffuser',
+    'waterDispenser', 'waterDispenser', 'fluffyRug', 'fluffyRug',
+    'paintNavy', 'marbleFloor',
+  ],
 };
 
 function furnishedKitIds(tier: RoomKey): string[] {

@@ -18,7 +18,7 @@ import {
 } from './shop';
 import { TIERS } from './economy';
 import { DIVINE_CONFIG } from '../constants/presets';
-import { fromData, newGame, moveTo, previewCashGrant } from './engine';
+import { fromData, newGame, moveTo, openShop, previewCashGrant } from './engine';
 
 function ownedStarterEquipment(): Placed[] {
   return STARTER_FURNITURE.map((item) => ({ ...item, uid: newUid() }));
@@ -199,4 +199,41 @@ test('preview cash grants add ₦20 billion once per preview revision and remain
   assert.equal(nextRevision.cash, original.cash + amount * 2, 'a fresh preview revision gets its own one-time grant');
   assert.equal(previewCashGrant(original, 'pr-30-revision-a', 0), original, 'invalid grant amounts are ignored');
   assert.ok(first.ledger.some((line) => line.label === 'Preview testing balance' && line.amount === amount));
+});
+
+test('Level 6 and Level 7 furnished packages contain practical luxury equipment and decor', () => {
+  const expectations = [
+    { tier: 5, minPlaced: 24, ceilingFans: 3, acUnits: 2, sofas: 2, makeupStations: 1, ledStrips: 4, wallArt: 2 },
+    { tier: 6, minPlaced: 34, ceilingFans: 4, acUnits: 3, sofas: 3, makeupStations: 2, ledStrips: 6, wallArt: 3 },
+  ];
+  for (const expected of expectations) {
+    const destination = listingsFor(expected.tier, 0).find((listing) => !listing.signature && listing.stars === 2)!;
+    const owned = ownedStarterEquipment();
+    const ownedUids = new Set(owned.map((item) => item.uid));
+    const fitout = prepareFurnitureForMove(owned, destination, 'furnished');
+    const kit = fitout.furniture.filter((item) => !ownedUids.has(item.uid));
+    const placed = kit.filter((item) => item.placed);
+    const count = (id: string) => kit.filter((item) => item.id === id).length;
+    assert.ok(placed.length >= expected.minPlaced, `tier ${expected.tier + 1} should arrange a full fitout, not just a few chairs`);
+    assert.ok(count('ceilingFan') >= expected.ceilingFans);
+    assert.ok(count('ac') >= expected.acUnits);
+    assert.ok(count('velvetSofa') >= expected.sofas);
+    assert.ok(count('makeupStation') >= expected.makeupStations);
+    assert.ok(count('ledStrip') >= expected.ledStrips);
+    assert.ok(count('wallArt') >= expected.wallArt);
+    assert.ok(count('generator') >= 1, 'the high-end shop should have backup power equipment');
+    assert.ok(count('chandelier') >= (expected.tier === 5 ? 2 : 3));
+    assert.ok(count(expected.tier === 5 ? 'herringbone' : 'marbleFloor') >= 1, 'floor finish should match the store tier');
+    assert.ok(count(expected.tier === 5 ? 'paintWhite' : 'paintNavy') >= 1, 'wall finish should match the store tier');
+  }
+});
+
+test('normal Level 6 and 7 properties receive celebrities on their scheduled luxury visit days', () => {
+  for (const tier of [5, 6]) {
+    const fresh = newGame(DIVINE_CONFIG);
+    const destination = listingsFor(tier, 0).find((listing) => !listing.signature && listing.stars === 2)!;
+    const state = { ...fresh, tier, listing: destination, day: 1, phase: 'prepare' as const };
+    const opened = openShop(state);
+    assert.ok(opened.arrivals.some((arrival) => !!arrival.c.celebrity), `regular level ${tier + 1} property must receive its tier-scheduled VIP`);
+  }
 });
