@@ -229,14 +229,38 @@ export function prepareShopperOrder(
   // Keep the order small enough to be reviewed and suitable for this shop's scale.
   const maxLines = [6, 8, 10, 13, 16][Math.max(0, Math.min(4, s.tier))] || 6;
   candidates.sort((a, b) => b.score - a.score || a.unitCost - b.unitCost || a.entry.label.localeCompare(b.entry.label));
+  const remainingCandidates = [...candidates];
   const chosen: ShopperOrderLine[] = [];
   const pickedProducts = new Set<string>();
+  const pickedKinds = new Map<string, number>();
+  const pickedGroups = new Map<string, number>();
   let spent = 0;
 
-  for (const candidate of candidates) {
-    if (chosen.length >= maxLines) break;
+  // Re-rank after each pick. Variety and premium missions gently penalise overrepresented
+  // kinds and catalogue groups, so the shopper does not fill the cart with near-copies.
+  while (chosen.length < maxLines && remainingCandidates.length) {
+    let bestIndex = -1;
+    let bestScore = Number.NEGATIVE_INFINITY;
+    for (let i = 0; i < remainingCandidates.length; i++) {
+      const candidate = remainingCandidates[i];
+      const key = [candidate.entry.kind, candidate.entry.id].join('|');
+      if (pickedProducts.has(key)) continue;
+      const kind = candidate.entry.kind;
+      const group = candidate.entry.group.toLowerCase();
+      const kindStock = representedKinds.get(kind) || 0;
+      const kindPicks = pickedKinds.get(kind) || 0;
+      const groupPicks = pickedGroups.get(group) || 0;
+      const diversityPenalty = mission === 'restock' ? 0
+        : Math.min(7, Math.log1p(kindStock) * 1.3) + kindPicks * 3 + groupPicks * 2.5;
+      const adjustedScore = candidate.score - diversityPenalty;
+      if (adjustedScore > bestScore) {
+        bestScore = adjustedScore;
+        bestIndex = i;
+      }
+    }
+    if (bestIndex < 0) break;
+    const candidate = remainingCandidates.splice(bestIndex, 1)[0];
     const productKey = [candidate.entry.kind, candidate.entry.id].join('|');
-    if (pickedProducts.has(productKey)) continue;
     const remaining = budget - spent;
     if (remaining < candidate.unitCost) continue;
     const quantity = Math.min(candidate.suggestedPieces, Math.floor(remaining / candidate.unitCost));
@@ -244,6 +268,10 @@ export function prepareShopperOrder(
     const line = { ...candidate.line, pieces: quantity };
     chosen.push(line);
     pickedProducts.add(productKey);
+    const kind = candidate.entry.kind;
+    const group = candidate.entry.group.toLowerCase();
+    pickedKinds.set(kind, (pickedKinds.get(kind) || 0) + 1);
+    pickedGroups.set(group, (pickedGroups.get(group) || 0) + 1);
     spent += candidate.unitCost * quantity;
   }
 
