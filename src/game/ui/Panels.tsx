@@ -315,6 +315,8 @@ export const MovePanel: React.FC<{ s: GameState; onMove: (l: Listing, plan: Move
               <div>
                 <div className="text-sm font-semibold text-white">{l.street} {l.signature && <Pill tone="gold">✦ SIGNATURE</Pill>}</div>
                 <div className="text-[10px] font-semibold uppercase tracking-wider text-amber-300">{sameTier ? `SAME-TIER ALTERNATIVE · ${TIERS[l.tier].name} Signature` : l.signature ? `NEXT-TIER UPGRADE · ${TIERS[l.tier].name} Signature` : `${TIERS[l.tier].name} · Standard listing`}</div>
+                {l.signature && l.tier === 5 && <div className="mt-1 text-[10px] font-bold uppercase tracking-wide text-emerald-200">Botanical Glass Atrium · living greenery · copper-framed glass canopy</div>}
+                {l.signature && l.tier === 6 && <div className="mt-1 text-[10px] font-bold uppercase tracking-wide text-sky-200">Cobalt Gallery · ivory stone · cobalt and coral architecture</div>}
                 <div className="text-[11px] text-slate-400">{l.area} · <Stars n={l.stars} /> · {roomOf(l).w}×{roomOf(l).d} m floor</div>
               </div>
               <Btn size="sm" tone="gold" onClick={() => { setMovePlan('arrange'); setPick(l0); }}>View</Btn>

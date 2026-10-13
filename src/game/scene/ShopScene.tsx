@@ -513,6 +513,13 @@ export function Room({ r, tier, painted }: { r: RoomStyle; tier: number; painted
           {/* SIGNATURE LEVEL 6 — BOTANICAL ATRIUM
               A conservatory rather than the regular Maison: forest-jade walls, copper frames,
               glass bays, a planted wall, leafy corners and an open glass-roof promenade. */}
+          {/* Copper portal and clear sidelights frame the entrance to the conservatory. */}
+          <B p={[portalCenter - Math.min(3.2, r.w * 0.10), H * 0.53, r.d + 0.19]} s={[0.22, H + 0.18, 0.24]} c="#C77E56" m={0.68} r={0.26} />
+          <B p={[portalCenter + Math.min(3.2, r.w * 0.10), H * 0.53, r.d + 0.19]} s={[0.22, H + 0.18, 0.24]} c="#C77E56" m={0.68} r={0.26} />
+          <B p={[portalCenter, H + 0.08, r.d + 0.19]} s={[Math.min(6.8, r.w * 0.22), 0.22, 0.26]} c="#164A40" r={0.34} />
+          <B p={[portalCenter, H + 0.20, r.d + 0.20]} s={[Math.min(6.9, r.w * 0.225), 0.035, 0.27]} c="#C77E56" m={0.68} e="#C77E56" ei={0.18} />
+          <B p={[portalCenter - 4.25, H * 0.49, r.d + 0.15]} s={[1.25, H * 0.64, 0.035]} c="#A9DED0" r={0.22} o={0.28} />
+          <B p={[portalCenter + 4.25, H * 0.49, r.d + 0.15]} s={[1.25, H * 0.64, 0.035]} c="#A9DED0" r={0.22} o={0.28} />
           {Array.from({ length: 7 }, (_, i) => {
             const x = r.w * (0.08 + i * 0.14);
             const paneW = r.w * 0.105;
@@ -523,6 +530,14 @@ export function Room({ r, tier, painted }: { r: RoomStyle; tier: number; painted
                 <B p={[x + paneW / 2, H * 0.53, 0.08]} s={[0.09, H * 0.67, 0.09]} c="#C77E56" m={0.62} r={0.28} />
                 <B p={[x, H * 0.23, 0.08]} s={[paneW, 0.08, 0.09]} c="#C77E56" m={0.62} r={0.28} />
                 <B p={[x, H * 0.83, 0.08]} s={[paneW, 0.08, 0.09]} c="#C77E56" m={0.62} r={0.28} />
+                {i % 2 === 0 && (
+                  <>
+                    <B p={[x - paneW * 0.37, H * 0.53, 0.12]} s={[paneW * 0.14, H * 0.57, 0.025]} c="#F0E5D1" r={0.9} o={0.78} />
+                    <B p={[x + paneW * 0.37, H * 0.53, 0.12]} s={[paneW * 0.14, H * 0.57, 0.025]} c="#F0E5D1" r={0.9} o={0.78} />
+                    <B p={[x - paneW * 0.30, H * 0.52, 0.15]} s={[paneW * 0.19, 0.09, 0.035]} c="#C77E56" m={0.36} r={0.32} />
+                    <B p={[x + paneW * 0.30, H * 0.52, 0.15]} s={[paneW * 0.19, 0.09, 0.035]} c="#C77E56" m={0.36} r={0.32} />
+                  </>
+                )}
               </React.Fragment>
             );
           })}
@@ -568,6 +583,23 @@ export function Room({ r, tier, painted }: { r: RoomStyle; tier: number; painted
           ))}
           <B p={[r.w / 2, H - 0.16, 0.13]} s={[r.w - 1, 0.045, 0.055]} c="#F5D8A5" e="#F5D8A5" ei={0.85} r={0.35} />
           <B p={[0.13, H - 0.16, r.d / 2]} s={[0.055, 0.045, r.d - 1]} c="#F5D8A5" e="#F5D8A5" ei={0.7} r={0.35} />
+          {/* Three warm ring pendants light the organic stone island. */}
+          {[0.27, 0.50, 0.73].map((fraction, i) => (
+            <group key={'atrium-ring-pendant-' + i} position={[r.w * fraction, H - 0.28, r.d * 0.34]}>
+              <B p={[0, 0.16, 0]} s={[0.035, 0.30, 0.035]} c="#C77E56" m={0.72} />
+              <mesh position={[0, -0.05, 0]} rotation={[Math.PI / 2, 0, 0]}>
+                <torusGeometry args={[0.48, 0.04, 8, 36]} />
+                <meshStandardMaterial color="#F5D8A5" metalness={0.5} roughness={0.28} emissive="#F5D8A5" emissiveIntensity={0.78} />
+              </mesh>
+              <mesh position={[0, -0.13, 0]}>
+                <sphereGeometry args={[0.10, 10, 8]} />
+                <meshStandardMaterial color="#FFF0C9" emissive="#FFE3A0" emissiveIntensity={1.05} roughness={0.24} />
+              </mesh>
+            </group>
+          ))}
+          {/* A quiet woven rug softens the stone walkway. */}
+          <B p={[r.w * 0.34, 0.018, r.d * 0.64]} s={[Math.min(7, r.w * 0.19), 0.02, Math.min(4.8, r.d * 0.21)]} c="#CFC7AE" r={0.96} />
+          <B p={[r.w * 0.34, 0.031, r.d * 0.64 - Math.min(4.8, r.d * 0.21) / 2]} s={[Math.min(7, r.w * 0.19), 0.018, 0.035]} c="#D28A5F" m={0.42} />
           {/* Natural-stone island medallion and restrained copper edge lines. */}
           <mesh position={[r.w * 0.70, 0.025, r.d * 0.58]} rotation={[-Math.PI / 2, 0, 0]}>
             <torusGeometry args={[Math.min(2.3, r.d * 0.09), 0.045, 8, 48]} />
@@ -585,6 +617,13 @@ export function Room({ r, tier, painted }: { r: RoomStyle; tier: number; painted
           {/* SIGNATURE LEVEL 7 — COBALT GALLERY
               Bright limestone, cobalt wainscoting, warm walnut/coral slats, sculptural frames and
               an oversized contemporary art wall. This is intentionally unlike the dark Empire House. */}
+          {/* Sculptural cobalt-and-coral entrance, distinct from the regular Empire's bronze portal. */}
+          <B p={[portalCenter - Math.min(4.0, r.w * 0.12), H * 0.53, r.d + 0.21]} s={[0.30, H + 0.30, 0.30]} c="#294A80" m={0.28} r={0.32} />
+          <B p={[portalCenter + Math.min(4.0, r.w * 0.12), H * 0.53, r.d + 0.21]} s={[0.30, H + 0.30, 0.30]} c="#294A80" m={0.28} r={0.32} />
+          <B p={[portalCenter, H + 0.12, r.d + 0.21]} s={[Math.min(8.4, r.w * 0.25), 0.28, 0.34]} c="#CF7052" m={0.34} r={0.28} />
+          <B p={[portalCenter, H + 0.28, r.d + 0.22]} s={[Math.min(8.6, r.w * 0.255), 0.045, 0.35]} c="#F4EBDD" r={0.44} />
+          <B p={[portalCenter, 0.034, r.d + 0.25]} s={[Math.min(8.2, r.w * 0.24), 0.06, 0.72]} c="#294A80" r={0.34} />
+          <B p={[portalCenter, 0.067, r.d + 0.25]} s={[Math.min(7.9, r.w * 0.23), 0.025, 0.62]} c="#CF7052" r={0.36} />
           {Array.from({ length: 18 }, (_, i) => {
             const x = 0.65 + i * ((r.w - 1.3) / 17);
             return (
