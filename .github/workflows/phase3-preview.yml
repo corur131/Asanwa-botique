@@ -25,6 +25,9 @@ jobs:
         run: npm run build
         env:
           VITE_AI_API_BASE_URL: https://asanwa-botique.onrender.com
+          # Preview-only one-time balance grant: a fresh grant ID per PR revision prevents repeat grants on reload.
+          VITE_PREVIEW_CASH_GRANT_ID: pr-${{ github.event.number }}-${{ github.event.pull_request.head.sha }}
+          VITE_PREVIEW_CASH_GRANT_AMOUNT: '20000000000'
           # Keep PR preview saves in browser-local fake cloud, never the live Firebase database.
           VITE_FAKE_CLOUD: '1'
       - name: Check deploy key
