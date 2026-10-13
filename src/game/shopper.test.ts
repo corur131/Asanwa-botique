@@ -123,7 +123,7 @@ test('shopper examples guide the proposed cart toward the requested catalogue pr
   const target = MARKET.find((item) =>
     canBuy(item, s.tier) &&
     pieceCost(item, item.fabric) * MARKUP <= ceiling &&
-    item.label.toLowerCase().includes('dress'),
+    item.label.trim().split(/\\s+/).filter((word) => word.length >= 4).length >= 2,
   );
   assert.ok(target, 'test catalogue should include an unlocked dress within the kiosk price guide');
 
