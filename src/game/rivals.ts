@@ -216,6 +216,7 @@ export function simulateRivals(s0: GameState): GameState {
   const youRank = rankById.get('you') || 20;
   const rivals: Rival[] = [];
   const news: { kind: 'up' | 'down' | 'viral' | 'scandal' | 'campaign'; r: Rival }[] = [];
+  const growthNotes: { owner: string; shop: string; detail: string }[] = [];
   for (const r0 of s.rivals) {
     const r = { ...r0, week: [...r0.week], weekCosts: [...(r0.weekCosts || [])] };
     const t = TIERS[r.tier];
@@ -247,13 +248,20 @@ export function simulateRivals(s0: GameState): GameState {
           : 1;
     // A shop's daily form is volatile enough that a strong week can overtake an established name.
     const form = 1 + 0.2 * Math.sin(today / 9 + hash(r.id));
-    const takings = DAILY[r.tier] * r.skill * form * repK * followK * ramp * rand(0.58, 1.48) * eventMultiplier * (r.stars === 1 ? 0.9 : r.stars >= 3 ? 1.1 : 1);
+    const branchCount = Math.max(0, r.branches || 0);
+    const departmentCount = (r.departments || []).length;
+    const expansionLift = 1 + branchCount * 0.28 + departmentCount * 0.075 + (r.wholesaleActive ? 0.16 : 0);
+    const takings = DAILY[r.tier] * expansionLift * r.skill * form * repK * followK * ramp * rand(0.58, 1.48) * eventMultiplier * (r.stars === 1 ? 0.9 : r.stars >= 3 ? 1.1 : 1);
     r.week.push(takings);
     r.week = r.week.slice(-7);
-    let dailyCosts = takings * STOCK_SHARE[r.tier] + t.running;
-    r.cash += takings * (1 - STOCK_SHARE[r.tier]) - t.running;
+    const stockShare = clamp(STOCK_SHARE[r.tier] + (r.wholesaleActive ? 0.05 : 0), 0.3, 0.78);
+    const branchRunning = branchCount * Math.max(5_000, t.running * 0.22);
+    const departmentRunning = departmentCount * 2_500;
+    const wholesaleRunning = r.wholesaleActive ? 7_000 : 0;
+    let dailyCosts = takings * stockShare + t.running + branchRunning + departmentRunning + wholesaleRunning;
+    r.cash += takings * (1 - stockShare) - t.running - branchRunning - departmentRunning - wholesaleRunning;
     if (today % 7 === 0) {
-      const weeklyCosts = t.rent * [0, 0.75, 1, 1.33, 1.75][r.stars] + WAGES[r.tier];
+      const weeklyCosts = t.rent * [0, 0.75, 1, 1.33, 1.75][r.stars] + WAGES[r.tier] + branchCount * t.rent * 0.55;
       r.cash -= weeklyCosts;
       dailyCosts += weeklyCosts;
     }
@@ -304,6 +312,35 @@ export function simulateRivals(s0: GameState): GameState {
       r.weekCosts[r.weekCosts.length - 1] = (r.weekCosts[r.weekCosts.length - 1] || 0) + scandalCost;
       news.push({ kind: 'scandal', r });
     }
+    // Established rivals reinvest retained earnings in a branch, wholesale, or a new department.
+    // Only one capital project can be bought per rival per week, and a rent reserve is protected.
+    const departmentNames = r.departments || [];
+    const reserve = TIERS[r.tier].rent * 3;
+    if (today % 7 === hash(r.id) % 7 && today - r.moved > 14 && r.cash > reserve + 1_250_000) {
+      const canOpenBranch = r.tier >= 3 && branchCount < 3 && r.cash > reserve + 12_000_000;
+      const canOpenWholesale = r.tier >= 2 && !r.wholesaleActive && r.cash > reserve + 8_000_000;
+      const preferredDepartment = r.speciality === 'bridal' ? 'Bridal & Occasionwear'
+        : r.speciality === 'menswear' ? 'Menswear' : 'Accessories';
+      const departmentCost = preferredDepartment === 'Bridal & Occasionwear' ? 2_500_000
+        : preferredDepartment === 'Menswear' ? 1_800_000 : 1_250_000;
+      const canOpenDepartment = r.tier >= (preferredDepartment === 'Accessories' ? 1 : 2)
+        && departmentNames.length < 3 && !departmentNames.includes(preferredDepartment)
+        && r.cash > reserve + departmentCost;
+      if (canOpenBranch && chance(0.5)) {
+        r.cash -= 7_500_000;
+        r.branches = branchCount + 1;
+        r.assetValue = Math.max(0, (r.assetValue || 0) + 2_500_000);
+        growthNotes.push({ owner: r.owner, shop: r.shop, detail: 'opened branch ' + r.branches + ' and committed ₦7,500,000 to its setup' });
+      } else if (canOpenWholesale && chance(0.55)) {
+        r.cash -= 5_000_000;
+        r.wholesaleActive = true;
+        growthNotes.push({ owner: r.owner, shop: r.shop, detail: 'launched wholesale operations with a ₦5,000,000 stock and fulfilment investment' });
+      } else if (canOpenDepartment && chance(0.7)) {
+        r.cash -= departmentCost;
+        r.departments = [...departmentNames, preferredDepartment];
+        growthNotes.push({ owner: r.owner, shop: r.shop, detail: 'opened its ' + preferredDepartment + ' department for ₦' + departmentCost.toLocaleString('en-NG') });
+      }
+    }
     // move up when they can afford it; get thrown down when broke too long
     const next = TIERS[r.tier + 1];
     const appetite = 1.1 + (hash(r.id) % 6) * 0.1;
@@ -331,6 +368,7 @@ export function simulateRivals(s0: GameState): GameState {
     rivals.push(r);
   }
   s = { ...s, rivals };
+  for (const note of growthNotes) s = gist(s, note.shop + ' expands its fashion empire', note.owner + ' ' + note.detail + '. The investment raises future sales potential but adds real operating costs.', note.shop);
 
   // news about other shops
   for (const n of news) {
