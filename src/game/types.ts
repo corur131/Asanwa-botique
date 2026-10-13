@@ -35,6 +35,20 @@ export interface ProductSalesRecord {
 export type ShopperMission = 'restock' | 'variety' | 'richCustomers' | 'contract';
 export type ShopperJobStatus = 'ready' | 'cancelled' | 'purchased';
 
+/** These three ranks deliberately mirror the class-fit rank used by scoreLook(). */
+export type ShopperDressRank = 0 | 1 | 2;
+export type ShopperAudience = 'women' | 'men';
+export type ShopperProductCategory =
+  | 'top' | 'bottom' | 'dress' | 'outer' | 'shoes' | 'bag'
+  | 'jewellery' | 'headwear' | 'glasses' | 'hair';
+
+export interface ShopperBuyingPreference {
+  audience: ShopperAudience;
+  category: ShopperProductCategory;
+  /** One or more game dress-ranks: 0 everyday, 1 middle, 2 luxury. */
+  ranks: ShopperDressRank[];
+}
+
 export interface ShopperJob {
   id: string;
   mission: ShopperMission;
@@ -47,6 +61,8 @@ export interface ShopperJob {
   summary: string;
   contractBrief?: string;
   contractId?: string;
+  /** Snapshot of the player's strict category and dressing-rank filters for this order. */
+  preferences?: ShopperBuyingPreference[];
 }
 
 export type PoliticianContractStatus = 'offered' | 'accepted' | 'fulfilled' | 'failed' | 'declined' | 'expired';
@@ -697,6 +713,8 @@ export interface GameState {
   productSales?: ProductSalesRecord[];
   /** Shopper orders and their statuses are part of the saved game. */
   shopperJobs?: ShopperJob[];
+  /** Player's reusable Shopper category/rank selections, retained across app opens and reloads. */
+  shopperPreferences?: ShopperBuyingPreference[];
   /** Government/office clothing contracts, offer history and deadlines. */
   politicianContracts?: PoliticianContract[];
   regulars: Regular[];

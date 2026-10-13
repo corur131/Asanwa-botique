@@ -2,8 +2,11 @@ import React, { useState } from 'react';
 import { naira, TIERS } from '../economy';
 import * as E from '../engine';
 import { entryFor } from '../market';
-import type { GameState, ShopperMission } from '../types';
-import { prepareShopperOrder, SHOPPER_MISSIONS, shopperAvailableBudget, shopperPriceCeiling } from '../shopper';
+import type { GameState, ShopperAudience, ShopperBuyingPreference, ShopperDressRank, ShopperMission } from '../types';
+import {
+  prepareShopperOrder, SHOPPER_MISSIONS, SHOPPER_PREFERENCE_CATEGORIES,
+  shopperAvailableBudget, shopperPriceCeiling,
+} from '../shopper';
 import type { CartLine } from '../engine';
 
 export const ShopperApp: React.FC<{
@@ -19,19 +22,49 @@ export const ShopperApp: React.FC<{
   const [budget, setBudget] = useState<number>(() => Math.min(500_000, available));
   const [contractId, setContractId] = useState('');
   const [shoppingExamples, setShoppingExamples] = useState('');
+  const [preferencesOpen, setPreferencesOpen] = useState(false);
+  const [preferenceAudience, setPreferenceAudience] = useState<ShopperAudience>('women');
+  const savedPreferences = s.shopperPreferences || [];
   const acceptedContracts = (s.politicianContracts || []).filter((contract) => contract.status === 'accepted');
   const selectedContract = acceptedContracts.find((contract) => contract.id === contractId) || acceptedContracts[0];
   const [error, setError] = useState('');
   const [latestJobId, setLatestJobId] = useState<string | null>(null);
   const recentJobs = [...(s.shopperJobs || [])].slice(-5).reverse();
   const latestJob = recentJobs.find((job) => job.id === latestJobId) || recentJobs[0];
+  const priceRankOptions: { rank: ShopperDressRank; label: string; short: string }[] = [
+    { rank: 0, label: 'Cheap / Everyday', short: 'Cheap' },
+    { rank: 1, label: 'Mid-range', short: 'Mid' },
+    { rank: 2, label: 'Expensive / Luxury', short: 'Luxury' },
+  ];
+  const selectedFilterCount = savedPreferences.reduce((sum, preference) => sum + preference.ranks.length, 0);
+  const filterSummary = savedPreferences.length
+    ? savedPreferences.slice(0, 2).map((preference) => {
+        const category = SHOPPER_PREFERENCE_CATEGORIES.find((row) => row.id === preference.category)?.label || preference.category;
+        const ranks = preference.ranks.map((rank) => priceRankOptions.find((row) => row.rank === rank)?.short || '').join('+');
+        return `${preference.audience === 'women' ? 'Women' : 'Men'}: ${category} (${ranks})`;
+      }).join(' · ') + (savedPreferences.length > 2 ? ` · +${savedPreferences.length - 2} more` : '')
+    : 'Automatic — shopper chooses based on the mission';
+
+  const setPreferenceRanks = (audience: ShopperAudience, category: ShopperBuyingPreference['category'], rank: ShopperDressRank, checked: boolean) => {
+    const current = savedPreferences.find((row) => row.audience === audience && row.category === category);
+    const ranks = checked
+      ? [...new Set([...(current?.ranks || []), rank])].sort((a, b) => a - b) as ShopperDressRank[]
+      : (current?.ranks || []).filter((value) => value !== rank);
+    const next = savedPreferences.filter((row) => !(row.audience === audience && row.category === category));
+    if (ranks.length) next.push({ audience, category, ranks });
+    up((game) => ({ ...game, shopperPreferences: next }));
+  };
 
   const sendShopper = () => {
     if (mission === 'contract' && !selectedContract) {
       setError('Accept a politician contract first. The shopper will then buy the exact catalogue goods it requires.');
       return;
     }
-    const result = prepareShopperOrder(s, mission, budget, selectedContract?.brief || '', mission === 'contract' ? selectedContract?.id : undefined, shoppingExamples);
+    const result = prepareShopperOrder(
+      s, mission, budget, selectedContract?.brief || '',
+      mission === 'contract' ? selectedContract?.id : undefined,
+      shoppingExamples, savedPreferences,
+    );
     if (!result.job) {
       setError(result.error || 'The shopper could not prepare an order.');
       return;
@@ -98,6 +131,77 @@ export const ShopperApp: React.FC<{
             </label>
           )}
 
+          {mission !== 'contract' && (
+            <section className="rounded-xl border border-white/10 bg-white/[0.035] overflow-hidden">
+              <button
+                type="button"
+                onClick={() => setPreferencesOpen((open) => !open)}
+                className="w-full flex items-center gap-2 text-left p-3 hover:bg-white/5"
+                aria-expanded={preferencesOpen}
+              >
+                <span className="flex-1 min-w-0">
+                  <span className="block text-sm font-semibold">2. Shopping preferences <span className="text-violet-300 font-medium">({selectedFilterCount} filters)</span></span>
+                  <span className="block text-[10px] text-slate-400 mt-1 truncate">{filterSummary}</span>
+                </span>
+                <span className="text-slate-300 text-lg shrink-0">{preferencesOpen ? '−' : '+'}</span>
+              </button>
+              {preferencesOpen && (
+                <div className="border-t border-white/10 p-3 space-y-3">
+                  <p className="text-[11px] text-slate-400">Choose who the products are for, then open a category and tick the quality ranks you want. These are strict filters. They use the same 0–2 class-rank logic as the game's outfit score, not just a generic price guess.</p>
+                  <div className="grid grid-cols-2 gap-2">
+                    {([{ id: 'women', label: 'Women' }, { id: 'men', label: 'Men' }] as const).map((audience) => (
+                      <button
+                        key={audience.id}
+                        type="button"
+                        onClick={() => setPreferenceAudience(audience.id)}
+                        className={`rounded-lg border py-2 text-sm font-semibold ${preferenceAudience === audience.id ? 'border-violet-400 bg-violet-500/15 text-white' : 'border-white/10 bg-black/15 text-slate-300'}`}
+                      >
+                        {audience.label}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="space-y-1.5">
+                    {SHOPPER_PREFERENCE_CATEGORIES.map((category) => {
+                      const preference = savedPreferences.find((row) => row.audience === preferenceAudience && row.category === category.id);
+                      const ranks = preference?.ranks || [];
+                      return (
+                        <details key={category.id} className="rounded-lg border border-white/10 bg-black/15">
+                          <summary className="flex cursor-pointer items-center gap-2 px-3 py-2.5 text-sm list-none">
+                            <span className="flex-1 font-medium">{category.label}</span>
+                            {ranks.length > 0 && <span className="rounded-full bg-violet-500/20 px-2 py-0.5 text-[10px] text-violet-200">{ranks.length} rank{ranks.length === 1 ? '' : 's'}</span>}
+                            <span className="text-slate-500 text-xs">⌄</span>
+                          </summary>
+                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-1.5 px-3 pb-3">
+                            {priceRankOptions.map((option) => (
+                              <label key={option.rank} className={`flex min-w-0 items-center gap-2 rounded-md border px-2 py-2 text-xs cursor-pointer ${ranks.includes(option.rank) ? 'border-violet-400/60 bg-violet-500/10 text-violet-100' : 'border-white/5 bg-black/10 text-slate-300'}`}>
+                                <input
+                                  type="checkbox"
+                                  checked={ranks.includes(option.rank)}
+                                  onChange={(event) => setPreferenceRanks(preferenceAudience, category.id, option.rank, event.target.checked)}
+                                  className="accent-violet-500"
+                                />
+                                <span>{option.label}</span>
+                              </label>
+                            ))}
+                          </div>
+                        </details>
+                      );
+                    })}
+                  </div>
+                  <div className="rounded-lg border border-white/10 bg-black/20 p-2.5 flex items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="text-xs font-semibold">{selectedFilterCount ? `${selectedFilterCount} quality filters active` : 'No manual filters selected'}</div>
+                      <div className="text-[10px] text-slate-400 mt-0.5">When active, only selected gender, category and rank combinations qualify.</div>
+                    </div>
+                    {savedPreferences.length > 0 && (
+                      <button type="button" onClick={() => up((game) => ({ ...game, shopperPreferences: [] }))} className="shrink-0 text-xs font-semibold text-rose-300 hover:text-rose-200">Clear</button>
+                    )}
+                  </div>
+                </div>
+              )}
+            </section>
+          )}
+
           {mission === 'contract' && (
             selectedContract ? (
               <div className="rounded-lg border border-emerald-300/20 bg-emerald-400/[0.06] p-3 space-y-1.5">
@@ -138,10 +242,20 @@ export const ShopperApp: React.FC<{
 
           <div className="rounded-lg bg-black/20 border border-white/5 px-3 py-2">
             <div className="text-[10px] text-slate-400">Current mission price guidance</div>
-            <div className="text-sm font-semibold">{mission === 'contract' ? 'Based on the contract brief and budget' : `Up to ${naira(shopperPriceCeiling(s, mission))} retail per item`}</div>
+            <div className="text-sm font-semibold">{mission === 'contract'
+              ? 'Based on the contract brief and budget'
+              : savedPreferences.length
+                ? 'Following your selected categories and dressing ranks'
+                : mission === 'richCustomers'
+                  ? 'Luxury dressing rank only (Rank 2)'
+                  : `Up to ${naira(shopperPriceCeiling(s, mission))} retail per item`}</div>
             <div className="text-[10px] text-slate-500 mt-0.5">{mission === 'contract'
-              ? 'The contract requirements, boutique unlocks and your budget control what the shopper sources.'
-              : 'This is the highest retail-price guide for one item in this mission—not your total order budget or a sales guarantee. More than one piece may be bought when your budget supports it.'}</div>
+              ? 'Contract requirements take priority over general shopping preferences.'
+              : savedPreferences.length
+                ? 'Only products matching selected gender, category and rank are eligible. Your budget controls how much is bought.'
+                : mission === 'richCustomers'
+                  ? 'Uses the same top quality rank that improves outfit scores for rich customers; if your tier has no eligible luxury items, the shopper will not silently substitute cheap stock.'
+                  : 'This is a retail-price guide for one item, not your total order budget or a sales guarantee.'}</div>
           </div>
 
           {error && <div role="alert" className="rounded-lg border border-rose-400/30 bg-rose-500/10 p-2.5 text-xs text-rose-200">{error}</div>}
@@ -153,7 +267,7 @@ export const ShopperApp: React.FC<{
         <section className="rounded-xl border border-white/10 bg-white/[0.035] p-3 space-y-2">
           <div className="flex items-center justify-between gap-2">
             <div>
-              <div className="font-semibold text-sm">2. Review the returned order</div>
+              <div className="font-semibold text-sm">3. Review the returned order</div>
               <div className="text-[11px] text-slate-400 mt-0.5">Every item is from the real catalogue and has been checked against your tier.</div>
             </div>
             <span className="text-lg">🛍️</span>

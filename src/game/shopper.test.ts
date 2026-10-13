@@ -4,7 +4,10 @@ import { DIVINE_CONFIG } from '../constants/presets';
 import { MARKUP } from './economy';
 import { buyCart, cartTotal, fromData, newGame, validateCart } from './engine';
 import { canBuy, MARKET, pieceCost } from './market';
-import { prepareShopperOrder, shopperPriceCeiling } from './shopper';
+import {
+  prepareShopperOrder, shopperDressRank, shopperEntryMatchesPreferences, shopperPriceCeiling,
+} from './shopper';
+import type { ShopperBuyingPreference } from './types';
 import type { GameState, ShopperOrderLine } from './types';
 
 function game(overrides: Partial<GameState> = {}): GameState {
@@ -133,4 +136,58 @@ test('shopper examples guide the proposed cart toward the requested catalogue pr
   assert.ok(result.job.items.some((line) => line.kind === target!.kind && line.itemId === target!.id),
     'shopper should prioritise the exact requested example when that catalogue entry is available');
   assert.ok(result.job.summary.includes(target!.label), 'order summary should remember what examples were requested');
+});
+
+
+test('explicit shopper preferences strictly filter audience, category, and game dressing rank', () => {
+  const preferences: ShopperBuyingPreference[] = [
+    { audience: 'men', category: 'top', ranks: [2] },
+  ];
+  const s = game({
+    cash: 100_000_000,
+    tier: 4,
+    stock: [],
+    marketCart: [],
+    productSales: [],
+    shopperPreferences: preferences,
+  });
+  const result = prepareShopperOrder(s, 'variety', 10_000_000, '', undefined, '', preferences);
+  assert.ok(result.job, result.error);
+  assert.ok(result.job.items.length > 0, 'the flagship catalogue has eligible luxury menswear tops');
+  assert.deepEqual(result.job.preferences, preferences, 'selected filters should be recorded with the order');
+  assert.ok(result.job.items.every((line) => {
+    const entry = MARKET.find((item) => item.kind === line.kind && item.id === line.itemId);
+    return !!entry && shopperEntryMatchesPreferences(entry, preferences);
+  }), 'the order may contain only items matching the selected filter');
+  assert.ok(result.job.items.every((line) => {
+    const entry = MARKET.find((item) => item.kind === line.kind && item.id === line.itemId)!;
+    return entry.for === 'm' && entry.kind === 'top' && shopperDressRank(entry) === 2;
+  }), 'cheap womenswear, accessories, and lower-rank tops must never leak into the cart');
+  assert.ok(result.job.estimatedTotal <= 10_000_000);
+  assert.deepEqual(result.state.shopperPreferences, preferences, 'preferences remain saved in the game state');
+});
+
+test('rich-customer mission defaults to the exact luxury rank instead of filling the cart with cheaper ranks', () => {
+  const s = game({ cash: 100_000_000, tier: 2, stock: [], marketCart: [], productSales: [] });
+  const result = prepareShopperOrder(s, 'richCustomers', 50_000_000);
+  assert.ok(result.job, result.error);
+  assert.ok(result.job.items.length > 0, 'this tier unlocks luxury-rank products');
+  assert.ok(result.job.items.every((line) => {
+    const entry = MARKET.find((item) => item.kind === line.kind && item.id === line.itemId)!;
+    return shopperDressRank(entry) === 2;
+  }), 'rich-customer shopping without manual filters must buy only rank-2 items');
+});
+
+test('selected shopper preferences let a restock mission add new products that match the requested filters', () => {
+  const preferences: ShopperBuyingPreference[] = [
+    { audience: 'men', category: 'top', ranks: [2] },
+  ];
+  const s = game({ cash: 30_000_000, tier: 4, stock: [], marketCart: [], shopperPreferences: preferences });
+  const result = prepareShopperOrder(s, 'restock', 5_000_000, '', undefined, '', preferences);
+  assert.ok(result.job, result.error);
+  assert.ok(result.job.items.length > 0, 'selected preferences let restock introduce an eligible product when none is stocked');
+  for (const line of result.job.items) {
+    const entry = MARKET.find((item) => item.kind === line.kind && item.id === line.itemId)!;
+    assert.ok(shopperEntryMatchesPreferences(entry, preferences));
+  }
 });
