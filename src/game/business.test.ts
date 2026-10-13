@@ -646,7 +646,7 @@ test('opening department and wholesale inventory values reconcile to their capit
   });
   game = investInExpansion(game, 'accessories');
   const department = game.businessExpansion?.departmentOperations?.[0];
-  assert.equal((department?.inventoryValue || 0) + 650_000, 1_250_000);
+  assert.equal((department?.inventoryValue || 0) + (department?.assetValue || 0), 1_250_000);
   game = investInExpansion(game, 'wholesale');
   assert.equal((game.businessExpansion?.wholesaleOperation?.inventoryValue || 0) + 4_500_000, 7_500_000);
 });
