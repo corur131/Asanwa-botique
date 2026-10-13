@@ -58,7 +58,7 @@ test('closing an already-closed day is a no-op and cannot charge obligations twi
 test('daily cash-flow report reconciles opening cash, operating result and other movements', () => {
   const before = state({
     cash: 25_000,
-    today: { day: 10, income: 120_000, costs: 20_000, openingCash: 100_000, events: [] } as GameState['today'],
+    today: { day: 10, served: 0, walkedOut: 0, lost: 0, income: 120_000, costs: 20_000, tips: 0, bestScore: 0, repChange: 0, staffServed: 0, openingCash: 100_000, events: [] },
     bank: { ...initialBankState(), savings: 40_000, rentVault: 15_000, fixedDeposits: [{ id: 'fd-test', amount: 10_000, ratePct: 1, openedDay: 1, maturityDay: 20 }] },
   });
   const report = cashFlowSummary(before);
@@ -74,7 +74,7 @@ test('daily cash-flow report reconciles opening cash, operating result and other
 });
 
 test('older saves without an opening-cash snapshot do not invent a cash-change figure', () => {
-  const report = cashFlowSummary(state({ today: { day: 10, income: 4_000, costs: 1_000, events: [] } as GameState['today'] }));
+  const report = cashFlowSummary(state({ today: { day: 10, served: 0, walkedOut: 0, lost: 0, income: 4_000, costs: 1_000, tips: 0, bestScore: 0, repChange: 0, staffServed: 0, events: [] } }));
   assert.equal(report.openingCash, null);
   assert.equal(report.cashChange, null);
   assert.equal(report.otherMovement, null);
