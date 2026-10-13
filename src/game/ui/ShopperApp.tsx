@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { naira, TIERS } from '../economy';
 import * as E from '../engine';
 import { entryFor } from '../market';
-import type { GameState, ShopperAudience, ShopperBuyingPreference, ShopperDressRank, ShopperMission } from '../types';
+import type { GameState, ShopperAudience, ShopperBuyingPreference, ShopperDressRank, ShopperMission, ShopperPriceBand } from '../types';
 import {
   prepareShopperOrder, SHOPPER_MISSIONS, SHOPPER_PREFERENCE_CATEGORIES,
   shopperAvailableBudget, shopperPriceCeiling,
@@ -36,12 +36,19 @@ export const ShopperApp: React.FC<{
     { rank: 1, label: 'Mid-range', short: 'Mid' },
     { rank: 2, label: 'Expensive / Luxury', short: 'Luxury' },
   ];
-  const selectedFilterCount = savedPreferences.reduce((sum, preference) => sum + preference.ranks.length, 0);
+  const priceBandOptions: { band: ShopperPriceBand; label: string; short: string }[] = [
+    { band: 'veryExpensive', label: 'Very Expensive · ₦500,000–₦999,999 per piece', short: 'Very Expensive' },
+    { band: 'millionCouture', label: 'Million-naira Couture · ₦1,000,000+ per piece', short: 'Million-naira Couture' },
+  ];
+  const selectedFilterCount = savedPreferences.reduce(
+    (sum, preference) => sum + preference.ranks.length + (preference.priceBands || []).length, 0,
+  );
   const filterSummary = savedPreferences.length
     ? savedPreferences.slice(0, 2).map((preference) => {
         const category = SHOPPER_PREFERENCE_CATEGORIES.find((row) => row.id === preference.category)?.label || preference.category;
-        const ranks = preference.ranks.map((rank) => priceRankOptions.find((row) => row.rank === rank)?.short || '').join('+');
-        return `${preference.audience === 'women' ? 'Women' : 'Men'}: ${category} (${ranks})`;
+        const ranks = preference.ranks.map((rank) => priceRankOptions.find((row) => row.rank === rank)?.short || '');
+        const bands = (preference.priceBands || []).map((band) => priceBandOptions.find((row) => row.band === band)?.short || '');
+        return `${preference.audience === 'women' ? 'Women' : 'Men'}: ${category} (${[...ranks, ...bands].filter(Boolean).join('+')})`;
       }).join(' · ') + (savedPreferences.length > 2 ? ` · +${savedPreferences.length - 2} more` : '')
     : 'Automatic — shopper chooses based on the mission';
 
@@ -50,8 +57,25 @@ export const ShopperApp: React.FC<{
     const ranks = checked
       ? [...new Set([...(current?.ranks || []), rank])].sort((a, b) => a - b) as ShopperDressRank[]
       : (current?.ranks || []).filter((value) => value !== rank);
+    const priceBands = current?.priceBands || [];
     const next = savedPreferences.filter((row) => !(row.audience === audience && row.category === category));
-    if (ranks.length) next.push({ audience, category, ranks });
+    if (ranks.length || priceBands.length) next.push({ audience, category, ranks, ...(priceBands.length ? { priceBands } : {}) });
+    up((game) => ({ ...game, shopperPreferences: next }));
+  };
+
+  const setPreferencePriceBand = (
+    audience: ShopperAudience,
+    category: ShopperBuyingPreference['category'],
+    band: ShopperPriceBand,
+    checked: boolean,
+  ) => {
+    const current = savedPreferences.find((row) => row.audience === audience && row.category === category);
+    const priceBands = checked
+      ? [...new Set([...(current?.priceBands || []), band])]
+      : (current?.priceBands || []).filter((value) => value !== band);
+    const ranks = current?.ranks || [];
+    const next = savedPreferences.filter((row) => !(row.audience === audience && row.category === category));
+    if (ranks.length || priceBands.length) next.push({ audience, category, ranks, ...(priceBands.length ? { priceBands } : {}) });
     up((game) => ({ ...game, shopperPreferences: next }));
   };
 
@@ -147,7 +171,7 @@ export const ShopperApp: React.FC<{
               </button>
               {preferencesOpen && (
                 <div className="border-t border-white/10 p-3 space-y-3">
-                  <p className="text-[11px] text-slate-400">Choose who the products are for, then open a category and tick the quality ranks you want. These are strict filters. They use the same 0–2 class-rank logic as the game's outfit score, not just a generic price guess.</p>
+                  <p className="text-[11px] text-slate-400">Choose who the products are for, open a category and tick the ranks or exact per-piece purchase-cost bands you want. “Very Expensive” means ₦500,000–₦999,999 per piece; “Million-naira Couture” means ₦1,000,000 or more. These price bands do not rely on an item's rich/luxury class label.</p>
                   <div className="grid grid-cols-2 gap-2">
                     {([{ id: 'women', label: 'Women' }, { id: 'men', label: 'Men' }] as const).map((audience) => (
                       <button
@@ -164,25 +188,48 @@ export const ShopperApp: React.FC<{
                     {SHOPPER_PREFERENCE_CATEGORIES.map((category) => {
                       const preference = savedPreferences.find((row) => row.audience === preferenceAudience && row.category === category.id);
                       const ranks = preference?.ranks || [];
+                      const priceBands = preference?.priceBands || [];
+                      const categoryFilterCount = ranks.length + priceBands.length;
                       return (
                         <details key={category.id} className="rounded-lg border border-white/10 bg-black/15">
                           <summary className="flex cursor-pointer items-center gap-2 px-3 py-2.5 text-sm list-none">
                             <span className="flex-1 font-medium">{category.label}</span>
-                            {ranks.length > 0 && <span className="rounded-full bg-violet-500/20 px-2 py-0.5 text-[10px] text-violet-200">{ranks.length} rank{ranks.length === 1 ? '' : 's'}</span>}
+                            {categoryFilterCount > 0 && <span className="rounded-full bg-violet-500/20 px-2 py-0.5 text-[10px] text-violet-200">{categoryFilterCount} filter{categoryFilterCount === 1 ? '' : 's'}</span>}
                             <span className="text-slate-500 text-xs">⌄</span>
                           </summary>
-                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-1.5 px-3 pb-3">
-                            {priceRankOptions.map((option) => (
-                              <label key={option.rank} className={`flex min-w-0 items-center gap-2 rounded-md border px-2 py-2 text-xs cursor-pointer ${ranks.includes(option.rank) ? 'border-violet-400/60 bg-violet-500/10 text-violet-100' : 'border-white/5 bg-black/10 text-slate-300'}`}>
-                                <input
-                                  type="checkbox"
-                                  checked={ranks.includes(option.rank)}
-                                  onChange={(event) => setPreferenceRanks(preferenceAudience, category.id, option.rank, event.target.checked)}
-                                  className="accent-violet-500"
-                                />
-                                <span>{option.label}</span>
-                              </label>
-                            ))}
+                          <div className="px-3 pb-3 space-y-2.5">
+                            <div>
+                              <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-500 mb-1.5">Dressing rank</div>
+                              <div className="grid grid-cols-1 sm:grid-cols-3 gap-1.5">
+                                {priceRankOptions.map((option) => (
+                                  <label key={option.rank} className={`flex min-w-0 items-center gap-2 rounded-md border px-2 py-2 text-xs cursor-pointer ${ranks.includes(option.rank) ? 'border-violet-400/60 bg-violet-500/10 text-violet-100' : 'border-white/5 bg-black/10 text-slate-300'}`}>
+                                    <input
+                                      type="checkbox"
+                                      checked={ranks.includes(option.rank)}
+                                      onChange={(event) => setPreferenceRanks(preferenceAudience, category.id, option.rank, event.target.checked)}
+                                      className="accent-violet-500"
+                                    />
+                                    <span>{option.label}</span>
+                                  </label>
+                                ))}
+                              </div>
+                            </div>
+                            <div className="border-t border-white/10 pt-2.5">
+                              <div className="text-[10px] font-semibold uppercase tracking-wide text-amber-200/80 mb-1.5">Exact per-piece purchase cost</div>
+                              <div className="grid grid-cols-1 gap-1.5">
+                                {priceBandOptions.map((option) => (
+                                  <label key={option.band} className={`flex min-w-0 items-center gap-2 rounded-md border px-2 py-2 text-xs cursor-pointer ${priceBands.includes(option.band) ? 'border-amber-300/60 bg-amber-500/10 text-amber-100' : 'border-white/5 bg-black/10 text-slate-300'}`}>
+                                    <input
+                                      type="checkbox"
+                                      checked={priceBands.includes(option.band)}
+                                      onChange={(event) => setPreferencePriceBand(preferenceAudience, category.id, option.band, event.target.checked)}
+                                      className="accent-amber-400"
+                                    />
+                                    <span>{option.label}</span>
+                                  </label>
+                                ))}
+                              </div>
+                            </div>
                           </div>
                         </details>
                       );
@@ -191,7 +238,7 @@ export const ShopperApp: React.FC<{
                   <div className="rounded-lg border border-white/10 bg-black/20 p-2.5 flex items-center justify-between gap-3">
                     <div className="min-w-0">
                       <div className="text-xs font-semibold">{selectedFilterCount ? `${selectedFilterCount} quality filters active` : 'No manual filters selected'}</div>
-                      <div className="text-[10px] text-slate-400 mt-0.5">When active, only selected gender, category and rank combinations qualify.</div>
+                      <div className="text-[10px] text-slate-400 mt-0.5">When active, only selected gender, category, rank and/or exact price-band combinations qualify.</div>
                     </div>
                     {savedPreferences.length > 0 && (
                       <button type="button" onClick={() => up((game) => ({ ...game, shopperPreferences: [] }))} className="shrink-0 text-xs font-semibold text-rose-300 hover:text-rose-200">Clear</button>
@@ -212,7 +259,7 @@ export const ShopperApp: React.FC<{
                   </select>
                 </label>
                 <div className="text-xs text-slate-300">{selectedContract.brief}</div>
-                <div className="text-[11px] text-emerald-200">The shopper will source only the missing items and quantities listed in this contract. Stock already in your boutique and goods already in the cart count toward the requirement.</div>
+                <div className="text-[11px] text-emerald-200">The shopper sources only contract-listed products and only the quantity still needed to reach each required total. Existing stock and matching items in the cart count toward those totals. A short budget creates a partial order in the contract's listed order; extra money never adds products or exceeds a requested quantity.</div>
               </div>
             ) : (
               <div className="rounded-lg border border-amber-300/20 bg-amber-400/[0.06] p-3 space-y-2">
@@ -245,14 +292,14 @@ export const ShopperApp: React.FC<{
             <div className="text-sm font-semibold">{mission === 'contract'
               ? 'Based on the contract brief and budget'
               : savedPreferences.length
-                ? 'Following your selected categories and dressing ranks'
+                ? 'Following selected categories, ranks and exact price bands'
                 : mission === 'richCustomers'
                   ? 'Luxury dressing rank only (Rank 2)'
                   : `Up to ${naira(shopperPriceCeiling(s, mission))} retail per item`}</div>
             <div className="text-[10px] text-slate-500 mt-0.5">{mission === 'contract'
               ? 'Contract requirements take priority over general shopping preferences.'
               : savedPreferences.length
-                ? 'Only products matching selected gender, category and rank are eligible. Your budget controls how much is bought.'
+                ? 'Only products matching selected gender, category, rank and/or exact price band are eligible. Very Expensive is ₦500,000–₦999,999 per piece; Million-naira Couture is ₦1,000,000+ per piece. Your budget controls quantity, not quality.'
                 : mission === 'richCustomers'
                   ? 'Uses the same top quality rank that improves outfit scores for rich customers; if your tier has no eligible luxury items, the shopper will not silently substitute cheap stock.'
                   : 'This is a retail-price guide for one item, not your total order budget or a sales guarantee.'}</div>
