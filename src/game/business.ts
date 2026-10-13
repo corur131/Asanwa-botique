@@ -1,4 +1,4 @@
-import type { BankPocket, BankState, BrandMetrics, BusinessBranch, BusinessExpansionState, BusinessLoan, CreditProfile, ExpansionInvestment, GameState, PromotionCampaign, PromotionLevel, PromotionMode, Rival, WeeklyWealthSnapshot } from './types';
+import type { BankPocket, BankState, BrandMetrics, BusinessBranch, BusinessExpansionState, BusinessLoan, CreditProfile, DepartmentOperation, ExpansionInvestment, GameState, WholesaleOperation, PromotionCampaign, PromotionLevel, PromotionMode, Rival, WeeklyWealthSnapshot } from './types';
 import { TIERS } from './economy';
 import { furnitureById } from './shop';
 
@@ -12,7 +12,7 @@ const PROMOTION_MAX: Record<PromotionLevel, number> = { local: 3_000, citywide: 
 const TIER_BUDGET_CAP = [2_000, 8_000, 30_000, 70_000, 150_000];
 
 export function initialBusinessExpansion(): BusinessExpansionState {
-  return { branches: [], departments: [], wholesaleActive: false, designerCollections: 0 };
+  return { branches: [], departments: [], departmentOperations: [], wholesaleActive: false, wholesaleOperation: undefined, designerCollections: 0, expansionCredit: 0 };
 }
 
 export function initialBankState(): BankState {
@@ -493,30 +493,100 @@ export interface ExpansionOption {
   title: string;
   description: string;
   cost: number;
+  cashRequired: number;
   minimumTier: number;
   available: boolean;
+  financeable: boolean;
   reason?: string;
+}
+
+const EXPANSION_COSTS: Record<ExpansionInvestment, number> = {
+  branch: 18_000_000, wholesale: 7_500_000, bridal: 2_500_000,
+  accessories: 1_250_000, menswear: 1_800_000, designer: 3_500_000,
+};
+
+function effectiveExpansionCost(s: GameState, cost: number): number {
+  const credit = Math.max(0, s.businessExpansion?.expansionCredit || 0);
+  return Math.max(0, cost - credit);
 }
 
 export function expansionOptions(s: GameState): ExpansionOption[] {
   const expansion = s.businessExpansion || initialBusinessExpansion();
-  const branchCost = [0, 0, 0, 0, 18_000_000][Math.max(0, Math.min(4, s.tier))] || 18_000_000;
-  const options: ExpansionOption[] = [
-    { id: 'branch', title: 'Open a new branch', description: 'Add a second shop with its own customers, stock costs, rent and daily profit or loss.', cost: branchCost, minimumTier: 4, available: s.tier >= 4 && expansion.branches.length < 4 && s.cash >= branchCost, reason: s.tier < 4 ? 'Reach Flagship tier first' : expansion.branches.length >= 4 ? 'Maximum of four branches reached' : s.cash < branchCost ? 'Not enough current-account cash' : undefined },
-    { id: 'wholesale', title: 'Wholesale operations', description: 'Sell in bulk to other boutiques. More revenue potential, but higher stock costs and cash-flow pressure.', cost: 7_500_000, minimumTier: 3, available: s.tier >= 3 && !expansion.wholesaleActive && s.cash >= 7_500_000, reason: s.tier < 3 ? 'Reach Big Boutique tier first' : expansion.wholesaleActive ? 'Already operating wholesale' : s.cash < 7_500_000 ? 'Not enough current-account cash' : undefined },
-    { id: 'bridal', title: 'Bridal & occasionwear department', description: 'Add a dedicated premium department that increases prestige and high-value demand.', cost: 2_500_000, minimumTier: 2, available: s.tier >= 2 && !expansion.departments.includes('Bridal & Occasionwear') && s.cash >= 2_500_000, reason: s.tier < 2 ? 'Reach Boutique tier first' : expansion.departments.includes('Bridal & Occasionwear') ? 'Department already open' : s.cash < 2_500_000 ? 'Not enough current-account cash' : undefined },
-    { id: 'accessories', title: 'Accessories department', description: 'Add bags, shoes, jewellery and accessories to create more complete looks and extra sales.', cost: 1_250_000, minimumTier: 1, available: s.tier >= 1 && !expansion.departments.includes('Accessories') && s.cash >= 1_250_000, reason: s.tier < 1 ? 'Reach Small Shop tier first' : expansion.departments.includes('Accessories') ? 'Department already open' : s.cash < 1_250_000 ? 'Not enough current-account cash' : undefined },
-    { id: 'menswear', title: 'Menswear department', description: 'Introduce a dedicated menswear range to diversify customers and sales.', cost: 1_800_000, minimumTier: 2, available: s.tier >= 2 && !expansion.departments.includes('Menswear') && s.cash >= 1_800_000, reason: s.tier < 2 ? 'Reach Boutique tier first' : expansion.departments.includes('Menswear') ? 'Department already open' : s.cash < 1_800_000 ? 'Not enough current-account cash' : undefined },
-    { id: 'designer', title: 'Launch a designer collection', description: 'Invest in an exclusive collection that boosts trend influence and brand prestige.', cost: 3_500_000, minimumTier: 2, available: s.tier >= 2 && s.cash >= 3_500_000, reason: s.tier < 2 ? 'Reach Boutique tier first' : s.cash < 3_500_000 ? 'Not enough current-account cash' : undefined },
+  const branchCost = s.tier >= 4 ? EXPANSION_COSTS.branch : 18_000_000;
+  const raw: Omit<ExpansionOption, 'cashRequired' | 'available' | 'financeable' | 'reason'>[] = [
+    { id: 'branch', title: 'Open a new branch', description: 'Add a second shop with its own customers, stock costs, rent and daily profit or loss.', cost: branchCost, minimumTier: 4 },
+    { id: 'wholesale', title: 'Wholesale operations', description: 'Fulfil bulk orders from tracked stock, restock from available cash, and manage stock-outs and fulfilment costs.', cost: EXPANSION_COSTS.wholesale, minimumTier: 3 },
+    { id: 'bridal', title: 'Bridal & occasionwear department', description: 'Operate a premium department with its own inventory, daily sales, cost of goods and running costs.', cost: EXPANSION_COSTS.bridal, minimumTier: 2 },
+    { id: 'accessories', title: 'Accessories department', description: 'Sell and restock bags, shoes, jewellery and accessories from an independently tracked inventory.', cost: EXPANSION_COSTS.accessories, minimumTier: 1 },
+    { id: 'menswear', title: 'Menswear department', description: 'Operate a dedicated menswear inventory with separate sales, restocking and operating performance.', cost: EXPANSION_COSTS.menswear, minimumTier: 2 },
+    { id: 'designer', title: 'Launch a designer collection', description: 'Invest in an exclusive collection that boosts trend influence and brand prestige.', cost: EXPANSION_COSTS.designer, minimumTier: 2 },
   ];
-  return options;
+  return raw.map((item) => {
+    const duplicate = item.id === 'branch' ? expansion.branches.length >= 4
+      : item.id === 'wholesale' ? expansion.wholesaleActive
+      : item.id === 'designer' ? false
+      : expansion.departments.includes(({ bridal: 'Bridal & Occasionwear', accessories: 'Accessories', menswear: 'Menswear' } as Record<string, string>)[item.id] || '');
+    const credit = Math.max(0, expansion.expansionCredit || 0);
+    const cashRequired = Math.max(0, item.cost - credit);
+    const shortfall = Math.max(0, cashRequired - Math.max(0, s.cash));
+    const financeable = shortfall > 0 && maximumLoan(s) >= shortfall;
+    const eligibleTier = s.tier >= item.minimumTier;
+    const available = eligibleTier && !duplicate && (s.cash >= cashRequired || financeable);
+    const reason = !eligibleTier ? 'Reach ' + (TIERS[item.minimumTier]?.name || 'the required') + ' tier first'
+      : duplicate ? item.id === 'branch' ? 'Maximum of four branches reached' : item.id === 'wholesale' ? 'Already operating wholesale' : 'Department already open'
+      : available ? undefined
+      : shortfall > 0 ? 'Insufficient cash and KoboBank borrowing capacity for the remaining ' + shortfall.toLocaleString('en-NG') + ' naira'
+      : undefined;
+    return { ...item, cashRequired, available, financeable: available && financeable, reason };
+  });
+}
+
+export function financeExpansionPurchase(s0: GameState, investment: ExpansionInvestment): GameState {
+  const option = expansionOptions(s0).find((item) => item.id === investment);
+  if (!option || !option.available) return s0;
+  const shortfall = Math.max(0, option.cashRequired - Math.max(0, s0.cash));
+  if (!shortfall) return investInExpansion(s0, investment);
+  if (maximumLoan(s0) < shortfall) return s0;
+  // The loan is posted through the existing KoboBank ledger and liability system.
+  // The proceeds are then spent immediately on the capital asset, preserving net worth.
+  const financed = takeBusinessLoan(s0, shortfall, 24);
+  if (financed === s0 || (financed.bank?.loans.length || 0) <= (s0.bank?.loans.length || 0)) return s0;
+  const invested = investInExpansion(financed, investment);
+  if (invested === financed) return s0;
+  return {
+    ...invested,
+    today: { ...invested.today, events: [...invested.today.events, 'KoboBank financed ' + option.title + ' with a ' + shortfall.toLocaleString('en-NG') + ' naira, 24-week business loan. Weekly repayments and interest remain due under the normal loan schedule.'] },
+  };
+}
+
+function makeDepartmentOperation(name: string, day: number, investmentCost: number): DepartmentOperation {
+  const config: Record<string, { units: number; share: number; markup: number }> = {
+    Accessories: { units: 180, share: 0.58, markup: 2.25 },
+    'Bridal & Occasionwear': { units: 72, share: 0.56, markup: 2.45 },
+    Menswear: { units: 120, share: 0.58, markup: 2.2 },
+  };
+  const c = config[name] || { units: 100, share: 0.55, markup: 2.1 };
+  const inventoryValue = roundMoney(investmentCost * c.share);
+  const unitCost = Math.max(1, roundMoney(inventoryValue / c.units));
+  return { name, openedDay: day, targetUnits: c.units, inventoryUnits: c.units, inventoryValue,
+    unitCost, unitPrice: roundMoney(unitCost * c.markup), cumulativeRevenue: 0, cumulativeCosts: 0, daysTrading: 0 };
+}
+
+function makeWholesaleOperation(investmentCost: number): WholesaleOperation {
+  const targetUnits = 320;
+  const inventoryValue = roundMoney(investmentCost * 0.56);
+  const unitCost = Math.max(1, roundMoney(inventoryValue / targetUnits));
+  return { targetUnits, inventoryUnits: targetUnits, inventoryValue, unitCost,
+    unitPrice: roundMoney(unitCost * 1.85), cumulativeRevenue: 0, cumulativeCosts: 0, ordersFulfilled: 0, ordersMissed: 0 };
 }
 
 export function investInExpansion(s0: GameState, investment: ExpansionInvestment): GameState {
   const option = expansionOptions(s0).find((item) => item.id === investment);
-  if (!option || !option.available) return s0;
+  if (!option || !option.available || s0.cash < option.cashRequired) return s0;
   const current = s0.businessExpansion || initialBusinessExpansion();
-  let expansion: BusinessExpansionState = current;
+  const effectiveCost = option.cashRequired;
+  const creditUsed = Math.min(Math.max(0, current.expansionCredit || 0), option.cost);
+  let expansion: BusinessExpansionState = { ...current, expansionCredit: Math.max(0, (current.expansionCredit || 0) - creditUsed) };
   let brand = getBrandMetrics(s0);
   switch (investment) {
     case 'branch': {
@@ -526,49 +596,58 @@ export function investInExpansion(s0: GameState, investment: ExpansionInvestment
         id: 'branch-' + s0.day + '-' + index,
         name: 'Asanwa Boutique ' + (index === 1 ? 'Lekki Outlet' : 'Branch ' + index),
         area: areas[current.branches.length % areas.length],
-        tier: 2,
-        openedDay: s0.day,
-        weeklyRent: 330_000,
-        assetValue: 2_200_000,
+        tier: 2, openedDay: s0.day, weeklyRent: 330_000, assetValue: 2_200_000,
       };
-      expansion = { ...current, branches: [...current.branches, branch] };
+      expansion = { ...expansion, branches: [...current.branches, branch] };
       break;
     }
     case 'wholesale':
-      expansion = { ...current, wholesaleActive: true };
+      expansion = { ...expansion, wholesaleActive: true, wholesaleOperation: makeWholesaleOperation(option.cost) };
       brand = { ...brand, awareness: clamp(brand.awareness + 2, 5, 100), reliability: clamp(brand.reliability + 1, 5, 100) };
       break;
-    case 'bridal':
-      expansion = { ...current, departments: [...current.departments, 'Bridal & Occasionwear'] };
+    case 'bridal': {
+      const name = 'Bridal & Occasionwear';
+      expansion = { ...expansion, departments: [...current.departments, name], departmentOperations: [...(current.departmentOperations || []), makeDepartmentOperation(name, s0.day, option.cost)] };
       brand = { ...brand, prestige: clamp(brand.prestige + 7, 5, 100), loyalty: clamp(brand.loyalty + 1.5, 5, 100) };
       break;
-    case 'accessories':
-      expansion = { ...current, departments: [...current.departments, 'Accessories'] };
+    }
+    case 'accessories': {
+      const name = 'Accessories';
+      expansion = { ...expansion, departments: [...current.departments, name], departmentOperations: [...(current.departmentOperations || []), makeDepartmentOperation(name, s0.day, option.cost)] };
       brand = { ...brand, awareness: clamp(brand.awareness + 2.5, 5, 100), loyalty: clamp(brand.loyalty + 1.5, 5, 100) };
       break;
-    case 'menswear':
-      expansion = { ...current, departments: [...current.departments, 'Menswear'] };
+    }
+    case 'menswear': {
+      const name = 'Menswear';
+      expansion = { ...expansion, departments: [...current.departments, name], departmentOperations: [...(current.departmentOperations || []), makeDepartmentOperation(name, s0.day, option.cost)] };
       brand = { ...brand, awareness: clamp(brand.awareness + 2, 5, 100), loyalty: clamp(brand.loyalty + 1, 5, 100) };
       break;
+    }
     case 'designer':
-      expansion = { ...current, designerCollections: current.designerCollections + 1 };
+      expansion = { ...expansion, designerCollections: current.designerCollections + 1 };
       brand = { ...brand, prestige: clamp(brand.prestige + 3.5, 5, 100), trendInfluence: clamp(brand.trendInfluence + 5, 5, 100) };
       break;
   }
-  const charged = ledger({ ...s0, businessExpansion: expansion, brand }, -option.cost, 'Business expansion: ' + option.title);
+  const charged = ledger({ ...s0, businessExpansion: expansion, brand }, -effectiveCost, 'Business expansion: ' + option.title, 'operating');
   return {
     ...charged,
-    today: { ...charged.today, events: [...charged.today.events, option.title + ' funded for ' + option.cost.toLocaleString('en-NG') + ' naira. The investment is recorded as a business asset rather than a daily operating expense.'] },
-    gist: [{ id: 'expansion-' + investment + '-' + s0.day, day: s0.day, title: option.title + ' at Asanwa Boutique', body: 'Divine invested ' + option.cost.toLocaleString('en-NG') + ' naira in business expansion. The move can improve long-term revenue, but the business must still cover its running costs.', about: 'you', hot: true }, ...(s0.gist || [])].slice(0, 40),
+    today: { ...charged.today, events: [...charged.today.events, option.title + ' funded for ' + effectiveCost.toLocaleString('en-NG') + ' naira. Earned event credit of ' + creditUsed.toLocaleString('en-NG') + ' naira was applied. The investment is recorded as a business asset rather than a daily operating expense.'] },
+    gist: [{ id: 'expansion-' + investment + '-' + s0.day, day: s0.day, title: option.title + ' at Asanwa Boutique', body: 'Divine invested ' + effectiveCost.toLocaleString('en-NG') + ' naira in business expansion. The move can improve long-term revenue, but the business must still cover its running costs.', about: 'you', hot: true }, ...(s0.gist || [])].slice(0, 40),
   };
 }
 
-/** Run branch stores through the same simulated day as the main shop. */
+/** Run branches, departments and wholesale through one idempotent daily close. */
 export function processExpansionAtClose(s0: GameState): GameState {
-  const expansion = s0.businessExpansion || initialBusinessExpansion();
-  // A repeated call must not double-post branch sales, wholesale orders, or rent.
-  if (expansion.lastProcessedDay === s0.day) return s0;
-  if (!expansion.branches.length && !expansion.wholesaleActive) return s0;
+  const original = s0.businessExpansion || initialBusinessExpansion();
+  if (original.lastProcessedDay === s0.day) return s0;
+  const expansion: BusinessExpansionState = {
+    ...original,
+    departmentOperations: [...(original.departmentOperations || original.departments.map((name) => makeDepartmentOperation(name, s0.day, EXPANSION_COSTS[(name === 'Accessories' ? 'accessories' : name === 'Menswear' ? 'menswear' : 'bridal') as ExpansionInvestment])) )],
+    wholesaleOperation: original.wholesaleActive ? (original.wholesaleOperation || makeWholesaleOperation(EXPANSION_COSTS.wholesale)) : original.wholesaleOperation,
+  };
+  if (!expansion.branches.length && !expansion.wholesaleActive && !(expansion.departmentOperations || []).length) {
+    return { ...s0, businessExpansion: { ...expansion, lastProcessedDay: s0.day } };
+  }
   let s = s0;
   const branches = [...expansion.branches];
   for (let index = 0; index < branches.length; index += 1) {
@@ -584,38 +663,88 @@ export function processExpansionAtClose(s0: GameState): GameState {
     const rentCost = s.day % 7 === 0 ? Math.max(0, branch.weeklyRent) : 0;
     const dayCosts = stockCost + runningCost + rentCost;
     s = ledger(s, revenue, branch.name + ' sales');
-    s = ledger(s, -(stockCost + runningCost), branch.name + ' stock and running costs');
-    s = {
-      ...s,
-      today: { ...s.today, income: s.today.income + revenue, costs: s.today.costs + stockCost + runningCost, events: [...s.today.events, branch.name + ' made ' + revenue.toLocaleString('en-NG') + ' naira in sales.'] },
-    };
+    s = ledger(s, -(stockCost + runningCost), branch.name + ' stock and running costs', 'operating');
+    s = { ...s, today: { ...s.today, income: s.today.income + revenue, costs: s.today.costs + stockCost + runningCost, events: [...s.today.events, branch.name + ' made ' + revenue.toLocaleString('en-NG') + ' naira in sales.'] } };
     if (rentCost > 0) {
-      s = ledger(s, -rentCost, branch.name + ' weekly rent');
+      s = ledger(s, -rentCost, branch.name + ' weekly rent', 'operating');
       s = { ...s, today: { ...s.today, costs: s.today.costs + rentCost, events: [...s.today.events, branch.name + ' paid ' + rentCost.toLocaleString('en-NG') + ' naira in weekly rent.'] } };
     }
-    branches[index] = {
-      ...branch,
-      cumulativeRevenue: Math.max(0, branch.cumulativeRevenue || 0) + revenue,
-      cumulativeCosts: Math.max(0, branch.cumulativeCosts || 0) + dayCosts,
-      daysTrading: Math.max(0, branch.daysTrading || 0) + 1,
-      lastDay: s.day,
-      lastDayRevenue: revenue,
-      lastDayCosts: dayCosts,
-      lastDayProfit: revenue - dayCosts,
-    };
+    branches[index] = { ...branch, cumulativeRevenue: Math.max(0, branch.cumulativeRevenue || 0) + revenue,
+      cumulativeCosts: Math.max(0, branch.cumulativeCosts || 0) + dayCosts, daysTrading: Math.max(0, branch.daysTrading || 0) + 1,
+      lastDay: s.day, lastDayRevenue: revenue, lastDayCosts: dayCosts, lastDayProfit: revenue - dayCosts };
   }
-  if (expansion.wholesaleActive) {
+
+  const departmentOperations = [...(expansion.departmentOperations || [])].map((originalDepartment) => {
+    let d = { ...originalDepartment };
     const brand = getBrandMetrics(s);
-    const revenue = roundMoney(85_000 * (0.7 + brand.awareness / 160) * (0.8 + Math.random() * 0.4));
-    const cost = roundMoney(revenue * 0.72);
-    s = ledger(s, revenue, 'Wholesale orders');
-    s = ledger(s, -cost, 'Wholesale stock and fulfilment');
-    s = { ...s, today: { ...s.today, income: s.today.income + revenue, costs: s.today.costs + cost, events: [...s.today.events, 'Wholesale orders recorded ' + revenue.toLocaleString('en-NG') + ' naira in sales.'] } };
+    const audience = Math.min(1.35, 0.75 + Math.log10(Math.max(1, s.followers || 0) + 1) / 12 + brand.awareness / 250);
+    const unitsDemanded = Math.max(1, Math.round(({ Accessories: 8, 'Bridal & Occasionwear': 3, Menswear: 5 }[d.name] || 4) * audience * (0.75 + Math.random() * 0.5)));
+    const unitsSold = Math.min(Math.max(0, d.inventoryUnits), unitsDemanded);
+    const revenue = unitsSold * d.unitPrice;
+    const costOfGoods = unitsSold * d.unitCost;
+    const runningCost = ({ Accessories: 2_500, 'Bridal & Occasionwear': 4_500, Menswear: 3_000 }[d.name] || 2_500);
+    s = ledger(s, revenue, d.name + ' department sales');
+    s = ledger(s, -costOfGoods, d.name + ' department cost of goods', 'operating');
+    s = ledger(s, -runningCost, d.name + ' department running costs', 'operating');
+    s = { ...s, today: { ...s.today, income: s.today.income + revenue, costs: s.today.costs + costOfGoods + runningCost,
+      events: [...s.today.events, d.name + ' sold ' + unitsSold + ' units for ' + revenue.toLocaleString('en-NG') + ' naira' + (unitsSold < unitsDemanded ? '; ' + (unitsDemanded - unitsSold) + ' requested units were unavailable.' : '.') ] } };
+    d.inventoryUnits = Math.max(0, d.inventoryUnits - unitsSold);
+    d.inventoryValue = Math.max(0, d.inventoryValue - costOfGoods);
+    const minimumStock = Math.ceil(d.targetUnits * 0.4);
+    if (d.inventoryUnits < minimumStock && s.cash > 0) {
+      const requestedUnits = Math.min(d.targetUnits - d.inventoryUnits, d.targetUnits - minimumStock + (minimumStock - d.inventoryUnits));
+      const affordableUnits = Math.min(requestedUnits, Math.floor(Math.max(0, s.cash) / Math.max(1, d.unitCost)));
+      if (affordableUnits > 0) {
+        const purchaseCost = affordableUnits * d.unitCost;
+        s = ledger(s, -purchaseCost, d.name + ' inventory restock', 'operating');
+        d.inventoryUnits += affordableUnits;
+        d.inventoryValue += purchaseCost;
+      }
+    }
+    d.cumulativeRevenue += revenue;
+    d.cumulativeCosts += costOfGoods + runningCost;
+    d.daysTrading += 1;
+    d.lastDay = s.day; d.lastDayRevenue = revenue; d.lastDayCosts = costOfGoods + runningCost; d.lastDayProfit = revenue - costOfGoods - runningCost;
+    return d;
+  });
+
+  let wholesaleOperation = expansion.wholesaleOperation;
+  if (expansion.wholesaleActive && wholesaleOperation) {
+    let w = { ...wholesaleOperation };
+    const brand = getBrandMetrics(s);
+    const demand = Math.max(1, Math.round((14 + brand.awareness / 8) * (0.7 + Math.random() * 0.6)));
+    const fulfilled = Math.min(w.inventoryUnits, demand);
+    const revenue = fulfilled * w.unitPrice;
+    const costOfGoods = fulfilled * w.unitCost;
+    const fulfilment = Math.round(revenue * 0.06);
+    const operating = 8_000;
+    s = ledger(s, revenue, 'Wholesale customer orders');
+    s = ledger(s, -costOfGoods, 'Wholesale cost of goods', 'operating');
+    s = ledger(s, -fulfilment, 'Wholesale fulfilment', 'operating');
+    s = ledger(s, -operating, 'Wholesale operations', 'operating');
+    s = { ...s, today: { ...s.today, income: s.today.income + revenue, costs: s.today.costs + costOfGoods + fulfilment + operating,
+      events: [...s.today.events, 'Wholesale fulfilled ' + fulfilled + ' of ' + demand + ' units for ' + revenue.toLocaleString('en-NG') + ' naira' + (fulfilled < demand ? '; stock-out prevented ' + (demand - fulfilled) + ' units from shipping.' : '.') ] } };
+    w.inventoryUnits = Math.max(0, w.inventoryUnits - fulfilled);
+    w.inventoryValue = Math.max(0, w.inventoryValue - costOfGoods);
+    if (fulfilled > 0) w.ordersFulfilled += 1;
+    if (fulfilled < demand) w.ordersMissed += 1;
+    const minimumStock = Math.ceil(w.targetUnits * 0.4);
+    if (w.inventoryUnits < minimumStock && s.cash > 0) {
+      const requestedUnits = Math.min(w.targetUnits - w.inventoryUnits, Math.max(0, w.targetUnits - minimumStock + (minimumStock - w.inventoryUnits)));
+      const affordableUnits = Math.min(requestedUnits, Math.floor(Math.max(0, s.cash) / Math.max(1, w.unitCost)));
+      if (affordableUnits > 0) {
+        const purchaseCost = affordableUnits * w.unitCost;
+        s = ledger(s, -purchaseCost, 'Wholesale inventory restock', 'operating');
+        w.inventoryUnits += affordableUnits;
+        w.inventoryValue += purchaseCost;
+      }
+    }
+    w.cumulativeRevenue += revenue;
+    w.cumulativeCosts += costOfGoods + fulfilment + operating;
+    w.lastDay = s.day; w.lastDayRevenue = revenue; w.lastDayCosts = costOfGoods + fulfilment + operating; w.lastDayProfit = revenue - costOfGoods - fulfilment - operating;
+    wholesaleOperation = w;
   }
-  return {
-    ...s,
-    businessExpansion: { ...expansion, branches, lastProcessedDay: s.day },
-  };
+  return { ...s, businessExpansion: { ...expansion, branches, departmentOperations, wholesaleOperation, lastProcessedDay: s.day } };
 }
 
 export function playerWeekTotals(s: GameState): { revenue: number; costs: number; profit: number } {
@@ -647,7 +776,9 @@ export function netWorthPlayer(s: GameState): number {
     try { return sum + furnitureById(item.id).price * 0.35; } catch { return sum; }
   }, 0);
   const expansion = s.businessExpansion || initialBusinessExpansion();
-  const expansionAssets = expansion.branches.reduce((sum, branch) => sum + Math.max(0, branch.assetValue), 0) + (expansion.wholesaleActive ? 4_500_000 : 0) + expansion.departments.length * 650_000 + expansion.designerCollections * 1_250_000;
+  const departmentInventory = (expansion.departmentOperations || []).reduce((sum, department) => sum + Math.max(0, department.inventoryValue || 0), 0);
+  const wholesaleInventory = Math.max(0, expansion.wholesaleOperation?.inventoryValue || 0);
+  const expansionAssets = expansion.branches.reduce((sum, branch) => sum + Math.max(0, branch.assetValue), 0) + (expansion.wholesaleActive ? 4_500_000 : 0) + expansion.departments.length * 650_000 + expansion.designerCollections * 1_250_000 + departmentInventory + wholesaleInventory;
   const weekly = playerWeekTotals(s);
   const goodwill = Math.max(0, weekly.profit) * 5 + Math.max(0, s.followers || 0) * 5 +
     brandPower(getBrandMetrics(s), s.followers || 0, s.tier) * 100;
