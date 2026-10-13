@@ -6,6 +6,7 @@ import {
   ROOMS,
   STARTER_FURNITURE,
   autoPlace,
+  canPlace,
   cellsBlocked,
   furnitureById,
   listingsFor,
@@ -158,4 +159,26 @@ test('moving into a ready-furnished shop charges the package once and keeps prio
   assert.ok(retained.every((item) => !item.placed));
   assert.ok(after.furniture.some((item) => !ownedUids.has(item.uid) && item.placed));
   assert.ok(after.ledger.some((line) => line.label === 'Ready-furnished shop package' && line.amount === -packagePrice));
+});
+
+test('walkable rugs cannot be arranged through the new internal walls', () => {
+  for (const tier of [5, 6]) {
+    const destination = listingsFor(tier, 0).find((listing) => !listing.signature && listing.stars === 2)!;
+    const room = roomOf(destination);
+    const wall = room.partitions!.find((partition) =>
+      Array.from({ length: partition.end - partition.start + 1 }, (_, i) => partition.start + i)
+        .some((cell) => !partition.openings.includes(cell)),
+    )!;
+    const start = Array.from({ length: wall.end - wall.start + 1 }, (_, i) => wall.start + i)
+      .find((cell) => !wall.openings.includes(cell))!;
+    const rug: Placed = {
+      uid: newUid(),
+      id: 'rug',
+      x: wall.axis === 'horizontal' ? start : wall.at - 1,
+      z: wall.axis === 'horizontal' ? wall.at - 1 : start,
+      rot: 0,
+      placed: true,
+    };
+    assert.equal(canPlace([], destination, rug), false, `tier ${tier} rug should not cross an internal wall`);
+  }
 });
