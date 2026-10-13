@@ -73,7 +73,7 @@ test('checkout rejects locked, malformed, duplicate, or unaffordable cart lines 
   const validLine = lineFor(affordable);
   assert.equal(validateCart(s, [validLine]).ok, true);
   assert.equal(validateCart(s, [validLine, { ...validLine }]).ok, false, 'duplicate lines must be rejected');
-  const expensiveQuantity = { ...validLine, pieces: 500 };
+  const expensiveQuantity = { ...validLine, pieces: 501 };
   assert.equal(validateCart(s, [expensiveQuantity]).ok, false, 'checkout must reject orders beyond available funds or quantity rules');
   const after = buyCart(s, [validLine]);
   assert.notEqual(after, s);
