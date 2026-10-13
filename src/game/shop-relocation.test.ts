@@ -183,17 +183,20 @@ test('walkable rugs cannot be arranged through the new internal walls', () => {
   }
 });
 
-test('preview cash grants add ₦20 billion once per preview revision and are inert when disabled', () => {
-  const original = newGame(DIVINE_CONFIG);
+test('preview cash grants add ₦20 billion once per preview revision and remain spendable', () => {
+  const fresh = newGame(DIVINE_CONFIG);
+  const original = { ...fresh, operatingPayables: 15_000_000 };
   const amount = 20_000_000_000;
   assert.equal(previewCashGrant(original, '', amount), original, 'no preview grant ID means no cash change');
 
   const first = previewCashGrant(original, 'pr-30-revision-a', amount);
-  assert.equal(first.cash, original.cash + amount);
+  assert.equal(first.cash, original.cash + amount, 'the entire grant must remain as available cash');
+  assert.equal(first.operatingPayables, original.operatingPayables, 'a test grant must not settle old payables');
   assert.ok(first.appliedGrants?.includes('preview-cash-pr-30-revision-a'));
   assert.equal(previewCashGrant(first, 'pr-30-revision-a', amount), first, 'reload/re-render must not duplicate the same grant');
 
   const nextRevision = previewCashGrant(first, 'pr-30-revision-b', amount);
   assert.equal(nextRevision.cash, original.cash + amount * 2, 'a fresh preview revision gets its own one-time grant');
   assert.equal(previewCashGrant(original, 'pr-30-revision-a', 0), original, 'invalid grant amounts are ignored');
+  assert.ok(first.ledger.some((line) => line.label === 'Preview testing balance' && line.amount === amount));
 });
