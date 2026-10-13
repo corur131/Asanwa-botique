@@ -1133,7 +1133,9 @@ export function payRent(s: GameState): GameState {
       : `Rent is short by ${naira(totalOwed)}. You have ${s.grace} day${s.grace > 1 ? 's' : ''} to clear it. If it remains unpaid by day ${due}, you move to a smaller shop.`, 'danger');
   }
   return msg(next, 'Landlord', prepaid > 0
-    ? `Rent of ${naira(rent)} is covered: ${naira(prepaid)} was paid early, with the rest settled now. See you next week.`
+    ? (remainingRent === 0
+      ? `Rent of ${naira(rent)} is fully covered by your ${naira(prepaid)} advance payment. See you next week.`
+      : `Rent of ${naira(rent)} received; ${naira(prepaid)} was paid early and the remaining ${naira(remainingRent)} is now settled. See you next week.`)
     : `Rent of ${naira(rent)} received. See you next week.`, 'info');
 }
 
