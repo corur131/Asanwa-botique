@@ -141,7 +141,7 @@ export function buildRequest(c: Omit<Customer, 'request'>, regular?: Regular): s
   if (c.service) parts.push(pick(c.male ? SERVICE_INTRO.male : SERVICE_INTRO[c.service]));
   c.wants.forEach((w) => parts.push(wantLine(w, c.male)));
   if (regular?.tasteKnown && !c.service) parts.push(`You know I love ${c.taste.favName}.`);
-  parts.push(pick(BUDGET_LINE[c.cls]).replace('{b}', `₦${c.budget.toLocaleString('en-NG')}`));
+  parts.push(pick(BUDGET_LINE[c.cls]).replace('{b}', `₦${c.budget?.toLocaleString('en-NG')}`));
   return parts.filter(Boolean).join(' ');
 }
 
@@ -247,7 +247,7 @@ export function makeCelebrityCustomer(state: GameState, celebrityTier: number): 
   };
   return {
     ...guest,
-    request: `A special Lagos celebrity guest has arrived: ${profile.name} · ${profile.rank}. I need a show-stopping luxury look. Money is not the issue, and my team is waiting outside. Please make this memorable. Budget: ₦${budget.toLocaleString('en-NG')}.`,
+    request: `A special Lagos celebrity guest has arrived: ${profile.name} · ${profile.rank}. I need a show-stopping luxury look. Money is not the issue, and my team is waiting outside. Please make this memorable. Budget: ₦${budget?.toLocaleString('en-NG')}.`,
   };
 }
 

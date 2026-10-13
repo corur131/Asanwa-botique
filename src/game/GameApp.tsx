@@ -386,10 +386,10 @@ export default function GameApp({ onLab, initial, storageKey, cloud, notice }: {
           {s.weather === 'sunny' ? '☀️ Sunny · hot' : s.weather === 'rainy' ? '🌧️ Rainy · fewer walk-ins' : s.weather === 'harmattan' ? '🌫️ Harmattan · dusty' : '☁️ Cloudy · mild'}
         </div>}
         <div className={`text-lg font-bold ${s.cash < 0 ? 'text-rose-300' : 'text-emerald-300'}`}>{naira(s.cash)}</div>
-        <div className="rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-xs"><div className="text-[10px] text-slate-400">Brand Power</div><div className="font-bold text-fuchsia-200">{brandPower(getBrandMetrics(s), s.followers || 0, s.tier).toLocaleString("en-NG")}</div></div>
+        <div className="rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-xs"><div className="text-[10px] text-slate-400">Brand Power</div><div className="font-bold text-fuchsia-200">{brandPower(getBrandMetrics(s), s.followers || 0, s.tier)?.toLocaleString("en-NG")}</div></div>
         <EnergyBar s={s} />
         <div className="text-xs text-slate-300 max-sm:hidden">
-          Prestige <b className="text-amber-300">{st.prestige}</b> · Followers <b className="text-pink-300">{(s.followers || 0).toLocaleString('en-NG')}</b>
+          Prestige <b className="text-amber-300">{st.prestige}</b> · Followers <b className="text-pink-300">{(s.followers || 0)?.toLocaleString('en-NG')}</b>
         </div>
         <div className={`text-xs ${s.lateRent ? 'text-rose-300 font-bold' : E.daysToRent(s.day) <= 2 ? 'text-amber-300' : 'text-slate-400'}`}>
           {s.lateRent ? `RENT LATE · clear by day ${s.lateRent.due}` : `Rent ${naira(s.listing.rent)} ${E.daysToRent(s.day) === 0 ? 'tonight' : `in ${E.daysToRent(s.day)}d`}`}
@@ -771,7 +771,7 @@ export default function GameApp({ onLab, initial, storageKey, cloud, notice }: {
             <div className="flex flex-wrap items-center gap-3 px-4 py-2 border-b border-white/10 bg-[#101219]">
               <div className="leading-tight min-w-0 flex-1">
                 <div className="text-white font-semibold">{r.shop} <Stars n={r.stars} /></div>
-                <div className="text-[11px] text-slate-400">{r.owner} · {TIERS[r.tier].name} in {r.area} · Brand Power {brandPower(r.brand || E.getBrandMetrics(s), r.followers, r.tier).toLocaleString('en-NG')} · {Math.max(0, Number(r.followers) || 0).toLocaleString('en-NG')} followers</div>
+                <div className="text-[11px] text-slate-400">{r.owner} · {TIERS[r.tier].name} in {r.area} · Brand Power {brandPower(r.brand || E.getBrandMetrics(s), r.followers, r.tier)?.toLocaleString('en-NG')} · {Math.max(0, Number(r.followers) || 0)?.toLocaleString('en-NG')} followers</div>
               </div>
               <Btn size="sm" tone="gold" onClick={() => setTouring(null)}>Leave the shop</Btn>
             </div>
@@ -1050,7 +1050,7 @@ const Evening: React.FC<{ s: GameState; onSleep: () => void; onPhone: () => void
           {d.tips > 0 && <li>Tips: {naira(d.tips)}</li>}
           {d.staffServed > 0 && <li>Your staff styled {d.staffServed} customer{d.staffServed > 1 ? 's' : ''}.</li>}
           {d.walkedOut > 0 && <li className="text-rose-300">{d.walkedOut} customer{d.walkedOut > 1 ? 's' : ''} didn't buy.</li>}
-          <li>Brand Power {brandPower(getBrandMetrics(s), s.followers || 0, s.tier).toLocaleString("en-NG")} · {Math.round(s.followers || 0).toLocaleString("en-NG")} social followers</li>
+          <li>Brand Power {brandPower(getBrandMetrics(s), s.followers || 0, s.tier)?.toLocaleString("en-NG")} · {Math.round(s.followers || 0)?.toLocaleString("en-NG")} social followers</li>
           {d.events.map((e, i) => <li key={i}>{e}</li>)}
         </ul>
       </Card>

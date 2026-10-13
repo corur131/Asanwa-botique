@@ -82,7 +82,7 @@ export function money(s: GameState, amount: number, label: string): GameState {
     cash -= paid;
     operatingPayables += shortfall;
     entries.push({ day: s.day, t, label, amount: -paid, category: 'operating' });
-    if (shortfall > 0) entries.unshift({ day: s.day, t, label: 'Unpaid operating cost: ' + label + ' (' + shortfall.toLocaleString('en-NG') + ' naira)', amount: 0, category: 'operating' });
+    if (shortfall > 0) entries.unshift({ day: s.day, t, label: 'Unpaid operating cost: ' + label + ' (' + shortfall?.toLocaleString('en-NG') + ' naira)', amount: 0, category: 'operating' });
   } else {
     cash += value;
     entries.push({ day: s.day, t, label, amount: value, category: 'operating' });
@@ -876,8 +876,8 @@ export function applyLook(s0: GameState, c: Customer, choice: StyleChoice, st0: 
     const gained = Math.round((8_000 + Math.random() * 10_000) * (1 + c.celebrity.tier * 0.85));
     const rivals = next.rivals.map((r) => r.id === 'you' ? r : { ...r, feeling: clamp(r.feeling - (8 + c.celebrity!.tier * 3), -100, 100) });
     next = { ...next, followers: (next.followers || 0) + gained, rep: clamp(next.rep + 3 + c.celebrity.tier * 2, 0, 100), rivals,
-      today: { ...next.today, events: [...next.today.events, `TRENDING IN LAGOS: ${c.name} paid ${naira(st.paid + st.tip)} including a ${naira(st.tip)} tip, then posted your look. +${gained.toLocaleString('en-NG')} followers. Rivals are watching.`] } };
-    next = msg(next, 'Gidigram', `TRENDING NOW 🔥 ${c.name} posted the look from your shop! +${gained.toLocaleString('en-NG')} followers, a huge reputation boost, and your rivals are jealous.`, 'good');
+      today: { ...next.today, events: [...next.today.events, `TRENDING IN LAGOS: ${c.name} paid ${naira(st.paid + st.tip)} including a ${naira(st.tip)} tip, then posted your look. +${gained?.toLocaleString('en-NG')} followers. Rivals are watching.`] } };
+    next = msg(next, 'Gidigram', `TRENDING NOW 🔥 ${c.name} posted the look from your shop! +${gained?.toLocaleString('en-NG')} followers, a huge reputation boost, and your rivals are jealous.`, 'good');
   }
   if (c.contest) next = judge(next, c, score.total);
   next = depart(next, c, lookOut, sold);

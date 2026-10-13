@@ -366,7 +366,7 @@ export function simulateRivals(s0: GameState): GameState {
         r.cash -= departmentCost;
         r.departments = [...departmentNames, preferredDepartment];
         expansionInvestmentMade = true;
-        growthNotes.push({ owner: r.owner, shop: r.shop, detail: 'opened its ' + preferredDepartment + ' department for ₦' + departmentCost.toLocaleString('en-NG') });
+        growthNotes.push({ owner: r.owner, shop: r.shop, detail: 'opened its ' + preferredDepartment + ' department for ₦' + departmentCost?.toLocaleString('en-NG') });
       }
     }
     // move up when they can afford it; get thrown down when broke too long
@@ -405,9 +405,9 @@ export function simulateRivals(s0: GameState): GameState {
     if (n.kind === 'celebrity') {
       const spend = n.spend || 0;
       const headline = `${r.shop} welcomes a celebrity client ✨`;
-      const detail = `${r.owner} hosted a celebrity shopping visit today. The client spent ${'₦' + spend.toLocaleString('en-NG')} on a luxury wardrobe; stock and service costs were deducted, and the visit lifted the boutique's profile.`;
+      const detail = `${r.owner} hosted a celebrity shopping visit today. The client spent ${'₦' + spend?.toLocaleString('en-NG')} on a luxury wardrobe; stock and service costs were deducted, and the visit lifted the boutique's profile.`;
       s = gist(s, headline, detail, r.id, true);
-      s = say(s, 'GistLagos', `🚨 CELEBRITY SIGHTING: ${r.shop} (${r.owner}) just welcomed a celebrity shopper. Reported spend: ₦${spend.toLocaleString('en-NG')}. Lagos fashion is getting competitive!`, { chat: GROUP, tone: 'good' });
+      s = say(s, 'GistLagos', `🚨 CELEBRITY SIGHTING: ${r.shop} (${r.owner}) just welcomed a celebrity shopper. Reported spend: ₦${spend?.toLocaleString('en-NG')}. Lagos fashion is getting competitive!`, { chat: GROUP, tone: 'good' });
       s = rivalPost(s, r, `A special guest came through today ✨ Celebrity client, luxury pieces, and a very good day at ${r.shop}. Thank you for the love! #CelebrityStyle #LagosFashion`);
       if (r.main) s = inGroup(s, r, `Celebrity client in my shop today 😌✨ The industry is watching.`, { tone: 'good' });
     } else if (n.kind === 'up') {

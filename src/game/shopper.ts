@@ -492,7 +492,7 @@ export function prepareShopperOrder(
   const filterNote = hasBuyingPreferences
     ? ` Applied ${activePreferences.length} strict category, dressing-rank and/or per-piece price filters.`
     : mission === 'richCustomers' ? ' Limited this order to the game’s luxury dressing rank.' : '';
-  const summary = `Shopper returned on day ${s.day}: ${chosen.length} product lines, ${chosen.reduce((sum, line) => sum + line.pieces, 0)} pieces, estimated total ₦${spent.toLocaleString('en-NG')}. I ${descriptions[mission]}.${exampleNote}${filterNote}${selectedContract ? ` Contract deadline: Day ${selectedContract.deadlineDay}. ` : ' '}Review everything in Yaba Mart before checkout.`;
+  const summary = `Shopper returned on day ${s.day}: ${chosen.length} product lines, ${chosen.reduce((sum, line) => sum + line.pieces, 0)} pieces, estimated total ₦${spent?.toLocaleString('en-NG')}. I ${descriptions[mission]}.${exampleNote}${filterNote}${selectedContract ? ` Contract deadline: Day ${selectedContract.deadlineDay}. ` : ' '}Review everything in Yaba Mart before checkout.`;
   const job: ShopperJob = {
     id, mission, budget, estimatedTotal: spent, status: 'ready',
     createdDay: s.day, completedDay: s.day, items: chosen, summary,

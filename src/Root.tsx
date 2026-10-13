@@ -17,7 +17,7 @@ class GameRenderBoundary extends React.Component<React.PropsWithChildren, GameRe
   }
 
   componentDidCatch(error: Error, info: React.ErrorInfo) {
-    const details = `${error.name}: ${error.message}\n\nComponent stack:\n${info.componentStack || '(not available)'}`;
+    const details = `${error.name}: ${error.message}\n\nError stack:\n${error.stack || '(not available)'}\n\nComponent stack:\n${info.componentStack || '(not available)'}`;
     this.setState({ errorDetails: details });
     console.error('Asanwa Boutique UI render error:', error, info.componentStack);
   }

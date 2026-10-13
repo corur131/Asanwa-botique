@@ -178,7 +178,7 @@ function ledger(s: GameState, amount: number, label: string, category?: 'transfe
     cash -= paid;
     operatingPayables += shortfall;
     entries.push({ day: s.day, t, label, amount: -paid, ...(category ? { category } : {}) });
-    if (shortfall > 0) entries.unshift({ day: s.day, t, label: 'Unpaid operating cost: ' + label + ' (' + shortfall.toLocaleString('en-NG') + ' naira)', amount: 0, category: 'operating' });
+    if (shortfall > 0) entries.unshift({ day: s.day, t, label: 'Unpaid operating cost: ' + label + ' (' + shortfall?.toLocaleString('en-NG') + ' naira)', amount: 0, category: 'operating' });
   } else {
     cash += amount;
     entries.push({ day: s.day, t, label, amount, ...(category ? { category } : {}) });
@@ -350,7 +350,7 @@ export function takeBusinessLoan(s0: GameState, requested: number, termWeeks: nu
     nextPaymentDay: Math.ceil((s0.day + 7) / 7) * 7, missedPayments: 0, arrearsBalance: 0,
   };
   const next = ledger({ ...s0, bank: { ...bank, loans: [...bank.loans, loan], creditProfile: { ...profile, score: clamp(profile.score - 3, 300, 850), loansTaken: profile.loansTaken + 1, lastApplicationDay: s0.day } } }, amount, 'Business loan disbursement', 'financing');
-  return { ...next, today: { ...next.today, events: [...next.today.events, 'Business loan approved: ' + amount.toLocaleString('en-NG') + ' naira over ' + termWeeks + ' weeks.'] } };
+  return { ...next, today: { ...next.today, events: [...next.today.events, 'Business loan approved: ' + amount?.toLocaleString('en-NG') + ' naira over ' + termWeeks + ' weeks.'] } };
 }
 
 export function repayBusinessLoan(s0: GameState, loanId: string, amount: number): GameState {
@@ -400,7 +400,7 @@ export function processPromotionAtClose(s0: GameState): GameState {
   const affordableHours = Math.min(hours, Math.max(0, s0.cash) / Math.max(1, p.hourlyBudget));
   const chargedHours = Math.floor(affordableHours * 100) / 100;
   const cost = roundMoney(chargedHours * p.hourlyBudget);
-  let s = cost ? ledger({ ...s0, today: { ...s0.today, costs: s0.today.costs + cost, events: [...s0.today.events, 'Promotion (' + p.level + '): ' + chargedHours + ' business hours, ' + cost.toLocaleString('en-NG') + ' naira.'] } }, -cost, 'Promotion: ' + p.level) : s0;
+  let s = cost ? ledger({ ...s0, today: { ...s0.today, costs: s0.today.costs + cost, events: [...s0.today.events, 'Promotion (' + p.level + '): ' + chargedHours + ' business hours, ' + cost?.toLocaleString('en-NG') + ' naira.'] } }, -cost, 'Promotion: ' + p.level) : s0;
   const newHours = Math.max(0, (p.hoursRemaining || 0) - chargedHours);
   const reachMultiplier = { local: 1, citywide: 2.5, premium: 5.5, luxury: 10 }[p.level];
   const estimatedReach = Math.round(p.hourlyBudget * chargedHours * reachMultiplier / 15);
@@ -416,7 +416,7 @@ export function processPromotionAtClose(s0: GameState): GameState {
     estimatedReach: p.estimatedReach + estimatedReach,
   };
   const warehouseTarget = p.target === 'warehouse';
-  s = { ...s, promotion, followers: Math.max(0, (s.followers || 0) + followersGained), brand: { ...brandBefore, awareness: clamp(brandBefore.awareness + (!warehouseTarget && estimatedReach > 0 ? 0.3 : 0), 5, 100), trendInfluence: clamp(brandBefore.trendInfluence + (!warehouseTarget && estimatedReach > 0 ? 0.15 : 0), 5, 100) }, today: { ...s.today, events: [...s.today.events, warehouseTarget ? ('Warehouse promotion reached an estimated ' + estimatedReach.toLocaleString('en-NG') + ' buyers; wholesale order demand is boosted while the campaign remains active.') : ('Promotion reached an estimated ' + estimatedReach.toLocaleString('en-NG') + ' people and added ' + followersGained.toLocaleString('en-NG') + ' followers.')] } };
+  s = { ...s, promotion, followers: Math.max(0, (s.followers || 0) + followersGained), brand: { ...brandBefore, awareness: clamp(brandBefore.awareness + (!warehouseTarget && estimatedReach > 0 ? 0.3 : 0), 5, 100), trendInfluence: clamp(brandBefore.trendInfluence + (!warehouseTarget && estimatedReach > 0 ? 0.15 : 0), 5, 100) }, today: { ...s.today, events: [...s.today.events, warehouseTarget ? ('Warehouse promotion reached an estimated ' + estimatedReach?.toLocaleString('en-NG') + ' buyers; wholesale order demand is boosted while the campaign remains active.') : ('Promotion reached an estimated ' + estimatedReach?.toLocaleString('en-NG') + ' people and added ' + followersGained?.toLocaleString('en-NG') + ' followers.')] } };
   if (chargedHours < hours) {
     s = { ...s, messages: [{ id: (s.msgSeq || 0) + 1, day: s.day, from: 'KoboBank', text: 'Your promotion stopped because the current account could not cover the full hourly budget.', tone: 'warn' as const, t: -1 }, ...(s.messages || [])].slice(0, 160), msgSeq: (s.msgSeq || 0) + 1, promotion: { ...promotion, active: false } };
   }
@@ -433,7 +433,7 @@ export function saveRentAtClose(s0: GameState): GameState {
   const amount = Math.min(requested, Math.max(0, s0.cash));
   if (!amount) return s0;
   const result = transferBank(s0, 'rentVault', amount);
-  return { ...result, today: { ...result.today, events: [...result.today.events, 'Automatic Rent Vault transfer: ' + amount.toLocaleString('en-NG') + ' naira.'] } };
+  return { ...result, today: { ...result.today, events: [...result.today.events, 'Automatic Rent Vault transfer: ' + amount?.toLocaleString('en-NG') + ' naira.'] } };
 }
 
 /** Release matured fixed deposits on their exact in-game maturity day. Safe to call daily. */
@@ -489,7 +489,7 @@ export function processBankWeekly(s0: GameState): GameState {
       const profile = currentBank.creditProfile || creditProfile({ ...s, bank: currentBank });
       const hasDelinquency = (loan.missedPayments || 0) > 0 || (loan.arrearsBalance || 0) > 0;
       const creditProfileNext = { ...profile, score: clamp(profile.score + (hasDelinquency ? 2 : 5), 300, 850), onTimePayments: profile.onTimePayments + (hasDelinquency ? 0 : 1) };
-      s = ledger({ ...s, bank: { ...currentBank, loans, creditProfile: creditProfileNext }, today: { ...s.today, costs: s.today.costs + interest, events: [...s.today.events, 'Paid ' + interest.toLocaleString('en-NG') + ' naira in business-loan interest.'] } }, -due, 'Weekly loan repayment');
+      s = ledger({ ...s, bank: { ...currentBank, loans, creditProfile: creditProfileNext }, today: { ...s.today, costs: s.today.costs + interest, events: [...s.today.events, 'Paid ' + interest?.toLocaleString('en-NG') + ' naira in business-loan interest.'] } }, -due, 'Weekly loan repayment');
       bank = s.bank || currentBank;
     } else {
       const profile = currentBank.creditProfile || creditProfile({ ...s, bank: currentBank });
@@ -505,7 +505,7 @@ export function processBankWeekly(s0: GameState): GameState {
         ...(penalty ? [{ day: s.day, t: -1, label: 'Missed loan payment fee', amount: -penalty }] : []),
         ...(interest ? [{ day: s.day, t: -1, label: 'Missed loan interest', amount: -interest }] : []),
       ];
-      s = { ...s, bank: { ...currentBank, loans, creditProfile: creditProfileNext }, today: { ...s.today, costs: s.today.costs + interest + penalty, events: [...s.today.events, 'A missed loan payment added ' + interest.toLocaleString('en-NG') + ' naira in interest and ' + penalty.toLocaleString('en-NG') + ' naira in late fees.'] }, ledger: [...missedEntries, ...(s.ledger || [])].slice(0, 500) };
+      s = { ...s, bank: { ...currentBank, loans, creditProfile: creditProfileNext }, today: { ...s.today, costs: s.today.costs + interest + penalty, events: [...s.today.events, 'A missed loan payment added ' + interest?.toLocaleString('en-NG') + ' naira in interest and ' + penalty?.toLocaleString('en-NG') + ' naira in late fees.'] }, ledger: [...missedEntries, ...(s.ledger || [])].slice(0, 500) };
       s = { ...s, messages: [{ id: (s.msgSeq || 0) + 1, day: s.day, from: 'KoboBank', text: formalCollectionsNotice ? 'FORMAL COLLECTIONS NOTICE: Your account has reached five consecutive missed payments and has been referred to KoboBank collections. Limited recovery from available business cash may begin, while protecting ₦25,000 for operating needs. Please clear the arrears or use an eligible repayment option.' : (nextMissed >= 3 ? 'Your KoboBank loan is now in DEFAULT. New borrowing is blocked until this loan is cleared. Your credit score has fallen sharply.' : 'A scheduled loan payment was missed. A capped late fee was added and your credit score has fallen.'), tone: 'danger' as const, t: -1 }, ...(s.messages || [])].slice(0, 160), msgSeq: (s.msgSeq || 0) + 1 };
       bank = s.bank || currentBank;
       // Persistent, limited collections begin at five consecutive missed payments.
@@ -516,7 +516,7 @@ export function processBankWeekly(s0: GameState): GameState {
         const collection = Math.min(availableForCollection, currentLoan ? currentLoan.balance : 0, Math.max(5_000, roundMoney(((currentLoan?.balance || 0) * 0.03))));
         if (collection > 0 && currentLoan) {
           const afterCollectionLoans = (s.bank || bank).loans.map((item) => item.id === loan.id ? { ...item, balance: Math.max(0, item.balance - collection), arrearsBalance: Math.max(0, (item.arrearsBalance || 0) - collection), collectionsStarted: true } : item).filter((item) => item.balance > 0);
-          s = { ...s, cash: s.cash - collection, bank: { ...(s.bank || bank), loans: afterCollectionLoans }, ledger: [{ day: s.day, t: -1, label: 'KoboBank debt recovery', amount: -collection }, ...(s.ledger || [])].slice(0, 500), messages: [{ id: (s.msgSeq || 0) + 1, day: s.day, from: 'KoboBank', text: 'FORMAL COLLECTIONS NOTICE: Your loan has been referred to KoboBank collections after five or more consecutive missed payments. ' + collection.toLocaleString('en-NG') + ' naira was recovered from available business cash; the ₦25,000 operating buffer was protected. Contact the in-game bank options to clear the arrears or request an eligible plan.', tone: 'danger' as const, t: -1 }, ...(s.messages || [])].slice(0, 160), msgSeq: (s.msgSeq || 0) + 1, today: { ...s.today, events: [...s.today.events, 'Debt recovery collected ' + collection.toLocaleString('en-NG') + ' naira while protecting a 25,000 naira operating buffer.'] } };
+          s = { ...s, cash: s.cash - collection, bank: { ...(s.bank || bank), loans: afterCollectionLoans }, ledger: [{ day: s.day, t: -1, label: 'KoboBank debt recovery', amount: -collection }, ...(s.ledger || [])].slice(0, 500), messages: [{ id: (s.msgSeq || 0) + 1, day: s.day, from: 'KoboBank', text: 'FORMAL COLLECTIONS NOTICE: Your loan has been referred to KoboBank collections after five or more consecutive missed payments. ' + collection?.toLocaleString('en-NG') + ' naira was recovered from available business cash; the ₦25,000 operating buffer was protected. Contact the in-game bank options to clear the arrears or request an eligible plan.', tone: 'danger' as const, t: -1 }, ...(s.messages || [])].slice(0, 160), msgSeq: (s.msgSeq || 0) + 1, today: { ...s.today, events: [...s.today.events, 'Debt recovery collected ' + collection?.toLocaleString('en-NG') + ' naira while protecting a 25,000 naira operating buffer.'] } };
           bank = s.bank || bank;
         }
       }
@@ -585,7 +585,7 @@ export function expansionOptions(s: GameState): ExpansionOption[] {
     const reason = !eligibleTier ? 'Reach ' + (TIERS[item.minimumTier]?.name || 'the required') + ' tier first'
       : duplicate ? item.id === 'branch' ? 'Maximum of four branches reached' : item.id === 'wholesale' ? 'Already operating wholesale' : 'Department already open'
       : available ? undefined
-      : shortfall > 0 ? 'Insufficient cash and KoboBank borrowing capacity for the remaining ' + shortfall.toLocaleString('en-NG') + ' naira'
+      : shortfall > 0 ? 'Insufficient cash and KoboBank borrowing capacity for the remaining ' + shortfall?.toLocaleString('en-NG') + ' naira'
       : undefined;
     return { ...item, cashRequired, available, financeable: available && financeable, reason };
   });
@@ -605,7 +605,7 @@ export function financeExpansionPurchase(s0: GameState, investment: ExpansionInv
   if (invested === financed) return s0;
   return {
     ...invested,
-    today: { ...invested.today, events: [...invested.today.events, 'KoboBank financed ' + option.title + ' with a ' + shortfall.toLocaleString('en-NG') + ' naira, 24-week business loan. Weekly repayments and interest remain due under the normal loan schedule.'] },
+    today: { ...invested.today, events: [...invested.today.events, 'KoboBank financed ' + option.title + ' with a ' + shortfall?.toLocaleString('en-NG') + ' naira, 24-week business loan. Weekly repayments and interest remain due under the normal loan schedule.'] },
   };
 }
 
@@ -685,8 +685,8 @@ export function investInExpansion(s0: GameState, investment: ExpansionInvestment
   const charged = ledger({ ...s0, businessExpansion: expansion, brand }, -effectiveCost, 'Business expansion: ' + option.title);
   return {
     ...charged,
-    today: { ...charged.today, events: [...charged.today.events, option.title + ' funded for ' + effectiveCost.toLocaleString('en-NG') + ' naira. Earned event credit of ' + creditUsed.toLocaleString('en-NG') + ' naira was applied. The investment is recorded as a business asset rather than a daily operating expense.'] },
-    gist: [{ id: 'expansion-' + investment + '-' + s0.day, day: s0.day, title: option.title + ' at Asanwa Boutique', body: 'Divine invested ' + effectiveCost.toLocaleString('en-NG') + ' naira in business expansion. The move can improve long-term revenue, but the business must still cover its running costs.', about: 'you', hot: true }, ...(s0.gist || [])].slice(0, 40),
+    today: { ...charged.today, events: [...charged.today.events, option.title + ' funded for ' + effectiveCost?.toLocaleString('en-NG') + ' naira. Earned event credit of ' + creditUsed?.toLocaleString('en-NG') + ' naira was applied. The investment is recorded as a business asset rather than a daily operating expense.'] },
+    gist: [{ id: 'expansion-' + investment + '-' + s0.day, day: s0.day, title: option.title + ' at Asanwa Boutique', body: 'Divine invested ' + effectiveCost?.toLocaleString('en-NG') + ' naira in business expansion. The move can improve long-term revenue, but the business must still cover its running costs.', about: 'you', hot: true }, ...(s0.gist || [])].slice(0, 40),
   };
 }
 
@@ -718,10 +718,10 @@ export function processExpansionAtClose(s0: GameState): GameState {
     const dayCosts = stockCost + runningCost + rentCost;
     s = ledger(s, revenue, branch.name + ' sales');
     s = ledger(s, -(stockCost + runningCost), branch.name + ' stock and running costs', 'operating');
-    s = { ...s, today: { ...s.today, income: s.today.income + revenue, costs: s.today.costs + stockCost + runningCost, events: [...s.today.events, branch.name + ' made ' + revenue.toLocaleString('en-NG') + ' naira in sales.'] } };
+    s = { ...s, today: { ...s.today, income: s.today.income + revenue, costs: s.today.costs + stockCost + runningCost, events: [...s.today.events, branch.name + ' made ' + revenue?.toLocaleString('en-NG') + ' naira in sales.'] } };
     if (rentCost > 0) {
       s = ledger(s, -rentCost, branch.name + ' weekly rent', 'operating');
-      s = { ...s, today: { ...s.today, costs: s.today.costs + rentCost, events: [...s.today.events, branch.name + ' paid ' + rentCost.toLocaleString('en-NG') + ' naira in weekly rent.'] } };
+      s = { ...s, today: { ...s.today, costs: s.today.costs + rentCost, events: [...s.today.events, branch.name + ' paid ' + rentCost?.toLocaleString('en-NG') + ' naira in weekly rent.'] } };
     }
     branches[index] = { ...branch, cumulativeRevenue: Math.max(0, branch.cumulativeRevenue || 0) + revenue,
       cumulativeCosts: Math.max(0, branch.cumulativeCosts || 0) + dayCosts, daysTrading: Math.max(0, branch.daysTrading || 0) + 1,
@@ -743,7 +743,7 @@ export function processExpansionAtClose(s0: GameState): GameState {
     // COGS is recognized when units leave inventory; cash was already paid at restock.
     s = ledger(s, -runningCost, d.name + ' department running costs', 'operating');
     s = { ...s, today: { ...s.today, income: s.today.income + revenue, costs: s.today.costs + costOfGoods + runningCost,
-      events: [...s.today.events, d.name + ' sold ' + unitsSold + ' units for ' + revenue.toLocaleString('en-NG') + ' naira' + (unitsSold < unitsDemanded ? '; ' + (unitsDemanded - unitsSold) + ' requested units were unavailable.' : '.') ] } };
+      events: [...s.today.events, d.name + ' sold ' + unitsSold + ' units for ' + revenue?.toLocaleString('en-NG') + ' naira' + (unitsSold < unitsDemanded ? '; ' + (unitsDemanded - unitsSold) + ' requested units were unavailable.' : '.') ] } };
     d.inventoryUnits = Math.max(0, d.inventoryUnits - unitsSold);
     d.inventoryValue = Math.max(0, d.inventoryValue - costOfGoods);
     const minimumStock = Math.ceil(d.targetUnits * 0.4);
@@ -782,7 +782,7 @@ export function processExpansionAtClose(s0: GameState): GameState {
     s = ledger(s, -fulfilment, 'Wholesale fulfilment', 'operating');
     s = ledger(s, -operating, 'Wholesale operations', 'operating');
     s = { ...s, today: { ...s.today, income: s.today.income + revenue, costs: s.today.costs + costOfGoods + fulfilment + operating,
-      events: [...s.today.events, 'Wholesale fulfilled ' + fulfilled + ' of ' + demand + ' units for ' + revenue.toLocaleString('en-NG') + ' naira' + (fulfilled < demand ? '; stock-out prevented ' + (demand - fulfilled) + ' units from shipping.' : '.') ] } };
+      events: [...s.today.events, 'Wholesale fulfilled ' + fulfilled + ' of ' + demand + ' units for ' + revenue?.toLocaleString('en-NG') + ' naira' + (fulfilled < demand ? '; stock-out prevented ' + (demand - fulfilled) + ' units from shipping.' : '.') ] } };
     w.inventoryUnits = Math.max(0, w.inventoryUnits - fulfilled);
     w.inventoryValue = Math.max(0, w.inventoryValue - costOfGoods);
     if (fulfilled > 0) w.ordersFulfilled += 1;
