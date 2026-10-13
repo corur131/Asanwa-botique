@@ -13,7 +13,7 @@ import { buildLook, hairGroup, lookCost, scoreLook } from './scoring';
 import { FABRIC_COLORS, FEMALE_HAIR, MAKEUP_LOOKS } from '../constants/catalog';
 import { colourName } from './colours';
 import { FURNITURE, KIOSK_LISTING, Listing, Placed, STARTER_FURNITURE, autoPlace, prepareFurnitureForMove,
-  findSpot, canPlace, turn, Rot, ceilingCapacity, ceilingUsed, yardCapacity, yardUsed, cheapestListing, furnitureById, listingsFor, newUid, prestigeRichShift, prestigeTraffic, shopStats, usesFloor, wallCapacity, wallUsed } from './shop';
+  findSpot, canPlace, turn, Rot, ceilingCapacity, ceilingUsed, yardCapacity, yardUsed, cheapestListing, furnitureById, listingsFor, newUid, prestigeRichShift, prestigeTraffic, shopStats, usesFloor, wallCapacity, wallUsed, MoveEquipmentPlan } from './shop';
 import { CharacterMemory, CollaborationEvent, CollaborationReply, Customer, DayLog, Departure, Design, ReplyChoice, GameState, LedgerLine, Message, PoliticianContract, PoliticianContractRequirement, Regular, ScoreBreakdown, Settlement, SponsorshipOffer, StaffMember, StaffProfession, StyleChoice } from './types';
 import { closeBrandDay, ensureBusinessState, getBrandMetrics, initialBankState, processBankWeekly, processFixedDepositMaturities, processPromotionAtClose, processExpansionAtClose, promotionTrafficBoost, recordWeeklyWealth, saveRentAtClose } from './business';
 
@@ -1412,11 +1412,11 @@ export function listingsNow(s: GameState): Listing[] {
   return listingsFor(s.tier + 1, week(s.day));
 }
 
-export function moveTo(s0: GameState, l0: Listing, equipmentPlan: 'arrange' | 'store' | 'sell' = 'arrange'): GameState {
+export function moveTo(s0: GameState, l0: Listing, equipmentPlan: MoveEquipmentPlan = 'arrange'): GameState {
   const fight = contestFor(s0, l0);
   const l = fight ? { ...l0, moveIn: l0.moveIn + fight.extra } : l0;
   const move = prepareFurnitureForMove(s0.furniture, l, equipmentPlan);
-  if ((l.tier !== s0.tier + 1 && !(l.signature && l.tier === s0.tier && !s0.listing.signature)) || s0.cash + move.saleProceeds < l.moveIn) return s0;
+  if ((l.tier !== s0.tier + 1 && !(l.signature && l.tier === s0.tier && !s0.listing.signature)) || s0.cash + move.saleProceeds < l.moveIn + move.packageCost) return s0;
   const s = fight ? wonListing(s0, l0) : s0;
   const tier = l.tier;
   const t = TIERS[tier];
@@ -1424,12 +1424,15 @@ export function moveTo(s0: GameState, l0: Listing, equipmentPlan: 'arrange' | 's
   // Credit sale proceeds before charging move-in so the transaction never creates a temporary payable.
   if (move.saleProceeds > 0) next = money(next, move.saleProceeds, 'Sold shop equipment during move');
   next = money(next, -l.moveIn, `Move-in: ${l.street}`);
+  if (move.packageCost > 0) next = money(next, -move.packageCost, 'Ready-furnished shop package');
   next = fitDisplay(next);
   const equipmentMessage = equipmentPlan === 'store'
     ? ' I have put your reusable equipment in storage; the new shop starts empty, and you can bring items out from Build mode.'
     : equipmentPlan === 'sell'
       ? ` I sold your reusable shop equipment for ${naira(move.saleProceeds)} at the usual 40% resale value. Your clothing stock and business records are still yours.`
-      : ' I arranged your equipment around the new floor plan. You can still drag pieces to different areas in Build mode.';
+      : equipmentPlan === 'furnished'
+        ? ` The ready-furnished package cost ${naira(move.packageCost)} and has been arranged for this shop. Your previously owned reusable equipment is safely in storage.`
+        : ' I arranged your equipment around the new floor plan. You can still drag pieces to different areas in Build mode.';
   next = msg(next, 'Deborah', `We moved! Welcome to your ${t.name} on ${l.street}, ${l.area}. Rent is ${naira(l.rent)} a week and the landlord is ${l.landlord}. The shop holds up to ${t.slots} designs.${equipmentMessage} It will be quiet for two weeks while people find us.`, 'good');
   next = reactToMove(next, !fight);
   if (t.staff && !s.staff.length) next = msg(next, 'Deborah', `You can hire staff now! Trainees are cheap and loyal; experts are good from day one but they leave for money.`, 'info');
