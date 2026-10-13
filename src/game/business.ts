@@ -678,13 +678,15 @@ export function processExpansionAtClose(s0: GameState): GameState {
     let d = { ...originalDepartment };
     const brand = getBrandMetrics(s);
     const audience = Math.min(1.35, 0.75 + Math.log10(Math.max(1, s.followers || 0) + 1) / 12 + brand.awareness / 250);
-    const unitsDemanded = Math.max(1, Math.round(({ Accessories: 8, 'Bridal & Occasionwear': 3, Menswear: 5 }[d.name] || 4) * audience * (0.75 + Math.random() * 0.5)));
+    const demandByDepartment: Record<string, number> = { Accessories: 8, 'Bridal & Occasionwear': 3, Menswear: 5 };
+    const unitsDemanded = Math.max(1, Math.round((demandByDepartment[d.name] || 4) * audience * (0.75 + Math.random() * 0.5)));
     const unitsSold = Math.min(Math.max(0, d.inventoryUnits), unitsDemanded);
     const revenue = unitsSold * d.unitPrice;
     const costOfGoods = unitsSold * d.unitCost;
-    const runningCost = ({ Accessories: 2_500, 'Bridal & Occasionwear': 4_500, Menswear: 3_000 }[d.name] || 2_500);
+    const runningByDepartment: Record<string, number> = { Accessories: 2_500, 'Bridal & Occasionwear': 4_500, Menswear: 3_000 };
+    const runningCost = runningByDepartment[d.name] || 2_500;
     s = ledger(s, revenue, d.name + ' department sales');
-    s = ledger(s, -costOfGoods, d.name + ' department cost of goods', 'operating');
+    // COGS is recognized when units leave inventory; cash was already paid at restock.
     s = ledger(s, -runningCost, d.name + ' department running costs', 'operating');
     s = { ...s, today: { ...s.today, income: s.today.income + revenue, costs: s.today.costs + costOfGoods + runningCost,
       events: [...s.today.events, d.name + ' sold ' + unitsSold + ' units for ' + revenue.toLocaleString('en-NG') + ' naira' + (unitsSold < unitsDemanded ? '; ' + (unitsDemanded - unitsSold) + ' requested units were unavailable.' : '.') ] } };
@@ -719,7 +721,7 @@ export function processExpansionAtClose(s0: GameState): GameState {
     const fulfilment = Math.round(revenue * 0.06);
     const operating = 8_000;
     s = ledger(s, revenue, 'Wholesale customer orders');
-    s = ledger(s, -costOfGoods, 'Wholesale cost of goods', 'operating');
+    // Wholesale COGS reduces inventory value, not cash a second time; stock purchases post cash at restock.
     s = ledger(s, -fulfilment, 'Wholesale fulfilment', 'operating');
     s = ledger(s, -operating, 'Wholesale operations', 'operating');
     s = { ...s, today: { ...s.today, income: s.today.income + revenue, costs: s.today.costs + costOfGoods + fulfilment + operating,
