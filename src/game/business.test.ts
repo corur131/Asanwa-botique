@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import type { GameState, Message } from './types';
+import type { Customer, GameState, Message } from './types';
+import { initRivals, simulateRivals } from './rivals';
+import { judge } from './encounters';
 import { answerInvite } from './encounters';
 import { money, payRent, settleLateRent, demote, closeShop } from './engine';
 import {
@@ -578,4 +580,49 @@ test('accepting a fashion invitation creates expansion credit and improves brand
   assert.equal(after.events.find((event) => event.id === 'event-credit-test')?.status, 'accepted');
   assert.equal(after.businessExpansion?.expansionCredit, 25_000);
   assert.ok((after.brand?.awareness || 0) > 0);
+});
+
+test('fashion event victories award expansion credit and strengthen business brand metrics', () => {
+  const event = { id: 'show-win-test', title: 'Pop-up Style-off', host: 'Fashion Host', day: 10, rivalId: 'missing-rival', prize: 200_000, followers: 250, status: 'accepted' as const };
+  const customer = {
+    id: 'model-show-win-test', name: 'Kiki', cls: 'rich', occasion: 'party', budget: 0, wants: [],
+    taste: { favColor: '#C2262E', favName: 'red' }, request: 'Style-off model', look: {} as Customer['look'],
+    male: false, influencer: true,
+    contest: { eventId: event.id, rivalId: event.rivalId, rivalScore: 70, prize: event.prize, title: event.title },
+  } as Customer;
+  const before = state({
+    day: 10, cash: 500_000, followers: 1_000, rep: 50,
+    events: [event], rivals: [], gist: [], messages: [],
+    businessExpansion: { branches: [], departments: [], wholesaleActive: false, designerCollections: 0 },
+  });
+  const after = judge(before, customer, 90);
+  assert.equal(after.events.find((item) => item.id === event.id)?.status, 'won');
+  assert.equal(after.businessExpansion?.expansionCredit, 30_000);
+  assert.equal(after.cash, 700_000);
+  assert.equal(after.followers, 1_250);
+  assert.ok((after.brand?.prestige || 0) > 0);
+});
+
+test('well-funded rival businesses develop branches, departments or wholesale operations over time', () => {
+  const base = initRivals().find((rival) => rival.id === 'ivory')!;
+  const rival = {
+    ...base, main: false, tier: 4, cash: 100_000_000, moved: -100, branches: 0,
+    departments: [], wholesaleActive: false, savings: 0,
+    week: Array.from({ length: 7 }, () => 500_000),
+    weekCosts: Array.from({ length: 7 }, () => 250_000),
+  };
+  const history = Array.from({ length: 7 }, (_, index) => ({
+    day: index + 1, served: 4, walkedOut: 0, lost: 0, income: 100_000, costs: 50_000,
+    tips: 0, bestScore: 80, repChange: 0, staffServed: 0, events: [],
+  }));
+  let game = state({
+    day: 1, tier: 2, history, listing: { area: 'Yaba', rent: 100_000 } as GameState['listing'],
+    rivals: [rival], ranking: [], dailyRanking: [], rivalPosts: [], gist: [], events: [],
+  });
+  for (let day = 1; day <= 84; day += 1) {
+    game = simulateRivals({ ...game, day, today: { ...game.today, events: [] } });
+  }
+  const developed = game.rivals[0];
+  assert.ok((developed.branches || 0) > 0 || (developed.departments || []).length > 0 || developed.wholesaleActive,
+    'a solvent established rival should reinvest in at least one operating expansion over twelve weeks');
 });
