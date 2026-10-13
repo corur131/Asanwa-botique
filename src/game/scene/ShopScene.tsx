@@ -146,8 +146,8 @@ export function Room({ r, tier, painted }: { r: RoomStyle; tier: number; painted
               color={r.signature
                 ? (Math.floor(x / 2) + Math.floor(z / 2)) % 2 ? r.floor : r.floor2
                 : (x + z) % 2 ? r.floor : r.floor2}
-              roughness={r.signature ? 0.18 : r.kind === 'marble' || r.kind === 'flagship' ? 0.25 : 0.9}
-              metalness={r.signature ? 0.08 : r.kind === 'flagship' ? 0.1 : 0}
+              roughness={r.signature ? 0.18 : r.kind === 'marble' || r.kind === 'flagship' || r.kind === 'maison' || r.kind === 'empire' ? 0.25 : 0.9}
+              metalness={r.signature ? 0.08 : r.kind === 'flagship' || r.kind === 'maison' || r.kind === 'empire' ? 0.1 : 0}
             />
           </mesh>,
         );
@@ -155,10 +155,10 @@ export function Room({ r, tier, painted }: { r: RoomStyle; tier: number; painted
   }, [r]);
   const door = Math.floor(r.w / 2);
   const ridges = r.kind === 'container' && !r.signature;
-  const signatureGold = tier === 0 ? '#78C8D5' : tier === 1 ? '#A8BCFF' : tier === 2 ? '#FFD54A' : tier === 3 ? '#D6B86C' : '#F0CD78';
-  const signatureAccent = tier === 0 ? '#315E67' : tier === 1 ? '#2D306E' : tier === 2 ? '#936013' : tier === 3 ? '#173D32' : '#281B2D';
-  const signatureInset = tier === 0 ? '#EAFBFD' : tier === 1 ? '#F4F6FF' : tier === 2 ? '#FFF2B2' : tier === 3 ? '#E1D4B9' : '#E9E1D6';
-  const runwayColor = tier === 0 ? '#8FCED7' : tier === 1 ? '#5B56AA' : tier === 2 ? '#E7C23D' : tier === 3 ? '#1B4A3D' : '#4B1425';
+  const signatureGold = ['#78C8D5', '#A8BCFF', '#FFD54A', '#D6B86C', '#F0CD78', '#D7B879', '#E4C56E'][tier] || '#F0CD78';
+  const signatureAccent = ['#315E67', '#2D306E', '#936013', '#173D32', '#281B2D', '#6A5440', '#171521'][tier] || '#281B2D';
+  const signatureInset = ['#EAFBFD', '#F4F6FF', '#FFF2B2', '#E1D4B9', '#E9E1D6', '#FBF7EF', '#F7F0E5'][tier] || '#E9E1D6';
+  const runwayColor = ['#8FCED7', '#5B56AA', '#E7C23D', '#1B4A3D', '#4B1425', '#D5C8B4', '#31263B'][tier] || '#4B1425';
   const carpetWidth = Math.min(3.2, Math.max(2.25, r.w * 0.095));
   const portalCenter = door + 0.5;
   const portalLeft = portalCenter - carpetWidth / 2 - 0.18;
@@ -228,7 +228,7 @@ export function Room({ r, tier, painted }: { r: RoomStyle; tier: number; painted
       <B p={[door / 2, 0.3, r.d + 0.06]} s={[door, 0.6, 0.12]} c={r.wall} />
       <B p={[door + 1 + (r.w - door - 1) / 2, 0.3, r.d + 0.06]} s={[r.w - door - 1, 0.6, 0.12]} c={r.wall} />
       {/* trim */}
-      <B p={[r.w / 2, H - 0.05, 0.01]} s={[r.w, 0.1, 0.03]} c={r.trim} m={r.signature || r.kind === 'marble' || r.kind === 'flagship' ? 0.8 : 0} />
+      <B p={[r.w / 2, H - 0.05, 0.01]} s={[r.w, 0.1, 0.03]} c={r.trim} m={r.signature || r.kind === 'marble' || r.kind === 'flagship' || r.kind === 'maison' || r.kind === 'empire' ? 0.8 : 0} />
       <B p={[0.01, H - 0.05, r.d / 2]} s={[0.03, 0.1, r.d]} c={r.trim} m={r.signature || r.kind === 'marble' || r.kind === 'flagship' ? 0.8 : 0} />
 
       {r.signature && tier === 0 && (
@@ -454,7 +454,7 @@ export function Room({ r, tier, painted }: { r: RoomStyle; tier: number; painted
       )}
       {r.finish >= 3 && (
         <>
-          <B p={[r.w / 2, 0.95, 0.02]} s={[r.w, 0.05, 0.03]} c={r.trim} m={r.kind === 'marble' || r.kind === 'flagship' ? 0.8 : 0.1} />
+          <B p={[r.w / 2, 0.95, 0.02]} s={[r.w, 0.05, 0.03]} c={r.trim} m={r.kind === 'marble' || r.kind === 'flagship' || r.kind === 'maison' || r.kind === 'empire' ? 0.8 : 0.1} />
           <B p={[0.02, 0.95, r.d / 2]} s={[0.03, 0.05, r.d]} c={r.trim} m={r.kind === 'marble' || r.kind === 'flagship' ? 0.8 : 0.1} />
         </>
       )}
