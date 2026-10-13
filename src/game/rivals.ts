@@ -43,11 +43,11 @@ const ROSTER: Seed[] = [
 ];
 
 /** Daily takings before rent at skill 1 and average reputation, by shop size. Tuned in tools/rivalsim. */
-const DAILY = [120_000, 400_000, 1_000_000, 2_500_000, 5_000_000];
+const DAILY = [120_000, 400_000, 1_000_000, 2_500_000, 15_000_000, 40_000_000, 120_000_000];
 /** Share of takings spent restocking, by shop size: big shops carry dearer stock. */
-const STOCK_SHARE = [0.45, 0.5, 0.55, 0.6, 0.62];
+const STOCK_SHARE = [0.45, 0.5, 0.55, 0.6, 0.62, 0.66, 0.7];
 /** Weekly wages for their staff. */
-const WAGES = [0, 0, 60_000, 150_000, 300_000];
+const WAGES = [0, 0, 60_000, 150_000, 300_000, 800_000, 1_800_000];
 const hash = (id: string) => Array.from(id).reduce((a, c) => a + c.charCodeAt(0), 0);
 
 function lookFor(male: boolean): CharacterConfig {
