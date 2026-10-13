@@ -339,13 +339,15 @@ export function prepareShopperOrder(
 
     // Premium sourcing can replenish a luxury style once it sells out. Otherwise, variety
     // and premium missions add catalogue styles the boutique has not stocked before.
-    if (mission === 'richCustomers' && variants.length && !hasBuyingPreferences) {
+    if (mission === 'richCustomers' && variants.length) {
       for (const variant of variants) {
-        if (variant.pieces > 0) continue;
+        // Without manual filters, premium sourcing replenishes sold-out styles only.
+        // With strict filters, it may deliberately buy more of a matching style already in stock.
+        if (!hasBuyingPreferences && variant.pieces > 0) continue;
         const line = candidateLine(entry, s, mission, records, variant, 1);
         if (hasBuyingPreferences && !shopperEntryMatchesPreferences(entry, activePreferences, line.fabric)) continue;
         const unitCost = pieceCost(entry, isClothing(entry.kind) ? line.fabric : undefined);
-        if (!Number.isFinite(unitCost) || unitCost <= 0 || unitCost * MARKUP > priceCeiling) continue;
+        if (!Number.isFinite(unitCost) || unitCost <= 0 || (!hasBuyingPreferences && unitCost * MARKUP > priceCeiling)) continue;
         const preferenceScore = shopperPreferenceScore(entry, shoppingExamples);
         const score = 90 + (entry.luxury ? 100 : 0) + productDemand * 2 +
           (shoppingExamples.trim() ? (preferenceScore > 0 ? 120 + preferenceScore * 120 : -80) : 0);
@@ -354,7 +356,7 @@ export function prepareShopperOrder(
       continue;
     }
 
-    if (variants.length && !(mission === 'richCustomers' && hasBuyingPreferences)) continue;
+    if (variants.length) continue;
     const line = candidateLine(entry, s, mission, records, undefined, 1);
     if (hasBuyingPreferences && !shopperEntryMatchesPreferences(entry, activePreferences, line.fabric)) continue;
     const unitCost = pieceCost(entry, isClothing(entry.kind) ? line.fabric : undefined);
