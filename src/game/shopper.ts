@@ -6,8 +6,8 @@ import type { MarketEntry } from './market';
 import type { CustomerClass, GameState, ProductSalesRecord, ShopperJob, ShopperMission, ShopperOrderLine } from './types';
 
 const CLASS_ORDER: CustomerClass[] = ['poor', 'middle', 'rich'];
-const DEFAULT_COLOUR = '#9A344D';
-const DEFAULT_TRIM = '#D9B25A';
+const DEFAULT_COLOUR = '#8E1F3A';
+const DEFAULT_TRIM = '#C9A163';
 
 export const SHOPPER_MISSIONS: { id: ShopperMission; label: string; description: string }[] = [
   { id: 'restock', label: 'Restock bestsellers', description: 'Replenish popular products that are running low or have sold out.' },
