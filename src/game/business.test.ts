@@ -543,11 +543,38 @@ test('established saves receive rival capital once, without granting it to new g
   const oldSave = state({ day: 31, history: [{ day: 30, income: 1_000_000, costs: 200_000 }] as GameState['history'], rivals });
   const migrated = ensureBusinessState(oldSave);
   const tolani = migrated.rivals.find((r) => r.id === 'tolani')!;
-  assert.ok(tolani.cash + (tolani.savings || 0) >= 220_000_000);
+  assert.ok(tolani.cash + (tolani.savings || 0) >= 475_000_000);
+  assert.equal(migrated.rivalEconomyVersion, 2);
   const secondPass = ensureBusinessState(migrated);
   assert.equal(secondPass.rivals.find((r) => r.id === 'tolani')!.cash, tolani.cash, 'the capital adjustment must not repeat');
   const newGame = ensureBusinessState(state({ day: 1, history: [], rivals: initRivals() }));
-  assert.ok((newGame.rivals.find((r) => r.id === 'tolani')!.cash + (newGame.rivals.find((r) => r.id === 'tolani')!.savings || 0)) < 220_000_000);
+  assert.ok((newGame.rivals.find((r) => r.id === 'tolani')!.cash + (newGame.rivals.find((r) => r.id === 'tolani')!.savings || 0)) < 475_000_000);
+});
+
+test('v1 boosted saves receive only the extra capital needed for the save-scaled v2 targets', () => {
+  const targets = [28_000_000, 65_000_000, 140_000_000, 275_000_000, 475_000_000];
+  const alreadyBoosted = initRivals().map((r) => {
+    const priorTarget = [8_000_000, 18_000_000, 45_000_000, 100_000_000, 220_000_000][r.tier];
+    return { ...r, cash: Math.round(priorTarget * 0.75), savings: priorTarget - Math.round(priorTarget * 0.75) };
+  });
+  const upgraded = ensureBusinessState(state({
+    day: 31,
+    history: [{ day: 30, income: 1_000_000, costs: 200_000 }] as GameState['history'],
+    rivals: alreadyBoosted,
+    rivalEconomyVersion: 1,
+  }));
+  for (const rival of upgraded.rivals) {
+    const liquidity = rival.cash + (rival.savings || 0);
+    assert.ok(liquidity >= targets[rival.tier], rival.shop + ' should reach its new target');
+  }
+  const tolani = upgraded.rivals.find((r) => r.id === 'tolani')!;
+  assert.equal(tolani.cash + (tolani.savings || 0), 475_000_000);
+  const secondPass = ensureBusinessState(upgraded);
+  assert.equal(
+    secondPass.rivals.find((r) => r.id === 'tolani')!.cash + (secondPass.rivals.find((r) => r.id === 'tolani')!.savings || 0),
+    475_000_000,
+    'the v2 boost must not repeat on every save load',
+  );
 });
 
 test('rivals announce celebrity visits in news, chat, and their social feed', () => {
