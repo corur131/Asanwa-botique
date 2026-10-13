@@ -626,3 +626,27 @@ test('well-funded rival businesses develop branches, departments or wholesale op
   assert.ok((developed.branches || 0) > 0 || (developed.departments || []).length > 0 || developed.wholesaleActive,
     'a solvent established rival should reinvest in at least one operating expansion over twelve weeks');
 });
+
+test('financing a branch converts cash and loan proceeds into a capital asset without inflating net worth', () => {
+  const before = state({
+    day: 14, tier: 4, cash: 100_000_000,
+    businessExpansion: { branches: [], departments: [], wholesaleActive: false, designerCollections: 0 },
+  });
+  const beforeWorth = netWorthPlayer(before);
+  const after = investInExpansion(before, 'branch');
+  assert.equal(after.businessExpansion?.branches[0].assetValue, 18_000_000);
+  assert.equal(after.cash, 82_000_000);
+  assert.equal(netWorthPlayer(after), beforeWorth);
+});
+
+test('opening department and wholesale inventory values reconcile to their capital setup costs', () => {
+  let game = state({
+    day: 14, tier: 3, cash: 40_000_000,
+    businessExpansion: { branches: [], departments: [], wholesaleActive: false, designerCollections: 0 },
+  });
+  game = investInExpansion(game, 'accessories');
+  const department = game.businessExpansion?.departmentOperations?.[0];
+  assert.equal((department?.inventoryValue || 0) + 650_000, 1_250_000);
+  game = investInExpansion(game, 'wholesale');
+  assert.equal((game.businessExpansion?.wholesaleOperation?.inventoryValue || 0) + 4_500_000, 7_500_000);
+});
