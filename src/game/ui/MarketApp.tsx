@@ -52,8 +52,8 @@ const Chip: React.FC<{ on?: boolean; onClick: () => void; children: React.ReactN
   <button onClick={onClick} className={`shrink-0 px-3 py-1.5 rounded-full text-xs font-semibold border ${on ? 'bg-orange-500 border-orange-500 text-white' : 'border-white/15 text-slate-200 bg-white/5'}`}>{children}</button>
 );
 
-export const MarketApp: React.FC<{ s: GameState; cart: CartLine[]; setCart: (f: (c: CartLine[]) => CartLine[]) => void; onPay: () => boolean; onBuyDrop: (n: number) => void }> = ({ s, cart, setCart, onPay, onBuyDrop }) => {
-  const [view, setView] = useState<'list' | 'item' | 'cart'>('list');
+export const MarketApp: React.FC<{ s: GameState; cart: CartLine[]; setCart: (f: (c: CartLine[]) => CartLine[]) => void; onPay: () => boolean; onBuyDrop: (n: number) => void; initialView?: 'list' | 'cart' }> = ({ s, cart, setCart, onPay, onBuyDrop, initialView = 'list' }) => {
+  const [view, setView] = useState<'list' | 'item' | 'cart'>(initialView);
   const [cat, setCat] = useState<MarketCategory>('clothes');
   const [who, setWho] = useState<'f' | 'm'>('f');
   const [origin, setOrigin] = useState<'all' | 'native' | 'english'>('all');
