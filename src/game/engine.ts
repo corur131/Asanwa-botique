@@ -631,7 +631,10 @@ export function applyLook(s0: GameState, c: Customer, choice: StyleChoice, st0: 
     stats: { ...s.stats, served: s.stats.served + (sold ? 1 : 0), totalEarned: s.stats.totalEarned + (sold ? st.paid + st.tip - st.cost : 0), bestScore: Math.max(s.stats.bestScore, score.total) },
   };
   if (sold) {
-    next = money(next, st.paid + st.tip, `${c.name}${c.service ? ` (${c.service === 'makeup' ? 'makeup' : c.service === 'both' ? 'hair & makeup' : 'hair'})` : ''}${st.tip ? ', with tip' : ''}`);
+    const customerReceiptLabel = c.celebrity
+      ? `${c.name} · celebrity payment including tip`
+      : `${c.name}${c.service ? ` (${c.service === 'makeup' ? 'makeup' : c.service === 'both' ? 'hair & makeup' : 'hair'})` : ''}${st.tip ? ', with tip' : ''}`;
+    next = money(next, st.paid + st.tip, customerReceiptLabel);
     next = money(next, -st.cost, 'Hair and makeup supplies');
   }
   if (c.influencer && score.total >= 80) next = { ...next, followers: (next.followers || 0) + Math.round(60 + Math.random() * 120) };
@@ -639,7 +642,7 @@ export function applyLook(s0: GameState, c: Customer, choice: StyleChoice, st0: 
     const gained = Math.round((8_000 + Math.random() * 10_000) * (1 + c.celebrity.tier * 0.85));
     const rivals = next.rivals.map((r) => r.id === 'you' ? r : { ...r, feeling: clamp(r.feeling - (8 + c.celebrity!.tier * 3), -100, 100) });
     next = { ...next, followers: (next.followers || 0) + gained, rep: clamp(next.rep + 3 + c.celebrity.tier * 2, 0, 100), rivals,
-      today: { ...next.today, events: [...next.today.events, `TRENDING IN LAGOS: ${c.name} visited your Signature shop, spent millions, tipped lavishly and posted your look. +${gained.toLocaleString('en-NG')} followers. Rivals are watching.`] } };
+      today: { ...next.today, events: [...next.today.events, `TRENDING IN LAGOS: ${c.name} paid ${naira(st.paid + st.tip)} including a ${naira(st.tip)} tip, then posted your look. +${gained.toLocaleString('en-NG')} followers. Rivals are watching.`] } };
     next = msg(next, 'Gidigram', `TRENDING NOW 🔥 ${c.name} posted the look from your shop! +${gained.toLocaleString('en-NG')} followers, a huge reputation boost, and your rivals are jealous.`, 'good');
   }
   if (c.contest) next = judge(next, c, score.total);
