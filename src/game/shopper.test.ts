@@ -90,3 +90,46 @@ test('shopper cannot spend cash already reserved by items in the existing cart',
   assert.ok(result.job.budget <= s.cash - cartTotal([reservation]));
   assert.ok(cartTotal(result.state.marketCart || []) <= s.cash, 'the combined cart must remain payable when generated');
 });
+
+
+test('rich-customer mission prioritises unlocked luxury items and scales order quantities with budget', () => {
+  const s = game({ cash: 100_000_000, tier: 2, stock: [], marketCart: [], productSales: [] });
+  const small = prepareShopperOrder(s, 'richCustomers', 5_000_000);
+  const large = prepareShopperOrder(s, 'richCustomers', 50_000_000);
+  assert.ok(small.job, small.error);
+  assert.ok(large.job, large.error);
+
+  const luxuryLines = small.job.items.filter((line) => {
+    const entry = MARKET.find((item) => item.kind === line.kind && item.id === line.itemId);
+    return !!entry?.luxury;
+  });
+  assert.ok(luxuryLines.length > 0, 'rich-customer sourcing should include unlocked luxury products where the tier has them');
+  assert.ok(large.job.items.some((line) => line.pieces > 1), 'premium shopping should buy more than one piece when the budget supports it');
+  assert.ok(large.job.estimatedTotal > small.job.estimatedTotal * 2, 'a much larger budget should materially increase the proposed order, not return almost the same tiny cart');
+  assert.ok(small.job.estimatedTotal <= 5_000_000);
+  assert.ok(large.job.estimatedTotal <= 50_000_000);
+
+  const ceiling = shopperPriceCeiling(s, 'richCustomers');
+  for (const line of large.job.items) {
+    const entry = MARKET.find((item) => item.kind === line.kind && item.id === line.itemId)!;
+    assert.ok(pieceCost(entry, line.fabric) * MARKUP <= ceiling, 'premium mission must respect the tier-specific retail ceiling');
+    assert.ok(canBuy(entry, s.tier), 'premium mission must not bypass product unlocks');
+  }
+});
+
+test('shopper examples guide the proposed cart toward the requested catalogue products', () => {
+  const s = game({ cash: 2_000_000, tier: 0, stock: [], marketCart: [] });
+  const ceiling = shopperPriceCeiling(s, 'variety');
+  const target = MARKET.find((item) =>
+    canBuy(item, s.tier) &&
+    pieceCost(item, item.fabric) * MARKUP <= ceiling &&
+    item.label.toLowerCase().includes('dress'),
+  );
+  assert.ok(target, 'test catalogue should include an unlocked dress within the kiosk price guide');
+
+  const result = prepareShopperOrder(s, 'variety', 500_000, '', undefined, target!.label);
+  assert.ok(result.job, result.error);
+  assert.ok(result.job.items.some((line) => line.kind === target!.kind && line.itemId === target!.id),
+    'shopper should prioritise the exact requested example when that catalogue entry is available');
+  assert.ok(result.job.summary.includes(target!.label), 'order summary should remember what examples were requested');
+});
