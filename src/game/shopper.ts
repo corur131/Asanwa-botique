@@ -152,11 +152,16 @@ export function prepareShopperOrder(
   mission: ShopperMission,
   requestedBudget: number,
   contractBrief = '',
+  contractId?: string,
 ): { state: GameState; job?: ShopperJob; error?: string } {
   const available = shopperAvailableBudget(s);
   const budget = Math.max(0, Math.min(available, Math.floor((Number.isFinite(requestedBudget) ? requestedBudget : 0) / 100) * 100));
   if (budget < 1_000) return { state: s, error: 'Set a budget of at least ₦1,000 and leave enough uncommitted cash for checkout.' };
-  if (mission === 'contract' && !contractBrief.trim()) return { state: s, error: 'Enter a short contract brief, such as “men’s native wear” or “bridesmaid dresses”.' };
+  const selectedContract = mission === 'contract' && contractId
+    ? (s.politicianContracts || []).find((row) => row.id === contractId && row.status === 'accepted')
+    : undefined;
+  if (contractId && !selectedContract) return { state: s, error: 'That politician contract is no longer active. Open Contracts and select an accepted contract.' };
+  if (mission === 'contract' && !selectedContract && !contractBrief.trim()) return { state: s, error: 'Accept a politician contract first, or enter a sourcing brief.' };
 
   const records = s.productSales || [];
   const existingByProduct = new Map<string, GameState['stock']>();
@@ -174,13 +179,32 @@ export function prepareShopperOrder(
 
   for (const entry of MARKET) {
     if (!canBuy(entry, s.tier)) continue;
-    if (mission === 'contract' && !textMatchesBrief(entry, contractBrief)) continue;
+    if (mission === 'contract' && !selectedContract && !textMatchesBrief(entry, contractBrief)) continue;
     const retail = pieceCost(entry, isClothing(entry.kind) ? entry.fabric || 'plain' : undefined) * MARKUP;
     if (mission !== 'contract' && retail > priceCeiling) continue;
 
     const productKey = [entry.kind, entry.id].join('|');
     const variants = existingByProduct.get(productKey) || [];
     const productDemand = demandScore(records, entry, s, mission);
+    if (mission === 'contract' && selectedContract) {
+      const requirement = selectedContract.requirements.find((row) => row.kind === entry.kind && row.itemId === entry.id);
+      if (!requirement) continue;
+      const inStock = s.stock.filter((row) => row.kind === requirement.kind && row.itemId === requirement.itemId)
+        .reduce((sum, row) => sum + Math.max(0, row.pieces), 0);
+      const inCart = (s.marketCart || []).filter((row) => row.kind === requirement.kind && row.itemId === requirement.itemId)
+        .reduce((sum, row) => sum + Math.max(0, row.pieces), 0);
+      const missing = Math.max(0, requirement.quantity - inStock - inCart);
+      if (missing <= 0) continue;
+      const line = candidateLine(entry, s, mission, records, variants[0], missing);
+      const unitCost = pieceCost(entry, isClothing(entry.kind) ? line.fabric : undefined);
+      if (!Number.isFinite(unitCost) || unitCost <= 0) continue;
+      candidates.push({
+        entry, line, unitCost,
+        score: 1000 + productDemand + (inStock <= 0 ? 3 : 0),
+        suggestedPieces: missing,
+      });
+      continue;
+    }
     if (mission === 'restock') {
       for (const variant of variants) {
         const matchingEntry = entryFor(variant.kind, variant.itemId);
@@ -283,13 +307,14 @@ export function prepareShopperOrder(
     restock: 'replenished low-stock designs with recent demand',
     variety: 'selected new styles to widen your assortment',
     richCustomers: 'selected a limited premium assortment within your current boutique level',
-    contract: 'matched your brief against eligible catalogue products',
+    contract: selectedContract ? `sourced the missing stock for “${selectedContract.title}”` : 'matched your brief against eligible catalogue products',
   };
-  const summary = `Shopper returned on day ${s.day}: ${chosen.length} product lines, ${chosen.reduce((sum, line) => sum + line.pieces, 0)} pieces, estimated total ₦${spent.toLocaleString('en-NG')}. I ${descriptions[mission]}. Review everything in Yaba Mart before checkout.`;
+  const summary = `Shopper returned on day ${s.day}: ${chosen.length} product lines, ${chosen.reduce((sum, line) => sum + line.pieces, 0)} pieces, estimated total ₦${spent.toLocaleString('en-NG')}. I ${descriptions[mission]}.${selectedContract ? ` Contract deadline: Day ${selectedContract.deadlineDay}. ` : ' '}Review everything in Yaba Mart before checkout.`;
   const job: ShopperJob = {
     id, mission, budget, estimatedTotal: spent, status: 'ready',
     createdDay: s.day, completedDay: s.day, items: chosen, summary,
-    ...(mission === 'contract' ? { contractBrief: contractBrief.trim().slice(0, 240) } : {}),
+    ...(mission === 'contract' ? { contractBrief: (selectedContract?.brief || contractBrief).trim().slice(0, 240) } : {}),
+    ...(selectedContract ? { contractId: selectedContract.id } : {}),
   };
   const newCart = mergeIntoCart(s.marketCart || [], chosen);
   const msgSeq = (s.msgSeq || 0) + 1;
