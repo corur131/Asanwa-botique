@@ -566,7 +566,8 @@ function makeDepartmentOperation(name: string, day: number, investmentCost: numb
     Menswear: { units: 120, share: 0.58, markup: 2.2 },
   };
   const c = config[name] || { units: 100, share: 0.55, markup: 2.1 };
-  const inventoryValue = roundMoney(investmentCost * c.share);
+  // The fixed department asset is valued at ₦650,000; the remaining acquisition cost is opening inventory.
+  const inventoryValue = Math.max(0, investmentCost - 650_000);
   const unitCost = Math.max(1, roundMoney(inventoryValue / c.units));
   return { name, openedDay: day, targetUnits: c.units, inventoryUnits: c.units, inventoryValue,
     unitCost, unitPrice: roundMoney(unitCost * c.markup), cumulativeRevenue: 0, cumulativeCosts: 0, daysTrading: 0 };
@@ -574,7 +575,8 @@ function makeDepartmentOperation(name: string, day: number, investmentCost: numb
 
 function makeWholesaleOperation(investmentCost: number): WholesaleOperation {
   const targetUnits = 320;
-  const inventoryValue = roundMoney(investmentCost * 0.56);
+  // Wholesale infrastructure is valued at ₦4,500,000; the remaining setup capital is opening stock.
+  const inventoryValue = Math.max(0, investmentCost - 4_500_000);
   const unitCost = Math.max(1, roundMoney(inventoryValue / targetUnits));
   return { targetUnits, inventoryUnits: targetUnits, inventoryValue, unitCost,
     unitPrice: roundMoney(unitCost * 1.85), cumulativeRevenue: 0, cumulativeCosts: 0, ordersFulfilled: 0, ordersMissed: 0 };
@@ -596,7 +598,7 @@ export function investInExpansion(s0: GameState, investment: ExpansionInvestment
         id: 'branch-' + s0.day + '-' + index,
         name: 'Asanwa Boutique ' + (index === 1 ? 'Lekki Outlet' : 'Branch ' + index),
         area: areas[current.branches.length % areas.length],
-        tier: 2, openedDay: s0.day, weeklyRent: 330_000, assetValue: 2_200_000,
+        tier: 2, openedDay: s0.day, weeklyRent: 330_000, assetValue: option.cost,
       };
       expansion = { ...expansion, branches: [...current.branches, branch] };
       break;
@@ -780,7 +782,7 @@ export function netWorthPlayer(s: GameState): number {
   const expansion = s.businessExpansion || initialBusinessExpansion();
   const departmentInventory = (expansion.departmentOperations || []).reduce((sum, department) => sum + Math.max(0, department.inventoryValue || 0), 0);
   const wholesaleInventory = Math.max(0, expansion.wholesaleOperation?.inventoryValue || 0);
-  const expansionAssets = expansion.branches.reduce((sum, branch) => sum + Math.max(0, branch.assetValue), 0) + (expansion.wholesaleActive ? 4_500_000 : 0) + expansion.departments.length * 650_000 + expansion.designerCollections * 1_250_000 + departmentInventory + wholesaleInventory + Math.max(0, expansion.expansionCredit || 0);
+  const expansionAssets = expansion.branches.reduce((sum, branch) => sum + Math.max(0, branch.assetValue), 0) + (expansion.wholesaleActive ? 4_500_000 : 0) + expansion.departments.length * 650_000 + expansion.designerCollections * EXPANSION_COSTS.designer + departmentInventory + wholesaleInventory + Math.max(0, expansion.expansionCredit || 0);
   const weekly = playerWeekTotals(s);
   const goodwill = Math.max(0, weekly.profit) * 5 + Math.max(0, s.followers || 0) * 5 +
     brandPower(getBrandMetrics(s), s.followers || 0, s.tier) * 100;
