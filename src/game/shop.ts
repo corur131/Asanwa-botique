@@ -507,7 +507,12 @@ export function canPlace(items: Placed[], tier: RoomKey, p: Placed): boolean {
   if (f.mount !== 'floor') return true;
   const { w, d } = footprint(p);
   if (p.x < 0 || p.z < 0 || p.x + w > r.w || p.z + d > r.d - 1) return false;
-  if (f.walkable) return true;
+  if (f.walkable) {
+    // Rugs can overlap furniture as decoration, but must never be placed through an internal wall.
+    const walls = cellsBlocked([], tier);
+    for (let z = p.z; z < p.z + d; z++) for (let x = p.x; x < p.x + w; x++) if (walls[z][x]) return false;
+    return true;
+  }
   const g = cellsBlocked(items, tier, p.uid);
   for (let z = p.z; z < p.z + d; z++) for (let x = p.x; x < p.x + w; x++) if (g[z][x]) return false;
   // nothing may wall off part of the floor: every free cell must still be reachable from the door
