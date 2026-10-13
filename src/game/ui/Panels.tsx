@@ -297,8 +297,8 @@ export const MovePanel: React.FC<{ s: GameState; onMove: (l: Listing, plan: Move
       </div>
       {next ? <div className="rounded-lg border border-white/10 bg-white/5 p-3 text-xs text-slate-300">
         <b className="text-white">{next.name}</b>: bigger, better listings are roomier and hold more{next.staff ? `, ${next.staff} staff` : ''}{next.luxury ? ', luxury suppliers' : ''}. Choose what happens to your reusable equipment when you move. You can arrange it in the new shop, keep it in storage, or sell it for cash. Listings change every week.
-      </div> : <div className="rounded-lg border border-white/10 bg-white/5 p-3 text-xs text-slate-300">You have reached the highest standard level in Lagos. You can still upgrade to the Signature flagship if you have not already.</div>}
-      <div className="rounded-lg border border-amber-500/25 bg-amber-500/5 p-3 text-xs text-amber-100">Signature properties are purpose-built luxury spaces. Scheduled celebrity visits rise with the Signature tier: 2 per fortnight at level 0, increasing to 6 at the level-4 Flagship. Weekly rent and move-in costs are much higher.</div>
+      </div> : <div className="rounded-lg border border-white/10 bg-white/5 p-3 text-xs text-slate-300">You have reached the highest standard shop level. A same-level Signature property may still be available as an alternative if you are currently in a standard shop.</div>}
+      <div className="rounded-lg border border-amber-500/25 bg-amber-500/5 p-3 text-xs text-amber-100">Signature properties are purpose-built luxury spaces with extra customer traffic and scheduled celebrity opportunities. Higher-tier Signature properties offer more frequent visit opportunities, alongside substantially higher rent and move-in costs.</div>
       <p className="text-xs text-slate-400">A same-tier Signature is an alternative to your current standard shop at the same size. A next-tier Signature is a larger shop upgrade; those are separate levels, not duplicate properties at one level.</p>
       {list.map((l0, index) => {
         const sameTier = l0.signature && l0.tier === s.tier;
@@ -347,7 +347,7 @@ export const MovePanel: React.FC<{ s: GameState; onMove: (l: Listing, plan: Move
             <li>Prestige from location: <b>{pick.stars * 2}</b> (more customers, more rich ones)</li>
             {pick.signature && <li className="text-amber-200">Signature benefits: extra customer traffic, rich-only walk-ins, much larger tips, celebrity visits with multi-million-naira spending, trending posts and large follower gains. Scheduled celebrity visits become more frequent at each Signature tier.</li>}
           </ul>
-          {s.cash - pick.moveIn < pick.rent * 2 && <p className="text-sm text-rose-300 mb-3">Careful: the first two weeks in a new shop are quiet, and you'd have less than two weeks of rent saved.</p>}
+          {s.cash - pick.moveIn - (movePlan === 'furnished' ? readyFurnishedCost(pick) : 0) < pick.rent * 2 && <p className="text-sm text-rose-300 mb-3">Careful: after move-in{movePlan === 'furnished' ? ' and the furnishing package' : ''}, you would have less than two weeks of rent saved. The first two weeks in a new shop are quiet.</p>}
           <section className="space-y-2 mb-4">
             <h3 className="text-sm font-semibold text-white">What should happen to your equipment?</h3>
             {([
