@@ -253,7 +253,7 @@ export function Room({ r, tier, painted }: { r: RoomStyle; tier: number; painted
       )}
       {/* trim */}
       <B p={[r.w / 2, H - 0.05, 0.01]} s={[r.w, 0.1, 0.03]} c={r.trim} m={r.signature || r.kind === 'marble' || r.kind === 'flagship' || r.kind === 'maison' || r.kind === 'empire' ? 0.8 : 0} />
-      <B p={[0.01, H - 0.05, r.d / 2]} s={[0.03, 0.1, r.d]} c={r.trim} m={r.signature || r.kind === 'marble' || r.kind === 'flagship' ? 0.8 : 0} />
+      <B p={[0.01, H - 0.05, r.d / 2]} s={[0.03, 0.1, r.d]} c={r.trim} m={r.signature || r.kind === 'marble' || r.kind === 'flagship' || r.kind === 'maison' || r.kind === 'empire' ? 0.8 : 0} />
 
       {r.signature && tier === 0 && (
         <>
@@ -479,7 +479,7 @@ export function Room({ r, tier, painted }: { r: RoomStyle; tier: number; painted
       {r.finish >= 3 && (
         <>
           <B p={[r.w / 2, 0.95, 0.02]} s={[r.w, 0.05, 0.03]} c={r.trim} m={r.kind === 'marble' || r.kind === 'flagship' || r.kind === 'maison' || r.kind === 'empire' ? 0.8 : 0.1} />
-          <B p={[0.02, 0.95, r.d / 2]} s={[0.03, 0.05, r.d]} c={r.trim} m={r.kind === 'marble' || r.kind === 'flagship' ? 0.8 : 0.1} />
+          <B p={[0.02, 0.95, r.d / 2]} s={[0.03, 0.05, r.d]} c={r.trim} m={r.kind === 'marble' || r.kind === 'flagship' || r.kind === 'maison' || r.kind === 'empire' ? 0.8 : 0.1} />
         </>
       )}
       {r.finish === 4 && (
