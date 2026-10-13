@@ -771,7 +771,7 @@ export default function GameApp({ onLab, initial, storageKey, cloud, notice }: {
             <div className="flex flex-wrap items-center gap-3 px-4 py-2 border-b border-white/10 bg-[#101219]">
               <div className="leading-tight min-w-0 flex-1">
                 <div className="text-white font-semibold">{r.shop} <Stars n={r.stars} /></div>
-                <div className="text-[11px] text-slate-400">{r.owner} · {TIERS[r.tier].name} in {r.area} · Brand Power {brandPower(r.brand || E.getBrandMetrics(s), r.followers, r.tier).toLocaleString('en-NG')} · {r.followers.toLocaleString('en-NG')} followers</div>
+                <div className="text-[11px] text-slate-400">{r.owner} · {TIERS[r.tier].name} in {r.area} · Brand Power {brandPower(r.brand || E.getBrandMetrics(s), r.followers, r.tier).toLocaleString('en-NG')} · {Math.max(0, Number(r.followers) || 0).toLocaleString('en-NG')} followers</div>
               </div>
               <Btn size="sm" tone="gold" onClick={() => setTouring(null)}>Leave the shop</Btn>
             </div>
