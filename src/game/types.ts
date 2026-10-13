@@ -37,6 +37,7 @@ export type ShopperJobStatus = 'ready' | 'cancelled' | 'purchased';
 
 /** These three ranks deliberately mirror the class-fit rank used by scoreLook(). */
 export type ShopperDressRank = 0 | 1 | 2;
+export type ShopperPriceBand = 'veryExpensive' | 'millionCouture';
 export type ShopperAudience = 'women' | 'men';
 export type ShopperProductCategory =
   | 'top' | 'bottom' | 'dress' | 'outer' | 'shoes' | 'bag'
@@ -47,6 +48,8 @@ export interface ShopperBuyingPreference {
   category: ShopperProductCategory;
   /** One or more game dress-ranks: 0 everyday, 1 middle, 2 luxury. */
   ranks: ShopperDressRank[];
+  /** Exact per-piece wholesale cost bands, independent of the visual/class rank. */
+  priceBands?: ShopperPriceBand[];
 }
 
 export interface ShopperJob {
