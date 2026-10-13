@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { DIVINE_CONFIG } from '../constants/presets';
-import { BUDGET, MARKUP } from './economy';
-import { buyCart, cartTotal, newGame, validateCart } from './engine';
+import { MARKUP } from './economy';
+import { buyCart, cartTotal, fromData, newGame, validateCart } from './engine';
 import { canBuy, MARKET, pieceCost } from './market';
 import { prepareShopperOrder, shopperPriceCeiling } from './shopper';
 import type { GameState, ShopperOrderLine } from './types';
@@ -39,6 +39,9 @@ test('tier-aware shopper orders only use unlocked catalogue items and stay withi
   assert.equal(result.state.marketCart?.length, result.job.items.length);
   assert.equal(result.state.shopperJobs?.at(-1)?.id, result.job.id, 'the order is saved in GameState');
   assert.equal(result.state.msgSeq, (s.msgSeq || 0) + 1, 'a return notification is recorded');
+  const roundTrip = fromData(JSON.parse(JSON.stringify(result.state)));
+  assert.deepEqual(roundTrip?.marketCart, result.state.marketCart, 'cart survives save serialisation');
+  assert.deepEqual(roundTrip?.shopperJobs, result.state.shopperJobs, 'shopper order survives save serialisation');
 });
 
 test('restock mission reacts to recorded recent sales and low inventory', () => {
