@@ -23,9 +23,12 @@ export const shopperAvailableBudget = (s: GameState, cart: CartLine[] = s.market
  * and spending bands. Explicit premium/contract missions may use a different ceiling,
  * but they never bypass catalogue unlocks, mission budget, or available cash. */
 export function shopperPriceCeiling(s: GameState, mission: ShopperMission): number {
-  const tier = TIERS[Math.max(0, Math.min(TIERS.length - 1, Math.floor(s.tier)))] || TIERS[0];
+  const tierIndex = Math.max(0, Math.min(TIERS.length - 1, Math.floor(s.tier)));
+  const tier = TIERS[tierIndex] || TIERS[0];
   const weightedSpend = tier.mix.reduce((sum, share, i) => sum + share * BUDGET[CLASS_ORDER[i]][1], 0);
-  if (mission === 'richCustomers') return Math.min(BUDGET.rich[1] * 0.8, weightedSpend * (1.05 + tier.mix[2] * 1.5));
+  // Premium missions need a tier-aware luxury ceiling instead of the normal blended
+  // customer average, which used to filter out almost every genuinely premium product.
+  if (mission === 'richCustomers') return [45_000, 110_000, 300_000, 600_000, 950_000][tierIndex] || 45_000;
   if (mission === 'contract') return BUDGET.rich[1] * 0.8;
   return Math.max(5_000, weightedSpend * 0.45);
 }
@@ -85,6 +88,35 @@ function textMatchesBrief(entry: MarketEntry, brief: string) {
   );
   if (!words.length) return true;
   return words.some((word) => text.includes(word));
+}
+
+/** Match shopper examples to real catalogue metadata. This is a ranking hint only:
+ * locked products remain locked and explicit missions still enforce their rules. */
+function shopperPreferenceScore(entry: MarketEntry, brief: string): number {
+  const words = brief.toLowerCase().replace(/[^a-z0-9\s-]/g, ' ').split(/\s+/).filter((word) =>
+    word.length >= 3 && !['the', 'and', 'for', 'with', 'from', 'that', 'this', 'please', 'need', 'want', 'buy', 'look', 'some', 'examples', 'example', 'items', 'products', 'stock', 'my', 'me'].includes(word),
+  );
+  if (!words.length) return 0;
+  const premiumTags = entry.luxury ? ' luxury premium designer expensive high-end couture rich exclusive' : '';
+  const nativeTags = entry.native ? ' native aso-oke ankara aso ebi' : '';
+  const text = (entry.label + ' ' + entry.group + ' ' + entry.kind + premiumTags + nativeTags).toLowerCase();
+  const aliases: Record<string, string[]> = {
+    gown: ['dress', 'gown'], gowns: ['dress', 'gown'], dresses: ['dress', 'gown'],
+    handbag: ['bag'], handbags: ['bag'], purses: ['bag'], purse: ['bag'],
+    wigs: ['hair', 'wig'], wig: ['hair', 'wig'], braids: ['hair', 'braid'], braid: ['hair', 'braid'],
+    heels: ['shoes', 'heel'], sneakers: ['shoes', 'sneaker'], footwear: ['shoes'],
+    trousers: ['bottom', 'trouser'], pants: ['bottom', 'pant'], jeans: ['bottom', 'jean'],
+    skirts: ['bottom', 'skirt'], blouse: ['top', 'blouse'], blouses: ['top', 'blouse'],
+    jewellery: ['jewellery', 'jewelry', 'necklace', 'earrings', 'wrist'], jewelry: ['jewellery', 'jewelry', 'necklace', 'earrings', 'wrist'],
+    asoebi: ['aso-ebi', 'aso-oke', 'ankara', 'native'], 'aso-ebi': ['aso-ebi', 'aso-oke', 'ankara', 'native'],
+    expensive: ['expensive', 'luxury', 'premium', 'designer', 'couture'],
+    designer: ['designer', 'luxury', 'premium', 'couture'],
+    luxury: ['luxury', 'premium', 'designer', 'couture'], premium: ['premium', 'luxury', 'designer', 'couture'],
+  };
+  return words.reduce((score, word) => {
+    const terms = aliases[word] || [word];
+    return score + (terms.some((term) => text.includes(term)) ? 1 : 0);
+  }, 0);
 }
 
 interface Candidate {
@@ -153,6 +185,7 @@ export function prepareShopperOrder(
   requestedBudget: number,
   contractBrief = '',
   contractId?: string,
+  shoppingExamples = '',
 ): { state: GameState; job?: ShopperJob; error?: string } {
   const available = shopperAvailableBudget(s);
   const budget = Math.max(0, Math.min(available, Math.floor((Number.isFinite(requestedBudget) ? requestedBudget : 0) / 100) * 100));
@@ -175,6 +208,12 @@ export function prepareShopperOrder(
   }
   const normalCeiling = shopperPriceCeiling(s, mission);
   const priceCeiling = normalCeiling;
+  const maxLines = [6, 8, 10, 13, 16][Math.max(0, Math.min(4, s.tier))] || 6;
+  // Aim to use a meaningful share of the budget on premium missions, scaling quantities
+  // rather than stopping at one unit per style. The 25-piece cap protects against runaway orders.
+  const richQuantityFor = (unitCost: number) => mission === 'richCustomers'
+    ? Math.max(1, Math.min(25, Math.ceil((budget * 0.75) / (maxLines * Math.max(1, unitCost)))))
+    : 1;
   const candidates: Candidate[] = [];
 
   for (const entry of MARKET) {
@@ -227,28 +266,44 @@ export function prepareShopperOrder(
       continue;
     }
 
-    // Variety and premium sourcing add catalogue styles the boutique does not already own.
-    // A different colour of the same catalogue style is not counted as new variety.
+    // Premium sourcing can replenish a luxury style once it sells out. Otherwise, variety
+    // and premium missions add catalogue styles the boutique has not stocked before.
+    if (mission === 'richCustomers' && variants.length) {
+      for (const variant of variants) {
+        if (variant.pieces > 0) continue;
+        const line = candidateLine(entry, s, mission, records, variant, 1);
+        const unitCost = pieceCost(entry, isClothing(entry.kind) ? line.fabric : undefined);
+        if (!Number.isFinite(unitCost) || unitCost <= 0 || unitCost * MARKUP > priceCeiling) continue;
+        const preferenceScore = shopperPreferenceScore(entry, shoppingExamples);
+        const score = 90 + (entry.luxury ? 100 : 0) + productDemand * 2 +
+          (shoppingExamples.trim() ? (preferenceScore > 0 ? 120 + preferenceScore * 120 : -80) : 0);
+        candidates.push({ entry, line, unitCost, score, suggestedPieces: richQuantityFor(unitCost) });
+      }
+      continue;
+    }
+
     if (variants.length) continue;
     const line = candidateLine(entry, s, mission, records, undefined, 1);
     const unitCost = pieceCost(entry, isClothing(entry.kind) ? line.fabric : undefined);
     if (!Number.isFinite(unitCost) || unitCost <= 0) continue;
     const missingKindBonus = (representedKinds.get(entry.kind) || 0) === 0 ? 5 : 0;
-    const luxuryBonus = mission === 'richCustomers' && entry.luxury ? 8 : 0;
+    const luxuryBonus = mission === 'richCustomers' && entry.luxury ? 100 : 0;
     const demandBonus = productDemand;
     const priceFit = mission === 'richCustomers' ? retail / Math.max(1, priceCeiling) : 1 - retail / Math.max(1, priceCeiling);
+    const preferenceScore = shopperPreferenceScore(entry, shoppingExamples);
     let score = 2 + missingKindBonus + luxuryBonus + demandBonus + Math.max(0, priceFit) * 2;
+    if (shoppingExamples.trim()) score += preferenceScore > 0 ? 120 + preferenceScore * 120 : -80;
     if (mission === 'variety') score += missingKindBonus * 1.5;
     if (mission === 'contract') {
       const text = (entry.label + ' ' + entry.group + ' ' + entry.kind).toLowerCase();
       const words = contractBrief.toLowerCase().split(/[^a-z0-9]+/).filter((word) => word.length >= 3);
       score += words.filter((word) => text.includes(word)).length * 10;
     }
-    candidates.push({ entry, line, unitCost, score, suggestedPieces: 1 });
+    candidates.push({ entry, line, unitCost, score, suggestedPieces: richQuantityFor(unitCost) });
   }
 
-  // Keep the order small enough to be reviewed and suitable for this shop's scale.
-  const maxLines = [6, 8, 10, 13, 16][Math.max(0, Math.min(4, s.tier))] || 6;
+  // Keep the assortment limited by boutique tier, but allow premium quantities to scale
+  // with the chosen budget instead of capping every catalogue style at one piece.
   candidates.sort((a, b) => b.score - a.score || a.unitCost - b.unitCost || a.entry.label.localeCompare(b.entry.label));
   const remainingCandidates = [...candidates];
   const chosen: ShopperOrderLine[] = [];
@@ -312,7 +367,10 @@ export function prepareShopperOrder(
     richCustomers: 'selected a limited premium assortment within your current boutique level',
     contract: selectedContract ? `sourced the missing stock for “${selectedContract.title}”` : 'matched your brief against eligible catalogue products',
   };
-  const summary = `Shopper returned on day ${s.day}: ${chosen.length} product lines, ${chosen.reduce((sum, line) => sum + line.pieces, 0)} pieces, estimated total ₦${spent.toLocaleString('en-NG')}. I ${descriptions[mission]}.${selectedContract ? ` Contract deadline: Day ${selectedContract.deadlineDay}. ` : ' '}Review everything in Yaba Mart before checkout.`;
+  const exampleNote = mission !== 'contract' && shoppingExamples.trim()
+    ? ` I prioritised catalogue items matching “${shoppingExamples.trim().slice(0, 120)}”.`
+    : '';
+  const summary = `Shopper returned on day ${s.day}: ${chosen.length} product lines, ${chosen.reduce((sum, line) => sum + line.pieces, 0)} pieces, estimated total ₦${spent.toLocaleString('en-NG')}. I ${descriptions[mission]}.${exampleNote}${selectedContract ? ` Contract deadline: Day ${selectedContract.deadlineDay}. ` : ' '}Review everything in Yaba Mart before checkout.`;
   const job: ShopperJob = {
     id, mission, budget, estimatedTotal: spent, status: 'ready',
     createdDay: s.day, completedDay: s.day, items: chosen, summary,
