@@ -560,16 +560,18 @@ export function financeExpansionPurchase(s0: GameState, investment: ExpansionInv
 }
 
 function makeDepartmentOperation(name: string, day: number, investmentCost: number): DepartmentOperation {
-  const config: Record<string, { units: number; share: number; markup: number }> = {
-    Accessories: { units: 180, share: 0.58, markup: 2.25 },
-    'Bridal & Occasionwear': { units: 72, share: 0.56, markup: 2.45 },
-    Menswear: { units: 120, share: 0.58, markup: 2.2 },
+  const config: Record<string, { units: number; markup: number }> = {
+    Accessories: { units: 180, markup: 2.25 },
+    'Bridal & Occasionwear': { units: 72, markup: 2.45 },
+    Menswear: { units: 120, markup: 2.2 },
   };
-  const c = config[name] || { units: 100, share: 0.55, markup: 2.1 };
-  // The fixed department asset is valued at ₦650,000; the remaining acquisition cost is opening inventory.
-  const inventoryValue = Math.max(0, investmentCost - 650_000);
-  const unitCost = Math.max(1, roundMoney(inventoryValue / c.units));
-  return { name, openedDay: day, targetUnits: c.units, inventoryUnits: c.units, inventoryValue,
+  const c = config[name] || { units: 100, markup: 2.1 };
+  // Keep unit costs integral and reconcile opening inventory plus fixtures exactly to acquisition cost.
+  const inventoryBudget = Math.max(0, investmentCost - 650_000);
+  const unitCost = Math.max(1, roundMoney(inventoryBudget / c.units));
+  const inventoryValue = unitCost * c.units;
+  const assetValue = Math.max(0, investmentCost - inventoryValue);
+  return { name, openedDay: day, targetUnits: c.units, inventoryUnits: c.units, inventoryValue, assetValue,
     unitCost, unitPrice: roundMoney(unitCost * c.markup), cumulativeRevenue: 0, cumulativeCosts: 0, daysTrading: 0 };
 }
 
@@ -780,9 +782,12 @@ export function netWorthPlayer(s: GameState): number {
     try { return sum + furnitureById(item.id).price * 0.35; } catch { return sum; }
   }, 0);
   const expansion = s.businessExpansion || initialBusinessExpansion();
-  const departmentInventory = (expansion.departmentOperations || []).reduce((sum, department) => sum + Math.max(0, department.inventoryValue || 0), 0);
+  const departmentOperations = expansion.departmentOperations || [];
+  const departmentInventory = departmentOperations.reduce((sum, department) => sum + Math.max(0, department.inventoryValue || 0), 0);
+  const departmentAssets = departmentOperations.reduce((sum, department) => sum + Math.max(0, department.assetValue ?? 650_000), 0);
+  const legacyDepartmentAssets = Math.max(0, expansion.departments.length - departmentOperations.length) * 650_000;
   const wholesaleInventory = Math.max(0, expansion.wholesaleOperation?.inventoryValue || 0);
-  const expansionAssets = expansion.branches.reduce((sum, branch) => sum + Math.max(0, branch.assetValue), 0) + (expansion.wholesaleActive ? 4_500_000 : 0) + expansion.departments.length * 650_000 + expansion.designerCollections * EXPANSION_COSTS.designer + departmentInventory + wholesaleInventory + Math.max(0, expansion.expansionCredit || 0);
+  const expansionAssets = expansion.branches.reduce((sum, branch) => sum + Math.max(0, branch.assetValue), 0) + (expansion.wholesaleActive ? 4_500_000 : 0) + departmentAssets + legacyDepartmentAssets + expansion.designerCollections * EXPANSION_COSTS.designer + departmentInventory + wholesaleInventory + Math.max(0, expansion.expansionCredit || 0);
   const weekly = playerWeekTotals(s);
   const goodwill = Math.max(0, weekly.profit) * 5 + Math.max(0, s.followers || 0) * 5 +
     brandPower(getBrandMetrics(s), s.followers || 0, s.tier) * 100;
