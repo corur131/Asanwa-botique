@@ -93,7 +93,12 @@ def simulate(pl, days=200, seed=0, shock_day=None, shock=0.0, fixed_tier=None):
             if served_by_staff and cls == 'rich':
                 cls = 'middle'      # rich clients always wait for Divine; staff take the small ones
             lo, hi = P['budget'][cls]
-            budget = rnd.uniform(lo, hi)
+            if cls == 'rich' and P.get('weighted_rich_budget', False):
+                # Forecast the roadmap's wider rich-customer range without assigning every
+                # visitor a near-maximum budget; most budgets are weighted toward the lower end.
+                budget = rnd.triangular(lo, hi, lo + 0.25 * (hi - lo))
+            else:
+                budget = rnd.uniform(lo, hi)
             fee = P['fee'][cls]
             W = max(1_000, (budget - fee) / P['markup'])
             fair = W * P['markup'] + fee
