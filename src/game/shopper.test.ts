@@ -118,18 +118,19 @@ test('rich-customer mission prioritises unlocked luxury items and scales order q
 });
 
 test('shopper examples guide the proposed cart toward the requested catalogue products', () => {
-  const s = game({ cash: 2_000_000, tier: 0, stock: [], marketCart: [] });
-  const ceiling = shopperPriceCeiling(s, 'variety');
+  const s = game({ cash: 10_000_000, tier: 2, stock: [], marketCart: [] });
+  const ceiling = shopperPriceCeiling(s, 'richCustomers');
   const target = MARKET.find((item) =>
     canBuy(item, s.tier) &&
+    item.luxury &&
     pieceCost(item, item.fabric) * MARKUP <= ceiling &&
-    item.label.trim().split(/\\s+/).filter((word) => word.length >= 4).length >= 2,
+    item.label.trim().split(/\s+/).filter((word) => word.length >= 4).length >= 2,
   );
-  assert.ok(target, 'test catalogue should include an unlocked dress within the kiosk price guide');
+  assert.ok(target, 'test catalogue should include an unlocked premium item with a descriptive label');
 
-  const result = prepareShopperOrder(s, 'variety', 500_000, '', undefined, target!.label);
+  const result = prepareShopperOrder(s, 'richCustomers', 5_000_000, '', undefined, target!.label);
   assert.ok(result.job, result.error);
   assert.ok(result.job.items.some((line) => line.kind === target!.kind && line.itemId === target!.id),
     'shopper should prioritise the exact requested example when that catalogue entry is available');
   assert.ok(result.job.summary.includes(target!.label), 'order summary should remember what examples were requested');
-});
+});;
