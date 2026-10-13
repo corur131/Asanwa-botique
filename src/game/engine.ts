@@ -1048,23 +1048,72 @@ export function settleLateRent(s0: GameState): GameState {
   return next;
 }
 
+/** Pay the landlord directly before the weekly rent run; any advance is credited once. */
+export function payRentEarly(s0: GameState, amount: number): GameState {
+  const requested = Math.round(amount);
+  const arrears = Math.max(0, s0.lateRent?.amount || 0);
+  const prepaid = Math.max(0, Math.round(s0.rentPrepaid || 0));
+  const rentRemaining = Math.max(0, Math.round(s0.listing.rent) - prepaid);
+  const maximumPayable = arrears + rentRemaining;
+  // Reject an invalid or unaffordable amount instead of silently making a partial payment.
+  if (!Number.isFinite(amount) || requested <= 0 || requested > Math.max(0, s0.cash) || requested > maximumPayable) return s0;
+
+  const arrearsPaid = Math.min(requested, arrears);
+  const advancePaid = requested - arrearsPaid;
+  const arrearsRemaining = arrears - arrearsPaid;
+  const t = s0.phase === 'shop' ? Math.floor(s0.clock) : -1;
+  const entries: GameState['ledger'] = [];
+  if (advancePaid > 0) entries.push({
+    day: s0.day, t, label: 'Advance rent paid to ' + s0.listing.landlord, amount: -advancePaid, category: 'operating',
+  });
+  if (arrearsPaid > 0) entries.push({
+    day: s0.day, t, label: 'Overdue rent paid to ' + s0.listing.landlord, amount: -arrearsPaid, category: 'operating',
+  });
+
+  let next: GameState = {
+    ...s0,
+    cash: Math.max(0, s0.cash - requested),
+    rentPrepaid: prepaid + advancePaid,
+    lateRent: s0.lateRent ? (arrearsRemaining > 0 ? { ...s0.lateRent, amount: arrearsRemaining } : null) : null,
+    ledger: [...entries, ...(s0.ledger || [])].slice(0, 500),
+    today: {
+      ...s0.today,
+      // Overdue rent was already charged when it fell due; only new advance rent is a new cost today.
+      costs: (s0.today?.costs || 0) + advancePaid,
+      events: [...(s0.today?.events || []), 'Paid ' + naira(requested) + ' directly to ' + s0.listing.landlord + '.'
+        + (arrearsPaid ? ' Overdue rent cleared: ' + naira(arrearsPaid) + '.' : '')
+        + (advancePaid ? ' Advance rent credit: ' + naira(advancePaid) + '.' : '')],
+    },
+  };
+  const message = arrearsRemaining > 0
+    ? 'Thank you. ' + naira(arrearsPaid) + ' has been applied to your overdue rent; ' + naira(arrearsRemaining) + ' remains due by Day ' + s0.lateRent!.due + '.'
+    : advancePaid > 0
+      ? 'Payment received. ' + naira(advancePaid) + ' has been credited toward your upcoming rent. I will deduct it from the next rent bill, so you will not pay that amount twice.'
+      : 'Thank you. Your overdue rent has been cleared.';
+  next = msg(next, 'Landlord', message, arrearsRemaining > 0 ? 'warn' : 'good');
+  return next;
+}
+
 export function payRent(s: GameState): GameState {
-  const rent = Math.max(0, s.listing.rent);
+  const rent = Math.max(0, Math.round(s.listing.rent));
   const bank = s.bank || initialBankState();
-  const vaultPaid = Math.min(Math.max(0, bank.rentVault), rent);
-  const afterVault = rent - vaultPaid;
-  // Rent must not create a second hidden overdraft. Any unpaid amount stays
-  // visible as a liability and can be paid from future cash or Rent Vault funds.
+  const prepaid = Math.min(Math.max(0, Math.round(s.rentPrepaid || 0)), rent);
+  const remainingRent = rent - prepaid;
+  const vaultPaid = Math.min(Math.max(0, bank.rentVault), remainingRent);
+  const afterVault = remainingRent - vaultPaid;
+  // Advance payments, the Rent Vault, and current cash are applied in that order.
+  // Only the unpaid remainder becomes a liability, and previously paid rent is never charged twice.
   const cashPaid = Math.min(Math.max(0, s.cash), afterVault);
-  const unpaid = Math.max(0, rent - vaultPaid - cashPaid);
+  const unpaid = Math.max(0, remainingRent - vaultPaid - cashPaid);
   const bankAfter = { ...bank, rentVault: bank.rentVault - vaultPaid };
   let next: GameState = {
     ...s,
     bank: bankAfter,
+    rentPrepaid: Math.max(0, Math.max(0, Math.round(s.rentPrepaid || 0)) - prepaid),
     today: {
       ...s.today,
-      costs: s.today.costs + rent,
-      events: [...s.today.events, `Rent bill ${naira(rent)}; Rent Vault paid ${naira(vaultPaid)}, current account paid ${naira(cashPaid)}${unpaid ? `, unpaid balance ${naira(unpaid)}` : ''}.`],
+      costs: (s.today?.costs || 0) + remainingRent,
+      events: [...(s.today?.events || []), `Rent bill ${naira(rent)}; advance payment covered ${naira(prepaid)}, Rent Vault paid ${naira(vaultPaid)}, current account paid ${naira(cashPaid)}${unpaid ? `, unpaid balance ${naira(unpaid)}` : ''}.`],
     },
   };
   if (vaultPaid > 0) {
@@ -1083,7 +1132,9 @@ export function payRent(s: GameState): GameState {
       ? `Rent is short by ${naira(totalOwed)}. Clear it today or you move out.`
       : `Rent is short by ${naira(totalOwed)}. You have ${s.grace} day${s.grace > 1 ? 's' : ''} to clear it. If it remains unpaid by day ${due}, you move to a smaller shop.`, 'danger');
   }
-  return msg(next, 'Landlord', `Rent of ${naira(rent)} received. See you next week.`, 'info');
+  return msg(next, 'Landlord', prepaid > 0
+    ? `Rent of ${naira(rent)} is covered: ${naira(prepaid)} was paid early, with the rest settled now. See you next week.`
+    : `Rent of ${naira(rent)} received. See you next week.`, 'info');
 }
 
 export function demote(s: GameState): GameState {
