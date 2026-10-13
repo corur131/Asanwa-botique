@@ -111,7 +111,7 @@ export default function GameApp({ onLab, initial, storageKey, cloud, notice }: {
   const [touring, setTouring] = useState<string | null>(null);
   const [cart, setCart] = useState<E.CartLine[]>([]);
   const [paused, setPaused] = useState(false);
-  const [timeSpeed, setTimeSpeed] = useState<1 | 2 | 3>(1);
+  const [timeSpeed, setTimeSpeed] = useState<2 | 5 | 10>(2);
   const [hidden, setHidden] = useState(false);
   const [confirmClose, setConfirmClose] = useState(false);
   const [lookEdit, setLookEdit] = useState<CharacterConfig | null>(null);
@@ -433,7 +433,7 @@ export default function GameApp({ onLab, initial, storageKey, cloud, notice }: {
             </div>
             <PowerChip s={s} up={up} />
             <div className="flex items-center gap-1 rounded-xl border border-white/10 bg-black/25 p-1" aria-label="Game speed">
-              {([1, 2, 3] as const).map((speed) => <button key={speed} type="button" aria-pressed={timeSpeed === speed} onClick={() => setTimeSpeed(speed)} className={`min-h-9 min-w-10 rounded-lg px-2 text-xs font-bold transition-colors ${timeSpeed === speed ? 'bg-amber-400 text-slate-950' : 'text-slate-200 hover:bg-white/10'}`}>{speed}×</button>)}
+              {([2, 5, 10] as const).map((speed) => <button key={speed} type="button" aria-pressed={timeSpeed === speed} onClick={() => setTimeSpeed(speed)} className={`min-h-9 min-w-10 rounded-lg px-2 text-xs font-bold transition-colors ${timeSpeed === speed ? 'bg-amber-400 text-slate-950' : 'text-slate-200 hover:bg-white/10'}`}>{speed}×</button>)}
             </div>
             <Btn size="sm" onClick={() => setPaused((p) => !p)}>{paused ? '▶ Play' : '❚❚ Pause'}</Btn>
             {!s.inShop.length && !s.serving && !closing && s.arrivals.length > 0 && <Btn size="sm" tone="ghost" onClick={() => up(E.skipAhead)}>Skip ⏩</Btn>}
