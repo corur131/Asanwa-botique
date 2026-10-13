@@ -5,7 +5,8 @@ import { MARKUP } from './economy';
 import { buyCart, cartTotal, fromData, newGame, validateCart } from './engine';
 import { canBuy, MARKET, pieceCost } from './market';
 import {
-  prepareShopperOrder, shopperDressRank, shopperEntryMatchesPreferences, shopperPriceCeiling,
+  prepareShopperOrder, shopperDressRank, shopperEntryMatchesPreferences, shopperPriceBandMatches,
+  shopperPriceCeiling,
 } from './shopper';
 import type { ShopperBuyingPreference } from './types';
 import type { GameState, ShopperOrderLine } from './types';
@@ -190,4 +191,87 @@ test('selected shopper preferences let a restock mission add new products that m
     const entry = MARKET.find((item) => item.kind === line.kind && item.id === line.itemId)!;
     assert.ok(shopperEntryMatchesPreferences(entry, preferences));
   }
+});
+
+
+test('strict Very Expensive and Million-naira filters use actual per-piece purchase cost, not rich/luxury labels', () => {
+  const s = game({ cash: 100_000_000, tier: 4, stock: [], marketCart: [], productSales: [] });
+  const veryExpensive: ShopperBuyingPreference[] = [
+    { audience: 'women', category: 'dress', ranks: [], priceBands: ['veryExpensive'] },
+  ];
+  const millionCouture: ShopperBuyingPreference[] = [
+    { audience: 'women', category: 'dress', ranks: [], priceBands: ['millionCouture'] },
+  ];
+  const bandA = MARKET.find((entry) => entry.kind === 'dress' && entry.for !== 'm' &&
+    canBuy(entry, s.tier) && shopperPriceBandMatches(entry, 'veryExpensive'));
+  const bandB = MARKET.find((entry) => entry.kind === 'dress' && entry.for !== 'm' &&
+    canBuy(entry, s.tier) && shopperPriceBandMatches(entry, 'millionCouture'));
+  assert.ok(bandA, 'catalogue should contain unlockable gowns/native sets in the ₦500k–₦999,999 band');
+  assert.ok(bandB, 'catalogue should contain unlockable gowns/native sets in the ₦1m+ band');
+  assert.equal(shopperPriceBandMatches(bandA!, 'millionCouture'), false);
+  assert.equal(shopperPriceBandMatches(bandB!, 'veryExpensive'), false);
+
+  for (const { preferences, band } of [
+    { preferences: veryExpensive, band: 'veryExpensive' as const },
+    { preferences: millionCouture, band: 'millionCouture' as const },
+  ]) {
+    const result = prepareShopperOrder(s, 'variety', 50_000_000, '', undefined, '', preferences);
+    assert.ok(result.job, result.error);
+    assert.ok(result.job.items.length > 0);
+    for (const line of result.job.items) {
+      const entry = MARKET.find((item) => item.kind === line.kind && item.id === line.itemId)!;
+      assert.ok(shopperPriceBandMatches(entry, band, line.fabric), 'each piece must remain in the selected strict price band');
+      assert.ok(shopperEntryMatchesPreferences(entry, preferences, line.fabric));
+    }
+  }
+});
+
+test('a generously funded contract order buys only listed products and no more than the contract quantities', () => {
+  const base = game({ cash: 100_000_000, tier: 4, stock: [], marketCart: [], productSales: [] });
+  const eligible = MARKET.filter((entry) => canBuy(entry, base.tier))
+    .sort((a, b) => pieceCost(b, b.fabric) - pieceCost(a, a.fabric));
+  const first = eligible[0]!;
+  const second = eligible.find((entry) => entry.kind !== first.kind || entry.id !== first.id)!;
+  const requirements = [
+    { kind: first.kind, itemId: first.id, label: first.label, quantity: 3, unitCost: pieceCost(first, first.fabric) },
+    { kind: second.kind, itemId: second.id, label: second.label, quantity: 5, unitCost: pieceCost(second, second.fabric) },
+  ];
+  const contract: NonNullable<GameState['politicianContracts']>[number] = {
+    id: 'test-contract-rich-budget', client: 'Test Client', title: 'Exact contract quantities',
+    brief: 'Only the listed items', offeredDay: base.day, offerExpiresDay: base.day + 3,
+    deadlineDays: 5, deadlineDay: base.day + 5, acceptedDay: base.day, status: 'accepted',
+    requirements, reward: 1_000_000, failurePenalty: 100_000,
+  };
+  const s = { ...base, politicianContracts: [contract] };
+  const result = prepareShopperOrder(s, 'contract', 50_000_000, contract.brief, contract.id);
+  assert.ok(result.job, result.error);
+  assert.deepEqual(
+    result.job.items.map((line) => ({ kind: line.kind, itemId: line.itemId, pieces: line.pieces })),
+    requirements.map((requirement) => ({ kind: requirement.kind, itemId: requirement.itemId, pieces: requirement.quantity })),
+    'a large budget must not create extra quantities or add unrelated products, and listed order must be preserved',
+  );
+  assert.equal(result.job.estimatedTotal, requirements.reduce((sum, requirement) => sum + requirement.unitCost * requirement.quantity, 0));
+});
+
+test('an underfunded contract order buys only the affordable requested quantity and never substitutes', () => {
+  const base = game({ cash: 100_000_000, tier: 4, stock: [], marketCart: [], productSales: [] });
+  const expensive = MARKET.filter((entry) => canBuy(entry, base.tier))
+    .sort((a, b) => pieceCost(b, b.fabric) - pieceCost(a, a.fabric))[0]!;
+  const unitCost = pieceCost(expensive, expensive.fabric);
+  const contract: NonNullable<GameState['politicianContracts']>[number] = {
+    id: 'test-contract-short-budget', client: 'Test Client', title: 'Partial contract order',
+    brief: 'Only this required product', offeredDay: base.day, offerExpiresDay: base.day + 3,
+    deadlineDays: 5, deadlineDay: base.day + 5, acceptedDay: base.day, status: 'accepted',
+    requirements: [{ kind: expensive.kind, itemId: expensive.id, label: expensive.label, quantity: 10, unitCost }],
+    reward: 1_000_000, failurePenalty: 100_000,
+  };
+  const budget = unitCost * 3 + Math.floor(unitCost / 2);
+  const result = prepareShopperOrder({ ...base, politicianContracts: [contract] }, 'contract', budget, contract.brief, contract.id);
+  assert.ok(result.job, result.error);
+  assert.equal(result.job.items.length, 1, 'only the specified contract product may be bought');
+  assert.equal(result.job.items[0].kind, expensive.kind);
+  assert.equal(result.job.items[0].itemId, expensive.id);
+  assert.equal(result.job.items[0].pieces, 3, 'the limited budget buys only the number of pieces it can afford');
+  assert.equal(result.job.estimatedTotal, unitCost * 3);
+  assert.ok(result.job.estimatedTotal <= budget);
 });
