@@ -84,6 +84,27 @@ export function planEvents(s0: GameState): GameState {
   return s;
 }
 
+function addExpansionEventReward(s0: GameState, creditAmount: number, brandBoost: Partial<{ awareness: number; prestige: number; trendInfluence: number; loyalty: number }>, reason: string): GameState {
+  const current = s0.businessExpansion || { branches: [], departments: [], departmentOperations: [], wholesaleActive: false, designerCollections: 0, expansionCredit: 0 };
+  const balance = Math.max(0, current.expansionCredit || 0);
+  const credit = Math.min(1_500_000, balance + Math.max(0, Math.round(creditAmount)));
+  const oldBrand = s0.brand || { awareness: clamp(18 + Math.log10(Math.max(1, s0.followers || 0) + 1) * 10 + s0.tier * 4, 5, 100), prestige: clamp(15 + (s0.rep || 35) * 0.52 + s0.tier * 3, 5, 100), trendInfluence: 20, loyalty: clamp(24 + (s0.rep || 35) * 0.46, 5, 100), reliability: 50 };
+  const brand = {
+    awareness: clamp(oldBrand.awareness + (brandBoost.awareness || 0), 5, 100),
+    prestige: clamp(oldBrand.prestige + (brandBoost.prestige || 0), 5, 100),
+    trendInfluence: clamp(oldBrand.trendInfluence + (brandBoost.trendInfluence || 0), 5, 100),
+    loyalty: clamp(oldBrand.loyalty + (brandBoost.loyalty || 0), 5, 100),
+    reliability: oldBrand.reliability,
+  };
+  const earned = credit - balance;
+  return {
+    ...s0,
+    businessExpansion: { ...current, expansionCredit: credit },
+    brand,
+    today: earned > 0 ? { ...s0.today, events: [...s0.today.events, reason + ' earned ' + earned.toLocaleString('en-NG') + ' naira in expansion credit.'] } : s0.today,
+  };
+}
+
 export function answerInvite(s0: GameState, m: Message, choice: ReplyChoice['id']): GameState {
   let s: GameState = { ...s0, messages: s0.messages.map((x) => (x.id === m.id ? { ...x, answered: choice } : x)) };
   const e = (s.events || []).find((x) => x.id === m.ctx?.eventId);
@@ -91,7 +112,10 @@ export function answerInvite(s0: GameState, m: Message, choice: ReplyChoice['id'
   const yes = choice === 'accept';
   s = { ...s, events: s.events.map((x) => (x.id === e.id ? { ...x, status: yes ? ('accepted' as const) : ('declined' as const) } : x)) };
   s = say(s, 'You', yes ? "I'm in! See you there." : "Thank you, but I can't make it this time.", { chat: m.chat || m.from });
-  if (yes) s = say(s, e.host, `Great! Your model will come to your shop around 11am on day ${e.day}. Style her like your life depends on it 😉`, { chat: m.chat || m.from });
+  if (yes) {
+    s = addExpansionEventReward(s, 25_000, { awareness: 0.5 }, 'Accepted fashion invitation');
+    s = say(s, e.host, `Great! Your model will come to your shop around 11am on day ${e.day}. Style her like your life depends on it 😉`, { chat: m.chat || m.from });
+  }
   return s;
 }
 
@@ -134,6 +158,7 @@ export function judge(s0: GameState, c: Customer, score: number): GameState {
   s = { ...s, events: (s.events || []).map((x) => (x.id === k.eventId ? { ...x, status: won ? ('won' as const) : ('lost' as const) } : x)) };
   if (won) {
     s = { ...s, cash: s.cash + k.prize, rep: clamp(s.rep + 3, 0, 100), followers: (s.followers || 0) + (e?.followers || 100), ledger: [{ day: s.day, t: Math.floor(s.clock), label: `${k.title} prize`, amount: k.prize }, ...(s.ledger || [])].slice(0, 150) };
+    s = addExpansionEventReward(s, Math.min(500_000, Math.round(k.prize * 0.15)), { awareness: 2, prestige: 2, trendInfluence: 1.5, loyalty: 0.75 }, 'Fashion event victory');
     s = gist(s, `Divine beats ${r?.owner || 'her rival'} at the ${k.title}!`, `The judges scored Asanwa Boutique ${score} to ${k.rivalScore}. ${r?.owner.split(' ')[0]} left without taking pictures 👀`, 'you', true);
     if (r) {
       s = startConvo(s, { with: r.owner, rivalId: r.id, chat: GROUP, topic: 'lostShow', opener: pick(['The judges were paid. Everybody knows 🙄', 'Congrats I guess. Next time.', 'Hmm. Enjoy it while it lasts 😏', 'My model\'s shoes were wrong size, that\'s the only reason 😤', 'Beginner\'s luck. Let\'s see next month.']) });
