@@ -179,6 +179,44 @@ export function Room({ r, tier, painted }: { r: RoomStyle; tier: number; painted
         <meshStandardMaterial color="#9A968A" roughness={1} />
       </mesh>
       {tiles}
+      {/* Actual internal partitions for the Level 6 Maison and Level 7 Empire House.
+          The grid definition and this geometry share the same doorway openings. */}
+      {(r.partitions || []).map((partition, partitionIndex) => {
+        const runs: Array<[number, number]> = [];
+        let runStart: number | null = null;
+        for (let along = partition.start; along <= partition.end + 1; along++) {
+          const isWall = along <= partition.end && !partition.openings.includes(along);
+          if (isWall && runStart === null) runStart = along;
+          if (!isWall && runStart !== null) {
+            runs.push([runStart, along - 1]);
+            runStart = null;
+          }
+        }
+        return (
+          <React.Fragment key={'partition-' + partitionIndex}>
+            {runs.map(([start, end], runIndex) => {
+              const length = end - start + 1;
+              const horizontal = partition.axis === 'horizontal';
+              const p: [number, number, number] = horizontal
+                ? [(start + end + 1) / 2, 0.78, partition.at + 0.5]
+                : [partition.at + 0.5, 0.78, (start + end + 1) / 2];
+              const lowerSize: [number, number, number] = horizontal ? [length, 1.56, 0.12] : [0.12, 1.56, length];
+              const glassPosition: [number, number, number] = [p[0], 2.38, p[2]];
+              const glassSize: [number, number, number] = horizontal ? [Math.max(0.2, length - 0.08), 1.55, 0.065] : [0.065, 1.55, Math.max(0.2, length - 0.08)];
+              const capPosition: [number, number, number] = horizontal ? [p[0], 1.58, p[2]] : [p[0], 1.58, p[2]];
+              const capSize: [number, number, number] = horizontal ? [length, 0.06, 0.16] : [0.16, 0.06, length];
+              const brass = r.kind === 'empire' ? '#E4C56E' : '#C6A66D';
+              return (
+                <React.Fragment key={'partition-run-' + runIndex}>
+                  <B p={p} s={lowerSize} c={r.kind === 'empire' ? '#292331' : '#CFC3B1'} r={0.62} />
+                  <B p={glassPosition} s={glassSize} c={r.kind === 'empire' ? '#B8A8C9' : '#DCE8E7'} r={0.22} m={0.12} o={0.34} />
+                  <B p={capPosition} s={capSize} c={brass} m={0.78} r={0.26} />
+                </React.Fragment>
+              );
+            })}
+          </React.Fragment>
+        );
+      })}
       {/* back wall */}
       <B p={[r.w / 2, H / 2, -0.06]} s={[r.w + 0.12, H, 0.12]} c={r.wall} r={r.signature && tier <= 1 ? 0.16 : ridges ? 0.6 : 0.9} m={r.signature && tier <= 1 ? 0.22 : ridges ? 0.3 : 0} o={r.signature && tier === 0 ? 0.32 : undefined} />
       <B p={[r.w / 2, 0.35, 0.005]} s={[r.w, 0.7, 0.02]} c={r.wallLow} />
@@ -373,6 +411,38 @@ export function Room({ r, tier, painted }: { r: RoomStyle; tier: number; painted
         </>
       )}
       {r.kind === 'flagship' && <B p={[r.w / 2, 1.6, 0.02]} s={[r.w - 0.4, 0.03, 0.01]} c={r.trim} m={0.9} e={r.trim} ei={0.3} />}
+      {r.kind === 'maison' && (
+        <>
+          {/* Maison: layered travertine and champagne-brass couture gallery. */}
+          <B p={[r.w / 2, H * 0.53, 0.025]} s={[r.w * 0.62, H * 0.66, 0.055]} c="#B5A58D" r={0.48} />
+          <B p={[r.w / 2, H * 0.53, 0.065]} s={[r.w * 0.59, H * 0.62, 0.025]} c="#E6D9C5" r={0.34} />
+          {Array.from({ length: Math.max(8, Math.floor(r.w / 1.65)) }, (_, i) => {
+            const x = 0.55 + i * (r.w - 1.1) / Math.max(1, Math.max(8, Math.floor(r.w / 1.65)) - 1);
+            return <B key={'maison-fin-' + i} p={[x, H * 0.5, -0.15]} s={[0.045, H * 0.84, 0.08]} c="#C6A66D" m={0.78} r={0.27} />;
+          })}
+          <B p={[r.w / 2, H - 0.18, r.d * 0.52]} s={[r.w * 0.84, 0.045, 0.045]} c="#E8D9B9" m={0.68} e="#E8D9B9" ei={0.2} />
+        </>
+      )}
+      {r.kind === 'empire' && (
+        <>
+          {/* Empire House: dark stone, monumental bronze portal and a dramatic couture wall. */}
+          <B p={[r.w / 2, H * 0.54, 0.025]} s={[r.w * 0.73, H * 0.72, 0.07]} c="#33283B" r={0.32} m={0.2} />
+          <B p={[r.w / 2, H * 0.54, 0.075]} s={[r.w * 0.69, H * 0.68, 0.026]} c="#E4C56E" r={0.24} m={0.82} />
+          <B p={[r.w / 2, H * 0.54, 0.095]} s={[r.w * 0.65, H * 0.63, 0.022]} c="#1F1A28" r={0.28} m={0.18} />
+          {Array.from({ length: 8 }, (_, i) => {
+            const x = r.w * (0.12 + i * 0.108);
+            return (
+              <React.Fragment key={'empire-pilaster-' + i}>
+                <B p={[x, H * 0.5, -0.19]} s={[0.16, H * 0.92, 0.16]} c="#9B7845" m={0.78} r={0.24} />
+                <B p={[x, H * 0.5, -0.285]} s={[0.055, H * 0.82, 0.045]} c="#F0D58C" m={0.82} r={0.2} e="#C7A04D" ei={0.12} />
+              </React.Fragment>
+            );
+          })}
+          <B p={[r.w / 2, H - 0.12, r.d * 0.52]} s={[r.w * 0.9, 0.07, 0.07]} c="#E4C56E" m={0.8} e="#E4C56E" ei={0.45} />
+          <B p={[0.12, H * 0.5, r.d / 2]} s={[0.08, H * 0.9, r.d * 0.88]} c="#E4C56E" m={0.78} r={0.24} />
+          <B p={[r.w - 0.12, H * 0.5, r.d / 2]} s={[0.08, H * 0.9, r.d * 0.88]} c="#E4C56E" m={0.78} r={0.24} />
+        </>
+      )}
       {/* how well kept the place is */}
       {r.finish === 1 && r.kind !== 'container' && (
         <>
