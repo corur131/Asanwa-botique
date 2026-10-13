@@ -650,7 +650,7 @@ export function investInExpansion(s0: GameState, investment: ExpansionInvestment
         id: 'branch-' + s0.day + '-' + index,
         name: 'Asanwa Boutique ' + (index === 1 ? 'Lekki Outlet' : 'Branch ' + index),
         area: areas[current.branches.length % areas.length],
-        tier: 2, openedDay: s0.day, weeklyRent: 330_000, assetValue: option.cost,
+        tier: 2, openedDay: s0.day, weeklyRent: TIERS[2].rent, assetValue: option.cost,
       };
       expansion = { ...expansion, branches: [...current.branches, branch] };
       break;
@@ -706,8 +706,8 @@ export function processExpansionAtClose(s0: GameState): GameState {
   const branches = [...expansion.branches];
   for (let index = 0; index < branches.length; index += 1) {
     const branch = branches[index];
-    const tier = clamp(branch.tier, 0, 4);
-    const base = [24_000, 75_000, 165_000, 340_000, 600_000][tier];
+    const tier = clamp(branch.tier, 0, 6);
+    const base = [24_000, 75_000, 450_000, 2_000_000, 8_000_000, 20_000_000, 50_000_000][tier];
     const brand = getBrandMetrics(s);
     const audienceLift = Math.min(0.3, Math.log10(Math.max(1, s.followers || 0) + 1) / 35);
     const demand = clamp((brand.awareness / 100) * 0.35 + (brand.loyalty / 100) * 0.25 + audienceLift, 0.3, 1.2);
