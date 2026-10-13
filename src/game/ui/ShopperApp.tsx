@@ -123,7 +123,10 @@ export const ShopperApp: React.FC<{
             <div className="rounded-lg bg-black/15 p-4 text-center text-xs text-slate-500">No shopper orders yet. Choose a mission above to prepare your first order.</div>
           ) : (
             <div className="rounded-lg border border-violet-400/25 bg-violet-500/[0.08] p-3 space-y-2">
-              <div className="font-semibold text-sm">{SHOPPER_MISSIONS.find((m) => m.id === latestJob.mission)?.label || 'Shopper order'}</div>
+              <div className="flex items-center justify-between gap-2">
+                <div className="font-semibold text-sm">{SHOPPER_MISSIONS.find((m) => m.id === latestJob.mission)?.label || 'Shopper order'}</div>
+                <span className={`shrink-0 rounded-full px-2 py-1 text-[10px] font-semibold ${latestJob.status === 'purchased' ? 'bg-emerald-500/15 text-emerald-300' : latestJob.status === 'cancelled' ? 'bg-rose-500/15 text-rose-300' : 'bg-violet-500/15 text-violet-200'}`}>{latestJob.status === 'purchased' ? 'Purchased' : latestJob.status === 'cancelled' ? 'Cancelled' : 'Ready in cart'}</span>
+              </div>
               <div className="text-xs text-slate-300">{latestJob.summary}</div>
               <div className="divide-y divide-white/5">
                 {latestJob.items.slice(0, 8).map((line) => (
