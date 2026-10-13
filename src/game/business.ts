@@ -101,6 +101,7 @@ export function startPromotion(
   s0: GameState, mode: PromotionMode, level: PromotionLevel, hourlyBudget: number, durationHours = 48, target: 'brand' | 'warehouse' = 'brand',
 ): GameState {
   if (!availablePromotionLevels(s0.tier).includes(level)) return s0;
+  if (target === 'warehouse' && !s0.businessExpansion?.wholesaleActive) return s0;
   const bounds = promotionBudgetBounds(s0.tier, level);
   const budget = Math.round(clamp(Number.isFinite(hourlyBudget) ? hourlyBudget : bounds.min, bounds.min, bounds.max) / 500) * 500;
   const hours = Math.round(clamp(Number.isFinite(durationHours) ? durationHours : 48, 8, 168) / 4) * 4;
