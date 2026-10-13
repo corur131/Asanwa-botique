@@ -2057,6 +2057,17 @@ export function fromData(raw: unknown): GameState | null {
 }
 
 /** Money sent by an admin. Applied once, shown in the bank and as a message. */
+/** Add a one-time testing balance only when a preview build explicitly enables it. */
+export function previewCashGrant(s: GameState, grantId: string, amount: number): GameState {
+  if (!grantId.trim() || !Number.isSafeInteger(amount) || amount <= 0) return s;
+  return adminGrant(s, {
+    id: 'preview-cash-' + grantId,
+    kind: 'add',
+    amount,
+    reason: 'Preview testing balance',
+  });
+}
+
 export function adminGrant(s: GameState, g: { id: string; kind: 'add' | 'set'; amount: number; reason: string }): GameState {
   if ((s.appliedGrants || []).includes(g.id)) return s;
   const delta = Math.round(g.kind === 'set' ? g.amount - s.cash : g.amount);
