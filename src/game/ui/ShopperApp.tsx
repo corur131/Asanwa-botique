@@ -11,19 +11,26 @@ export const ShopperApp: React.FC<{
   up: (f: (g: GameState) => GameState) => void;
   cart: CartLine[];
   openMarket: () => void;
-}> = ({ s, up, cart, openMarket }) => {
+  openContracts: () => void;
+}> = ({ s, up, cart, openMarket, openContracts }) => {
   const available = shopperAvailableBudget(s, cart);
   // If this save has not recorded item-level demand yet, start with variety; restocking becomes smarter as new sales are recorded.
   const [mission, setMission] = useState<ShopperMission>(() => (s.productSales || []).length ? 'restock' : 'variety');
   const [budget, setBudget] = useState<number>(() => Math.min(500_000, available));
-  const [brief, setBrief] = useState('');
+  const [contractId, setContractId] = useState('');
+  const acceptedContracts = (s.politicianContracts || []).filter((contract) => contract.status === 'accepted');
+  const selectedContract = acceptedContracts.find((contract) => contract.id === contractId) || acceptedContracts[0];
   const [error, setError] = useState('');
   const [latestJobId, setLatestJobId] = useState<string | null>(null);
   const recentJobs = [...(s.shopperJobs || [])].slice(-5).reverse();
   const latestJob = recentJobs.find((job) => job.id === latestJobId) || recentJobs[0];
 
   const sendShopper = () => {
-    const result = prepareShopperOrder(s, mission, budget, brief);
+    if (mission === 'contract' && !selectedContract) {
+      setError('Accept a politician contract first. The shopper will then buy the exact catalogue goods it requires.');
+      return;
+    }
+    const result = prepareShopperOrder(s, mission, budget, selectedContract?.brief || '', mission === 'contract' ? selectedContract?.id : undefined);
     if (!result.job) {
       setError(result.error || 'The shopper could not prepare an order.');
       return;
@@ -76,11 +83,24 @@ export const ShopperApp: React.FC<{
           </div>
 
           {mission === 'contract' && (
-            <label className="block space-y-1">
-              <span className="text-xs font-semibold text-slate-200">Contract sourcing brief</span>
-              <textarea value={brief} onChange={(e) => setBrief(e.target.value)} maxLength={240} rows={2} placeholder="e.g. men's native wear, aso-oke outfits, bridesmaid dresses" className="w-full rounded-lg bg-black/25 border border-white/15 px-3 py-2 text-sm placeholder:text-slate-500 outline-none focus:border-violet-400" />
-              <span className="block text-[10px] text-slate-500">This first version matches the brief to Yaba Mart catalogue names and categories. Formal contract offers, rewards and deadlines are a separate feature.</span>
-            </label>
+            selectedContract ? (
+              <div className="rounded-lg border border-emerald-300/20 bg-emerald-400/[0.06] p-3 space-y-1.5">
+                <label className="block space-y-1">
+                  <span className="text-xs font-semibold text-slate-200">Accepted contract to source for</span>
+                  <select value={selectedContract.id} onChange={(e) => setContractId(e.target.value)} className="w-full rounded-lg bg-[#19191e] border border-white/15 px-3 py-2 text-sm outline-none focus:border-emerald-400">
+                    {acceptedContracts.map((contract) => <option key={contract.id} value={contract.id}>{contract.title} · due Day {contract.deadlineDay}</option>)}
+                  </select>
+                </label>
+                <div className="text-xs text-slate-300">{selectedContract.brief}</div>
+                <div className="text-[11px] text-emerald-200">The shopper will source only the missing items and quantities listed in this contract. Stock already in your boutique and goods already in the cart count toward the requirement.</div>
+              </div>
+            ) : (
+              <div className="rounded-lg border border-amber-300/20 bg-amber-400/[0.06] p-3 space-y-2">
+                <div className="text-sm font-semibold text-amber-100">Accept a contract first</div>
+                <div className="text-xs text-slate-300">Open Politician Contracts, inspect an offer and accept it. The shopper will then target its exact required products and quantities.</div>
+                <button onClick={openContracts} className="w-full rounded-full border border-amber-200/25 bg-amber-400/10 py-2 text-sm font-semibold text-amber-100">View politician contract offers →</button>
+              </div>
+            )
           )}
 
           <label className="block space-y-1">
@@ -107,7 +127,7 @@ export const ShopperApp: React.FC<{
           </div>
 
           {error && <div role="alert" className="rounded-lg border border-rose-400/30 bg-rose-500/10 p-2.5 text-xs text-rose-200">{error}</div>}
-          <button onClick={sendShopper} disabled={available < 1000 || budget < 1000 || budget > available || (mission === 'contract' && !brief.trim())} className="w-full rounded-full bg-violet-600 hover:bg-violet-500 disabled:opacity-40 disabled:cursor-not-allowed py-2.5 text-sm font-bold">
+          <button onClick={sendShopper} disabled={available < 1000 || budget < 1000 || budget > available || (mission === 'contract' && !selectedContract)} className="w-full rounded-full bg-violet-600 hover:bg-violet-500 disabled:opacity-40 disabled:cursor-not-allowed py-2.5 text-sm font-bold">
             Send shopper · up to {naira(Math.min(budget, available))}
           </button>
         </section>
