@@ -275,3 +275,42 @@ test('an underfunded contract order buys only the affordable requested quantity 
   assert.equal(result.job.estimatedTotal, unitCost * 3);
   assert.ok(result.job.estimatedTotal <= budget);
 });
+
+
+test('rich-customer mission honours exact price bands for matching styles already in stock', () => {
+  const target = MARKET.find((entry) =>
+    entry.kind === 'dress' && entry.for !== 'm' && canBuy(entry, 4) &&
+    shopperPriceBandMatches(entry, 'millionCouture'),
+  );
+  assert.ok(target, 'catalogue should contain an unlocked million-naira dress');
+  const preference: ShopperBuyingPreference[] = [
+    { audience: 'women', category: 'dress', ranks: [], priceBands: ['millionCouture'] },
+  ];
+  const fabric = target!.fabric || 'plain';
+  const unitCost = pieceCost(target!, fabric);
+  const stockedDesign = {
+    uid: 'test-millionnaira-dress',
+    kind: target!.kind,
+    itemId: target!.id,
+    label: target!.label,
+    fabric,
+    color: '#8E1F3A',
+    color2: '#C9A163',
+    pattern: 0,
+    cost: unitCost,
+    pieces: 4,
+    displayed: true,
+  };
+  const s = game({
+    cash: 100_000_000, tier: 4, stock: [stockedDesign], marketCart: [],
+    productSales: [], shopperPreferences: preference,
+  });
+  const result = prepareShopperOrder(s, 'richCustomers', 50_000_000, '', undefined, '', preference);
+  assert.ok(result.job, result.error);
+  assert.ok(result.job.items.some((line) => line.kind === target!.kind && line.itemId === target!.id),
+    'the shopper can top up a matching style even if it already has stock');
+  assert.ok(result.job.items.every((line) => {
+    const entry = MARKET.find((item) => item.kind === line.kind && item.id === line.itemId)!;
+    return shopperPriceBandMatches(entry, 'millionCouture', line.fabric);
+  }), 'the old rich-customer spending ceiling must not filter a selected million-naira item');
+});
