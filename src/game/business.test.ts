@@ -542,7 +542,7 @@ test('department sales consume inventory, record operating performance, and do n
 
 test('wholesale operation tracks order fulfilment, inventory value, and idempotent daily closing', () => {
   let before = state({
-    day: 14, tier: 3, cash: 30_000_000,
+    day: 14, tier: 3, cash: 100_000_000,
     businessExpansion: { branches: [], departments: [], wholesaleActive: false, designerCollections: 0 },
   });
   before = investInExpansion(before, 'wholesale');
@@ -672,7 +672,8 @@ test('wholesale inventory upgrade doubles capacity, buys added stock, and refuse
   assert.equal(operation.inventoryUnits, beforeOperation.inventoryUnits + beforeOperation.targetUnits);
   assert.equal(operation.inventoryValue, beforeOperation.inventoryValue + beforeOperation.targetUnits * beforeOperation.unitCost);
   assert.equal(upgraded.businessExpansion!.wholesaleUpgradeLevel, 1);
-  assert.equal(upgradeWholesaleInventory({ ...before, cash: quote.cost - 1 }), { ...before, cash: quote.cost - 1 });
+  const unaffordable = { ...before, cash: quote.cost - 1 };
+  assert.equal(upgradeWholesaleInventory(unaffordable), unaffordable);
 });
 
 test('warehouse promotion is recorded as a buyer-demand campaign, not a follower campaign', () => {
