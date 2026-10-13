@@ -1538,7 +1538,7 @@ function normaliseCharacterMemories(value: unknown, day: number): NonNullable<Ga
   for (const [name, rawMemory] of Object.entries(value as Record<string, unknown>).slice(0, 40)) {
     if (!name.trim() || !rawMemory || typeof rawMemory !== 'object' || Array.isArray(rawMemory)) continue;
     const candidate = rawMemory as Partial<CharacterMemory>;
-    const summary = typeof candidate.summary === 'string' ? candidate.summary.trim().slice(0, 150) : '';
+    const summary = typeof candidate.summary === 'string' ? candidate.summary.trim().slice(0, 500) : '';
     const notes = Array.isArray(candidate.notes)
       ? candidate.notes.filter((note): note is string => typeof note === 'string').map((note) => note.trim().slice(0, 160)).filter(Boolean).slice(-6)
       : [];
