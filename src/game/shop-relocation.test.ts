@@ -18,7 +18,7 @@ import {
 } from './shop';
 import { TIERS } from './economy';
 import { DIVINE_CONFIG } from '../constants/presets';
-import { fromData, newGame, moveTo } from './engine';
+import { fromData, newGame, moveTo, previewCashGrant } from './engine';
 
 function ownedStarterEquipment(): Placed[] {
   return STARTER_FURNITURE.map((item) => ({ ...item, uid: newUid() }));
@@ -181,4 +181,19 @@ test('walkable rugs cannot be arranged through the new internal walls', () => {
     };
     assert.equal(canPlace([], destination, rug), false, `tier ${tier} rug should not cross an internal wall`);
   }
+});
+
+test('preview cash grants add ₦20 billion once per preview revision and are inert when disabled', () => {
+  const original = newGame(DIVINE_CONFIG);
+  const amount = 20_000_000_000;
+  assert.equal(previewCashGrant(original, '', amount), original, 'no preview grant ID means no cash change');
+
+  const first = previewCashGrant(original, 'pr-30-revision-a', amount);
+  assert.equal(first.cash, original.cash + amount);
+  assert.ok(first.appliedGrants?.includes('preview-cash-pr-30-revision-a'));
+  assert.equal(previewCashGrant(first, 'pr-30-revision-a', amount), first, 'reload/re-render must not duplicate the same grant');
+
+  const nextRevision = previewCashGrant(first, 'pr-30-revision-b', amount);
+  assert.equal(nextRevision.cash, original.cash + amount * 2, 'a fresh preview revision gets its own one-time grant');
+  assert.equal(previewCashGrant(original, 'pr-30-revision-a', 0), original, 'invalid grant amounts are ignored');
 });
