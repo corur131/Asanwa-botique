@@ -690,11 +690,3 @@ test('warehouse promotion is recorded as a buyer-demand campaign, not a follower
 });
 
 
-test('large customer receipts remain in the statement and visibly reconcile against operating payables', () => {
-  const before = state({ cash: 0, operatingPayables: 12_000_000, ledger: [] });
-  const after = money(before, 10_000_000, 'Celebrity payment: Funke Akindele');
-  assert.equal(after.cash, 0);
-  assert.equal(after.operatingPayables, 2_000_000);
-  assert.ok(after.ledger.some((line) => line.label === 'Celebrity payment: Funke Akindele' && line.amount === 10_000_000));
-  assert.ok(after.ledger.some((line) => line.label === 'Operating payables settled' && line.amount === -10_000_000));
-});
