@@ -48,6 +48,35 @@ export interface ShopperJob {
   contractBrief?: string;
 }
 
+export type PoliticianContractStatus = 'offered' | 'accepted' | 'fulfilled' | 'failed' | 'declined' | 'expired';
+
+export interface PoliticianContractRequirement {
+  kind: StockKind;
+  itemId: string;
+  label: string;
+  quantity: number;
+  /** Wholesale cost per piece at the time this contract was offered, for a transparent estimate. */
+  unitCost: number;
+}
+
+export interface PoliticianContract {
+  id: string;
+  client: string;
+  title: string;
+  brief: string;
+  offeredDay: number;
+  offerExpiresDay: number;
+  deadlineDays: number;
+  deadlineDay?: number;
+  acceptedDay?: number;
+  completedDay?: number;
+  status: PoliticianContractStatus;
+  requirements: PoliticianContractRequirement[];
+  reward: number;
+  failurePenalty: number;
+  penaltyCharged?: number;
+}
+
 /** What an item in stock is. Clothes use the wardrobe slots; the rest are accessory kinds. */
 export type StockKind = 'top' | 'bottom' | 'dress' | 'outer' | 'shoes' | 'bag' | 'headwear' | 'necklace' | 'wrist' | 'glasses' | 'earrings' | 'hair';
 
@@ -667,6 +696,8 @@ export interface GameState {
   productSales?: ProductSalesRecord[];
   /** Shopper orders and their statuses are part of the saved game. */
   shopperJobs?: ShopperJob[];
+  /** Government/office clothing contracts, offer history and deadlines. */
+  politicianContracts?: PoliticianContract[];
   regulars: Regular[];
   staff: StaffMember[];
   hireOkDay: number;
