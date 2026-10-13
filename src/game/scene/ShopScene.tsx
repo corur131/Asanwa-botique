@@ -511,8 +511,8 @@ export function Room({ r, tier, painted }: { r: RoomStyle; tier: number; painted
       {r.signatureTheme === 'botanical-atrium' && (
         <>
           {/* SIGNATURE LEVEL 6 — BOTANICAL ATRIUM
-              A conservatory rather than the regular Maison: forest-jade walls, copper frames,
-              glass bays, a planted wall, leafy corners and an open glass-roof promenade. */}
+              Forest-jade walls, copper-framed windows, living greenery and an open ceiling
+              preserve the game's unobstructed cutaway view of the shop interior. */}
           {/* Copper portal and clear sidelights frame the entrance to the conservatory. */}
           <B p={[portalCenter - Math.min(3.2, r.w * 0.10), H * 0.53, r.d + 0.19]} s={[0.22, H + 0.18, 0.24]} c="#C77E56" m={0.68} r={0.26} />
           <B p={[portalCenter + Math.min(3.2, r.w * 0.10), H * 0.53, r.d + 0.19]} s={[0.22, H + 0.18, 0.24]} c="#C77E56" m={0.68} r={0.26} />
@@ -571,32 +571,10 @@ export function Room({ r, tier, painted }: { r: RoomStyle; tier: number; painted
               </React.Fragment>
             );
           })}
-          {/* Roof glazing with slim copper ribs and warm concealed perimeter light. */}
-          {Array.from({ length: 7 }, (_, i) => (
-            <React.Fragment key={'atrium-roof-bay-' + i}>
-              <B p={[r.w / 2, H + 0.015, 0.65 + i * ((r.d - 1.3) / 7)]} s={[r.w - 0.5, 0.024, (r.d - 1.3) / 7 - 0.045]} c="#B7E4D7" r={0.22} o={0.14} />
-              <B p={[r.w / 2, H + 0.055, 0.65 + i * ((r.d - 1.3) / 7)]} s={[r.w - 0.4, 0.055, 0.055]} c="#C77E56" m={0.7} r={0.24} />
-            </React.Fragment>
-          ))}
-          {Array.from({ length: 9 }, (_, i) => (
-            <B key={'atrium-roof-rib-' + i} p={[0.6 + i * ((r.w - 1.2) / 8), H + 0.05, r.d / 2]} s={[0.055, 0.05, r.d - 0.5]} c="#C77E56" m={0.7} r={0.24} />
-          ))}
+          {/* No roof or canopy: the existing open-top shop cutaway stays unobstructed. */}
           <B p={[r.w / 2, H - 0.16, 0.13]} s={[r.w - 1, 0.045, 0.055]} c="#F5D8A5" e="#F5D8A5" ei={0.85} r={0.35} />
           <B p={[0.13, H - 0.16, r.d / 2]} s={[0.055, 0.045, r.d - 1]} c="#F5D8A5" e="#F5D8A5" ei={0.7} r={0.35} />
-          {/* Three warm ring pendants light the organic stone island. */}
-          {[0.27, 0.50, 0.73].map((fraction, i) => (
-            <group key={'atrium-ring-pendant-' + i} position={[r.w * fraction, H - 0.28, r.d * 0.34]}>
-              <B p={[0, 0.16, 0]} s={[0.035, 0.30, 0.035]} c="#C77E56" m={0.72} />
-              <mesh position={[0, -0.05, 0]} rotation={[Math.PI / 2, 0, 0]}>
-                <torusGeometry args={[0.48, 0.04, 8, 36]} />
-                <meshStandardMaterial color="#F5D8A5" metalness={0.5} roughness={0.28} emissive="#F5D8A5" emissiveIntensity={0.78} />
-              </mesh>
-              <mesh position={[0, -0.13, 0]}>
-                <sphereGeometry args={[0.10, 10, 8]} />
-                <meshStandardMaterial color="#FFF0C9" emissive="#FFE3A0" emissiveIntensity={1.05} roughness={0.24} />
-              </mesh>
-            </group>
-          ))}
+          {/* Wall-level cove lights keep the room bright without hanging fixtures or a ceiling. */}
           {/* A quiet woven rug softens the stone walkway. */}
           <B p={[r.w * 0.34, 0.018, r.d * 0.64]} s={[Math.min(7, r.w * 0.19), 0.02, Math.min(4.8, r.d * 0.21)]} c="#CFC7AE" r={0.96} />
           <B p={[r.w * 0.34, 0.031, r.d * 0.64 - Math.min(4.8, r.d * 0.21) / 2]} s={[Math.min(7, r.w * 0.19), 0.018, 0.035]} c="#D28A5F" m={0.42} />
@@ -651,22 +629,7 @@ export function Room({ r, tier, painted }: { r: RoomStyle; tier: number; painted
           <B p={[r.w * 0.46, H * 0.56, 0.27]} s={[r.w * 0.12, H * 0.36, 0.025]} c="#294A80" r={0.35} rot={[0, 0, -0.38]} />
           <B p={[r.w * 0.57, H * 0.53, 0.285]} s={[r.w * 0.085, H * 0.31, 0.03]} c="#CF7052" r={0.35} rot={[0, 0, 0.42]} />
           <B p={[r.w * 0.51, H * 0.48, 0.30]} s={[r.w * 0.14, 0.12, 0.035]} c="#D6B76B" m={0.56} />
-          {/* Floating rectangular light frames instead of chandelier rings. */}
-          {[0.74, 0.48].map((scale, i) => {
-            const frameW = r.w * scale;
-            const frameD = r.d * (scale === 0.74 ? 0.64 : 0.42);
-            const z = r.d / 2;
-            const y = H + 0.025 + i * 0.035;
-            const color = i === 0 ? '#294A80' : '#CF7052';
-            return (
-              <React.Fragment key={'cobalt-ceiling-frame-' + i}>
-                <B p={[r.w / 2, y, z - frameD / 2]} s={[frameW, 0.055, 0.07]} c={color} m={0.6} e={color} ei={0.28} />
-                <B p={[r.w / 2, y, z + frameD / 2]} s={[frameW, 0.055, 0.07]} c={color} m={0.6} e={color} ei={0.28} />
-                <B p={[r.w / 2 - frameW / 2, y, z]} s={[0.07, 0.055, frameD]} c={color} m={0.6} e={color} ei={0.28} />
-                <B p={[r.w / 2 + frameW / 2, y, z]} s={[0.07, 0.055, frameD]} c={color} m={0.6} e={color} ei={0.28} />
-              </React.Fragment>
-            );
-          })}
+          {/* Wall sconces define the gallery while preserving the established open-top view. */}
           {/* Architectural sconces cast a warm line onto the cobalt lower wall. */}
           {Array.from({ length: 8 }, (_, i) => {
             const x = r.w * (0.08 + i * 0.12);
@@ -1193,7 +1156,7 @@ function CameraRig({ view, r }: { view: View; r: RoomStyle }) {
   const dist = Math.max(r.w, r.d) * 1.25 + 3;
   useEffect(() => {
     const pos: Record<View, [number, number, number]> = {
-      angle: [cx + dist * 0.75, dist * 0.95, cz + dist * 1.05],
+      angle: [cx + dist * 0.72, dist * 1.35, cz + dist],
       top: [cx, dist * 1.75, cz + 0.01],
       front: [cx, 1.9, cz + dist * 1.35],
       free: [cx - dist * 0.8, dist * 0.7, cz + dist * 1.0],
@@ -1355,7 +1318,7 @@ export default function ShopScene(p: SceneProps) {
   };
   return (
     <div style={{ position: 'relative', width: '100%', height: '100%', touchAction: 'none' }}>
-      <Canvas onCreated={handleCanvasCreated} shadows={r.w * r.d <= 220} dpr={[1, 1.25]} camera={{ fov: 32, position: [cx + dist * 0.75, dist * 0.95, cz + dist * 1.05], near: 0.1, far: 200 }} style={{ background: r.signatureTheme === 'botanical-atrium' ? 'linear-gradient(#9DCDBF,#263D35)' : r.signatureTheme === 'cobalt-gallery' ? 'linear-gradient(#C9D6ED,#37496D)' : p.night ? 'linear-gradient(#0b0d1a,#1a1630)' : 'linear-gradient(#24305a,#3a4a7a)' }}>
+      <Canvas onCreated={handleCanvasCreated} shadows={r.w * r.d <= 220} dpr={[1, 1.25]} camera={{ fov: 32, position: [cx + dist * 0.72, dist * 1.35, cz + dist], near: 0.1, far: 200 }} style={{ background: r.signatureTheme === 'botanical-atrium' ? 'linear-gradient(#9DCDBF,#263D35)' : r.signatureTheme === 'cobalt-gallery' ? 'linear-gradient(#C9D6ED,#37496D)' : p.night ? 'linear-gradient(#0b0d1a,#1a1630)' : 'linear-gradient(#24305a,#3a4a7a)' }}>
         <ambientLight color={r.signatureTheme === 'botanical-atrium' ? '#D5F1E0' : r.signatureTheme === 'cobalt-gallery' ? '#DEE8FF' : '#FFFFFF'} intensity={p.night ? 0.35 : p.dark ? 0.14 : r.signatureTheme ? 0.68 : 0.6} />
         <hemisphereLight args={[r.signatureTheme === 'botanical-atrium' ? '#E0F3DD' : r.signatureTheme === 'cobalt-gallery' ? '#E5EBFF' : '#FFF4E0', r.signatureTheme === 'botanical-atrium' ? '#23483A' : r.signatureTheme === 'cobalt-gallery' ? '#354668' : '#3A3A50', p.night ? 0.3 : p.dark ? 0.12 : r.signatureTheme ? 0.6 : 0.55]} />
         <directionalLight position={[cx + 6, 12, cz + 8]} intensity={p.night ? 0.4 : p.dark ? 0.35 : 1.2} castShadow={r.w * r.d <= 220} shadow-mapSize={[512, 512]} shadow-camera-left={-12} shadow-camera-right={12} shadow-camera-top={12} shadow-camera-bottom={-12} />
@@ -1413,13 +1376,14 @@ export default function ShopScene(p: SceneProps) {
 /** A slowly turning look at an empty room, for the shop listings. */
 export function RoomPreview({ tier, stars, signature }: { tier: number; stars: number; signature?: boolean }) {
   const r = room({ tier, stars, signature });
-  const dist = Math.max(r.w, r.d) * 0.78 + 1.6;
+  // Stable, elevated three-quarter view: show the full floor plan without a roof/canopy hiding it.
+  const dist = Math.max(r.w, r.d) * 0.70 + 1.8;
   return (
-    <Canvas dpr={[1, 1.25]} camera={{ fov: 32, position: [r.w / 2 + dist * 0.75, dist * 0.95, r.d / 2 + dist * 1.05], near: 0.1, far: 200 }} style={{ background: 'linear-gradient(#24305a,#3a4a7a)' }}>
+    <Canvas dpr={[1, 1.25]} camera={{ fov: 32, position: [r.w / 2 + dist * 0.70, dist * 1.15, r.d / 2 + dist * 0.95], near: 0.1, far: 200 }} style={{ background: 'linear-gradient(#24305a,#3a4a7a)' }}>
       <ambientLight color={r.signatureTheme === 'botanical-atrium' ? '#D5F1E0' : r.signatureTheme === 'cobalt-gallery' ? '#DEE8FF' : '#FFFFFF'} intensity={r.signatureTheme ? 0.68 : 0.6} />
       <hemisphereLight args={[r.signatureTheme === 'botanical-atrium' ? '#E0F3DD' : r.signatureTheme === 'cobalt-gallery' ? '#E5EBFF' : '#FFF4E0', r.signatureTheme === 'botanical-atrium' ? '#23483A' : r.signatureTheme === 'cobalt-gallery' ? '#354668' : '#3A3A50', r.signatureTheme ? 0.6 : 0.55]} />
       <directionalLight position={[r.w / 2 + 6, 12, r.d / 2 + 8]} intensity={r.signatureTheme === 'botanical-atrium' ? 1.1 : r.signatureTheme === 'cobalt-gallery' ? 1.0 : 1.2} />
-      <OrbitControls target={[r.w / 2, 0.6, r.d / 2]} enablePan={false} autoRotate autoRotateSpeed={0.6} minPolarAngle={0.45} maxPolarAngle={1.2} minDistance={dist * 0.45} maxDistance={dist * 1.8} />
+      <OrbitControls target={[r.w / 2, 0.7, r.d / 2]} enablePan={false} minPolarAngle={0.25} maxPolarAngle={1.18} minDistance={dist * 0.42} maxDistance={dist * 1.55} enableDamping dampingFactor={0.08} />
       <Room r={r} tier={tier} />
     </Canvas>
   );
