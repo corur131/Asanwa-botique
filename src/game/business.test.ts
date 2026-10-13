@@ -596,6 +596,47 @@ test('rivals announce celebrity visits in news, chat, and their social feed', ()
   }
 });
 
+test('Level 6 and Level 7 rivals retain finite celebrity finances and publicize visits', () => {
+  const originalRandom = Math.random;
+  try {
+    Math.random = () => 0.001;
+    for (const tier of [5, 6]) {
+      const seed = initRivals().find((rival) => rival.id === 'ivory')!;
+      const elite = {
+        ...seed,
+        tier,
+        stars: 4,
+        cash: 1_000_000_000,
+        savings: 0,
+        moved: 31,
+        week: Array.from({ length: 7 }, () => 10_000_000),
+        weekCosts: Array.from({ length: 7 }, () => 2_000_000),
+      };
+      const base = state({
+        day: 31,
+        history: [],
+        ranking: [],
+        dailyRanking: [],
+        listing: { area: 'Yaba' } as GameState['listing'],
+        today: { day: 31, bestScore: 0, events: [] } as unknown as GameState['today'],
+        rivals: [elite],
+        messages: [],
+        gist: [],
+        rivalPosts: [],
+      });
+      const updated = simulateRivals(base);
+      const result = updated.rivals.find((rival) => rival.id === 'ivory')!;
+      assert.ok(Number.isFinite(result.cash), 'Level ' + (tier + 1) + ' rival cash must remain finite');
+      assert.ok(result.week.every(Number.isFinite), 'Level ' + (tier + 1) + ' rival revenue history must remain finite');
+      assert.ok(updated.gist.some((item) => /celebrity client/i.test(item.title)), 'Level ' + (tier + 1) + ' celebrity visit should appear in the news feed');
+      assert.ok(updated.messages.some((item) => item.from === 'GistLagos' && /CELEBRITY SIGHTING/i.test(item.text)), 'Level ' + (tier + 1) + ' celebrity visit should be announced');
+      assert.ok(updated.rivalPosts.some((post) => /Celebrity client|special guest/i.test(post.caption)), 'Level ' + (tier + 1) + ' celebrity visit should appear on social media');
+    }
+  } finally {
+    Math.random = originalRandom;
+  }
+});
+
 
 test('demotion waives half of rent arrears without creating fake cash and preserves the remaining debt', () => {
   const before = state({
