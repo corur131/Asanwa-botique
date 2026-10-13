@@ -1,4 +1,3 @@
-import { FABRIC_COLORS } from '../constants/catalog';
 import { BUDGET, MARKUP, TIERS } from './economy';
 import { cartTotal } from './engine';
 import type { CartLine } from './engine';
