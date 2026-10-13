@@ -30,9 +30,6 @@ export function shopperPriceCeiling(s: GameState, mission: ShopperMission): numb
   return Math.max(5_000, weightedSpend * 0.45);
 }
 
-const designKey = (d: Pick<ShopperOrderLine, 'kind' | 'itemId' | 'fabric' | 'color' | 'color2' | 'pattern'>) =>
-  [d.kind, d.itemId, d.fabric || 'plain', d.color, d.color2, d.pattern].join('|');
-
 const cartKey = (d: Omit<ShopperOrderLine, 'key' | 'pieces'>) =>
   [d.kind, d.itemId, d.fabric || '', d.color, d.color2, d.pattern].join('|');
 
