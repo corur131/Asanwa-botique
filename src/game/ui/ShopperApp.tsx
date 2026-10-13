@@ -18,6 +18,7 @@ export const ShopperApp: React.FC<{
   const [mission, setMission] = useState<ShopperMission>(() => (s.productSales || []).length ? 'restock' : 'variety');
   const [budget, setBudget] = useState<number>(() => Math.min(500_000, available));
   const [contractId, setContractId] = useState('');
+  const [shoppingExamples, setShoppingExamples] = useState('');
   const acceptedContracts = (s.politicianContracts || []).filter((contract) => contract.status === 'accepted');
   const selectedContract = acceptedContracts.find((contract) => contract.id === contractId) || acceptedContracts[0];
   const [error, setError] = useState('');
@@ -30,7 +31,7 @@ export const ShopperApp: React.FC<{
       setError('Accept a politician contract first. The shopper will then buy the exact catalogue goods it requires.');
       return;
     }
-    const result = prepareShopperOrder(s, mission, budget, selectedContract?.brief || '', mission === 'contract' ? selectedContract?.id : undefined);
+    const result = prepareShopperOrder(s, mission, budget, selectedContract?.brief || '', mission === 'contract' ? selectedContract?.id : undefined, shoppingExamples);
     if (!result.job) {
       setError(result.error || 'The shopper could not prepare an order.');
       return;
@@ -82,6 +83,21 @@ export const ShopperApp: React.FC<{
             ))}
           </div>
 
+          {mission !== 'contract' && (
+            <label className="block space-y-1">
+              <span className="text-xs font-semibold text-slate-200">Examples of what you want the shopper to buy (optional)</span>
+              <input
+                type="text"
+                value={shoppingExamples}
+                onChange={(e) => setShoppingExamples(e.target.value)}
+                maxLength={240}
+                placeholder="e.g. luxury gowns, designer bags, Ankara dresses, premium wigs"
+                className="w-full rounded-lg bg-black/25 border border-white/15 px-3 py-2 text-sm outline-none focus:border-violet-400"
+              />
+              <div className="text-[10px] text-slate-500">The shopper will prioritise matching catalogue items. Boutique unlocks and your budget still apply.</div>
+            </label>
+          )}
+
           {mission === 'contract' && (
             selectedContract ? (
               <div className="rounded-lg border border-emerald-300/20 bg-emerald-400/[0.06] p-3 space-y-1.5">
@@ -122,8 +138,10 @@ export const ShopperApp: React.FC<{
 
           <div className="rounded-lg bg-black/20 border border-white/5 px-3 py-2">
             <div className="text-[10px] text-slate-400">Current mission price guidance</div>
-            <div className="text-sm font-semibold">{mission === 'contract' ? 'Based on the contract brief and budget' : `About ${naira(shopperPriceCeiling(s, mission))} retail per item`}</div>
-            <div className="text-[10px] text-slate-500 mt-0.5">This is a recommendation guardrail, not a promise that customers will buy every item.</div>
+            <div className="text-sm font-semibold">{mission === 'contract' ? 'Based on the contract brief and budget' : `Up to ${naira(shopperPriceCeiling(s, mission))} retail per item`}</div>
+            <div className="text-[10px] text-slate-500 mt-0.5">{mission === 'contract'
+              ? 'The contract requirements, boutique unlocks and your budget control what the shopper sources.'
+              : 'This is the highest retail-price guide for one item in this mission—not your total order budget or a sales guarantee. More than one piece may be bought when your budget supports it.'}</div>
           </div>
 
           {error && <div role="alert" className="rounded-lg border border-rose-400/30 bg-rose-500/10 p-2.5 text-xs text-rose-200">{error}</div>}
