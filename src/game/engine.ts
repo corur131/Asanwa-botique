@@ -1,6 +1,6 @@
 import { CharacterConfig } from '../types/character';
 import { generateRandomCustomer } from '../utils/randomizer';
-import { DIVINE_CAPACITY, HOUR_WEIGHTS, PATIENCE, SHOP_MINUTES, staffMinutes, NEW_SHOP_RAMP_DAYS, NEW_SHOP_START, SERVICE_FEE, SLOW_WEEK_CHANCE, STAFF, STAFF_CAPACITY, START_CASH, SUPPLIES_SHARE, MARKUP, TIERS, naira } from './economy';
+import { DIVINE_CAPACITY, HOUR_WEIGHTS, PATIENCE, SHOP_MINUTES, staffMinutes, NEW_SHOP_RAMP_DAYS, NEW_SHOP_START, SERVICE_FEE, SLOW_WEEK_CHANCE, STAFF, STAFF_CAPACITY, START_CASH, SUPPLIES_SHARE, MARKUP, TIERS, FABRIC_COST, naira } from './economy';
 import { canBuy, entryFor, isClothing, makeDesign, pieceCost, productKey } from './market';
 import { FabricId } from '../types/character';
 import { answerRival, competition, initRivals, poacher, reactToMove, simulateRivals } from './rivals';
@@ -598,10 +598,31 @@ export function applyLook(s0: GameState, c: Customer, choice: StyleChoice, st0: 
   // Apply every tip modifier before the day log, lifetime earnings, and bank receipt are updated.
   if (sold && st.tip && stats(s).tipBonus) st = { ...st, tip: Math.round((st.tip * (1 + stats(s).tipBonus)) / 100) * 100 };
   let stock = s.stock;
+  let productSales = [...(s.productSales || [])];
   const lookOut = sold ? buildLook(c, choice, s.stock) : c.look;
   if (sold) {
     const used = new Set(Object.entries(choice).filter(([k]) => !['hair', 'hairColor', 'makeup', 'makeupLook', 'beard'].includes(k)).map(([, v]) => v as string));
     stock = s.stock.map((d) => (used.has(d.uid) ? { ...d, pieces: d.pieces - 1 } : d));
+
+    // Record real product demand, not just daily revenue. Repeated sales in the same
+    // day are aggregated by exact variant, customer class and shop tier.
+    for (const uid of used) {
+      const design = s.stock.find((d) => d.uid === uid);
+      if (!design) continue;
+      const designKey = [design.kind, design.itemId, design.fabric, design.color, design.color2, design.pattern].join('|');
+      const at = productSales.findIndex((row) => row.day === s.day && row.designKey === designKey && row.customerClass === c.cls && row.tier === s.tier);
+      if (at >= 0) {
+        productSales[at] = { ...productSales[at], units: productSales[at].units + 1 };
+      } else {
+        productSales.push({
+          day: s.day, designKey, kind: design.kind, itemId: design.itemId,
+          fabric: design.fabric, color: design.color, color2: design.color2,
+          pattern: design.pattern, customerClass: c.cls, units: 1, tier: s.tier,
+        });
+      }
+    }
+    // Keep a generous rolling window so the save does not grow forever.
+    productSales = productSales.filter((row) => row.day >= s.day - 179).slice(-5000);
   }
   let regulars = s.regulars;
   if (c.regularId) {
@@ -626,6 +647,7 @@ export function applyLook(s0: GameState, c: Customer, choice: StyleChoice, st0: 
     ...s,
     rep: clamp(s.rep + (st.repDelta > 0 ? st.repDelta * (1 + coolNow(s) * 0.6) : st.repDelta), 0, 100),
     stock,
+    productSales,
     regulars,
     today,
     stats: { ...s.stats, served: s.stats.served + (sold ? 1 : 0), totalEarned: s.stats.totalEarned + (sold ? st.paid + st.tip - st.cost : 0), bestScore: Math.max(s.stats.bestScore, score.total) },
@@ -1419,6 +1441,63 @@ export function cartLineCost(l: CartLine) {
 }
 export const cartTotal = (lines: CartLine[]) => lines.reduce((a, l) => a + cartLineCost(l), 0);
 
+export interface CartValidation {
+  ok: boolean;
+  total: number;
+  errors: string[];
+}
+
+/** Validate the entire order before any cash or inventory is changed. */
+export function validateCart(s: GameState, lines: CartLine[]): CartValidation {
+  const errors: string[] = [];
+  if (!Array.isArray(lines) || lines.length === 0) errors.push('Your cart is empty.');
+  if (Array.isArray(lines) && lines.length > 250) errors.push('Your cart contains too many separate lines.');
+  const seen = new Set<string>();
+  let total = 0;
+  for (const line of Array.isArray(lines) ? lines : []) {
+    if (!line || typeof line !== 'object') {
+      errors.push('The cart contains an invalid item.');
+      continue;
+    }
+    const entry = entryFor(line.kind, line.itemId);
+    if (!entry) {
+      errors.push('A cart item is not in the official Yaba Mart catalogue.');
+      continue;
+    }
+    if (!canBuy(entry, s.tier)) {
+      errors.push(`${entry.label} is locked at your current boutique level.`);
+      continue;
+    }
+    if (!Number.isInteger(line.pieces) || line.pieces < 1 || line.pieces > 500) {
+      errors.push(`${entry.label} has an invalid quantity. Quantities must be between 1 and 500 per line.`);
+      continue;
+    }
+    if (typeof line.color !== 'string' || !/^#[0-9a-fA-F]{6}$/.test(line.color) ||
+        typeof line.color2 !== 'string' || !/^#[0-9a-fA-F]{6}$/.test(line.color2)) {
+      errors.push(`${entry.label} has an invalid colour selection.`);
+      continue;
+    }
+    if (!Number.isInteger(line.pattern) || line.pattern < 0 || line.pattern > 32) {
+      errors.push(`${entry.label} has an invalid pattern.`);
+      continue;
+    }
+    const fabric = line.fabric || 'plain';
+    if (isClothing(line.kind) && !Object.prototype.hasOwnProperty.call(FABRIC_COST, fabric)) {
+      errors.push(`${entry.label} has an invalid fabric selection.`);
+      continue;
+    }
+    const canonicalKey = [line.kind, line.itemId, line.fabric || '', line.color, line.color2, line.pattern].join('|');
+    if (seen.has(canonicalKey)) {
+      errors.push(`Duplicate cart lines found for ${entry.label}. Combine duplicate quantities before checkout.`);
+      continue;
+    }
+    seen.add(canonicalKey);
+    total += pieceCost(entry, isClothing(line.kind) ? fabric as FabricId : undefined) * line.pieces;
+  }
+  if (errors.length === 0 && s.cash < total) errors.push('There is not enough available cash to pay for this cart.');
+  return { ok: errors.length === 0, total, errors };
+}
+
 const sameDesign = (d: Design, l: CartLine) => d.kind === l.kind && d.itemId === l.itemId && (!isClothing(l.kind) || d.fabric === (l.fabric || d.fabric)) && d.color === l.color && (!isClothing(l.kind) || (d.color2 === l.color2 && d.pattern === l.pattern));
 
 /** Number of new rack styles a cart introduces; extra colours do not consume more display slots. */
@@ -1437,7 +1516,8 @@ export const cartNewDesigns = (s: GameState, lines: CartLine[]) => {
 
 /** Pay for everything in the cart. Matching designs already in stock get topped up. */
 export function buyCart(s0: GameState, lines: CartLine[]): GameState {
-  if (s0.cash < cartTotal(lines)) return s0;
+  const validation = validateCart(s0, lines);
+  if (!validation.ok) return s0;
   let s = s0;
   for (const l of lines) {
     const e = entryFor(l.kind, l.itemId);
