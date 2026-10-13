@@ -1526,7 +1526,27 @@ export function buyCart(s0: GameState, lines: CartLine[]): GameState {
     if (have) s = restock(s, have.uid, l.pieces);
     else s = buyDesign(s, makeDesign(e, { fabric: l.fabric, color: l.color, color2: l.color2, pattern: l.pattern, pieces: l.pieces }));
   }
-  return s;
+
+  // Mark a shopper order purchased only when its complete proposed quantity was
+  // actually present in this successful checkout. Keep quantities separate so
+  // two similar pending orders cannot both claim the same cart pieces.
+  const purchasedCounts = new Map<string, number>();
+  for (const line of lines) {
+    const key = [line.kind, line.itemId, line.fabric || '', line.color, line.color2, line.pattern].join('|');
+    purchasedCounts.set(key, (purchasedCounts.get(key) || 0) + line.pieces);
+  }
+  const shopperJobs = (s.shopperJobs || []).map((job) => {
+    if (job.status !== 'ready') return job;
+    const needed = new Map<string, number>();
+    for (const line of job.items) {
+      needed.set(line.key, (needed.get(line.key) || 0) + line.pieces);
+    }
+    const complete = [...needed.entries()].every(([key, amount]) => (purchasedCounts.get(key) || 0) >= amount);
+    if (!complete) return job;
+    for (const [key, amount] of needed) purchasedCounts.set(key, Math.max(0, (purchasedCounts.get(key) || 0) - amount));
+    return { ...job, status: 'purchased' as const };
+  });
+  return { ...s, shopperJobs };
 }
 
 /** Sell old stock back to the market at half price. */
