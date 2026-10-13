@@ -130,6 +130,8 @@ const CONTRACT_TIER_RULES = [
   { retailCeiling: 100_000, lines: 2, minQty: 4, maxQty: 6, deadlineDays: 7 },
   { retailCeiling: 200_000, lines: 2, minQty: 6, maxQty: 9, deadlineDays: 8 },
   { retailCeiling: 300_000, lines: 3, minQty: 8, maxQty: 12, deadlineDays: 10 },
+  { retailCeiling: 1_000_000, lines: 3, minQty: 10, maxQty: 16, deadlineDays: 12 },
+  { retailCeiling: 3_000_000, lines: 4, minQty: 12, maxQty: 20, deadlineDays: 14 },
 ] as const;
 
 const CONTRACT_CLIENTS = [
@@ -1053,7 +1055,7 @@ export function confirmCollaboration(s0: GameState, messageId: number): GameStat
     return collaborationOutcome(s0, messageId, 'already_booked', 'I already have a pop-up scheduled with you. Let’s finish that one before booking another.');
   }
 
-  const tierBudgetMax = [250_000, 2_000_000, 10_000_000, 50_000_000, 150_000_000][clamp(s0.tier, 0, 4)];
+  const tierBudgetMax = [250_000, 2_000_000, 10_000_000, 50_000_000, 150_000_000, 300_000_000, 600_000_000][clamp(s0.tier, 0, 6)];
   const cashBudgetMax = Math.max(25_000, Math.min(tierBudgetMax, Math.max(0, s0.cash) * 2 + Math.max(0, partner.cash) * 2));
   const totalCost = Math.round(clamp(Number.isFinite(offer.totalCost) ? offer.totalCost : 20000, 15_000, cashBudgetMax) / 2500) * 2500;
   const playerCostSharePct = Math.round(Math.max(10, Math.min(90, Number.isFinite(offer.playerCostSharePct) ? offer.playerCostSharePct : 50)));
