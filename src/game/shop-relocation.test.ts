@@ -232,7 +232,7 @@ test('normal Level 6 and 7 properties receive celebrities on their scheduled lux
   for (const tier of [5, 6]) {
     const fresh = newGame(DIVINE_CONFIG);
     const destination = listingsFor(tier, 0).find((listing) => !listing.signature && listing.stars === 2)!;
-    const state = { ...fresh, tier, listing: destination, day: 1, phase: 'prepare' as const };
+    const state = { ...fresh, tier, listing: destination, day: 1, phase: 'morning' as const };
     const opened = openShop(state);
     assert.ok(opened.arrivals.some((arrival) => !!arrival.c.celebrity), `regular level ${tier + 1} property must receive its tier-scheduled VIP`);
   }
