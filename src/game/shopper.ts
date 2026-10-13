@@ -66,6 +66,23 @@ export function shopperEntryMatchesPreferences(
   });
 }
 
+/** Return keys for each selected strict price band this exact product/fabric qualifies for. */
+function matchingPriceBandPreferenceKeys(
+  entry: MarketEntry,
+  preferences: ShopperBuyingPreference[],
+  fabric?: MarketEntry['fabric'],
+): string[] {
+  return [...new Set(preferences.flatMap((preference) => {
+    const genderMatches = entry.for === 'both' ||
+      (preference.audience === 'women' ? entry.for === 'f' : entry.for === 'm');
+    const category = SHOPPER_PREFERENCE_CATEGORIES.find((row) => row.id === preference.category);
+    if (!genderMatches || !category?.kinds.includes(entry.kind)) return [];
+    return (preference.priceBands || [])
+      .filter((band) => shopperPriceBandMatches(entry, band, fabric))
+      .map((band) => `${preference.audience}|${preference.category}|${band}`);
+  }))];
+}
+
 export const SHOPPER_MISSIONS: { id: ShopperMission; label: string; description: string }[] = [
   { id: 'restock', label: 'Restock bestsellers', description: 'Replenish popular products that are running low or have sold out.' },
   { id: 'variety', label: 'Add variety', description: 'Fill gaps in your assortment with distinct styles rather than near-duplicates.' },
@@ -339,13 +356,15 @@ export function prepareShopperOrder(
 
     // Premium sourcing can replenish a luxury style once it sells out. Otherwise, variety
     // and premium missions add catalogue styles the boutique has not stocked before.
-    if (mission === 'richCustomers' && variants.length && !hasBuyingPreferences) {
+    if (mission === 'richCustomers' && variants.length) {
       for (const variant of variants) {
-        if (variant.pieces > 0) continue;
+        // Without manual filters, premium sourcing replenishes sold-out styles only.
+        // With strict filters, it may deliberately buy more of a matching style already in stock.
+        if (!hasBuyingPreferences && variant.pieces > 0) continue;
         const line = candidateLine(entry, s, mission, records, variant, 1);
         if (hasBuyingPreferences && !shopperEntryMatchesPreferences(entry, activePreferences, line.fabric)) continue;
         const unitCost = pieceCost(entry, isClothing(entry.kind) ? line.fabric : undefined);
-        if (!Number.isFinite(unitCost) || unitCost <= 0 || unitCost * MARKUP > priceCeiling) continue;
+        if (!Number.isFinite(unitCost) || unitCost <= 0 || (!hasBuyingPreferences && unitCost * MARKUP > priceCeiling)) continue;
         const preferenceScore = shopperPreferenceScore(entry, shoppingExamples);
         const score = 90 + (entry.luxury ? 100 : 0) + productDemand * 2 +
           (shoppingExamples.trim() ? (preferenceScore > 0 ? 120 + preferenceScore * 120 : -80) : 0);
@@ -354,7 +373,7 @@ export function prepareShopperOrder(
       continue;
     }
 
-    if (variants.length && !(mission === 'richCustomers' && hasBuyingPreferences)) continue;
+    if (variants.length) continue;
     const line = candidateLine(entry, s, mission, records, undefined, 1);
     if (hasBuyingPreferences && !shopperEntryMatchesPreferences(entry, activePreferences, line.fabric)) continue;
     const unitCost = pieceCost(entry, isClothing(entry.kind) ? line.fabric : undefined);
@@ -387,6 +406,7 @@ export function prepareShopperOrder(
   const pickedProducts = new Set<string>();
   const pickedKinds = new Map<string, number>();
   const pickedGroups = new Map<string, number>();
+  const coveredPriceBandKeys = new Set<string>();
   let spent = 0;
   const lineLimit = mission === 'contract' && selectedContract
     ? selectedContract.requirements.length
@@ -413,7 +433,11 @@ export function prepareShopperOrder(
         const groupPicks = pickedGroups.get(group) || 0;
         const diversityPenalty = mission === 'restock' ? 0
           : Math.min(7, Math.log1p(kindStock) * 1.3) + kindPicks * 3 + groupPicks * 2.5;
-        const adjustedScore = candidate.score - diversityPenalty;
+        const bandKeys = hasBuyingPreferences
+          ? matchingPriceBandPreferenceKeys(candidate.entry, activePreferences, candidate.line.fabric)
+          : [];
+        const uncoveredBandBonus = bandKeys.filter((key) => !coveredPriceBandKeys.has(key)).length * 1_000;
+        const adjustedScore = candidate.score - diversityPenalty + uncoveredBandBonus;
         if (adjustedScore > bestScore) {
           bestScore = adjustedScore;
           bestIndex = i;
@@ -435,6 +459,9 @@ export function prepareShopperOrder(
     }
     const line = { ...candidate.line, pieces: quantity };
     chosen.push(line);
+    for (const key of matchingPriceBandPreferenceKeys(candidate.entry, activePreferences, line.fabric)) {
+      coveredPriceBandKeys.add(key);
+    }
     pickedProducts.add(productKey);
     const kind = candidate.entry.kind;
     const group = candidate.entry.group.toLowerCase();
