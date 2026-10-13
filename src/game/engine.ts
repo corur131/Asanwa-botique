@@ -482,19 +482,23 @@ export function openShop(s0: GameState): GameState {
     mix[2] = Math.max(0, mix[2] + shift);
   }
   const arrivals = Array.from({ length: n }, () => ({ at: arrivalMinute(), c: makeCustomer(s, mix) }));
-  // Premium access scales with property tier. These are the scheduled visit
-  // days within each 14-day cycle (2, 3, 4, 5, and 6 visits, respectively).
+  // Scheduled visit days per 14-day cycle scale with the seven shop tiers.
+  // The visitor's celebrity rank is rolled separately from shop level, using the existing five-rank scale.
   const celebrityDaysByTier: number[][] = [
     [2, 9],
     [1, 5, 10],
     [0, 4, 7, 11],
     [1, 4, 7, 10, 13],
     [0, 2, 4, 7, 9, 12],
+    [0, 2, 4, 6, 8, 10, 12],
+    [0, 1, 3, 5, 7, 9, 11, 13],
   ];
   const fortnightDay = (s.day - 1) % 14;
   const celebrityScheduled = (celebrityDaysByTier[s.tier] || []).includes(fortnightDay);
   if (s.listing.signature && celebrityScheduled) {
-    const c = makeCelebrityCustomer(s);
+    const highestEligibleCelebrityTier = Math.min(4, Math.max(0, Math.floor(s.tier || 0)));
+    const celebrityTier = Math.floor(Math.random() * (highestEligibleCelebrityTier + 1));
+    const c = makeCelebrityCustomer(s, celebrityTier);
     arrivals.push({ at: 100 + Math.random() * 560, c });
   }
   const model = contestModel(s);
