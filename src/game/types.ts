@@ -483,12 +483,53 @@ export interface BusinessBranch {
 
 export type ExpansionInvestment = 'branch' | 'wholesale' | 'bridal' | 'accessories' | 'menswear' | 'designer';
 
+export interface DepartmentOperation {
+  name: string;
+  openedDay: number;
+  targetUnits: number;
+  inventoryUnits: number;
+  inventoryValue: number;
+  /** Non-inventory fixtures/brand assets for valuation reconciliation. */
+  assetValue?: number;
+  unitCost: number;
+  unitPrice: number;
+  cumulativeRevenue: number;
+  cumulativeCosts: number;
+  daysTrading: number;
+  lastDay?: number;
+  lastDayRevenue?: number;
+  lastDayCosts?: number;
+  lastDayProfit?: number;
+}
+
+export interface WholesaleOperation {
+  targetUnits: number;
+  inventoryUnits: number;
+  inventoryValue: number;
+  unitCost: number;
+  unitPrice: number;
+  cumulativeRevenue: number;
+  cumulativeCosts: number;
+  ordersFulfilled: number;
+  ordersMissed: number;
+  lastDay?: number;
+  lastDayRevenue?: number;
+  lastDayCosts?: number;
+  lastDayProfit?: number;
+}
+
 export interface BusinessExpansionState {
   branches: BusinessBranch[];
   departments: string[];
+  /** Detailed department-level stock and operating performance; optional for legacy saves. */
+  departmentOperations?: DepartmentOperation[];
   wholesaleActive: boolean;
+  /** Inventory and order fulfilment for wholesale, initialized when activated. */
+  wholesaleOperation?: WholesaleOperation;
   designerCollections: number;
-  /** Prevents branch and wholesale transactions being posted twice for one in-game day. */
+  /** Earned event credit can offset a future capital expansion purchase. */
+  expansionCredit?: number;
+  /** Prevents branch, department and wholesale transactions being posted twice for one in-game day. */
   lastProcessedDay?: number;
 }
 
