@@ -13,8 +13,8 @@ function game(overrides: Partial<GameState> = {}): GameState {
 
 function lineFor(item: (typeof MARKET)[number], pieces = 1): ShopperOrderLine {
   const fabric = ['top', 'bottom', 'dress', 'outer'].includes(item.kind) ? item.fabric || 'plain' : undefined;
-  const color = '#9A344D';
-  const color2 = fabric ? '#D9B25A' : color;
+  const color = item.kind === 'hair' ? '#1E1E24' : '#8E1F3A';
+  const color2 = fabric ? '#C9A163' : color;
   const pattern = 0;
   return {
     key: [item.kind, item.id, fabric || '', color, color2, pattern].join('|'),
@@ -29,6 +29,7 @@ test('tier-aware shopper orders only use unlocked catalogue items and stay withi
   assert.ok(result.job, result.error);
   assert.ok(result.job.estimatedTotal <= budget);
   assert.ok(result.job.estimatedTotal <= s.cash);
+  assert.equal(validateCart(result.state, result.state.marketCart || []).ok, true, 'the shopper cart must pass the same checkout validator');
   for (const line of result.job.items) {
     const entry = MARKET.find((item) => item.kind === line.kind && item.id === line.itemId);
     assert.ok(entry, 'shopper must use the official catalogue');
