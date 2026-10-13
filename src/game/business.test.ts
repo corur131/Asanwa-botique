@@ -522,6 +522,53 @@ test('net worth falls by the value of newly recorded rent arrears', () => {
   assert.equal(netWorthPlayer(noDebt) - netWorthPlayer(withDebt), 15_000);
 });
 
+test('net worth goodwill smooths a one-day sales spike across up to 28 days', () => {
+  const baseHistory = Array.from({ length: 28 }, (_, i) => ({
+    day: i + 1, income: 1_000_000, costs: 0,
+  })) as GameState['history'];
+  const spikeHistory = baseHistory!.map((day, i) => i === 27 ? { ...day, income: 51_000_000 } : day);
+  const common = {
+    tier: 0, rep: 35, followers: 120, stock: [], furniture: [],
+    bank: { ...initialBankState(), savings: 0, rentVault: 0, fixedDeposits: [], loans: [] },
+    businessExpansion: { branches: [], departments: [], wholesaleActive: false, designerCollections: 0 },
+  };
+  const ordinary = netWorthPlayer(state({ ...common, history: baseHistory }));
+  const oneOff = netWorthPlayer(state({ ...common, history: spikeHistory }));
+  assert.ok(oneOff > ordinary, 'a profitable celebrity day should still add value');
+  assert.ok(oneOff - ordinary < 50_000_000, 'a one-day spike must not be valued as five full weeks of repeatable profit');
+});
+
+test('established saves receive rival capital once, without granting it to new games', () => {
+  const rivals = initRivals();
+  const oldSave = state({ day: 31, history: [{ day: 30, income: 1_000_000, costs: 200_000 }] as GameState['history'], rivals });
+  const migrated = ensureBusinessState(oldSave);
+  const tolani = migrated.rivals.find((r) => r.id === 'tolani')!;
+  assert.ok(tolani.cash + (tolani.savings || 0) >= 220_000_000);
+  const secondPass = ensureBusinessState(migrated);
+  assert.equal(secondPass.rivals.find((r) => r.id === 'tolani')!.cash, tolani.cash, 'the capital adjustment must not repeat');
+  const newGame = ensureBusinessState(state({ day: 1, history: [], rivals: initRivals() }));
+  assert.ok((newGame.rivals.find((r) => r.id === 'tolani')!.cash + (newGame.rivals.find((r) => r.id === 'tolani')!.savings || 0)) < 220_000_000);
+});
+
+test('rivals announce celebrity visits in news, chat, and their social feed', () => {
+  const originalRandom = Math.random;
+  const base = state({
+    day: 31, history: [], ranking: [], dailyRanking: [],
+    listing: { area: 'Yaba' } as GameState['listing'],
+    today: { day: 31, bestScore: 0, events: [] } as GameState['today'],
+    rivals: initRivals(), messages: [], gist: [], rivalPosts: [],
+  });
+  try {
+    Math.random = () => 0.001;
+    const updated = simulateRivals(base);
+    assert.ok(updated.gist.some((item) => /celebrity client/i.test(item.title)));
+    assert.ok(updated.messages.some((item) => item.from === 'GistLagos' && /CELEBRITY SIGHTING/i.test(item.text)));
+    assert.ok(updated.rivalPosts.some((post) => /Celebrity client|special guest/i.test(post.caption)));
+  } finally {
+    Math.random = originalRandom;
+  }
+});
+
 
 test('demotion waives half of rent arrears without creating fake cash and preserves the remaining debt', () => {
   const before = state({
