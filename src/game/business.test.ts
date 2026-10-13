@@ -433,7 +433,7 @@ test('paying the landlord early credits the next rent bill without a second cash
   const before = state({
     day: 5,
     cash: 120_000,
-    listing: { rent: 100_000 } as GameState['listing'],
+    listing: { rent: 100_000, landlord: 'Test Landlord' } as GameState['listing'],
     lateRent: null,
     rentPrepaid: 0,
     bank: { ...initialBankState(), savings: 0, rentVault: 15_000, fixedDeposits: [], loans: [] },
@@ -443,7 +443,7 @@ test('paying the landlord early credits the next rent bill without a second cash
   assert.equal(paidEarly.cash, 20_000);
   assert.equal(paidEarly.rentPrepaid, 100_000);
   assert.equal(paidEarly.today.costs, 100_000);
-  assert.equal(paidEarly.ledger?.[0]?.label, 'Advance rent paid to undefined');
+  assert.equal(paidEarly.ledger?.[0]?.label, 'Advance rent paid to Test Landlord');
 
   const dueDay = {
     ...paidEarly,
@@ -462,7 +462,7 @@ test('partial early rent payment is deducted from the scheduled bill before Rent
   const before = state({
     day: 5,
     cash: 200_000,
-    listing: { rent: 100_000 } as GameState['listing'],
+    listing: { rent: 100_000, landlord: 'Test Landlord' } as GameState['listing'],
     lateRent: null,
     bank: { ...initialBankState(), savings: 0, rentVault: 20_000, fixedDeposits: [], loans: [] },
     today: { day: 5, served: 0, walkedOut: 0, lost: 0, income: 0, costs: 0, tips: 0, bestScore: 0, repChange: 0, staffServed: 0, events: [] },
@@ -488,7 +488,7 @@ test('direct landlord payment clears overdue rent first and credits only the ext
   const before = state({
     day: 10,
     cash: 80_000,
-    listing: { rent: 100_000 } as GameState['listing'],
+    listing: { rent: 100_000, landlord: 'Test Landlord' } as GameState['listing'],
     lateRent: { amount: 20_000, due: 12 },
     rentPrepaid: 0,
     today: { day: 10, served: 0, walkedOut: 0, lost: 0, income: 0, costs: 7_000, tips: 0, bestScore: 0, repChange: 0, staffServed: 0, events: [] },
@@ -503,7 +503,7 @@ test('direct landlord payment clears overdue rent first and credits only the ext
 test('direct landlord payment refuses a payment larger than cash or the rent balance', () => {
   const before = state({
     cash: 20_000,
-    listing: { rent: 100_000 } as GameState['listing'],
+    listing: { rent: 100_000, landlord: 'Test Landlord' } as GameState['listing'],
     lateRent: null,
     rentPrepaid: 10_000,
   });
