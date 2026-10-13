@@ -301,10 +301,11 @@ export function simulateRivals(s0: GameState): GameState {
     }
     // Celebrity clients are a real, recurring source of prestige sales for rivals too.
     // Higher-tier and more visible boutiques attract them more often, but any rival can land one.
-    const celebrityChanceByTier = [0.12, 0.19, 0.27, 0.36, 0.45];
-    const celebrityChance = clamp(celebrityChanceByTier[r.tier] + Math.min(0.06, r.followers / 2_000_000), 0.08, 0.5);
+    // The rival economy now has seven shop tiers; luxury levels also need valid celebrity odds.
+    const celebrityChanceByTier = [0.12, 0.19, 0.27, 0.36, 0.45, 0.52, 0.58];
+    const celebrityChance = clamp((celebrityChanceByTier[r.tier] ?? celebrityChanceByTier[0]) + Math.min(0.06, r.followers / 2_000_000), 0.08, 0.64);
     if (chance(celebrityChance)) {
-      const celebritySpendBase = [400_000, 1_200_000, 3_500_000, 9_000_000, 18_000_000][r.tier];
+      const celebritySpendBase = [400_000, 1_200_000, 3_500_000, 9_000_000, 18_000_000, 32_000_000, 55_000_000][r.tier] ?? 400_000;
       const celebritySpend = Math.round(celebritySpendBase * rand(0.7, 2.2) * (0.8 + r.skill * 0.2));
       const celebrityGoodsCost = Math.round(celebritySpend * clamp(stockShare * rand(0.82, 1.05), 0.3, 0.78));
       const celebrityServiceCost = Math.round(celebritySpend * rand(0.025, 0.06));
