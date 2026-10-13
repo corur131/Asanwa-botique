@@ -425,6 +425,8 @@ export interface PromotionCampaign {
   hoursRun: number;
   totalSpent: number;
   estimatedReach: number;
+  /** Optional for legacy saves: warehouse promotion drives wholesale demand instead of followers. */
+  target?: 'brand' | 'warehouse';
 }
 
 export interface BusinessLoan {
@@ -526,6 +528,8 @@ export interface BusinessExpansionState {
   wholesaleActive: boolean;
   /** Inventory and order fulfilment for wholesale, initialized when activated. */
   wholesaleOperation?: WholesaleOperation;
+  /** Number of paid wholesale inventory-capacity upgrades. */
+  wholesaleUpgradeLevel?: number;
   designerCollections: number;
   /** Earned event credit can offset a future capital expansion purchase. */
   expansionCredit?: number;
