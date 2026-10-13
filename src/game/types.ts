@@ -293,6 +293,10 @@ export interface DayLog {
   tips: number;
   bestScore: number;
   repChange: number;
+  /** Cash available at the beginning of the in-game day, before morning purchases/transfers. */
+  openingCash?: number;
+  /** Cash balance recorded when the shop day was closed. */
+  closingCash?: number;
   staffServed: number;
   impatient?: number;
   doorLost?: number;
