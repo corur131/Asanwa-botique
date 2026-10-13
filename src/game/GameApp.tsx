@@ -111,6 +111,7 @@ export default function GameApp({ onLab, initial, storageKey, cloud, notice }: {
   const [touring, setTouring] = useState<string | null>(null);
   const [cart, setCart] = useState<E.CartLine[]>([]);
   const [paused, setPaused] = useState(false);
+  const [timeSpeed, setTimeSpeed] = useState<1 | 2 | 3>(1);
   const [hidden, setHidden] = useState(false);
   const [confirmClose, setConfirmClose] = useState(false);
   const [lookEdit, setLookEdit] = useState<CharacterConfig | null>(null);
@@ -181,10 +182,10 @@ export default function GameApp({ onLab, initial, storageKey, cloud, notice }: {
       const now = performance.now();
       const dt = Math.min(2, (now - last) / 1000);
       last = now;
-      setS((g) => (g ? E.tick(g, dt) : g));
+      setS((g) => (g ? E.tick(g, dt * timeSpeed) : g));
     }, 500);
     return () => window.clearInterval(id);
-  }, [running]);
+  }, [running, timeSpeed]);
 
   // a new WhatsApp message pops up like a notification
   useEffect(() => {
@@ -431,6 +432,9 @@ export default function GameApp({ onLab, initial, storageKey, cloud, notice }: {
               <div className="w-24 h-1 rounded-full bg-white/10 mt-1 overflow-hidden"><div className="h-full bg-amber-400" style={{ width: `${(s.clock / SHOP_MINUTES) * 100}%` }} /></div>
             </div>
             <PowerChip s={s} up={up} />
+            <div className="flex items-center gap-1 rounded-xl border border-white/10 bg-black/25 p-1" aria-label="Game speed">
+              {([1, 2, 3] as const).map((speed) => <button key={speed} type="button" aria-pressed={timeSpeed === speed} onClick={() => setTimeSpeed(speed)} className={`min-h-9 min-w-10 rounded-lg px-2 text-xs font-bold transition-colors ${timeSpeed === speed ? 'bg-amber-400 text-slate-950' : 'text-slate-200 hover:bg-white/10'}`}>{speed}×</button>)}
+            </div>
             <Btn size="sm" onClick={() => setPaused((p) => !p)}>{paused ? '▶ Play' : '❚❚ Pause'}</Btn>
             {!s.inShop.length && !s.serving && !closing && s.arrivals.length > 0 && <Btn size="sm" tone="ghost" onClick={() => up(E.skipAhead)}>Skip ⏩</Btn>}
           </div>
