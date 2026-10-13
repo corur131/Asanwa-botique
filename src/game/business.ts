@@ -858,8 +858,6 @@ export function netWorthPlayer(s: GameState): number {
 }
 
 export function netWorthRival(r: Rival): number {
-  const revenue = (r.week || []).reduce((sum, amount) => sum + amount, 0);
-  const costs = (r.weekCosts || []).reduce((sum, amount) => sum + amount, 0);
   const profitHistory = Array.isArray(r.profitHistory) && r.profitHistory.length
     ? r.profitHistory
     : (r.week || []).map((amount, index) => amount - ((r.weekCosts || [])[index] || 0));
