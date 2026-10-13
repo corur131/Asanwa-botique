@@ -23,7 +23,27 @@ const pick = <T,>(a: readonly T[]): T => a[Math.floor(Math.random() * a.length)]
 const chance = (p: number) => Math.random() < p;
 const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
 
-const emptyLog = (day: number): DayLog => ({ day, served: 0, walkedOut: 0, lost: 0, income: 0, costs: 0, tips: 0, bestScore: 0, repChange: 0, staffServed: 0, events: [] });
+const emptyLog = (day: number, openingCash?: number): DayLog => ({ day, served: 0, walkedOut: 0, lost: 0, income: 0, costs: 0, tips: 0, bestScore: 0, repChange: 0, ...(typeof openingCash === 'number' && Number.isFinite(openingCash) ? { openingCash: Math.round(openingCash) } : {}), staffServed: 0, events: [] });
+
+/** Reconcile reported operating performance with current cash and money held in KoboBank. */
+export function cashFlowSummary(s: GameState) {
+  const openingCash = typeof s.today?.openingCash === 'number' && Number.isFinite(s.today.openingCash) ? Math.round(s.today.openingCash) : null;
+  const cash = Math.round(s.cash);
+  const operatingResult = Math.round((s.today?.income || 0) - (s.today?.costs || 0));
+  const cashChange = openingCash === null ? null : cash - openingCash;
+  const otherMovement = cashChange === null ? null : cashChange - operatingResult;
+  const bank = s.bank || initialBankState();
+  const fixedDeposits = (bank.fixedDeposits || []).reduce((total, deposit) => total + Math.max(0, deposit.amount || 0), 0);
+  const recentMovements = (s.ledger || []).filter((line) => line.day === s.day && (
+    line.category === 'transfer' || line.t < 0 || /move-in|furniture|starter stock|inventory|rent|promotion|debt recovery|fixed deposit|savings|vault|loan|wholesale/i.test(line.label)
+  )).slice(0, 8);
+  return {
+    openingCash, cash, operatingResult, cashChange, otherMovement,
+    savings: Math.round(bank.savings || 0), rentVault: Math.round(bank.rentVault || 0),
+    fixedDeposits: Math.round(fixedDeposits),
+    recentMovements,
+  };
+}
 
 export const daysToRent = (day: number) => (7 - (day % 7)) % 7;
 export const rentDue = (s: GameState) => s.listing.rent;
@@ -74,7 +94,7 @@ export function money(s: GameState, amount: number, label: string): GameState {
       entries.unshift({ day: s.day, t, label: 'Operating payables settled', amount: -settlement, category: 'operating' });
     }
   }
-  return { ...s, cash, operatingPayables, ledger: [...entries, ...(s.ledger || [])].slice(0, 150) };
+  return { ...s, cash, operatingPayables, ledger: [...entries, ...(s.ledger || [])].slice(0, 500) };
 }
 
 // ---------------------------------------------------------------------------
@@ -150,6 +170,8 @@ export function newGame(divine: CharacterConfig): GameState {
   s = ensureBusinessState(s);
   s = { ...s, weather: weatherForDay(s.day, s.seed) };
   s = money(s, -spent, 'Starter stock from Yaba market');
+  // Day-one opening cash starts after the starter inventory has been purchased.
+  s = { ...s, today: { ...s.today, openingCash: s.cash } };
   s = msg(s, 'Deborah', `Sis! The kiosk is ready. I helped you stock it with ${naira(spent)} of clothes from Yaba market. You have ${naira(s.cash)} left. Rent is ${naira(TIERS[0].rent)} every 7 days. The place is small and rough, but we'll fix it up as the money comes.`, 'good');
   s = msg(s, 'Deborah', `The shop opens 8am to 8pm. Customers come in all day, busiest at lunch and after work. If you're slow, they get tired of waiting and leave, so move fast! Some only want hair or makeup, no clothes.`, 'info');
   return s;
@@ -228,7 +250,10 @@ export function shopBonus(s: GameState, c: Customer, choice: StyleChoice): { bon
 }
 
 export function openShop(s0: GameState): GameState {
-  let s: GameState = { ...s0, phase: 'shop', weather: weatherForDay(s0.day, s0.seed), ...freshDay, today: emptyLog(s0.day) };
+  const today = s0.today?.day === s0.day
+    ? { ...s0.today, openingCash: typeof s0.today.openingCash === 'number' && Number.isFinite(s0.today.openingCash) ? s0.today.openingCash : s0.cash }
+    : emptyLog(s0.day, s0.cash);
+  let s: GameState = { ...s0, phase: 'shop', weather: weatherForDay(s0.day, s0.seed), ...freshDay, today };
   let slow = s.slowWeek;
   if (s.day % 7 === 1) {
     slow = s.day > 7 && chance(SLOW_WEEK_CHANCE);
@@ -570,6 +595,8 @@ export function applyLook(s0: GameState, c: Customer, choice: StyleChoice, st0: 
   // styling wears Divine out: a full look more than a quick hair or makeup job
   const s = s0.serving === c.id ? spendEnergy(s0, c.service ? ENERGY.service : ENERGY.fullLook) : s0;
   const sold = st.outcome === 'paid' || st.outcome === 'bargained';
+  // Apply every tip modifier before the day log, lifetime earnings, and bank receipt are updated.
+  if (sold && st.tip && stats(s).tipBonus) st = { ...st, tip: Math.round((st.tip * (1 + stats(s).tipBonus)) / 100) * 100 };
   let stock = s.stock;
   const lookOut = sold ? buildLook(c, choice, s.stock) : c.look;
   if (sold) {
@@ -603,7 +630,6 @@ export function applyLook(s0: GameState, c: Customer, choice: StyleChoice, st0: 
     today,
     stats: { ...s.stats, served: s.stats.served + (sold ? 1 : 0), totalEarned: s.stats.totalEarned + (sold ? st.paid + st.tip - st.cost : 0), bestScore: Math.max(s.stats.bestScore, score.total) },
   };
-  if (sold && st.tip && stats(s).tipBonus) st = { ...st, tip: Math.round((st.tip * (1 + stats(s).tipBonus)) / 100) * 100 };
   if (sold) {
     next = money(next, st.paid + st.tip, `${c.name}${c.service ? ` (${c.service === 'makeup' ? 'makeup' : c.service === 'both' ? 'hair & makeup' : 'hair'})` : ''}${st.tip ? ', with tip' : ''}`);
     next = money(next, -st.cost, 'Hair and makeup supplies');
@@ -747,11 +773,15 @@ export function closeShop(s0: GameState): GameState {
     s = { ...s, history: [...s.history.slice(0, -1), s.today] };
   }
   if (s.day % 7 === 0) s = recordWeeklyWealth(s);
-  return { ...s, phase: 'evening', visit: null };
+  const finalToday = { ...s.today, closingCash: Math.round(s.cash) };
+  const finalHistory = s.history.length && s.history[s.history.length - 1].day === s.day
+    ? [...s.history.slice(0, -1), finalToday]
+    : s.history;
+  return { ...s, today: finalToday, history: finalHistory, phase: 'evening', visit: null };
 }
 
 export function nextMorning(s: GameState): GameState {
-  return planDrop({ ...s, day: s.day + 1, weather: weatherForDay(s.day + 1, s.seed), phase: 'morning', ...freshDay, busy: null, energy: ENERGY.max, today: emptyLog(s.day + 1) });
+  return planDrop({ ...s, day: s.day + 1, weather: weatherForDay(s.day + 1, s.seed), phase: 'morning', ...freshDay, busy: null, energy: ENERGY.max, today: emptyLog(s.day + 1, s.cash) });
 }
 
 /** Add a message to a specific WhatsApp thread without invoking a model call. */
@@ -1008,7 +1038,7 @@ export function settleLateRent(s0: GameState): GameState {
   if (vaultPaid > 0) {
     next = {
       ...next,
-      ledger: [{ day: next.day, t: -1, label: 'Overdue rent paid from Rent Vault', amount: -vaultPaid }, ...(next.ledger || [])].slice(0, 150),
+      ledger: [{ day: next.day, t: -1, label: 'Overdue rent paid from Rent Vault', amount: -vaultPaid }, ...(next.ledger || [])].slice(0, 500),
     };
   }
   if (cashPaid > 0) next = money(next, -cashPaid, 'Overdue rent payment');
@@ -1037,7 +1067,7 @@ export function payRent(s: GameState): GameState {
   if (vaultPaid > 0) {
     next = {
       ...next,
-      ledger: [{ day: next.day, t: -1, label: 'Rent paid from Rent Vault', amount: -vaultPaid }, ...(next.ledger || [])].slice(0, 150),
+      ledger: [{ day: next.day, t: -1, label: 'Rent paid from Rent Vault', amount: -vaultPaid }, ...(next.ledger || [])].slice(0, 500),
     };
   }
   if (cashPaid > 0) next = money(next, -cashPaid, 'Rent');
