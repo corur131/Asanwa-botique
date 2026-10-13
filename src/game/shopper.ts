@@ -102,7 +102,7 @@ export function shopperPriceCeiling(s: GameState, mission: ShopperMission): numb
   const weightedSpend = tier.mix.reduce((sum, share, i) => sum + share * BUDGET[CLASS_ORDER[i]][1], 0);
   // Premium missions need a tier-aware luxury ceiling instead of the normal blended
   // customer average, which used to filter out almost every genuinely premium product.
-  if (mission === 'richCustomers') return [45_000, 110_000, 300_000, 600_000, 950_000][tierIndex] || 45_000;
+  if (mission === 'richCustomers') return [45_000, 110_000, 300_000, 600_000, 950_000, 1_800_000, 3_000_000][tierIndex] || 45_000;
   if (mission === 'contract') return BUDGET.rich[1] * 0.8;
   return Math.max(5_000, weightedSpend * 0.45);
 }
@@ -287,7 +287,7 @@ export function prepareShopperOrder(
   }
   const normalCeiling = shopperPriceCeiling(s, mission);
   const priceCeiling = normalCeiling;
-  const maxLines = [6, 8, 10, 13, 16][Math.max(0, Math.min(4, s.tier))] || 6;
+  const maxLines = [6, 8, 10, 13, 16, 20, 24][Math.max(0, Math.min(6, Math.floor(s.tier || 0)))] || 6;
   // Aim to use a meaningful share of the budget on premium missions, scaling quantities
   // rather than stopping at one unit per style. The 25-piece cap protects against runaway orders.
   const richQuantityFor = (unitCost: number) => (mission === 'richCustomers' || hasBuyingPreferences)
