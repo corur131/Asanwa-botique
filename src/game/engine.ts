@@ -1,7 +1,7 @@
 import { CharacterConfig } from '../types/character';
 import { generateRandomCustomer } from '../utils/randomizer';
 import { DIVINE_CAPACITY, HOUR_WEIGHTS, PATIENCE, SHOP_MINUTES, staffMinutes, NEW_SHOP_RAMP_DAYS, NEW_SHOP_START, SERVICE_FEE, SLOW_WEEK_CHANCE, STAFF, STAFF_CAPACITY, START_CASH, SUPPLIES_SHARE, MARKUP, TIERS, FABRIC_COST, naira } from './economy';
-import { canBuy, entryFor, isClothing, makeDesign, pieceCost, productKey } from './market';
+import { canBuy, entryFor, HAIR_SWATCHES, isClothing, makeDesign, pieceCost, productKey } from './market';
 import { FabricId } from '../types/character';
 import { answerRival, competition, initRivals, poacher, reactToMove, simulateRivals } from './rivals';
 import { answerInvite, contestFor, contestModel, dropStep, judge, planDrop, planEvents, planTips, visitStep, wonListing } from './encounters';
@@ -10,7 +10,7 @@ import { answerConvo, startGist } from './convos';
 import { ENERGY, busyNow, divineBonus, energyOf, energyStep, exhausted, payBills, spendEnergy } from './life';
 import { makeCustomer, makeCelebrityCustomer } from './customers';
 import { buildLook, hairGroup, lookCost, scoreLook } from './scoring';
-import { FEMALE_HAIR, MAKEUP_LOOKS } from '../constants/catalog';
+import { FABRIC_COLORS, FEMALE_HAIR, MAKEUP_LOOKS } from '../constants/catalog';
 import { colourName } from './colours';
 import { FURNITURE, KIOSK_LISTING, Listing, Placed, STARTER_FURNITURE, autoPlace, prepareFurnitureForMove,
   findSpot, canPlace, turn, Rot, ceilingCapacity, ceilingUsed, yardCapacity, yardUsed, cheapestListing, furnitureById, listingsFor, newUid, prestigeRichShift, prestigeTraffic, shopStats, usesFloor, wallCapacity, wallUsed } from './shop';
@@ -1472,13 +1472,17 @@ export function validateCart(s: GameState, lines: CartLine[]): CartValidation {
       errors.push(`${entry.label} has an invalid quantity. Quantities must be between 1 and 500 per line.`);
       continue;
     }
-    if (typeof line.color !== 'string' || !/^#[0-9a-fA-F]{6}$/.test(line.color) ||
-        typeof line.color2 !== 'string' || !/^#[0-9a-fA-F]{6}$/.test(line.color2)) {
-      errors.push(`${entry.label} has an invalid colour selection.`);
+    const palette = line.kind === 'hair' ? HAIR_SWATCHES.map((swatch) => swatch.color) : FABRIC_COLORS;
+    if (!palette.includes(line.color) || !palette.includes(line.color2)) {
+      errors.push(`${entry.label} has a colour that is not offered by the official market palette.`);
       continue;
     }
     if (!Number.isInteger(line.pattern) || line.pattern < 0 || line.pattern > 32) {
       errors.push(`${entry.label} has an invalid pattern.`);
+      continue;
+    }
+    if (line.kind === 'hair' && HAIR_SWATCHES[line.pattern]?.color !== line.color) {
+      errors.push(`${entry.label} has a hair colour/pattern combination that is not offered by the market.`);
       continue;
     }
     const fabric = line.fabric || 'plain';
