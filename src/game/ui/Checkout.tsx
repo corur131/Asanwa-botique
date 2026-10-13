@@ -105,7 +105,7 @@ export const Reveal: React.FC<{ state: GameState; c: Customer; choice: StyleChoi
               <div><div className="text-3xl font-bold text-white">{c.contest.rivalScore}</div><div className="text-xs text-slate-400">Your rival</div></div>
             </div>
             <div className={`text-center font-bold mt-2 ${score.total > c.contest.rivalScore ? 'text-emerald-300' : 'text-rose-300'}`}>
-              {score.total > c.contest.rivalScore ? `You win ₦${c.contest.prize.toLocaleString('en-NG')}!` : 'You lost this one.'}
+              {score.total > c.contest.rivalScore ? `You win ₦${Math.max(0, Number(c.contest.prize) || 0).toLocaleString('en-NG')}!` : 'You lost this one.'}
             </div>
           </div>
         ) : (
