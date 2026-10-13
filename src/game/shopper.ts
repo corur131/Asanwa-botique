@@ -297,6 +297,9 @@ export function prepareShopperOrder(
   }
 
   if (!chosen.length) {
+    if (selectedContract) {
+      return { state: s, error: 'Your current stock and existing cart already cover the contract goods, or there is no remaining quantity within this budget. Check out any pending cart items, then deliver the contract in the Contracts app.' };
+    }
     return { state: s, error: mission === 'contract'
       ? 'I could not match that brief to affordable, unlocked Yaba Mart products. Try simpler product or category words.'
       : 'I could not find suitable products within this budget and your boutique’s current buying limits. Try a different mission or a larger budget.' };
