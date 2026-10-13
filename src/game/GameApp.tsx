@@ -33,6 +33,14 @@ type Panel = null | 'rail' | 'furniture';
 
 const CLS_DOT = { poor: 'bg-slate-400', middle: 'bg-sky-400', rich: 'bg-amber-400' } as const;
 
+/** Environment values exist only in dedicated preview builds; normal/live builds receive no grant. */
+function applyPreviewCashGrant(state: GameState | null): GameState | null {
+  if (!state) return state;
+  const grantId = import.meta.env.VITE_PREVIEW_CASH_GRANT_ID || '';
+  const amount = Number(import.meta.env.VITE_PREVIEW_CASH_GRANT_AMOUNT || 0);
+  return E.previewCashGrant(state, grantId, amount);
+}
+
 /** A lightweight animated shop-floor layer makes a rival visit feel occupied while the existing 3D shop scene remains interactive-looking beneath it. */
 const RivalShopActivity: React.FC<{ r: Rival }> = ({ r }) => {
   const [actors] = useState(() => {
@@ -82,7 +90,7 @@ const RivalShopActivity: React.FC<{ r: Rival }> = ({ r }) => {
 
 
 export default function GameApp({ onLab, initial, storageKey, cloud, notice }: { onLab: () => void; initial?: GameState | null; storageKey?: string; cloud?: CloudSession; notice?: string }) {
-  const [s, setS] = useState<GameState | null>(() => (initial !== undefined ? initial : E.load(storageKey)));
+  const [s, setS] = useState<GameState | null>(() => applyPreviewCashGrant(initial !== undefined ? initial : E.load(storageKey)));
   const [syncState, setSyncState] = useState<'saved' | 'saving' | 'offline'>('saved');
   const [admin, setAdmin] = useState(false);
   const [panel, setPanel] = useState<Panel>(null);
@@ -234,7 +242,7 @@ export default function GameApp({ onLab, initial, storageKey, cloud, notice }: {
     }
   }, [s?.phase]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  if (!s) return <NewGame onStart={(cfg) => { const g = E.newGame(cfg); seenMsg.current = g.msgSeq; setManualTarget(null); setSitting(null); setLocalAct(null); setS(g); }} onLab={onLab} />;
+  if (!s) return <NewGame onStart={(cfg) => { const g = applyPreviewCashGrant(E.newGame(cfg))!; seenMsg.current = g.msgSeq; setManualTarget(null); setSitting(null); setLocalAct(null); setS(g); }} onLab={onLab} />;
 
   const up = (f: (g: GameState) => GameState) => setS((g) => (g ? f(g) : g));
   // Yaba Mart cart lives in GameState so it is saved locally and synchronised with the account.
@@ -330,7 +338,7 @@ export default function GameApp({ onLab, initial, storageKey, cloud, notice }: {
     const parsed = E.parseSave(await f.text());
     if (parsed) {
       seenMsg.current = parsed.msgSeq;
-      setS(parsed);
+      setS(applyPreviewCashGrant(parsed));
       setMenu(false);
     } else alert('That file is not an Asanwa Boutique save.');
   };
