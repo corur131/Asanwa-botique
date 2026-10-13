@@ -672,8 +672,8 @@ export const HAIR_PRODUCTS: AccessoryItem[] = [
   A('handcraftedBraidCrown', 'Handcrafted Braid Crown', 'f', 680_000, true, { renderId: 'fulaniBraids', minTier: 4 }),
   A('mensLocsCrownPiece', 'Men’s Locs Crown Piece', 'm', 85_000, false, { renderId: 'longLocs', minTier: 2 }),
   A('mensPremiumHairSystem', 'Premium Men’s Hair System', 'm', 260_000, false, { renderId: 'shortDreads', minTier: 3 }),
-  A('maisonVirginHairLaceFront', 'Maison Virgin-Hair HD Lace Front', 'f', 1_100_000, false, { renderId: 'rawHairHDFrontal', minTier: 5 }),
-  A('empireVirginHairLaceFront', 'Empire Virgin-Hair HD Lace Front', 'f', 1_850_000, false, { renderId: 'rawHairHDFrontal', minTier: 6 }),
+  A('maisonVirginHairLaceFront', 'Maison Virgin-Hair HD Lace Front', 'f', 1_100_000, false, { renderId: 'sidePartFrontal', minTier: 5 }),
+  A('empireVirginHairLaceFront', 'Empire Virgin-Hair HD Lace Front', 'f', 1_850_000, false, { renderId: 'sidePartFrontal', minTier: 6 }),
 ];
 
 export const EARRINGS: Option<EarringStyle>[] = [
