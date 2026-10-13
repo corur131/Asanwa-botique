@@ -23,6 +23,10 @@ import {
   investInExpansion,
   financeExpansionPurchase,
   expansionOptions,
+  wholesaleUpgradeQuote,
+  upgradeWholesaleInventory,
+  startPromotion,
+  processPromotionAtClose,
 } from './business';
 
 function state(overrides: Partial<GameState> = {}): GameState {
@@ -538,7 +542,7 @@ test('department sales consume inventory, record operating performance, and do n
 
 test('wholesale operation tracks order fulfilment, inventory value, and idempotent daily closing', () => {
   let before = state({
-    day: 14, tier: 3, cash: 30_000_000,
+    day: 14, tier: 3, cash: 100_000_000,
     businessExpansion: { branches: [], departments: [], wholesaleActive: false, designerCollections: 0 },
   });
   before = investInExpansion(before, 'wholesale');
@@ -650,3 +654,39 @@ test('opening department and wholesale inventory values reconcile to their capit
   game = investInExpansion(game, 'wholesale');
   assert.equal((game.businessExpansion?.wholesaleOperation?.inventoryValue || 0) + 4_500_000, 7_500_000);
 });
+
+
+test('wholesale inventory upgrade doubles capacity, buys added stock, and refuses unaffordable purchases', () => {
+  let before = state({
+    day: 14, tier: 3, cash: 30_000_000,
+    businessExpansion: { branches: [], departments: [], wholesaleActive: false, designerCollections: 0 },
+  });
+  before = investInExpansion(before, 'wholesale');
+  const beforeOperation = before.businessExpansion!.wholesaleOperation!;
+  const quote = wholesaleUpgradeQuote(before);
+  assert.equal(quote.available, true);
+  assert.equal(quote.nextCapacity, beforeOperation.targetUnits * 2);
+  const upgraded = upgradeWholesaleInventory(before);
+  const operation = upgraded.businessExpansion!.wholesaleOperation!;
+  assert.equal(operation.targetUnits, quote.nextCapacity);
+  assert.equal(operation.inventoryUnits, beforeOperation.inventoryUnits + beforeOperation.targetUnits);
+  assert.equal(operation.inventoryValue, beforeOperation.inventoryValue + beforeOperation.targetUnits * beforeOperation.unitCost);
+  assert.equal(upgraded.businessExpansion!.wholesaleUpgradeLevel, 1);
+  const unaffordable = { ...before, cash: quote.cost - 1 };
+  assert.equal(upgradeWholesaleInventory(unaffordable), unaffordable);
+});
+
+test('warehouse promotion is recorded as a buyer-demand campaign, not a follower campaign', () => {
+  let before = state({
+    day: 14, tier: 3, cash: 30_000_000,
+    businessExpansion: { branches: [], departments: [], wholesaleActive: false, designerCollections: 0 },
+  });
+  before = investInExpansion(before, 'wholesale');
+  const campaign = startPromotion(before, 'period', 'local', 10_000, 24, 'warehouse');
+  assert.equal(campaign.promotion?.target, 'warehouse');
+  const after = processPromotionAtClose(campaign);
+  assert.equal(after.followers || 0, before.followers || 0);
+  assert.ok(after.today.events.some((event) => event.includes('Warehouse promotion reached')));
+});
+
+

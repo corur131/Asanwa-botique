@@ -98,14 +98,15 @@ export function promotionTrafficBoost(s: GameState): number {
 }
 
 export function startPromotion(
-  s0: GameState, mode: PromotionMode, level: PromotionLevel, hourlyBudget: number, durationHours = 48,
+  s0: GameState, mode: PromotionMode, level: PromotionLevel, hourlyBudget: number, durationHours = 48, target: 'brand' | 'warehouse' = 'brand',
 ): GameState {
   if (!availablePromotionLevels(s0.tier).includes(level)) return s0;
+  if (target === 'warehouse' && !s0.businessExpansion?.wholesaleActive) return s0;
   const bounds = promotionBudgetBounds(s0.tier, level);
   const budget = Math.round(clamp(Number.isFinite(hourlyBudget) ? hourlyBudget : bounds.min, bounds.min, bounds.max) / 500) * 500;
   const hours = Math.round(clamp(Number.isFinite(durationHours) ? durationHours : 48, 8, 168) / 4) * 4;
   const campaign: PromotionCampaign = {
-    active: true, mode, level, hourlyBudget: budget, startedDay: s0.day,
+    active: true, mode, level, hourlyBudget: budget, startedDay: s0.day, target,
     hoursRemaining: mode === 'period' ? hours : undefined, hoursRun: 0, totalSpent: 0, estimatedReach: 0,
   };
   return { ...s0, promotion: campaign };
@@ -113,6 +114,32 @@ export function startPromotion(
 
 export function stopPromotion(s: GameState): GameState {
   return s.promotion?.active ? { ...s, promotion: { ...s.promotion, active: false } } : s;
+}
+
+/** Price for the next wholesale stock-and-capacity upgrade; maximum three upgrades. */
+export function wholesaleUpgradeQuote(s: GameState): { level: number; nextCapacity: number; cost: number; available: boolean } {
+  const expansion = s.businessExpansion || initialBusinessExpansion();
+  const operation = expansion.wholesaleOperation;
+  const level = Math.max(0, expansion.wholesaleUpgradeLevel || 0);
+  const targetUnits = operation?.targetUnits || 320;
+  const unitCost = Math.max(1, operation?.unitCost || 1);
+  return { level, nextCapacity: targetUnits * 2, cost: roundMoney(750_000 * (level + 1) + targetUnits * unitCost), available: !!expansion.wholesaleActive && !!operation && level < 3 };
+}
+
+/** Doubles wholesale inventory capacity and buys the added stock at cost. */
+export function upgradeWholesaleInventory(s0: GameState): GameState {
+  const expansion = s0.businessExpansion || initialBusinessExpansion();
+  const operation = expansion.wholesaleOperation;
+  const quote = wholesaleUpgradeQuote(s0);
+  if (!quote.available || !operation || s0.cash < quote.cost) return s0;
+  const addedUnits = operation.targetUnits;
+  const stockCost = addedUnits * operation.unitCost;
+  const upgradeFee = quote.cost - stockCost;
+  let s = ledger(s0, -quote.cost, 'Wholesale inventory capacity upgrade', 'operating');
+  const upgraded = { ...operation, targetUnits: quote.nextCapacity, inventoryUnits: operation.inventoryUnits + addedUnits, inventoryValue: operation.inventoryValue + stockCost };
+  s = { ...s, businessExpansion: { ...expansion, wholesaleOperation: upgraded, wholesaleUpgradeLevel: quote.level + 1 },
+    today: { ...s.today, costs: s.today.costs + upgradeFee, events: [...s.today.events, 'Wholesale capacity upgraded to ' + quote.nextCapacity + ' units; added stock is recorded as inventory assets.'] } };
+  return s;
 }
 
 function ledger(s: GameState, amount: number, label: string, category?: 'transfer' | 'operating' | 'financing' | 'interest'): GameState {
@@ -357,7 +384,7 @@ export function processPromotionAtClose(s0: GameState): GameState {
   const estimatedReach = Math.round(p.hourlyBudget * chargedHours * reachMultiplier / 15);
   const followerRate = { local: 0.0007, citywide: 0.0011, premium: 0.0016, luxury: 0.002 }[p.level];
   const brandBefore = getBrandMetrics(s);
-  const followersGained = estimatedReach > 0 ? Math.max(0, Math.round(estimatedReach * followerRate * (0.75 + Math.random() * 0.5) * (0.8 + brandBefore.loyalty / 250))) : 0;
+  const followersGained = p.target === 'warehouse' ? 0 : (estimatedReach > 0 ? Math.max(0, Math.round(estimatedReach * followerRate * (0.75 + Math.random() * 0.5) * (0.8 + brandBefore.loyalty / 250))) : 0);
   const stillActive = p.mode === 'always' ? chargedHours >= hours : newHours > 0;
   const promotion = {
     ...p, active: stillActive && (p.mode === 'always' || newHours > 0),
@@ -366,7 +393,8 @@ export function processPromotionAtClose(s0: GameState): GameState {
     totalSpent: p.totalSpent + cost,
     estimatedReach: p.estimatedReach + estimatedReach,
   };
-  s = { ...s, promotion, followers: Math.max(0, (s.followers || 0) + followersGained), brand: { ...brandBefore, awareness: clamp(brandBefore.awareness + (estimatedReach > 0 ? 0.3 : 0), 5, 100), trendInfluence: clamp(brandBefore.trendInfluence + (estimatedReach > 0 ? 0.15 : 0), 5, 100) }, today: { ...s.today, events: [...s.today.events, 'Promotion reached an estimated ' + estimatedReach.toLocaleString('en-NG') + ' people and added ' + followersGained.toLocaleString('en-NG') + ' followers.'] } };
+  const warehouseTarget = p.target === 'warehouse';
+  s = { ...s, promotion, followers: Math.max(0, (s.followers || 0) + followersGained), brand: { ...brandBefore, awareness: clamp(brandBefore.awareness + (!warehouseTarget && estimatedReach > 0 ? 0.3 : 0), 5, 100), trendInfluence: clamp(brandBefore.trendInfluence + (!warehouseTarget && estimatedReach > 0 ? 0.15 : 0), 5, 100) }, today: { ...s.today, events: [...s.today.events, warehouseTarget ? ('Warehouse promotion reached an estimated ' + estimatedReach.toLocaleString('en-NG') + ' buyers; wholesale order demand is boosted while the campaign remains active.') : ('Promotion reached an estimated ' + estimatedReach.toLocaleString('en-NG') + ' people and added ' + followersGained.toLocaleString('en-NG') + ' followers.')] } };
   if (chargedHours < hours) {
     s = { ...s, messages: [{ id: (s.msgSeq || 0) + 1, day: s.day, from: 'KoboBank', text: 'Your promotion stopped because the current account could not cover the full hourly budget.', tone: 'warn' as const, t: -1 }, ...(s.messages || [])].slice(0, 160), msgSeq: (s.msgSeq || 0) + 1, promotion: { ...promotion, active: false } };
   }
@@ -718,7 +746,10 @@ export function processExpansionAtClose(s0: GameState): GameState {
   if (expansion.wholesaleActive && wholesaleOperation) {
     let w = { ...wholesaleOperation };
     const brand = getBrandMetrics(s);
-    const demand = Math.max(1, Math.round((14 + brand.awareness / 8) * (0.7 + Math.random() * 0.6)));
+    const warehouseCampaign = s.promotion?.active && s.promotion.target === 'warehouse' ? s.promotion : null;
+    const promotionLift = warehouseCampaign ? ({ local: 1.15, citywide: 1.3, premium: 1.5, luxury: 1.75 }[warehouseCampaign.level]) : 1;
+    const budgetLift = warehouseCampaign ? Math.min(0.2, warehouseCampaign.hourlyBudget / 2_000_000) : 0;
+    const demand = Math.max(1, Math.round((14 + brand.awareness / 8) * (0.7 + Math.random() * 0.6) * (promotionLift + budgetLift)));
     const fulfilled = Math.min(w.inventoryUnits, demand);
     const revenue = fulfilled * w.unitPrice;
     const costOfGoods = fulfilled * w.unitCost;

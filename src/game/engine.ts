@@ -17,7 +17,7 @@ import { FURNITURE, KIOSK_LISTING, Listing, Placed, STARTER_FURNITURE, autoPlace
 import { CharacterMemory, CollaborationEvent, CollaborationReply, Customer, DayLog, Departure, Design, ReplyChoice, GameState, LedgerLine, Message, Regular, ScoreBreakdown, Settlement, SponsorshipOffer, StaffMember, StaffProfession, StyleChoice } from './types';
 import { closeBrandDay, ensureBusinessState, getBrandMetrics, initialBankState, processBankWeekly, processFixedDepositMaturities, processPromotionAtClose, processExpansionAtClose, promotionTrafficBoost, recordWeeklyWealth, saveRentAtClose } from './business';
 
-export { brandPower, currentWealthRows, financialAssets, getBrandMetrics, creditProfile, creditRating, creditHistoryReport, premiumLoanEligible, takePremiumBusinessLoan, renegotiateBusinessLoan, loanRateForScore, maximumLoan, netWorthPlayer, netWorthRival, playerWeekTotals, totalLiabilities, unlocksForFollowers, availablePromotionLevels, promotionBudgetBounds, promotionTrafficBoost, startPromotion, stopPromotion, transferBank, setRentSaving, setSavingsGoal, createFixedDeposit, takeBusinessLoan, repayBusinessLoan, arrangeBusinessLoanRepayment, expansionOptions, investInExpansion, financeExpansionPurchase } from './business';
+export { brandPower, currentWealthRows, financialAssets, getBrandMetrics, creditProfile, creditRating, creditHistoryReport, premiumLoanEligible, takePremiumBusinessLoan, renegotiateBusinessLoan, loanRateForScore, maximumLoan, netWorthPlayer, netWorthRival, playerWeekTotals, totalLiabilities, unlocksForFollowers, availablePromotionLevels, promotionBudgetBounds, promotionTrafficBoost, startPromotion, stopPromotion, wholesaleUpgradeQuote, upgradeWholesaleInventory, transferBank, setRentSaving, setSavingsGoal, createFixedDeposit, takeBusinessLoan, repayBusinessLoan, arrangeBusinessLoanRepayment, expansionOptions, investInExpansion, financeExpansionPurchase } from './business';
 
 const pick = <T,>(a: readonly T[]): T => a[Math.floor(Math.random() * a.length)];
 const chance = (p: number) => Math.random() < p;
@@ -566,6 +566,7 @@ export function settle(c: Customer, score: ScoreBreakdown, price: number, suppli
 export function applyLook(s0: GameState, c: Customer, choice: StyleChoice, st0: Settlement, score: ScoreBreakdown): GameState {
   let st = st0;
   if (s0.listing.signature && !c.celebrity) st = { ...st, tip: Math.max(st.tip, Math.round(st.paid * 0.12 / 100) * 100) };
+  // Apply tip bonuses before calculating the day report so reported income matches the actual receipt.
   // styling wears Divine out: a full look more than a quick hair or makeup job
   const s = s0.serving === c.id ? spendEnergy(s0, c.service ? ENERGY.service : ENERGY.fullLook) : s0;
   const sold = st.outcome === 'paid' || st.outcome === 'bargained';
