@@ -33,6 +33,20 @@ type Panel = null | 'rail' | 'furniture';
 
 const CLS_DOT = { poor: 'bg-slate-400', middle: 'bg-sky-400', rich: 'bg-amber-400' } as const;
 
+const CELEBRITY_NAMEPLATES = [
+  { label: 'B', containerClass: 'border-teal-400/70 bg-teal-950/55 shadow-[0_0_12px_rgba(45,212,191,0.20)]', nameClass: 'text-teal-100', badgeClass: 'border-teal-300/60 bg-teal-400/20 text-teal-100', dotClass: 'bg-teal-300' },
+  { label: 'A', containerClass: 'border-sky-400/70 bg-sky-950/55 shadow-[0_0_12px_rgba(56,189,248,0.22)]', nameClass: 'text-sky-100', badgeClass: 'border-sky-300/60 bg-sky-400/20 text-sky-100', dotClass: 'bg-sky-300' },
+  { label: 'S', containerClass: 'border-rose-400/70 bg-rose-950/55 shadow-[0_0_13px_rgba(251,113,133,0.22)]', nameClass: 'text-rose-100', badgeClass: 'border-rose-300/60 bg-rose-400/20 text-rose-100', dotClass: 'bg-rose-300' },
+  { label: 'SS', containerClass: 'border-violet-400/70 bg-violet-950/55 shadow-[0_0_14px_rgba(167,139,250,0.25)]', nameClass: 'text-violet-100', badgeClass: 'border-violet-300/60 bg-violet-400/20 text-violet-100', dotClass: 'bg-violet-300' },
+  { label: 'SSS', containerClass: 'border-amber-300 bg-amber-950/65 ring-1 ring-amber-200/30 shadow-[0_0_18px_rgba(250,204,21,0.36)]', nameClass: 'text-amber-100', badgeClass: 'border-amber-200 bg-amber-300 text-amber-950', dotClass: 'bg-amber-200' },
+] as const;
+
+function celebrityNameplate(customer?: Customer) {
+  if (!customer?.celebrity) return null;
+  const tier = Math.max(0, Math.min(4, Math.floor(customer.celebrity.tier)));
+  return CELEBRITY_NAMEPLATES[tier];
+}
+
 /** A lightweight animated shop-floor layer makes a rival visit feel occupied while the existing 3D shop scene remains interactive-looking beneath it. */
 const RivalShopActivity: React.FC<{ r: Rival }> = ({ r }) => {
   const [actors] = useState(() => {
@@ -559,22 +573,34 @@ export default function GameApp({ onLab, initial, storageKey, cloud, notice }: {
                 <Btn size="sm" tone={closing || (!s.arrivals.length && !s.inShop.length) ? 'gold' : 'ghost'} onClick={() => (s.inShop.length || (s.arrivals.length && !closing) ? setConfirmClose(true) : up(E.closeShop))}>Close shop</Btn>
               </div>
               <div className="flex gap-1.5 overflow-x-auto pb-0.5">
-                {current && (
-                  <button onClick={() => setStyling(true)} className="shrink-0 rounded-xl border border-amber-500 bg-amber-500/15 px-3 py-2 text-left">
-                    <div className="text-xs font-bold text-amber-200">Continue →</div>
-                    <div className="text-sm text-white">{current.name}</div>
-                  </button>
-                )}
+                {current && (() => {
+                  const nameplate = celebrityNameplate(current);
+                  return (
+                    <button onClick={() => setStyling(true)} className={`shrink-0 rounded-xl border px-3 py-2 text-left ${nameplate ? nameplate.containerClass : 'border-amber-500 bg-amber-500/15'}`}>
+                      <div className="flex items-center gap-2">
+                        <span className={`text-xs font-bold ${nameplate ? nameplate.nameClass : 'text-amber-200'}`}>Continue →</span>
+                        {nameplate && <span className={`rounded border px-1 py-0.5 text-[9px] font-black tracking-wide ${nameplate.badgeClass}`}>{nameplate.label}</span>}
+                      </div>
+                      <div className={`text-sm font-semibold ${nameplate ? nameplate.nameClass : 'text-white'}`}>{current.name}</div>
+                    </button>
+                  );
+                })()}
                 {queue.map((v) => {
                   const canSendToStaff = E.canAssignToStaff(s, v.c.id);
                   return <WaitChip key={v.c.id} v={v} clock={s.clock} disabled={!!current} onClick={() => styleCustomer(v.c.id)} onStaff={canSendToStaff && !v.forStaff ? () => up((g) => E.sendToStaff(g, v.c.id)) : undefined} staffHint={!v.forStaff && s.staff.length > 0 && !canSendToStaff ? 'No staff/stock match yet' : undefined} />;
                 })}
-                {s.inShop.filter((v) => v.by && v.by !== 'divine').map((v) => (
-                  <div key={v.c.id} className="shrink-0 rounded-xl border border-white/10 bg-white/5 px-3 py-2 opacity-70">
-                    <div className="text-[10px] text-slate-400">With {s.staff.find((m) => m.id === v.by)?.name}</div>
-                    <div className="text-sm text-white">{v.c.name}</div>
-                  </div>
-                ))}
+                {s.inShop.filter((v) => v.by && v.by !== 'divine').map((v) => {
+                  const nameplate = celebrityNameplate(v.c);
+                  return (
+                    <div key={v.c.id} className={`shrink-0 rounded-xl border px-3 py-2 ${nameplate ? nameplate.containerClass : 'border-white/10 bg-white/5 opacity-70'}`}>
+                      <div className={`text-[10px] ${nameplate ? nameplate.nameClass : 'text-slate-400'}`}>With {s.staff.find((m) => m.id === v.by)?.name}</div>
+                      <div className="flex items-center gap-2">
+                        <div className={`text-sm font-semibold ${nameplate ? nameplate.nameClass : 'text-white'}`}>{v.c.name}</div>
+                        {nameplate && <span className={`rounded border px-1 py-0.5 text-[9px] font-black tracking-wide ${nameplate.badgeClass}`}>{nameplate.label}</span>}
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           </div>
@@ -687,7 +713,7 @@ export default function GameApp({ onLab, initial, storageKey, cloud, notice }: {
                 up((g) => E.turnAway(g, current.id));
                 setStyling(false);
               }}
-              onSendToStaff={s.staff.length && current.cls !== 'rich' ? () => { up((g) => E.sendToStaff(g, current.id)); setStyling(false); } : null}
+              onSendToStaff={E.canAssignToStaff(s, current.id) ? () => { up((g) => E.sendToStaff(g, current.id)); setStyling(false); } : null}
             />
           )}
           {step.kind === 'price' && (
@@ -1034,14 +1060,17 @@ const PhoneButton: React.FC<{ unread: number; onClick: () => void }> = ({ unread
 
 const WaitChip: React.FC<{ v: Visitor; clock: number; disabled: boolean; onClick: () => void; onStaff?: () => void; staffHint?: string }> = ({ v, clock, disabled, onClick, onStaff, staffHint }) => {
   const left = Math.max(0, 1 - (v.waited ?? clock - v.arrived) / v.patience);
+  const nameplate = celebrityNameplate(v.c);
+  const ordinaryService = v.forStaff ? 'For staff' : v.c.service ? (v.c.male ? 'Haircut only' : v.c.service === 'makeup' ? 'Makeup only' : v.c.service === 'both' ? 'Hair & makeup' : 'Hair only') : 'Full look';
   return (
-    <div className={`shrink-0 w-36 rounded-xl border px-2.5 py-2 ${disabled ? 'border-white/10 bg-white/5 opacity-60' : 'border-white/15 bg-white/5 hover:border-amber-400/60'}`}>
+    <div className={`shrink-0 w-36 rounded-xl border px-2.5 py-2 ${nameplate ? nameplate.containerClass : disabled ? 'border-white/10 bg-white/5 opacity-60' : 'border-white/15 bg-white/5 hover:border-amber-400/60'}`}>
       <button className="w-full text-left" onClick={onClick} disabled={disabled}>
-        <div className="flex items-center gap-1.5">
-          <span className={`w-2 h-2 rounded-full ${CLS_DOT[v.c.cls]}`} />
-          <span className="text-sm text-white font-semibold truncate">{v.c.name}</span>
+        <div className="flex min-w-0 items-center gap-1.5">
+          <span className={`w-2 h-2 rounded-full shrink-0 ${nameplate ? nameplate.dotClass : CLS_DOT[v.c.cls]}`} />
+          <span className={`min-w-0 flex-1 text-sm font-semibold truncate ${nameplate ? nameplate.nameClass : 'text-white'}`}>{v.c.name}</span>
+          {nameplate && <span className={`shrink-0 rounded border px-1 py-0.5 text-[9px] font-black tracking-wide ${nameplate.badgeClass}`}>{nameplate.label}</span>}
         </div>
-        <div className="text-[10px] text-slate-400 truncate">{v.forStaff ? 'For staff' : v.c.service ? (v.c.male ? 'Haircut only' : v.c.service === 'makeup' ? 'Makeup only' : v.c.service === 'both' ? 'Hair & makeup' : 'Hair only') : 'Full look'}{v.c.regularId ? ' · Regular' : ''}</div>
+        <div className={`text-[10px] truncate ${nameplate ? nameplate.nameClass : 'text-slate-400'}`}>{nameplate ? `${nameplate.label} celebrity · ${ordinaryService}` : ordinaryService}{v.c.regularId ? ' · Regular' : ''}</div>
         <div className="h-1 mt-1 rounded-full bg-white/10 overflow-hidden"><div className={`h-full ${left > 0.5 ? 'bg-emerald-400' : left > 0.25 ? 'bg-amber-400' : 'bg-rose-500'}`} style={{ width: `${left * 100}%` }} /></div>
       </button>
       {onStaff && <button onClick={onStaff} className="text-[10px] text-sky-300 mt-1 hover:underline">Send to staff</button>}
