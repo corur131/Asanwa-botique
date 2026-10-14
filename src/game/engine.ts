@@ -1766,7 +1766,7 @@ function canonicaliseCartColours(line: CartLine): CartLine {
   return {
     ...line,
     color: colour || line.color,
-    ...(isClothing(line.kind) && colour2 ? { color2 } : {}),
+    ...(isClothing(line.kind) && colour2 ? { color2: colour2 } : {}),
   };
 }
 
