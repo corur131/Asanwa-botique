@@ -124,6 +124,9 @@ export function rivalDefaults() {
 
 const freshDay = { clock: 0, arrivals: [], inShop: [], serving: null, left: [], outages: [] as GameState['outages'], shouts: [] as GameState['shouts'] };
 
+// Large government/organization contracts must remain rare enough not to replace ordinary shop progression.
+const POLITICIAN_CONTRACT_COOLDOWN_DAYS = 45;
+
 const CONTRACT_TIER_RULES = [
   { retailCeiling: 18_000, lines: 1, minQty: 2, maxQty: 3, deadlineDays: 5 },
   { retailCeiling: 60_000, lines: 1, minQty: 3, maxQty: 5, deadlineDays: 6 },
@@ -247,7 +250,7 @@ export function ensurePoliticianContractOffer(s0: GameState, force = false): Gam
   contracts = [...(s.politicianContracts || contracts)];
   const hasLive = contracts.some((row) => row.status === 'offered' || row.status === 'accepted');
   const lastActivityDay = contracts.reduce((latest, row) => Math.max(latest, row.completedDay || row.offeredDay), 0);
-  if (hasLive || (!force && contracts.length > 0 && s.day < lastActivityDay + 3)) {
+  if (hasLive || (!force && contracts.length > 0 && s.day < lastActivityDay + POLITICIAN_CONTRACT_COOLDOWN_DAYS)) {
     return contracts.length ? { ...s, politicianContracts: contracts.slice(-20) } : s;
   }
   // Politician contracts are rare late-game opportunities, not day-one walk-in orders.
