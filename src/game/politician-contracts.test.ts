@@ -7,7 +7,8 @@ import { prepareShopperOrder } from './shopper';
 import type { GameState, PoliticianContract } from './types';
 
 function game(overrides: Partial<GameState> = {}): GameState {
-  return { ...newGame(DIVINE_CONFIG), ...overrides } as GameState;
+  // Most contract workflow tests exercise the late-game eligible tier.
+  return { ...newGame(DIVINE_CONFIG), tier: 6, ...overrides } as GameState;
 }
 
 function contractFor(s: GameState): PoliticianContract {
