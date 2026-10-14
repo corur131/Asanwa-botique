@@ -106,12 +106,17 @@ export const generatorCapacityKw = (s: GameState, uid?: string) => {
   const kind = generatorKind(s, uid);
   return kind ? POWER.capacityKw[kind] : 0;
 };
+export const generatorFuelBurnForLoad = (kind: 'small' | 'big' | 'industrial', demandKw: number) =>
+  POWER.burn[kind] * (0.35 + 0.65 * Math.min(1, Math.max(0, demandKw) / POWER.capacityKw[kind]));
+export const solarDrainMinutes = (minutes: number, demandKw: number, panels: number, acOn = false) =>
+  Math.max(0, minutes) * Math.max(acOn ? 2 : 1, Math.max(1, demandKw / Math.max(0.35, panels * 0.35)));
+export const solarChargeMinutes = (current: number, minutes: number, panels: number) =>
+  Math.max(0, current) + Math.max(0, minutes) * POWER.chargePerPanelPerMinute * Math.max(0, panels);
 export const generatorOverloaded = (s: GameState) => !!s.power?.gen && loadKw(s) > generatorCapacityKw(s) + 0.001;
 
 /** Electricity drawn right now, in kW. Baseline lighting scales with floor area and display capacity. */
 export function loadKw(s: GameState): number {
   const st = liveStats(s);
-  const size = Math.max(20, (s.listing?.area ? 1 : 0) + 1);
   const slots = Math.max(0, st.display || 0);
   const room = (s.listing as any)?.w && (s.listing as any)?.d ? (s.listing as any).w * (s.listing as any).d : 30;
   const baseline = 0.08 + Math.min(0.8, room / 100 * 0.12) + Math.min(0.6, slots / 100 * 0.18) + Math.max(0, (s.tier || 0)) * 0.025;
@@ -186,7 +191,7 @@ export const fuelPerHour = (s: GameState) => {
   const capacity = POWER.capacityKw[g];
   const demand = loadKw(s);
   const loadFraction = Math.min(1, demand / capacity);
-  return POWER.burn[g] * (0.35 + 0.65 * loadFraction);
+  return generatorFuelBurnForLoad(g, demand);
 };
 
 const pick = <T,>(a: readonly T[]): T => a[Math.floor(Math.random() * a.length)];
@@ -232,7 +237,7 @@ export function powerStep(s0: GameState, from: number, to: number): GameState {
     s = { ...s, today: { ...s.today, outageMinutes: (s.today.outageMinutes || 0) + minutes } };
     if (power.gen && st.gen) {
       const g = generatorKind(s, activeUid);
-      const rate = g ? POWER.burn[g] * (0.35 + 0.65 * Math.min(1, loadKw(s) / POWER.capacityKw[g])) : POWER.burn[st.gen];
+      const rate = g ? generatorFuelBurnForLoad(g, loadKw(s)) : POWER.burn[st.gen];
       power.fuel = Math.max(0, power.fuel - (rate * minutes) / 60);
       if (activeUid) power.generatorFuel[activeUid] = power.fuel;
       if (power.fuel <= 0) {
@@ -242,7 +247,7 @@ export function powerStep(s0: GameState, from: number, to: number): GameState {
     } else if (st.solarPanels && power.solar > 0) {
       const acOn = st.coolAc > 0 && st.solarPanels >= POWER.acPanels;
       const demandFactor = Math.max(1, loadKw(s) / Math.max(0.35, st.solarPanels * 0.35));
-      power.solar = Math.max(0, power.solar - minutes * Math.max(acOn ? 2 : 1, demandFactor));
+      power.solar = Math.max(0, power.solar - solarDrainMinutes(minutes, loadKw(s), st.solarPanels, acOn));
       if (power.solar <= 0) s = addShout(s, 'Solar', st.gen ? 'Solar battery is flat. Start the generator!' : 'Solar battery is flat. The shop is dark now.', 'warn');
     } else if (s.furniture.some((p) => p.placed && p.id === 'rechargeableFan') && power.fanBattery > 0) {
       power.fanBattery = Math.max(0, power.fanBattery - minutes);
@@ -252,7 +257,7 @@ export function powerStep(s0: GameState, from: number, to: number): GameState {
     if (s.furniture.some((p) => p.placed && p.id === 'rechargeableFan')) power.fanBattery = Math.min(120, power.fanBattery + minutes * 0.5);
     if (st.solarPanels && to < 600) {
       // sunshine and light: the batteries charge
-      power.solar = Math.min(cap, power.solar + minutes * POWER.chargePerPanelPerMinute * st.solarPanels);
+      power.solar = Math.min(cap, solarChargeMinutes(power.solar, minutes, st.solarPanels));
     }
     // on NEPA: the meter runs
     if (s.phase === 'shop') s = { ...s, meter: { kwh: (s.meter?.kwh || 0) + kwhForLoad(loadKw(s), minutes) } };
