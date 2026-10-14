@@ -28,6 +28,8 @@ test('new offer uses real catalogue items unlocked for the current boutique leve
   const s = game({ tier: 6 });
   const offer = contractFor(s);
   assert.equal(offer.status, 'offered');
+  assert.ok(offer.reward >= 500_000_000 && offer.reward <= 1_000_000_000,
+    'Level 7 major contracts must offer ₦500m–₦1bn');
   assert.ok(offer.reward > offer.requirements.reduce((sum, row) => sum + row.unitCost * row.quantity, 0));
   assert.ok(offer.requirements.length >= 1);
   for (const requirement of offer.requirements) {
@@ -37,6 +39,16 @@ test('new offer uses real catalogue items unlocked for the current boutique leve
     assert.ok(Number.isInteger(requirement.quantity) && requirement.quantity > 0);
   }
   assert.equal(s.cash < 0, false);
+});
+
+test('Level 6 and Level 7 major contracts use the proposed late-game payout scale', () => {
+  const level6 = contractFor(game({ tier: 5, politicianContracts: [] }));
+  assert.ok(level6.reward >= 220_000_000 && level6.reward <= 500_000_000,
+    'Level 6 major contracts must offer ₦220m–₦500m');
+
+  const level7 = contractFor(game({ tier: 6, politicianContracts: [] }));
+  assert.ok(level7.reward >= 500_000_000 && level7.reward <= 1_000_000_000,
+    'Level 7 major contracts must offer ₦500m–₦1bn');
 });
 
 test('accepting a contract sets a deadline but never charges the player', () => {
@@ -52,13 +64,13 @@ test('accepting a contract sets a deadline but never charges the player', () => 
 });
 
 test('shopper sources only missing quantities for the accepted contract and delivery pays after stock is verified', () => {
-  const s = game({ cash: 5_000_000, tier: 6, marketCart: [] });
+  const s = game({ cash: 1_000_000_000, tier: 6, marketCart: [] });
   const offer = contractFor(s);
   const accepted = acceptPoliticianContract(s, offer.id);
   const contract = accepted.politicianContracts!.find((row) => row.id === offer.id)!;
-  // Late-game bulk contracts must source the full required quantity, so give the
-  // shopper a budget that covers the contract's actual catalogue cost.
-  const sourcingBudget = contract.requirements.reduce((sum, row) => sum + row.unitCost * row.quantity, 0);
+  // This is a fulfilment regression test, so fund the late-game sourcing order
+  // generously enough to cover every required line. This is test-only money.
+  const sourcingBudget = 500_000_000;
   const shopper = prepareShopperOrder(accepted, 'contract', sourcingBudget, contract.brief, contract.id);
   assert.ok(shopper.job, shopper.error);
   assert.equal(shopper.job.contractId, contract.id);
