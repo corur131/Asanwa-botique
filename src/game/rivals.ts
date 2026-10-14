@@ -6,8 +6,8 @@
  */
 import { CharacterConfig } from '../types/character';
 import { generateRandomCustomer } from '../utils/randomizer';
-import { TIERS } from './economy';
-import { celebrityIsScheduled, celebrityVisitChance } from './customers';
+import { CELEBRITY_FULFILMENT_RATE, TIERS } from './economy';
+import { celebrityAmountsForTier, celebrityAttractionMultiplier, celebrityIsScheduled, celebrityVisitChance, chooseCelebrityTierForShop } from './customers';
 import { GameState, Gist, Message, ReplyChoice, Rival, RivalPost } from './types';
 import { Topic, startConvo } from './convos';
 import { brandFromLegacy, brandPower, getBrandMetrics } from './business';
@@ -21,7 +21,7 @@ type Seed = Omit<Rival, 'cash' | 'rep' | 'followers' | 'week' | 'feeling' | 'loo
 
 const ROSTER: Seed[] = [
   // the five
-  { id: 'tolani', owner: 'Tolani Adebayo', shop: 'House of Tolani', handle: 'houseoftolani', main: true, personality: 'queen', speciality: 'bridal', area: 'Victoria Island', tier: 4, skill: 1.28, aggression: 0.45, rep: 88, followers: 48_000 },
+  { id: 'tolani', owner: 'Tolani Adebayo', shop: 'House of Tolani', handle: 'houseoftolani', main: true, personality: 'queen', speciality: 'bridal', area: 'Victoria Island', tier: 4, signature: true, skill: 1.28, aggression: 0.45, rep: 88, followers: 48_000 },
   { id: 'amaka', owner: 'Amaka Obi', shop: "Amaka's Closet", handle: 'amakascloset_', main: true, personality: 'loud', speciality: 'genz', area: 'Yaba', tier: 1, skill: 1.02, aggression: 0.8, rep: 55, followers: 3_200 },
   { id: 'bisi', owner: 'Iya Bisi', shop: 'Bisi Aso-Oke & Lace', handle: 'bisi_asooke', main: true, personality: 'oldschool', speciality: 'native', area: 'Surulere', tier: 1, skill: 0.98, aggression: 0.4, rep: 60, followers: 1_400 },
   { id: 'chioma', owner: 'Chioma Eze', shop: 'Chi Cheap & Chic', handle: 'chicheapchic', main: true, personality: 'shady', speciality: 'cheap', area: 'Yaba', tier: 0, skill: 0.95, aggression: 0.9, rep: 38, followers: 900 },
@@ -153,6 +153,71 @@ function rivalPost(s: GameState, r: Rival, caption: string, shade = false): Game
   return { ...s, rivalPosts: [p, ...(s.rivalPosts || [])].slice(0, 60) };
 }
 
+export interface CelebrityVisitAnnouncement {
+  shopId: string;
+  shopName: string;
+  ownerName: string;
+  celebrityName: string;
+  spend: number;
+  bought: boolean;
+  premiumOrder: boolean;
+  followerGain?: number;
+}
+
+/** Shared celebrity press/social event for Divine and rivals; reported receipts are not described as profit. */
+export function announceCelebrityVisit(s0: GameState, event: CelebrityVisitAnnouncement): GameState {
+  let s = s0;
+  const spend = Math.max(0, Math.round(event.spend || 0));
+  const moneyText = `₦${spend.toLocaleString('en-NG')}`;
+  const headline = event.premiumOrder
+    ? `${event.shopName} welcomes a celebrity client ✨`
+    : event.bought
+      ? `Celebrity shopping visit at ${event.shopName}`
+      : `Celebrity visit to ${event.shopName} ends without an order`;
+  const outcome = event.premiumOrder
+    ? `${event.celebrityName} placed a premium order with reported revenue of ${moneyText}, including any tip.`
+    : event.bought
+      ? `${event.celebrityName} purchased a wardrobe with reported revenue of ${moneyText}, including any tip; it was not a top-tier premium order.`
+      : `${event.celebrityName} visited but left without completing a purchase.`;
+  const body = `${event.ownerName} of ${event.shopName}: ${outcome} Stock, styling and fulfilment costs are accounted for separately.`;
+  s = gist(s, headline, body, event.shopId, event.premiumOrder || !event.bought);
+  s = say(s, 'GistLagos',
+    `🚨 CELEBRITY SIGHTING: ${event.shopName} (${event.ownerName}) — ${event.premiumOrder ? `premium order reported at ${moneyText}` : event.bought ? `a purchase reported at ${moneyText}` : 'no purchase was recorded'}.`,
+    { chat: GROUP, tone: event.bought ? 'good' : 'warn' });
+  if (event.shopId === 'you') {
+    const gainText = event.followerGain ? ` +${event.followerGain.toLocaleString('en-NG')} followers.` : '';
+    s = say(s, 'Gidigram', event.premiumOrder
+      ? `TRENDING NOW 🔥 ${event.celebrityName} placed a premium order at Asanwa Boutique and posted the look.${gainText}`
+      : event.bought
+        ? `CELEBRITY SPOTTED ✨ ${event.celebrityName} shopped at Asanwa Boutique. Reported revenue: ${moneyText}.`
+        : `CELEBRITY SIGHTING: ${event.celebrityName} visited Asanwa Boutique but left without buying.`,
+      { tone: event.premiumOrder ? 'good' : event.bought ? 'info' : 'warn' });
+    s = say(s, 'Asanwa Boutique',
+      `Celebrity update: ${event.celebrityName} ${event.premiumOrder ? `placed a premium order worth ${moneyText}` : event.bought ? `made a purchase worth ${moneyText}` : 'left without placing an order'}.`,
+      { chat: GROUP, tone: event.bought ? 'good' : 'warn' });
+    if (!event.followerGain) {
+      s = { ...s, today: { ...s.today, events: [...(s.today?.events || []), headline] } };
+    }
+  } else {
+    const rival = rivalById(s, event.shopId);
+    if (rival) s = rivalPost(s, rival,
+      event.premiumOrder
+        ? `A celebrity guest chose a standout luxury look at ${event.shopName} ✨ Reported order: ${moneyText}. #CelebrityStyle #LagosFashion`
+        : event.bought
+          ? `A celebrity guest purchased a wardrobe at ${event.shopName} ✨ #LagosFashion`
+          : `A celebrity guest visited ${event.shopName} today, but no order was completed.`,
+      !event.bought);
+    if (rival?.main) s = inGroup(s, rival,
+      event.premiumOrder
+        ? `Celebrity client in my shop today 😌✨ Reported order: ${moneyText}. The industry is watching.`
+        : event.bought
+          ? `Celebrity shopper came through today ✨ A wardrobe purchase at ${event.shopName}.`
+          : `A celebrity visited today but left without buying. We will take the feedback and do better.`,
+      { tone: event.bought ? 'good' : 'warn' });
+  }
+  return s;
+}
+
 const LINES = {
   brag: {
     queen: ['Another bride, another masterpiece. Some of us were built for this. 👑', 'Booked till December. Thank God for growth 🙏🏾', 'Some people are still learning to tie gele. I just did three brides before 10am.'],
@@ -216,7 +281,7 @@ export function simulateRivals(s0: GameState): GameState {
   const rankById = new Map(currentOrder.map((id, index) => [id, index + 1] as const));
   const youRank = rankById.get('you') || 20;
   const rivals: Rival[] = [];
-  const news: { kind: 'up' | 'down' | 'viral' | 'scandal' | 'campaign' | 'celebrity'; r: Rival; spend?: number }[] = [];
+  const news: { kind: 'up' | 'down' | 'viral' | 'scandal' | 'campaign' | 'celebrity'; r: Rival; spend?: number; bought?: boolean; premiumOrder?: boolean; celebrityTier?: number }[] = [];
   const growthNotes: { owner: string; shop: string; detail: string }[] = [];
   for (const r0 of s.rivals) {
     const r = { ...r0, week: [...r0.week], weekCosts: [...(r0.weekCosts || [])] };
@@ -300,29 +365,55 @@ export function simulateRivals(s0: GameState): GameState {
       r.rep = clamp(r.rep + rand(0.2, 0.8), 5, 99);
       if (r.main) news.push({ kind: 'campaign', r });
     }
-    // Rivals share the ordinary shop's 14-day celebrity calendar; visits only roll on eligible days.
-    // This prevents high-follower rivals (especially Tolani) from receiving celebrities almost daily.
-    const celebrityScheduled = celebrityIsScheduled(r.tier, today);
-    const celebrityChance = celebrityVisitChance(r.tier, false);
+    // The player and every rival share one opportunity, brand-heat and celebrity-rank model.
+    // Tolani retains premium positioning on existing saves as well as new games.
+    const signatureProperty = !!r.signature || (r.id === 'tolani' && r.tier >= 4 && r.stars >= 3);
+    const celebrityProfile = {
+      reputation: r.rep,
+      followers: r.followers || 0,
+      shopTierIndex: r.tier,
+      awareness: r.brand?.awareness,
+      prestige: r.brand?.prestige,
+      trendInfluence: r.brand?.trendInfluence,
+    };
+    const celebrityScheduled = celebrityIsScheduled(r.tier, today, signatureProperty);
+    const celebrityChance = celebrityVisitChance(r.tier, signatureProperty, celebrityProfile);
     if (celebrityScheduled && chance(celebrityChance)) {
-      const celebritySpendBase = [400_000, 1_200_000, 3_500_000, 9_000_000, 18_000_000, 32_000_000, 55_000_000][r.tier] ?? 400_000;
-      const celebritySpend = Math.round(celebritySpendBase * rand(0.7, 2.2) * (0.8 + r.skill * 0.2));
-      const celebrityGoodsCost = Math.round(celebritySpend * clamp(stockShare * rand(0.82, 1.05), 0.3, 0.78));
-      const celebrityServiceCost = Math.round(celebritySpend * rand(0.025, 0.06));
-      const celebrityCosts = celebrityGoodsCost + celebrityServiceCost;
-      r.week[r.week.length - 1] = (r.week[r.week.length - 1] || 0) + celebritySpend;
-      r.cash += celebritySpend - celebrityCosts;
+      const celebrityTier = chooseCelebrityTierForShop(r.tier, signatureProperty, celebrityProfile);
+      const { budget, spendFloor } = celebrityAmountsForTier(celebrityTier);
+      const currentBrand = r.brand || brandFromLegacy(r.rep, r.followers || 0, r.tier);
+      const purchaseChance = clamp(0.80 + (r.skill - 1) * 0.20 + (r.rep - 50) / 500, 0.55, 0.92);
+      const premiumOrderChance = clamp(0.48 + (r.skill - 1) * 0.60 + (r.rep - 50) * 0.002 +
+        (currentBrand.reliability - 50) * 0.0015, 0.15, 0.90);
+      const bought = chance(purchaseChance);
+      const premiumOrder = bought && chance(premiumOrderChance);
+      const regularOrderFloor = [250_000, 900_000, 1_500_000, 3_000_000, 5_000_000][celebrityTier] || 250_000;
+      const celebritySpend = !bought ? 0 : premiumOrder
+        ? Math.min(budget, spendFloor)
+        : Math.min(budget, Math.max(regularOrderFloor, Math.round(budget * rand(0.08, 0.18))));
+      const tipRate = premiumOrder ? 0.05 + celebrityTier * 0.02 : 0.015 + celebrityTier * 0.005;
+      const celebrityTip = Math.round(celebritySpend * tipRate);
+      const celebrityRevenue = celebritySpend + celebrityTip;
+      const celebrityCosts = premiumOrder
+        ? Math.round(celebritySpend * CELEBRITY_FULFILMENT_RATE)
+        : Math.round(celebritySpend * clamp(stockShare * rand(0.82, 1.05) + 0.025, 0.3, 0.85));
+      r.week[r.week.length - 1] = (r.week[r.week.length - 1] || 0) + celebrityRevenue;
+      r.cash += celebrityRevenue - celebrityCosts;
       r.weekCosts[r.weekCosts.length - 1] = (r.weekCosts[r.weekCosts.length - 1] || 0) + celebrityCosts;
       dailyCosts += celebrityCosts;
-      r.rep = clamp(r.rep + rand(0.8, 2.2), 5, 99);
-      r.followers += Math.round(rand(250, 1_800) * (r.tier + 1) + celebritySpend / 100_000 * rand(2, 8));
+      r.rep = clamp(r.rep + (premiumOrder ? rand(0.8, 2.2) : bought ? rand(0.1, 0.5) : -rand(0.3, 1.1)), 5, 99);
+      if (bought) {
+        r.followers += premiumOrder
+          ? Math.round(rand(250, 1_800) * (r.tier + 1) + celebritySpend / 100_000 * rand(2, 8))
+          : Math.round(rand(20, 100) * (r.tier + 1));
+      }
       r.brand = {
-        ...(r.brand || brandFromLegacy(r.rep, r.followers, r.tier)),
-        awareness: clamp((r.brand || brandFromLegacy(r.rep, r.followers, r.tier)).awareness + rand(0.8, 2.1), 5, 100),
-        prestige: clamp((r.brand || brandFromLegacy(r.rep, r.followers, r.tier)).prestige + rand(0.4, 1.4), 5, 100),
-        trendInfluence: clamp((r.brand || brandFromLegacy(r.rep, r.followers, r.tier)).trendInfluence + rand(0.5, 1.7), 5, 100),
+        ...currentBrand,
+        awareness: clamp(currentBrand.awareness + (premiumOrder ? rand(0.8, 2.1) : bought ? rand(0.1, 0.6) : -rand(0.2, 0.7)), 5, 100),
+        prestige: clamp(currentBrand.prestige + (premiumOrder ? rand(0.4, 1.4) : bought ? rand(0.1, 0.5) : -rand(0.5, 1.1)), 5, 100),
+        trendInfluence: clamp(currentBrand.trendInfluence + (premiumOrder ? rand(0.5, 1.7) : bought ? rand(0.1, 0.7) : -rand(0.3, 0.9)), 5, 100),
       };
-      news.push({ kind: 'celebrity', r, spend: celebritySpend });
+      news.push({ kind: 'celebrity', r, spend: celebrityRevenue, bought, premiumOrder, celebrityTier });
     }
     // Bad weeks still hurt: theft, a landlord's surprise charge or a dead generator.
     if (chance(0.025)) { const incidentCost = Math.round(takings * rand(2, 4)); r.cash -= incidentCost; r.weekCosts[r.weekCosts.length - 1] = (r.weekCosts[r.weekCosts.length - 1] || 0) + incidentCost; }
@@ -404,13 +495,15 @@ export function simulateRivals(s0: GameState): GameState {
   for (const n of news) {
     const r = n.r;
     if (n.kind === 'celebrity') {
-      const spend = n.spend || 0;
-      const headline = `${r.shop} welcomes a celebrity client ✨`;
-      const detail = `${r.owner} hosted a celebrity shopping visit today. The client spent ${'₦' + spend?.toLocaleString('en-NG')} on a luxury wardrobe; stock and service costs were deducted, and the visit lifted the boutique's profile.`;
-      s = gist(s, headline, detail, r.id, true);
-      s = say(s, 'GistLagos', `🚨 CELEBRITY SIGHTING: ${r.shop} (${r.owner}) just welcomed a celebrity shopper. Reported spend: ₦${spend?.toLocaleString('en-NG')}. Lagos fashion is getting competitive!`, { chat: GROUP, tone: 'good' });
-      s = rivalPost(s, r, `A special guest came through today ✨ Celebrity client, luxury pieces, and a very good day at ${r.shop}. Thank you for the love! #CelebrityStyle #LagosFashion`);
-      if (r.main) s = inGroup(s, r, `Celebrity client in my shop today 😌✨ The industry is watching.`, { tone: 'good' });
+      s = announceCelebrityVisit(s, {
+        shopId: r.id,
+        shopName: r.shop,
+        ownerName: r.owner,
+        celebrityName: n.premiumOrder ? 'a celebrity client' : 'a celebrity guest',
+        spend: n.spend || 0,
+        bought: !!n.bought,
+        premiumOrder: !!n.premiumOrder,
+      });
     } else if (n.kind === 'up') {
       s = gist(s, `${r.shop} moves to a ${TIERS[r.tier].name}!`, `${r.owner} has upgraded. Sources say the rent is not small.`, r.id);
       if (r.main) {
