@@ -64,7 +64,7 @@ json.dump({
         'rentTargetsAreProposals': True,
         'plannedRichBudgetRange': [100_000, 5_000_000],
         'plannedRichBudgetsAreWeightedBelowMaximum': True,
-        'richBudgetBands': RICH_RETAIL_BUDGET_BANDS if False else econ.RICH_RETAIL_BUDGET_BANDS,
+        'richBudgetBands': econ.RICH_RETAIL_BUDGET_BANDS,
         'celebritySpendRanges': econ.CELEBRITY_SPEND_RANGES,
         'celebrityFulfilmentRate': econ.CELEBRITY_FULFILMENT_RATE,
         'celebrityPremiumScoreSuccessAssumption': econ.CELEBRITY_PREMIUM_SCORE_SUCCESS_RATE,
