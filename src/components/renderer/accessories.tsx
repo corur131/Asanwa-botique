@@ -702,6 +702,54 @@ export const Headwear: React.FC<{ id: Id; acc: Accessories; plain: boolean }> = 
       {kind === 'coutureCrystalHeadpiece' && <>{[0,1,2,3,4,5,6,7].map((i) => <path key={i} d={`M ${350 + i * 13} ${140 - i * 9} l 4 -5 l 4 5 l -4 5 Z`} fill="#F2F8FF" stroke="#B9CADF" strokeWidth="0.8" />)}<path d="M 316 166 Q 350 184 390 160" fill="none" stroke="#D9B25A" strokeWidth="2.5" /></>}
       {kind === 'goldThreadAsoOkeGele' && <>{[0,1,2,3,4,5].map((i) => <path key={i} d={`M ${230 + i * 16} ${190 - i * 8} Q 300 ${164 - i * 10} ${390 + i * 3} ${190 - i * 8}`} fill="none" stroke={`url(#${id('gold')})`} strokeWidth="2" />)}</>}
       {kind === 'heirloomGoldGele' && <>{[0,1,2,3,4,5,6,7,8].map((i) => <circle key={i} cx={230 + i * 17} cy={211 - Math.sin(i * Math.PI / 8) * 24} r="3.1" fill="#FFF1BC" stroke={`url(#${id('gold')})`} strokeWidth="1" />)}<path d="M 200 248 Q 300 222 400 248" fill="none" stroke={`url(#${id('gold')})`} strokeWidth="4" /></>}
+      {kind === 'atelierHaloDiscHat' && <>
+        <ellipse cx="300" cy="178" rx="112" ry="20" fill={paint.base} stroke={lo} strokeWidth="2" />
+        <ellipse cx="300" cy="174" rx="100" ry="13" fill={fill} opacity="0.88" />
+        <path d="M 262 177 C 260 145 276 132 300 132 C 324 132 340 145 338 177 Z" fill={paint.base} stroke={lo} strokeWidth="1.6" />
+        <ellipse cx="300" cy="175" rx="66" ry="7" fill={lighten(paint.base, 0.35)} opacity="0.7" />
+        <path d="M 250 177 Q 300 187 350 177" fill="none" stroke={`url(#${id('gold')})`} strokeWidth="2.4" />
+      </>}
+      {kind === 'atelierSculptedPillbox' && <>
+        <path d="M 224 205 C 220 172 246 144 300 142 C 354 144 380 172 376 205 Q 300 221 224 205 Z" fill={paint.base} stroke={lo} strokeWidth="2" />
+        <path d="M 236 192 Q 300 171 364 192" fill="none" stroke={lighten(paint.base, 0.42)} strokeWidth="3.2" />
+        <path d="M 260 152 Q 300 169 340 152" fill="none" stroke={`url(#${id('gold')})`} strokeWidth="2.8" />
+        {Array.from({length:5},(_,i)=><circle key={i} cx={272+i*14} cy={165+Math.abs(i-2)*3} r="2.3" fill="#F7FBFF" stroke="#BAC9D8" strokeWidth="0.5" />)}
+      </>}
+      {kind === 'atelierFoldedFascinator' && <>
+        <path d="M 257 202 Q 246 155 278 121 Q 309 96 344 116 Q 325 148 291 180 Z" fill={paint.base} stroke={lo} strokeWidth="1.8" />
+        <path d="M 274 197 Q 295 151 330 122 M 284 199 Q 310 160 339 134" fill="none" stroke={lighten(paint.base, 0.42)} strokeWidth="2.1" />
+        <ellipse cx="294" cy="193" rx="45" ry="15" transform="rotate(-14 294 193)" fill={fill} stroke={lo} strokeWidth="1.5" />
+        <circle cx="294" cy="193" r="5" fill={`url(#${id('gold')})`} stroke="#FFF0B8" strokeWidth="1.2" />
+      </>}
+      {kind === 'atelierCrystalHeadband' && <>
+        <path d="M 204 254 Q 218 143 300 136 Q 382 143 396 254" fill="none" stroke={`url(#${id('gold')})`} strokeWidth="7" />
+        <path d="M 206 252 Q 220 151 300 145 Q 380 151 394 252" fill="none" stroke="#F6E7B5" strokeWidth="1.6" />
+        {[0,1,2,3,4,5,6,7,8].map((i)=><path key={i} d={`M ${225+i*19} ${170+Math.abs(i-4)*6} l 4 -6 l 4 6 l -4 6 Z`} fill="#F6FBFF" stroke="#AFC5D9" strokeWidth="0.8" />)}
+      </>}
+      {kind === 'empireArcTiara' && <>
+        <path d="M 202 260 Q 220 211 240 219 Q 257 234 274 196 Q 300 147 326 196 Q 343 234 360 219 Q 380 211 398 260" fill="none" stroke={`url(#${id('gold')})`} strokeWidth="5.6" />
+        <path d="M 202 260 Q 300 280 398 260" fill="none" stroke={`url(#${id('gold')})`} strokeWidth="5.6" />
+        {Array.from({length:9},(_,i)=><path key={i} d={`M ${230+i*17.5} ${228-Math.sin(i*Math.PI/8)*38} l 4 -7 l 4 7 l -4 7 Z`} fill="#F7FBFF" stroke="#BAC9D8" strokeWidth="0.8" />)}
+        <circle cx="300" cy="189" r="8" fill="#E9F4FF" stroke={`url(#${id('gold')})`} strokeWidth="1.6" />
+      </>}
+      {kind === 'atelierMonolithFedora' && <>
+        <path d="M 236 201 C 239 160 267 143 300 143 C 333 143 361 160 364 201 Q 300 214 236 201 Z" fill={paint.base} stroke={lo} strokeWidth="1.9" />
+        <path d="M 200 201 Q 300 180 400 201 Q 406 222 300 228 Q 194 222 200 201 Z" fill={fill} stroke={lo} strokeWidth="2" />
+        <path d="M 239 199 Q 300 215 361 199" fill="none" stroke={`url(#${id('gold')})`} strokeWidth="4" />
+        <path d="M 292 144 L 291 195 M 308 144 L 309 195" stroke={lighten(paint.base, 0.35)} strokeWidth="1.4" />
+      </>}
+      {kind === 'atelierArchitecturalCap' && <>
+        <path d="M 224 206 C 220 170 251 144 300 144 C 349 144 380 170 376 206 Z" fill={paint.base} stroke={lo} strokeWidth="1.7" />
+        <path d="M 216 205 Q 300 190 384 205 Q 397 221 300 225 Q 203 221 216 205 Z" fill={fill} stroke={lo} strokeWidth="1.8" />
+        <path d="M 300 145 L 300 202 M 262 151 L 276 201 M 338 151 L 324 201" stroke={lighten(paint.base, 0.34)} strokeWidth="1.5" />
+        <rect x="292" y="151" width="16" height="16" rx="2" fill={`url(#${id('gold')})`} />
+      </>}
+      {kind === 'empireCashmereBeanie' && <>
+        <path d="M 224 218 C 215 170 251 128 300 128 C 349 128 385 170 376 218 Q 300 238 224 218 Z" fill={paint.base} stroke={lo} strokeWidth="1.9" />
+        <path d="M 223 202 Q 300 223 377 202 L 381 218 Q 300 240 219 218 Z" fill={fill} stroke={lo} strokeWidth="1.4" />
+        {[0,1,2,3,4].map((i)=><path key={i} d={`M ${250+i*25} 151 Q ${244+i*25} 185 ${250+i*25} 215`} fill="none" stroke={lighten(paint.base,0.32)} strokeWidth="2" opacity="0.8" />)}
+        <circle cx="300" cy="131" r="4.5" fill={`url(#${id('gold')})`} />
+      </>}
     </g>
   );
 };
