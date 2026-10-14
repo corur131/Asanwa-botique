@@ -52,9 +52,14 @@ export type FemaleHairStyle =
   | 'highBun'
   | 'sleekPonytail'
   | 'fauxLocs'
-  | 'bantuKnots';
+  | 'bantuKnots'
+  | 'atelierGlassSilkBob'
+  | 'atelierSculptedSWave'
+  | 'atelierCurtainLayers'
+  | 'empireOrbitHaloCurls'
+  | 'empireLiquidSidePony';
 
-export type MaleHairStyle = 'lowCut' | 'waves' | 'shortDreads' | 'highTopFade' | 'afro' | 'longLocs' | 'bald';
+export type MaleHairStyle = 'lowCut' | 'waves' | 'shortDreads' | 'highTopFade' | 'afro' | 'longLocs' | 'bald' | 'atelierMonolithTaper' | 'atelierSculptedQuiff' | 'empireSilkCurtainWaves';
 
 export type HairStyle = FemaleHairStyle | MaleHairStyle;
 
@@ -70,7 +75,7 @@ export type FacialHairPreset =
   | 'chinStrap'
   | 'moustache';
 
-export type EarringStyle = 'none' | 'goldStuds' | 'goldHoops' | 'bigHoops' | 'goldDrops' | 'pearls' | 'chandelier' | 'coralDrops' | 'huggies' | 'pearlCascadeDrops' | 'goldFiligreeDrops' | 'diamondHaloStuds' | 'crystalBridalChandeliers' | 'heirloomCoralDrops' | 'diamondStatementHoops' | 'royalPearlChandeliers';
+export type EarringStyle = 'none' | 'goldStuds' | 'goldHoops' | 'bigHoops' | 'goldDrops' | 'pearls' | 'chandelier' | 'coralDrops' | 'huggies' | 'pearlCascadeDrops' | 'goldFiligreeDrops' | 'diamondHaloStuds' | 'crystalBridalChandeliers' | 'heirloomCoralDrops' | 'diamondStatementHoops' | 'royalPearlChandeliers' | 'atelierPearlDriftEarClimbers' | 'atelierOrbitHaloDrops' | 'atelierGlassShardChandeliers';
 
 export type CharacterState = 'styled' | 'plain';
 
