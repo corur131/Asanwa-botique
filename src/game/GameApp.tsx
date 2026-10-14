@@ -772,7 +772,7 @@ export default function GameApp({ onLab, initial, storageKey, cloud, notice }: {
           cart={cart}
           setCart={setCart}
           onClose={() => setPhone(false)}
-          onMove={(l, plan) => up((g) => E.moveTo(g, l, plan))}
+          onMove={(l, plan, retainedStaffIds) => up((g) => E.moveTo(g, l, plan, retainedStaffIds))}
           staff={staffActions}
           profile={profile}
           setProfile={setProfile}
