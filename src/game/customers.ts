@@ -389,6 +389,28 @@ export function affluentCustomerShareShift(followers: number, promotionLevel?: P
     : 0;
   return (followerOpportunityBonus(followers) * 0.25 + campaignPoints) / 100;
 }
+/** Bounded 0.78–1.25 attraction multiplier retained for celebrity-rank selection and existing rival systems. */
+export function celebrityAttractionMultiplier(profile?: CelebrityAttractionProfile): number {
+  if (!profile) return 1;
+  const clampScore = (value: number | undefined, fallback: number) =>
+    typeof value === 'number' && Number.isFinite(value)
+      ? Math.max(0, Math.min(100, value))
+      : Math.max(0, Math.min(100, fallback));
+  const reputation = clampScore(profile.reputation, 50);
+  const followers = typeof profile.followers === 'number' && Number.isFinite(profile.followers)
+    ? Math.max(0, profile.followers) : 0;
+  const social = Math.log10(followers + 1);
+  const tier = typeof profile.shopTierIndex === 'number' && Number.isFinite(profile.shopTierIndex)
+    ? Math.max(0, Math.min(6, Math.floor(profile.shopTierIndex))) : 0;
+  const awareness = clampScore(profile.awareness, 18 + social * 10 + tier * 4);
+  const prestige = clampScore(profile.prestige, 15 + reputation * 0.52 + tier * 3);
+  const trendInfluence = clampScore(profile.trendInfluence, 12 + social * 5);
+  const audienceScore = Math.max(0, Math.min(100, social / 5 * 100));
+  const brandHeat = reputation * 0.35 + awareness * 0.25 + prestige * 0.20 +
+    trendInfluence * 0.15 + audienceScore * 0.05;
+  return Math.max(0.78, Math.min(1.25, 0.78 + (brandHeat / 100) * 0.47));
+}
+
 /** Higher shop tiers increasingly attract the strongest ranks; Signature and brand heat tilt the mix upward. */
 export const CELEBRITY_TIER_WEIGHTS_BY_SHOP_TIER: readonly (readonly number[])[] = [
   [],
