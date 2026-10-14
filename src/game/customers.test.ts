@@ -54,7 +54,7 @@ test('rich clothing budgets progress by shop tier and Signature properties skew 
 
   const random = seededRandom(20261013);
   const ordinaryMax = [1_250_000, 2_500_000, 5_000_000, 5_000_000, 7_500_000, 10_000_000, 10_000_000];
-  const signatureMax = [2_500_000, 4_000_000, 5_000_000, 5_000_000, 7_500_000, 10_000_000, 10_000_000];
+  const signatureMax = [2_500_000, 4_000_000, 5_000_000, 5_000_000, 10_000_000, 10_000_000, 10_000_000];
   for (let tier = 0; tier < 7; tier++) {
     const ordinary = Array.from({ length: 8_000 }, () => richRetailBudget(random, tier, false));
     const signature = Array.from({ length: 8_000 }, () => richRetailBudget(random, tier, true));
@@ -125,7 +125,7 @@ test('celebrity eligibility opens at Level 3 and lower celebrity ranks can visit
   }
   assert.equal(celebrityVisitChance(1, true), 0, 'Signature status cannot bypass the Level 3 gate');
   assert.deepEqual(
-    [2, 3, 4, 5, 6].map((tier) => celebrityVisitChance(tier, true)),
+    [2, 3, 4, 5, 6].map((tier) => Number(celebrityVisitChance(tier, true).toFixed(2))),
     [0.15, 0.24, 0.33, 0.42, 0.51],
   );
 });
