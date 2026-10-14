@@ -1,5 +1,8 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import React from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
+import { BODY_SPECS } from '../components/renderer/geometry';
 import { WARDROBE } from '../constants/catalog';
 import { GARMENTS } from '../components/renderer/garments';
 import { MARKUP } from './economy';
@@ -77,4 +80,45 @@ test('40 original global couture designs have distinct, real renderer drawings',
   for (const category of counts) {
     assert.equal(designs.filter((item) => item.for === category.gender && category.match(item.group)).length, category.expected, category.label + ' count');
   }
+});
+
+
+test('all 40 original couture garments render on their intended body types with distinct silhouettes', () => {
+  const designs = WARDROBE.filter((item) => item.id.startsWith('couture26'));
+  const canonicalWomen = new Set<string>();
+  const canonicalMen = new Set<string>();
+
+  for (const item of designs) {
+    const renderer = GARMENTS[item.renderId!]!;
+    const isWomen = item.for === 'f';
+    const bodyTypes = isWomen
+      ? (['femaleSlim', 'femaleRegular', 'femalePlus'] as const)
+      : (['male'] as const);
+
+    for (const bodyType of bodyTypes) {
+      const context = {
+        id: (part: string) => 'couture-render-test-' + part,
+        s: BODY_SPECS[bodyType],
+        p: { base: '#43213d', kind: 'satin' },
+        p2: { base: '#c5a56d', kind: 'velvet' },
+        plain: false,
+        k: 'shape-fingerprint',
+        bottom: 'trousers',
+      };
+      const markup = renderToStaticMarkup(React.createElement(
+        'svg',
+        { viewBox: '0 0 600 1500', xmlns: 'http://www.w3.org/2000/svg' },
+        renderer.under?.(context as never),
+        renderer.over?.(context as never),
+      ));
+      assert.ok(markup.length > 250, item.id + ' should produce non-empty garment geometry');
+      assert.ok(markup.includes('<path') || markup.includes('<g'), item.id + ' should draw real SVG geometry');
+      assert.ok(!/NaN|undefined|null/.test(markup), item.id + ' must not output invalid geometry values');
+      if (isWomen && bodyType === 'femaleSlim') canonicalWomen.add(markup);
+      if (!isWomen) canonicalMen.add(markup);
+    }
+  }
+
+  assert.equal(canonicalWomen.size, 25, 'every womenswear design must produce a distinct rendered drawing');
+  assert.equal(canonicalMen.size, 15, 'every menswear design must produce a distinct rendered drawing');
 });

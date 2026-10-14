@@ -9,6 +9,9 @@ econ.P.update(
     fee={'poor': 2_000, 'middle': 5_000, 'rich': 15_000},
     start_cash=200_000,
     slow_chance=slow_chance,
+    weighted_rich_budget=False,
+    celebrity_enabled=False,
+    celebrity_signature=False,
 )
 for i, (rent, move_in) in enumerate([
     (30_000, 0),
@@ -31,27 +34,45 @@ print('--- Current-budget stress test: 60% cash shock on day 60')
 for name in current_shock:
     print(name, current_shock[name]['reach'], 'demotions', current_shock[name]['demotions'], 'broke days', current_shock[name]['broke_days'])
 
-# Forecast only: this is the planned Batch 3 budget expansion, not current live behaviour.
+# Forecast only: this is the planned Batch 3 customer-budget and celebrity expansion, not current live behaviour.
 econ.P['budget']['rich'] = (100_000, 5_000_000)
 econ.P['weighted_rich_budget'] = True
+econ.P['celebrity_enabled'] = True
+econ.P['celebrity_signature'] = False
 print('=== Planned rich-customer forecast (rich budget ₦100,000–₦5,000,000; weighted below maximum) ===')
 planned = econ.run(days=200, n=300)
 planned_shock = econ.run(days=200, n=300, shock_day=60, shock=0.6)
 for name in planned:
     print(name, planned[name]['reach'], 'demotions', planned[name]['demotions'], 'broke days', planned[name]['broke_days'], 'staff quits', planned[name]['quits'])
+    print('  200-day celebrity model:', planned[name]['celebrity'])
 print('--- Planned-budget stress test: 60% cash shock on day 60')
 for name in planned_shock:
     print(name, planned_shock[name]['reach'], 'demotions', planned_shock[name]['demotions'], 'broke days', planned_shock[name]['broke_days'])
+
+celebrity_forecast = econ.simulate_celebrity_forecast(days=200, runs=1000)
+print('=== Fixed-tier celebrity frequency and net payout forecast (200 days x 1,000 runs; 60% premium-quality assumption) ===')
+for shop_name, scenarios in celebrity_forecast.items():
+    print(shop_name, scenarios)
+rent_coverage = [(shop, property_name) for shop, scenarios in celebrity_forecast.items() for property_name, values in scenarios.items() if values['premiumReceiptsAloneCoverFortnightRent']]
+if rent_coverage:
+    raise AssertionError('Celebrity premium receipts alone cover fortnightly rent under the current assumptions: ' + repr(rent_coverage))
 
 json.dump({
     'currentBudgetBaseline': current,
     'currentBudgetStress': current_shock,
     'plannedRichBudgetForecast': planned,
     'plannedRichBudgetStress': planned_shock,
+    'celebrityOrderForecast': celebrity_forecast,
     'assumptions': {
         'rentTargetsAreProposals': True,
         'plannedRichBudgetRange': [100_000, 5_000_000],
         'plannedRichBudgetsAreWeightedBelowMaximum': True,
+        'richBudgetBands': econ.RICH_RETAIL_BUDGET_BANDS,
+        'celebritySpendRanges': econ.CELEBRITY_SPEND_RANGES,
+        'celebrityFulfilmentRate': econ.CELEBRITY_FULFILMENT_RATE,
+        'celebrityPremiumScoreSuccessAssumption': econ.CELEBRITY_PREMIUM_SCORE_SUCCESS_RATE,
+        'celebrityForecastIncludesSecondaryCelebrityOpportunityPath': True,
+        'secondaryCelebrityTipSchedulesTwoDaysAheadWithPendingVisitCooldown': True,
         'days': 200,
         'runsPerPlayerType': 300,
         'cashShock': {'day': 60, 'fraction': 0.6},

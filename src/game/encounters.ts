@@ -358,8 +358,11 @@ export function wonListing(s0: GameState, l: Listing): GameState {
 // ---------------------------------------------------------------------------
 export function planTips(s0: GameState): GameState {
   let s = s0;
-  if (s.day < 5 || s.celebDay && s.celebDay >= s.day) return s;
-  if (!chance(0.06)) return s;
+  // No celebrity tips before Level 3; luxury properties can earn more opportunities through openShop.
+  if (s.tier < 2 || s.day < 5 || s.celebDay && s.celebDay >= s.day) return s;
+  const chanceByTier = [0, 0, 0.04, 0.045, 0.05, 0.055, 0.06];
+  const visitChance = Math.min(0.1, chanceByTier[Math.min(6, Math.floor(s.tier))] + (s.listing.signature ? 0.02 : 0));
+  if (!chance(visitChance)) return s;
   const day = s.day + 2;
   s = { ...s, celebDay: day };
   return say(s, 'Deborah', pick([`Gist: Tolani said a celebrity is coming to ${s.listing.area} on day ${day} to shop for an event. Make sure your best pieces are out 👀`, `Sis, I heard from Tolani that a Nollywood actress is shopping around ${s.listing.area} on day ${day}. Be ready!`]), { tone: 'good' });

@@ -40,6 +40,13 @@ export const PATIENCE: Record<CustomerClass, number> = { poor: 150, middle: 120,
 export const staffMinutes = (level: number) => Math.max(30, 90 - 6 * level);
 
 export const START_CASH = 200_000;
+
+/**
+ * High-value celebrity orders represent a fulfilled premium commission, not just one garment's
+ * sticker price. Reserve this share of the order receipt for external sourcing, priority tailoring,
+ * fitting and delivery. This is an explicit operating cost, separate from the stock bought earlier.
+ */
+export const CELEBRITY_FULFILMENT_RATE = 0.45;
 export const MARKUP = 1.35;
 export const PIECES_PER_DESIGN = 1;
 export const DIVINE_CAPACITY = 8;
@@ -50,10 +57,11 @@ export const SLOW_WEEK_CHANCE = 0.12;
 
 export const SERVICE_FEE: Record<CustomerClass, number> = { poor: 2_000, middle: 5_000, rich: 15_000 };
 export const SUPPLIES_SHARE = 0.35;
+/** Retail purchase capacity. Rich retail customers use a weighted sampler inside this wider band. */
 export const BUDGET: Record<CustomerClass, [number, number]> = {
   poor: [6_000, 18_000],
   middle: [20_000, 60_000],
-  rich: [100_000, 300_000],
+  rich: [100_000, 5_000_000],
 };
 
 /** Customers who only want hair or makeup done. */

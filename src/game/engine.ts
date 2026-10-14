@@ -1,6 +1,6 @@
 import { CharacterConfig } from '../types/character';
 import { generateRandomCustomer } from '../utils/randomizer';
-import { DIVINE_CAPACITY, HOUR_WEIGHTS, PATIENCE, SHOP_MINUTES, staffMinutes, NEW_SHOP_RAMP_DAYS, NEW_SHOP_START, SERVICE_FEE, SLOW_WEEK_CHANCE, STAFF, STAFF_CAPACITY, START_CASH, SUPPLIES_SHARE, MARKUP, TIERS, FABRIC_COST, naira } from './economy';
+import { DIVINE_CAPACITY, HOUR_WEIGHTS, PATIENCE, SHOP_MINUTES, staffMinutes, NEW_SHOP_RAMP_DAYS, NEW_SHOP_START, SERVICE_FEE, SLOW_WEEK_CHANCE, STAFF, STAFF_CAPACITY, START_CASH, SUPPLIES_SHARE, MARKUP, TIERS, FABRIC_COST, CELEBRITY_FULFILMENT_RATE, naira } from './economy';
 import { canBuy, entryFor, HAIR_SWATCHES, isClothing, makeDesign, pieceCost, productKey, MARKET } from './market';
 import { FabricId } from '../types/character';
 import { answerRival, competition, initRivals, poacher, reactToMove, simulateRivals } from './rivals';
@@ -8,7 +8,7 @@ import { answerInvite, contestFor, contestModel, dropStep, judge, planDrop, plan
 import { POWER as POWER_CFG, activeGeneratorUid, addShout, coolRunning, drainRate, fuelOf, fuelPrice, liveStats, nepaOff, outageAt, planOutages, pourFuel, powerStep, scarcity, source, tankSize } from './power';
 import { answerConvo, startGist } from './convos';
 import { ENERGY, busyNow, divineBonus, energyOf, energyStep, exhausted, payBills, spendEnergy } from './life';
-import { makeCustomer, makeCelebrityCustomer } from './customers';
+import { makeCustomer, makeCelebrityCustomer, celebrityIsScheduled, celebrityVisitChance, maximumCelebrityTierForShop } from './customers';
 import { buildLook, hairGroup, lookCost, scoreLook } from './scoring';
 import { FABRIC_COLORS, FEMALE_HAIR, MAKEUP_LOOKS } from '../constants/catalog';
 import { colourName } from './colours';
@@ -482,30 +482,25 @@ export function openShop(s0: GameState): GameState {
     mix[2] = Math.max(0, mix[2] + shift);
   }
   const arrivals = Array.from({ length: n }, () => ({ at: arrivalMinute(), c: makeCustomer(s, mix) }));
-  // Scheduled visit days per 14-day cycle scale with the seven shop tiers.
-  // The visitor's celebrity rank is rolled separately from shop level, using the existing five-rank scale.
-  const celebrityDaysByTier: number[][] = [
-    [2, 9],
-    [1, 5, 10],
-    [0, 4, 7, 11],
-    [1, 4, 7, 10, 13],
-    [0, 2, 4, 7, 9, 12],
-    [0, 1, 3, 4, 6, 8, 10, 12, 13],
-    [0, 1, 2, 3, 4, 6, 7, 8, 9, 11, 12, 13],
-  ];
-  const fortnightDay = (s.day - 1) % 14;
-  const celebrityScheduled = (celebrityDaysByTier[s.tier] || []).includes(fortnightDay);
-  if ((s.listing.signature || s.tier >= 5) && celebrityScheduled) {
-    const highestEligibleCelebrityTier = Math.min(4, Math.max(0, Math.floor(s.tier || 0)));
+  // Celebrity eligibility starts at shop Level 3; signature properties improve odds without being a gate.
+  const celebrityScheduled = celebrityIsScheduled(s.tier, s.day);
+  const highestEligibleCelebrityTier = maximumCelebrityTierForShop(s.tier);
+  if (
+    highestEligibleCelebrityTier >= 0 &&
+    celebrityScheduled &&
+    chance(celebrityVisitChance(s.tier, !!s.listing.signature))
+  ) {
     const celebrityTier = Math.floor(Math.random() * (highestEligibleCelebrityTier + 1));
     const c = makeCelebrityCustomer(s, celebrityTier);
     arrivals.push({ at: 100 + Math.random() * 560, c });
   }
   const model = contestModel(s);
   if (model) arrivals.push(model);
-  if (s.celebDay === s.day) {
-    const c = makeCustomer(s, [0, 0, 1]);
-    arrivals.push({ at: 120 + Math.random() * 360, c: { ...c, influencer: true, budget: Math.round(c.budget * 1.5 / 10_000) * 10_000, request: `Hi! I'm ${c.name}. ${c.request} (A celebrity! Her followers will see this look.)` } });
+  // Deborah's separately scheduled celebrity tip uses the same five-tier system and Level 3 gate.
+  if (s.celebDay === s.day && highestEligibleCelebrityTier >= 0) {
+    const celebrityTier = Math.floor(Math.random() * (highestEligibleCelebrityTier + 1));
+    const c = makeCelebrityCustomer(s, celebrityTier);
+    arrivals.push({ at: 120 + Math.random() * 360, c });
   }
   arrivals.sort((a, b) => a.at - b.at);
   const outages = planOutages(s.day);
@@ -748,10 +743,12 @@ export function settle(c: Customer, score: ScoreBreakdown, price: number, suppli
       outcome = 'bargained';
       line = `It's fine, but ${naira(price)} is too much. I'll give you ${naira(paid)}.`;
     }
-    if (c.cls === 'rich' && s < 80) {
+    if (c.cls === 'rich') {
       paid = c.budget;
       outcome = 'bargained';
-      line = `For this? ${naira(paid)}, take it or leave it.`;
+      line = s >= 80
+        ? `I love the look, but my budget is ${naira(c.budget)}. Can we keep it there?`
+        : `For this? ${naira(paid)}, take it or leave it.`;
     }
   }
   if (s < 50 && !c.celebrity) {
@@ -785,18 +782,37 @@ export function settle(c: Customer, score: ScoreBreakdown, price: number, suppli
       line = `${line} Transfer alert received. Thank goodness.`;
     }
   }
+  // A celebrity can refuse a poor look. High-value orders are only unlocked by a strong result.
+  if (c.celebrity && s < 60) {
+    return {
+      price, paid: 0, tip: 0, cost: 0, outcome: 'refused',
+      line: 'I needed a standout look for my event. This is not right for me, so I will not buy it today.',
+      reaction: 'frown', repDelta: -3, becameRegular: false,
+    };
+  }
+  // Budget is a spending ceiling, not a guarantee that every rich customer spends it all.
+  if (c.cls === 'rich') paid = Math.min(paid, c.budget);
   let tip = 0;
+  let fulfilmentCost = supplies;
   if (s >= 85) tip = { poor: 0.03, middle: 0.08, rich: 0.15 }[c.cls] * paid;
   else if (s >= 75) tip = { poor: 0.01, middle: 0.04, rich: 0.07 }[c.cls] * paid;
   if (c.male) tip *= 1.5; // men tip big
   if (c.celebrity) {
-    paid = Math.max(paid, c.celebrity.spendFloor);
-    outcome = 'paid';
-    tip = Math.max(tip, Math.round(paid * (0.22 + c.celebrity.tier * 0.035) / 100) * 100);
-    line = `${c.name} loved the luxury look and paid lavishly, with a generous celebrity tip.`;
+    if (s >= 80) {
+      // The premium order is earned by a strong look; mediocre styling sells only at its normal price.
+      paid = Math.min(c.budget, Math.max(paid, c.celebrity.spendFloor));
+      fulfilmentCost = Math.max(supplies, Math.round(paid * CELEBRITY_FULFILMENT_RATE));
+      outcome = 'paid';
+      const celebrityTipRate = 0.05 + c.celebrity.tier * 0.02;
+      tip = Math.max(tip, Math.round(paid * celebrityTipRate / 100) * 100);
+      line = `${c.name} loved the luxury look and placed a premium celebrity order, with a generous tip.`;
+    } else {
+      paid = Math.min(paid, c.budget);
+      line = `${c.name} liked parts of the look and bought it at the regular price, but did not place a premium order.`;
+    }
   }
   const repDelta = ((s - 65) / 18) * (c.influencer ? 3 : 1);
-  return { price, paid: Math.round(paid), tip: Math.round(tip / 100) * 100, cost: supplies, outcome, line, reaction, repDelta, becameRegular: s >= 80 && !c.regularId };
+  return { price, paid: Math.round(paid), tip: Math.round(tip / 100) * 100, cost: fulfilmentCost, outcome, line, reaction, repDelta, becameRegular: s >= 80 && !c.regularId };
 }
 
 /** Applies a finished look: stock leaves the shop, money and reputation move, the customer walks out. */
@@ -869,10 +885,10 @@ export function applyLook(s0: GameState, c: Customer, choice: StyleChoice, st0: 
       ? `${c.name} · celebrity payment including tip`
       : `${c.name}${c.service ? ` (${c.service === 'makeup' ? 'makeup' : c.service === 'both' ? 'hair & makeup' : 'hair'})` : ''}${st.tip ? ', with tip' : ''}`;
     next = money(next, st.paid + st.tip, customerReceiptLabel);
-    next = money(next, -st.cost, 'Hair and makeup supplies');
+    next = money(next, -st.cost, c.celebrity && score.total >= 80 ? 'Celebrity order fulfilment, sourcing & tailoring' : 'Hair and makeup supplies');
   }
   if (c.influencer && score.total >= 80) next = { ...next, followers: (next.followers || 0) + Math.round(60 + Math.random() * 120) };
-  if (c.celebrity && sold) {
+  if (c.celebrity && sold && score.total >= 80) {
     const gained = Math.round((8_000 + Math.random() * 10_000) * (1 + c.celebrity.tier * 0.85));
     const rivals = next.rivals.map((r) => r.id === 'you' ? r : { ...r, feeling: clamp(r.feeling - (8 + c.celebrity!.tier * 3), -100, 100) });
     next = { ...next, followers: (next.followers || 0) + gained, rep: clamp(next.rep + 3 + c.celebrity.tier * 2, 0, 100), rivals,

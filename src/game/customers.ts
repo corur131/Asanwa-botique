@@ -120,6 +120,99 @@ function classFor(state: GameState, mix: [number, number, number]): CustomerClas
 
 const roundBudget = (b: number) => (b >= 100_000 ? Math.round(b / 10_000) * 10_000 : Math.round(b / 1_000) * 1_000);
 
+const unitSample = (random: () => number) => {
+  const value = random();
+  return Number.isFinite(value) ? Math.max(0, Math.min(0.999999999, value)) : 0.5;
+};
+const roundToFiveThousand = (value: number) => Math.round(value / 5_000) * 5_000;
+
+/**
+ * Rich retail customers have a ₦100k–₦5m spending capacity, not a promise to spend it.
+ * The distribution is deliberately weighted toward sub-₦1.25m budgets; very large budgets are rare.
+ */
+export const RICH_RETAIL_BUDGET_BANDS = [
+  { weight: 0.65, min: 100_000, max: 500_000 },
+  { weight: 0.22, min: 500_000, max: 1_250_000 },
+  { weight: 0.09, min: 1_250_000, max: 2_500_000 },
+  { weight: 0.035, min: 2_500_000, max: 4_000_000 },
+  { weight: 0.005, min: 4_000_000, max: 5_000_000 },
+] as const;
+
+export function richRetailBudget(random: () => number = Math.random): number {
+  const roll = unitSample(random);
+  let cumulative = 0;
+  let band = RICH_RETAIL_BUDGET_BANDS[RICH_RETAIL_BUDGET_BANDS.length - 1];
+  for (const candidate of RICH_RETAIL_BUDGET_BANDS) {
+    cumulative += candidate.weight;
+    if (roll < cumulative) {
+      band = candidate;
+      break;
+    }
+  }
+  const value = band.min + unitSample(random) * (band.max - band.min);
+  return Math.max(100_000, Math.min(5_000_000, roundToFiveThousand(value)));
+}
+
+/**
+ * Celebrity tiers are a separate five-level scale (0–4 internally, tiers 1–5 in-game).
+ * Each lower tier tops out no more than ₦5m above the next tier's minimum.
+ * Squared randomness favours attainable lower-end orders while retaining the rare upper end.
+ */
+export const CELEBRITY_SPEND_RANGES = [
+  { min: 750_000, max: 8_500_000 },
+  { min: 3_500_000, max: 12_500_000 },
+  { min: 7_500_000, max: 20_000_000 },
+  { min: 15_000_000, max: 35_000_000 },
+  { min: 30_000_000, max: 210_000_000 },
+] as const;
+
+function lowWeightedAmount(min: number, max: number, random: () => number): number {
+  const sample = unitSample(random);
+  return Math.max(min, Math.min(max, roundToFiveThousand(min + (max - min) * sample * sample)));
+}
+
+export function celebrityAmountsForTier(tier: number, random: () => number = Math.random): { budget: number; spendFloor: number } {
+  const index = Math.max(0, Math.min(4, Math.floor(Number.isFinite(tier) ? tier : 0)));
+  const range = CELEBRITY_SPEND_RANGES[index];
+  const budget = lowWeightedAmount(range.min, range.max, random);
+  const spendFloor = lowWeightedAmount(range.min, budget, random);
+  return { budget, spendFloor };
+}
+
+/** Zero-based shop tier index: a Level 3 shop (index 2) may attract celebrity tiers 1–3. */
+export function maximumCelebrityTierForShop(shopTierIndex: number): number {
+  if (!Number.isFinite(shopTierIndex) || shopTierIndex < 2) return -1;
+  return Math.min(4, Math.floor(shopTierIndex));
+}
+
+/** Candidate days per 14-day cycle; actual visits are still randomized on these days. */
+export const CELEBRITY_DAYS_BY_SHOP_TIER: readonly (readonly number[])[] = [
+  [],
+  [],
+  [2],
+  [1, 9],
+  [0, 5, 10],
+  [0, 4, 8, 12],
+  [0, 2, 4, 7, 9, 12],
+];
+
+export function celebrityIsScheduled(shopTierIndex: number, day: number): boolean {
+  if (!Number.isFinite(shopTierIndex) || shopTierIndex < 2) return false;
+  const tier = Math.min(6, Math.floor(shopTierIndex));
+  const days = CELEBRITY_DAYS_BY_SHOP_TIER[tier] || [];
+  const fortnightDay = (Math.max(1, Math.floor(day)) - 1) % 14;
+  return days.includes(fortnightDay);
+}
+
+/** Probability on a candidate day. Signature status raises the odds but is never required. */
+export function celebrityVisitChance(shopTierIndex: number, signatureProperty: boolean): number {
+  if (maximumCelebrityTierForShop(shopTierIndex) < 0) return 0;
+  const tier = Math.min(6, Math.floor(shopTierIndex));
+  // Scheduled days are opportunities; higher tiers gain more dates, not a guaranteed visit.
+  const baseByTier = [0, 0, 0.10, 0.16, 0.22, 0.28, 0.34];
+  return Math.min(0.95, (baseByTier[tier] || 0) + (signatureProperty ? 0.15 : 0));
+}
+
 const SERVICE_INTRO = {
   hair: ["I didn't come for clothes today, just my hair.", 'Only my hair today, I already have my outfit.', "Abeg I just want to make my hair. I have clothes at home."],
   makeup: ['I just want makeup, my dress is ready.', "Only my face today. I'm wearing my own outfit.", 'Just makeup please, nothing else.'],
@@ -231,8 +324,7 @@ export function makeCelebrityCustomer(state: GameState, celebrityTier: number): 
     const candidates = Array.from({ length: 12 }, () => generateRandomCustomer('plain')).find((c) => (c.body === 'male') === profile.male);
     if (candidates) base = { ...base, look: { ...candidates, state: 'plain' }, male: profile.male };
   }
-  const spendFloor = [1_500_000, 2_500_000, 4_000_000, 7_500_000, 15_000_000][tier];
-  const budget = [3_000_000, 5_000_000, 8_000_000, 15_000_000, 35_000_000][tier];
+  const { budget, spendFloor } = celebrityAmountsForTier(tier);
   const guest = {
     ...base,
     id: `vip-${state.day}-${Math.random().toString(36).slice(2, 8)}`,
@@ -263,7 +355,11 @@ export function makeCustomer(state: GameState, mix: [number, number, number]): C
   const wigs = shopStats(state.furniture, state.tier, state.listing.stars).wigs;
   const service: Customer['service'] = chance(male ? SERVICE_SHARE.male : SERVICE_SHARE.female) ? (male ? 'hair' : pick(['hair', 'hair', 'makeup', 'both'] as const)) : undefined;
   const [lo, hi] = (service ? SERVICE_BUDGET : BUDGET)[cls];
-  const budget = roundBudget(lo + Math.random() * (hi - lo));
+  const budget = service
+    ? roundBudget(lo + Math.random() * (hi - lo))
+    : cls === 'rich'
+      ? richRetailBudget()
+      : roundBudget(lo + Math.random() * (hi - lo));
   const fav = regular ? { favColor: regular.favColor, favName: regular.favName } : (() => { const c = pick(WANTED_COLOURS); return { favColor: c.color, favName: c.name }; })();
   const base = {
     id: `c${state.day}-${Math.random().toString(36).slice(2, 8)}`,

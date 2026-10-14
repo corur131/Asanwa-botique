@@ -15,7 +15,33 @@ P = dict(
     pieces=2,                       # pieces bought per new design
     divine_cap=8,                   # customers Divine can style herself per day
     staff_cap=5,                    # extra customers per staff member
+    celebrity_enabled=False,         # planned Batch 3 model; disabled for legacy budget baseline
+    celebrity_signature=False,       # normal property baseline; Signature odds are forecast separately
 )
+
+# Keep the simulator aligned with src/game/customers.ts and src/game/economy.ts.
+RICH_RETAIL_BUDGET_BANDS = [
+    (0.65, 100_000, 500_000),
+    (0.22, 500_000, 1_250_000),
+    (0.09, 1_250_000, 2_500_000),
+    (0.035, 2_500_000, 4_000_000),
+    (0.005, 4_000_000, 5_000_000),
+]
+CELEBRITY_DAYS_BY_SHOP_TIER = [
+    [], [], [2], [1, 9], [0, 5, 10], [0, 4, 8, 12], [0, 2, 4, 7, 9, 12],
+]
+CELEBRITY_VISIT_CHANCE = [0, 0, 0.10, 0.16, 0.22, 0.28, 0.34]
+CELEBRITY_EXTRA_CHANCE = [0, 0, 0.04, 0.045, 0.05, 0.055, 0.06]
+CELEBRITY_SPEND_RANGES = [
+    (750_000, 8_500_000),
+    (3_500_000, 12_500_000),
+    (7_500_000, 20_000_000),
+    (15_000_000, 35_000_000),
+    (30_000_000, 210_000_000),
+]
+CELEBRITY_FULFILMENT_RATE = 0.45
+CELEBRITY_PREMIUM_SCORE_SUCCESS_RATE = 0.60  # scenario assumption, not guaranteed gameplay success
+
 
 # name, display slots, weekly rent, one-off upgrade cost (deposit + fit-out), base customers/day,
 # class mix (poor, middle, rich) at 50 reputation, staff slots, daily running cost (light, fuel)
@@ -42,6 +68,64 @@ PLAYERS = {
 STAFF = dict(trainee_wage=12_000, expert_wage=60_000, train_fee=lambda lvl: 15_000 * lvl)
 
 
+def _nearest_5000(value):
+    return int(round(value / 5_000) * 5_000)
+
+
+def weighted_rich_budget(rnd):
+    """Match the game's five weighted ₦100k–₦5m retail-budget bands exactly."""
+    roll = rnd.random()
+    cumulative = 0.0
+    lo, hi = RICH_RETAIL_BUDGET_BANDS[-1][1:]
+    for weight, band_lo, band_hi in RICH_RETAIL_BUDGET_BANDS:
+        cumulative += weight
+        if roll < cumulative:
+            lo, hi = band_lo, band_hi
+            break
+    value = lo + rnd.random() * (hi - lo)
+    return max(100_000, min(5_000_000, _nearest_5000(value)))
+
+
+def low_weighted_amount(lo, hi, rnd):
+    """Match the game's squared-random weighting toward a tier's lower spend values."""
+    value = lo + (hi - lo) * (rnd.random() ** 2)
+    return max(lo, min(hi, _nearest_5000(value)))
+
+
+def celebrity_amounts(tier, rnd):
+    lo, hi = CELEBRITY_SPEND_RANGES[max(0, min(4, int(tier)))]
+    budget = low_weighted_amount(lo, hi, rnd)
+    spend_floor = low_weighted_amount(lo, budget, rnd)
+    return budget, spend_floor
+
+
+def celebrity_visit_probability(shop_tier, signature=False):
+    if shop_tier < 2:
+        return 0.0
+    base = CELEBRITY_VISIT_CHANCE[min(6, int(shop_tier))]
+    return min(0.95, base + (0.15 if signature else 0.0))
+
+
+def record_celebrity_visit(rnd, shop_tier, log):
+    """Return conservative net premium receipt; normal-price celebrity sales are omitted."""
+    log['celebrity_visits'] += 1
+    highest = min(4, shop_tier)
+    celebrity_tier = rnd.randint(0, highest)
+    budget, spend_floor = celebrity_amounts(celebrity_tier, rnd)
+    if rnd.random() >= CELEBRITY_PREMIUM_SCORE_SUCCESS_RATE:
+        return 0
+    gross = min(budget, spend_floor)
+    tip_rate = 0.05 + celebrity_tier * 0.02
+    tip = int(round((gross * tip_rate) / 100) * 100)
+    fulfilment = max(0, int(round(gross * CELEBRITY_FULFILMENT_RATE)))
+    net = gross + tip - fulfilment
+    log['celebrity_premium_orders'] += 1
+    log['celebrity_gross'] += gross
+    log['celebrity_fulfilment_cost'] += fulfilment
+    log['celebrity_net'] += net
+    return net
+
+
 def cap_score(tier, cls):
     t = TIERS[tier]
     variety = min(1.0, t['slots'] / NEED[cls])
@@ -57,10 +141,11 @@ def simulate(pl, days=200, seed=0, shock_day=None, shock=0.0, fixed_tier=None):
         tier, rep, cash = fixed_tier, 50.0, 10**9
     stock_value = 0
     staff = []                      # dicts: level, wage, loyalty, trained
-    history, log = [], dict(upgrades={}, demotions=0, lost_customers=0, served=0, broke_days=0, quits=0)
+    history, log = [], dict(upgrades={}, demotions=0, lost_customers=0, served=0, broke_days=0, quits=0, celebrity_visits=0, celebrity_premium_orders=0, celebrity_gross=0, celebrity_fulfilment_cost=0, celebrity_net=0)
     late_due, late_amount = None, 0
     hire_ok = 0
     slow = False
+    celeb_day = None  # matches planTips: only one pending tipped celebrity visit at a time
 
     def stock_needed(t):
         return TIERS[t]['slots'] * P['pieces'] * avg_w(t)
@@ -94,9 +179,7 @@ def simulate(pl, days=200, seed=0, shock_day=None, shock=0.0, fixed_tier=None):
                 cls = 'middle'      # rich clients always wait for Divine; staff take the small ones
             lo, hi = P['budget'][cls]
             if cls == 'rich' and P.get('weighted_rich_budget', False):
-                # Forecast the roadmap's wider rich-customer range without assigning every
-                # visitor a near-maximum budget; most budgets are weighted toward the lower end.
-                budget = rnd.triangular(lo, hi, lo + 0.25 * (hi - lo))
+                budget = weighted_rich_budget(rnd)
             else:
                 budget = rnd.uniform(lo, hi)
             fee = P['fee'][cls]
@@ -137,6 +220,23 @@ def simulate(pl, days=200, seed=0, shock_day=None, shock=0.0, fixed_tier=None):
             influence = 3 if (cls == 'rich' and rnd.random() < 0.25) else 1
             rep = max(0, min(100, rep + (score - 65) / 18 * influence))
             log['served'] += 1
+        # Planned Batch 3: scheduled celebrity opportunities, with the same tier gates and
+        # rates as the game. Premium order revenue is only counted for 60% successful high-score
+        # styling in this planning scenario and includes the game's 45% fulfilment expense.
+        if P.get('celebrity_enabled', False) and tier >= 2:
+            cycle_day = (day - 1) % 14
+            signature = bool(P.get('celebrity_signature', False))
+            schedule = CELEBRITY_DAYS_BY_SHOP_TIER[tier]
+            if cycle_day in schedule and rnd.random() < celebrity_visit_probability(tier, signature):
+                income += record_celebrity_visit(rnd, tier, log)
+            # Deborah's planTips path schedules for day+2 and refuses to plan another visit
+            # while celeb_day is current/future. This cooldown is part of the game mechanics.
+            if celeb_day == day:
+                income += record_celebrity_visit(rnd, tier, log)
+            extra_chance = CELEBRITY_EXTRA_CHANCE[tier] + (0.02 if signature else 0.0)
+            if day >= 5 and (celeb_day is None or celeb_day < day) and rnd.random() < min(0.10, extra_chance):
+                celeb_day = day + 2
+
         cash += income
         cash -= t['run']
         # staff
@@ -195,12 +295,58 @@ def simulate(pl, days=200, seed=0, shock_day=None, shock=0.0, fixed_tier=None):
     return history, log
 
 
+
+
+def simulate_celebrity_forecast(days=200, runs=1000):
+    """Fixed-tier 200-day frequency/payout simulation for normal and Signature properties."""
+    forecast = {}
+    for shop_tier in range(2, len(TIERS)):
+        by_property = {}
+        for signature in (False, True):
+            total_visits = total_premium = total_gross = total_cost = total_net = 0
+            for seed in range(runs):
+                rnd = random.Random(900_000 + shop_tier * 10_000 + int(signature) * 1_000 + seed)
+                log = dict(celebrity_visits=0, celebrity_premium_orders=0, celebrity_gross=0, celebrity_fulfilment_cost=0, celebrity_net=0)
+                celeb_day = None
+                for day in range(1, days + 1):
+                    cycle_day = (day - 1) % 14
+                    # Independent tier-scheduled opportunity, as in openShop.
+                    if cycle_day in CELEBRITY_DAYS_BY_SHOP_TIER[shop_tier] and rnd.random() < celebrity_visit_probability(shop_tier, signature):
+                        record_celebrity_visit(rnd, shop_tier, log)
+                    # Deborah tip arrival comes two days after it is planned. A pending tip blocks
+                    # fresh tips until its visit day has passed, matching planTips in encounters.ts.
+                    if celeb_day == day:
+                        record_celebrity_visit(rnd, shop_tier, log)
+                    extra_chance = CELEBRITY_EXTRA_CHANCE[shop_tier] + (0.02 if signature else 0.0)
+                    if day >= 5 and (celeb_day is None or celeb_day < day) and rnd.random() < min(0.10, extra_chance):
+                        celeb_day = day + 2
+                total_visits += log['celebrity_visits']
+                total_premium += log['celebrity_premium_orders']
+                total_gross += log['celebrity_gross']
+                total_cost += log['celebrity_fulfilment_cost']
+                total_net += log['celebrity_net']
+            fortnights = runs * days / 14
+            average_net = total_net / fortnights
+            by_property['signature' if signature else 'normal'] = {
+                'visitsPerFortnight': round(total_visits / fortnights, 2),
+                'premiumOrdersPerFortnight': round(total_premium / fortnights, 2),
+                'grossPremiumReceiptsPerFortnight': round(total_gross / fortnights),
+                'fulfilmentCostsPerFortnight': round(total_cost / fortnights),
+                'netPremiumReceiptsPerFortnight': round(average_net),
+                'fortnightRent': TIERS[shop_tier]['rent'] * 2,
+                'premiumReceiptsAloneCoverFortnightRent': average_net >= TIERS[shop_tier]['rent'] * 2,
+            }
+        forecast[TIERS[shop_tier]['name']] = by_property
+    return forecast
+
+
 def run(days=200, n=400, shock_day=None, shock=0.0):
     out = {}
     for name, pl in PLAYERS.items():
         reach = {k: [] for k in range(1, len(TIERS))}
         tiers_by_day = [[] for _ in range(days)]
         demos, broke, lost, quits = [], [], [], []
+        celebrity_stats = {key: [] for key in ('celebrity_visits', 'celebrity_premium_orders', 'celebrity_gross', 'celebrity_fulfilment_cost', 'celebrity_net')}
         for seed in range(n):
             h, lg = simulate(pl, days, seed, shock_day, shock)
             for k in range(1, len(TIERS)):
@@ -209,12 +355,15 @@ def run(days=200, n=400, shock_day=None, shock=0.0):
             for d, t, c, r in h:
                 tiers_by_day[d - 1].append(t)
             demos.append(lg['demotions']); broke.append(lg['broke_days']); lost.append(lg['lost_customers']); quits.append(lg['quits'])
+            for key in celebrity_stats:
+                celebrity_stats[key].append(lg[key])
         out[name] = dict(
             reach={TIERS[k]['name']: (round(statistics.median(v)) if len(v) > n / 2 else None, round(100 * len(v) / n)) for k, v in reach.items()},
             avg_tier_curve=[round(statistics.mean(x), 2) for x in tiers_by_day],
             demotions=round(statistics.mean(demos), 2),
             broke_days=round(statistics.mean(broke), 1),
             quits=round(statistics.mean(quits), 2),
+            celebrity={key: round(statistics.mean(values), 2) for key, values in celebrity_stats.items()},
         )
     return out
 
