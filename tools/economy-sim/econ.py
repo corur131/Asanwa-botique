@@ -169,6 +169,7 @@ def simulate(pl, days=200, seed=0, shock_day=None, shock=0.0, fixed_tier=None):
     hire_ok = 0
     slow = False
     celeb_day = None  # matches planTips: only one pending tipped celebrity visit at a time
+    last_celebrity_visit_day = None
 
     def stock_needed(t):
         return TIERS[t]['slots'] * P['pieces'] * avg_w(t)
@@ -250,12 +251,14 @@ def simulate(pl, days=200, seed=0, shock_day=None, shock=0.0, fixed_tier=None):
             cycle_day = (day - 1) % 14
             signature = bool(P.get('celebrity_signature', False))
             schedule = SIGNATURE_CELEBRITY_DAYS_BY_SHOP_TIER[tier] if signature else CELEBRITY_DAYS_BY_SHOP_TIER[tier]
-            if cycle_day in schedule and rnd.random() < celebrity_visit_probability(tier, signature):
+            if (cycle_day in schedule and last_celebrity_visit_day != day - 1
+                    and rnd.random() < celebrity_visit_probability(tier, signature)):
                 income += record_celebrity_visit(rnd, tier, log, signature)
-            # Deborah's planTips path schedules for day+2 and refuses to plan another visit
-            # while celeb_day is current/future. This cooldown is part of the game mechanics.
-            if celeb_day == day:
+                last_celebrity_visit_day = day
+            # Deborah's confirmed lead is a special opportunity, but never stacks twice on the same day.
+            if celeb_day == day and last_celebrity_visit_day != day:
                 income += record_celebrity_visit(rnd, tier, log, signature)
+                last_celebrity_visit_day = day
             extra_chance = CELEBRITY_EXTRA_CHANCE[tier] * (1.25 if signature else 1.0)
             if day >= 5 and (celeb_day is None or celeb_day < day) and rnd.random() < min(0.10, extra_chance):
                 celeb_day = day + 2
@@ -331,16 +334,19 @@ def simulate_celebrity_forecast(days=200, runs=1000):
                 rnd = random.Random(900_000 + shop_tier * 10_000 + int(signature) * 1_000 + seed)
                 log = dict(celebrity_visits=0, celebrity_premium_orders=0, celebrity_gross=0, celebrity_fulfilment_cost=0, celebrity_net=0)
                 celeb_day = None
+                last_celebrity_visit_day = None
                 for day in range(1, days + 1):
                     cycle_day = (day - 1) % 14
                     # Independent tier-scheduled opportunity, as in openShop.
                     signature_schedule = SIGNATURE_CELEBRITY_DAYS_BY_SHOP_TIER[shop_tier] if signature else CELEBRITY_DAYS_BY_SHOP_TIER[shop_tier]
-                    if cycle_day in signature_schedule and rnd.random() < celebrity_visit_probability(shop_tier, signature):
+                    if (cycle_day in signature_schedule and last_celebrity_visit_day != day - 1
+                            and rnd.random() < celebrity_visit_probability(shop_tier, signature)):
                         record_celebrity_visit(rnd, shop_tier, log, signature)
-                    # Deborah tip arrival comes two days after it is planned. A pending tip blocks
-                    # fresh tips until its visit day has passed, matching planTips in encounters.ts.
-                    if celeb_day == day:
+                        last_celebrity_visit_day = day
+                    # Deborah tip arrival is a special lead and cannot stack with a same-day scheduled visit.
+                    if celeb_day == day and last_celebrity_visit_day != day:
                         record_celebrity_visit(rnd, shop_tier, log, signature)
+                        last_celebrity_visit_day = day
                     extra_chance = CELEBRITY_EXTRA_CHANCE[shop_tier] * (1.25 if signature else 1.0)
                     if day >= 5 and (celeb_day is None or celeb_day < day) and rnd.random() < min(0.10, extra_chance):
                         celeb_day = day + 2
