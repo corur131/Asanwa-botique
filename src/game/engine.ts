@@ -915,7 +915,6 @@ export function applyLook(s0: GameState, c: Customer, choice: StyleChoice, st0: 
       bought: sold && st.paid > 0,
       premiumOrder: sold && score.total >= 80,
       followerGain: celebrityFollowerGain,
-      followers: next.followers || 0,
     });
   }
   if (c.contest) next = judge(next, c, score.total);
