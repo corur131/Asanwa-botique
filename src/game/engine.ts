@@ -1554,6 +1554,8 @@ export function moveTo(s0: GameState, l0: Listing, equipmentPlan: MoveEquipmentP
   const tier = l.tier;
   const t = TIERS[tier];
   let next: GameState = { ...s, tier, listing: l, furniture: move.furniture, staff: s.staff.filter((member) => retainedIds.has(member.id)), movedDay: s.day, grace: l.grace };
+  const departedStaff = s.staff.filter((member) => !retainedIds.has(member.id));
+  if (departedStaff.length) next = msg(next, 'Deborah', `Before the move, you chose to part ways with ${departedStaff.map((member) => member.name).join(', ')} to fit the new shop's ${staffLimit} staff slot${staffLimit === 1 ? '' : 's'}. Their weekly wages will no longer be charged.`, 'good');
   // Credit sale proceeds before charging move-in so the transaction never creates a temporary payable.
   if (move.saleProceeds > 0) next = money(next, move.saleProceeds, 'Sold shop equipment during move');
   next = money(next, -l.moveIn, `Move-in: ${l.street}`);
