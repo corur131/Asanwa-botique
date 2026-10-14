@@ -302,6 +302,7 @@ export function weeklyBills(s: GameState): Bill[] {
 }
 
 export function payBills(s0: GameState): GameState {
+  if (s0.utilityBillDay === s0.day) return s0;
   const bills = weeklyBills(s0);
   let s = s0;
   let total = 0;
@@ -311,6 +312,6 @@ export function payBills(s0: GameState): GameState {
     const line = { day: s.day, t: -1, label: b.label, amount: -b.amount };
     s = { ...s, cash: s.cash - b.amount, ledger: [line, ...(s.ledger || [])].slice(0, 500) };
   }
-  s = { ...s, meter: { kwh: 0 }, today: { ...s.today, costs: s.today.costs + total, events: [...s.today.events, `Paid ${naira(total)} in weekly bills.`] } };
+  s = { ...s, utilityBillDay: s.day, meter: { kwh: 0 }, today: { ...s.today, costs: s.today.costs + total, events: [...s.today.events, `Paid ${naira(total)} in weekly bills.`] } };
   return text(s, 'Bills', `This week's bills:\n${bills.map((b) => `• ${b.label}: ${naira(b.amount)}`).join('\n')}\nTotal: ${naira(total)}. Paid from your account.`);
 }
