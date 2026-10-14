@@ -5,6 +5,7 @@ import {
   kwhForLoad, solarChargeMinutes, solarDrainMinutes, tariffFor,
 } from './power';
 import type { GameState } from './types';
+import { weeklyBills } from './life';
 
 test('powered equipment contributes its rated load; clothing stock contributes none', () => {
   assert.equal(EQUIPMENT_WATTS.ac, 1500);
@@ -50,4 +51,18 @@ test('generator and solar capacities make undersized installations distinguishab
   assert.ok(1.5 > POWER.capacityKw.small);
   assert.ok(5 > POWER.capacityKw.big);
   assert.ok(5 < POWER.capacityKw.industrial);
+});
+
+test('utility bill estimate uses the chosen tariff once for actual metered kWh', () => {
+  const s = {
+    tier: 0,
+    listing: { tier: 0, stars: 2, area: 'Yaba', rent: 1000 },
+    meter: { kwh: 2.4 },
+    power: { gen: false, solar: 0, tariff: 310 },
+  } as unknown as GameState;
+  const bills = weeklyBills(s);
+  const electricity = bills.filter((bill) => bill.label.startsWith('NEPA electricity'));
+  assert.equal(electricity.length, 1);
+  assert.equal(electricity[0].amount, 744);
+  assert.match(electricity[0].label, /2.4 kWh @ ₦310\/kWh/);
 });
