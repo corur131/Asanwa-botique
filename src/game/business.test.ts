@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import type { Customer, GameState, Message } from './types';
-import { initRivals, simulateRivals } from './rivals';
+import { announceCelebrityVisit, initRivals, simulateRivals } from './rivals';
 import { judge } from './encounters';
 import { answerInvite } from './encounters';
 import { money, payRent, payRentEarly, settleLateRent, demote, closeShop, cashFlowSummary } from './engine';
@@ -577,12 +577,12 @@ test('v1 boosted saves receive only the extra capital needed for the save-scaled
   );
 });
 
-test('rivals announce celebrity visits in news, chat, and their social feed', () => {
+test('rivals announce celebrity visits in news, chat, and their social feed on a scheduled day', () => {
   const originalRandom = Math.random;
   const base = state({
-    day: 31, history: [], ranking: [], dailyRanking: [],
+    day: 29, history: [], ranking: [], dailyRanking: [],
     listing: { area: 'Yaba' } as GameState['listing'],
-    today: { day: 31, bestScore: 0, events: [] } as unknown as GameState['today'],
+    today: { day: 29, bestScore: 0, events: [] } as unknown as GameState['today'],
     rivals: initRivals(), messages: [], gist: [], rivalPosts: [],
   });
   try {
@@ -590,7 +590,99 @@ test('rivals announce celebrity visits in news, chat, and their social feed', ()
     const updated = simulateRivals(base);
     assert.ok(updated.gist.some((item) => /celebrity client/i.test(item.title)));
     assert.ok(updated.messages.some((item) => item.from === 'GistLagos' && /CELEBRITY SIGHTING/i.test(item.text)));
-    assert.ok(updated.rivalPosts.some((post) => /Celebrity client|special guest/i.test(post.caption)));
+    assert.ok(updated.messages.some((item) => item.from === 'Gidigram' && /FASHION ALERT|CELEBRITY SPOTTED/i.test(item.text)));
+    assert.ok(updated.rivalPosts.some((post) => /celebrity|special guest/i.test(post.caption)));
+  } finally {
+    Math.random = originalRandom;
+  }
+});
+
+
+test('player celebrity visits are announced across gist, group chat and Gidigram', () => {
+  const base = state({
+    day: 29,
+    history: [],
+    today: { day: 29, bestScore: 0, events: [] } as unknown as GameState['today'],
+    messages: [],
+    msgSeq: 0,
+    gist: [],
+    rivalPosts: [],
+    rivals: initRivals(),
+  });
+  const updated = announceCelebrityVisit(base, {
+    shopId: 'you', shopName: 'Asanwa Boutique', ownerName: 'Divine',
+    celebrityName: 'Nollywood guest', spend: 80_000_000,
+    bought: true, premiumOrder: true, followerGain: 15_000,
+  });
+  assert.ok(updated.gist.some((item) => /celebrity client/i.test(item.title)));
+  assert.ok(updated.messages.some((item) => item.from === 'GistLagos' && /CELEBRITY SIGHTING/i.test(item.text)));
+  assert.ok(updated.messages.some((item) => item.from === 'Gidigram' && /TRENDING NOW/i.test(item.text)));
+  assert.ok(updated.messages.some((item) => item.from === 'Asanwa Boutique' && item.chat === 'Lagos Fashion Babes'));
+});
+
+test('Tolani and other rivals do not receive celebrity clients on every day; off-schedule days are quiet', () => {
+  const originalRandom = Math.random;
+  const tolani = initRivals().find((rival) => rival.id === 'tolani')!;
+  try {
+    Math.random = () => 0.001;
+    const offSchedule = state({
+      day: 32, // cycle day 3; ordinary Flagship celebrity days are 1, 6 and 11
+      history: [], ranking: [], dailyRanking: [],
+      listing: { area: 'Yaba' } as GameState['listing'],
+      today: { day: 32, bestScore: 0, events: [] } as unknown as GameState['today'],
+      rivals: [tolani], messages: [], gist: [], rivalPosts: [],
+    });
+    const quiet = simulateRivals(offSchedule);
+    assert.ok(!quiet.gist.some((item) => /celebrity client/i.test(item.title)),
+      'Tolani must not receive a scheduled celebrity on an off-day');
+
+    const scheduled = state({
+      day: 29, // cycle day 0 is an ordinary Flagship candidate day
+      history: [], ranking: [], dailyRanking: [],
+      listing: { area: 'Yaba' } as GameState['listing'],
+      today: { day: 29, bestScore: 0, events: [] } as unknown as GameState['today'],
+      rivals: [tolani], messages: [], gist: [], rivalPosts: [],
+    });
+    const visit = simulateRivals(scheduled);
+    assert.ok(visit.gist.some((item) => /celebrity client/i.test(item.title)),
+      'Tolani should still receive celebrity opportunities on scheduled days');
+  } finally {
+    Math.random = originalRandom;
+  }
+});
+
+test('a rival cannot receive routine celebrity visits on consecutive days', () => {
+  const originalRandom = Math.random;
+  try {
+    Math.random = () => 0.001;
+    const seed = initRivals().find((rival) => rival.id === 'ivory')!;
+    const elite = {
+      ...seed,
+      tier: 6,
+      signature: true,
+      stars: 4,
+      cash: 1_000_000_000,
+      moved: 31,
+      week: Array.from({ length: 7 }, () => 10_000_000),
+      weekCosts: Array.from({ length: 7 }, () => 2_000_000),
+    };
+    const day29 = state({
+      day: 29, history: [], ranking: [], dailyRanking: [],
+      listing: { area: 'Yaba' } as GameState['listing'],
+      today: { day: 29, bestScore: 0, events: [] } as unknown as GameState['today'],
+      rivals: [elite], messages: [], gist: [], rivalPosts: [],
+    });
+    const first = simulateRivals(day29);
+    assert.ok(first.gist.some((item) => item.day === 29 && /celebrity client/i.test(item.title)));
+    assert.equal(first.rivals[0].lastCelebrityVisitDay, 29);
+
+    const day30 = state({
+      ...first, day: 30, history: [...(first.history || [])],
+      today: { day: 30, bestScore: 0, events: [] } as unknown as GameState['today'],
+    });
+    const second = simulateRivals(day30);
+    assert.ok(!second.gist.some((item) => item.day === 30 && /celebrity client/i.test(item.title)),
+      'Signature Level 7 has a scheduled candidate on day 30, but a day-29 visit triggers cooldown');
   } finally {
     Math.random = originalRandom;
   }
@@ -613,12 +705,12 @@ test('Level 6 and Level 7 rivals retain finite celebrity finances and publicize 
         weekCosts: Array.from({ length: 7 }, () => 2_000_000),
       };
       const base = state({
-        day: 31,
+        day: 29,
         history: [],
         ranking: [],
         dailyRanking: [],
         listing: { area: 'Yaba' } as GameState['listing'],
-        today: { day: 31, bestScore: 0, events: [] } as unknown as GameState['today'],
+        today: { day: 29, bestScore: 0, events: [] } as unknown as GameState['today'],
         rivals: [elite],
         messages: [],
         gist: [],
@@ -630,7 +722,7 @@ test('Level 6 and Level 7 rivals retain finite celebrity finances and publicize 
       assert.ok(result.week.every(Number.isFinite), 'Level ' + (tier + 1) + ' rival revenue history must remain finite');
       assert.ok(updated.gist.some((item) => /celebrity client/i.test(item.title)), 'Level ' + (tier + 1) + ' celebrity visit should appear in the news feed');
       assert.ok(updated.messages.some((item) => item.from === 'GistLagos' && /CELEBRITY SIGHTING/i.test(item.text)), 'Level ' + (tier + 1) + ' celebrity visit should be announced');
-      assert.ok(updated.rivalPosts.some((post) => /Celebrity client|special guest/i.test(post.caption)), 'Level ' + (tier + 1) + ' celebrity visit should appear on social media');
+      assert.ok(updated.rivalPosts.some((post) => /celebrity|special guest/i.test(post.caption)), 'Level ' + (tier + 1) + ' celebrity visit should appear on social media');
     }
   } finally {
     Math.random = originalRandom;

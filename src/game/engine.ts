@@ -3,12 +3,12 @@ import { generateRandomCustomer } from '../utils/randomizer';
 import { DIVINE_CAPACITY, HOUR_WEIGHTS, PATIENCE, SHOP_MINUTES, staffMinutes, NEW_SHOP_RAMP_DAYS, NEW_SHOP_START, SERVICE_FEE, SLOW_WEEK_CHANCE, STAFF, STAFF_CAPACITY, START_CASH, SUPPLIES_SHARE, MARKUP, TIERS, FABRIC_COST, CELEBRITY_FULFILMENT_RATE, naira } from './economy';
 import { canBuy, entryFor, HAIR_SWATCHES, isClothing, makeDesign, pieceCost, productKey, MARKET } from './market';
 import { FabricId } from '../types/character';
-import { answerRival, competition, initRivals, poacher, reactToMove, simulateRivals } from './rivals';
+import { announceCelebrityVisit, answerRival, competition, initRivals, poacher, reactToMove, simulateRivals } from './rivals';
 import { answerInvite, contestFor, contestModel, dropStep, judge, planDrop, planEvents, planTips, visitStep, wonListing } from './encounters';
 import { POWER as POWER_CFG, activeGeneratorUid, addShout, coolRunning, drainRate, fuelOf, fuelPrice, liveStats, nepaOff, outageAt, planOutages, pourFuel, powerStep, scarcity, source, tankSize } from './power';
 import { answerConvo, startGist } from './convos';
 import { ENERGY, busyNow, divineBonus, energyOf, energyStep, exhausted, payBills, spendEnergy } from './life';
-import { makeCustomer, makeCelebrityCustomer, celebrityIsScheduled, celebrityVisitChance, maximumCelebrityTierForShop } from './customers';
+import { makeCustomer, makeCelebrityCustomer, celebrityIsScheduled, celebrityVisitChance, maximumCelebrityTierForShop, chooseCelebrityTierForShop } from './customers';
 import { buildLook, hairGroup, lookCost, scoreLook } from './scoring';
 import { FABRIC_COLORS, FEMALE_HAIR, MAKEUP_LOOKS } from '../constants/catalog';
 import { colourName } from './colours';
@@ -482,23 +482,34 @@ export function openShop(s0: GameState): GameState {
     mix[2] = Math.max(0, mix[2] + shift);
   }
   const arrivals = Array.from({ length: n }, () => ({ at: arrivalMinute(), c: makeCustomer(s, mix) }));
-  // Celebrity eligibility starts at shop Level 3; signature properties improve odds without being a gate.
-  const celebrityScheduled = celebrityIsScheduled(s.tier, s.day);
+  // One shared celebrity model serves the player and rivals: schedule, brand heat, then celebrity rank.
+  const signatureProperty = !!s.listing.signature;
+  const celebrityProfile = {
+    reputation: s.rep,
+    followers: s.followers || 0,
+    shopTierIndex: s.tier,
+    awareness: s.brand?.awareness,
+    prestige: s.brand?.prestige,
+    trendInfluence: s.brand?.trendInfluence,
+  };
+  const celebrityScheduled = celebrityIsScheduled(s.tier, s.day, signatureProperty);
   const highestEligibleCelebrityTier = maximumCelebrityTierForShop(s.tier);
+  const celebrityCooldownClear = s.lastCelebrityVisitDay !== s.day - 1;
   if (
     highestEligibleCelebrityTier >= 0 &&
     celebrityScheduled &&
-    chance(celebrityVisitChance(s.tier, !!s.listing.signature))
+    celebrityCooldownClear &&
+    chance(celebrityVisitChance(s.tier, signatureProperty, celebrityProfile))
   ) {
-    const celebrityTier = Math.floor(Math.random() * (highestEligibleCelebrityTier + 1));
+    const celebrityTier = chooseCelebrityTierForShop(s.tier, signatureProperty, celebrityProfile);
     const c = makeCelebrityCustomer(s, celebrityTier);
     arrivals.push({ at: 100 + Math.random() * 560, c });
   }
   const model = contestModel(s);
   if (model) arrivals.push(model);
-  // Deborah's separately scheduled celebrity tip uses the same five-tier system and Level 3 gate.
-  if (s.celebDay === s.day && highestEligibleCelebrityTier >= 0) {
-    const celebrityTier = Math.floor(Math.random() * (highestEligibleCelebrityTier + 1));
+  // Deborah's advance tip represents a confirmed lead. Avoid stacking two celebrity arrivals on one day.
+  if (s.celebDay === s.day && highestEligibleCelebrityTier >= 0 && !arrivals.some((arrival) => !!arrival.c.celebrity)) {
+    const celebrityTier = chooseCelebrityTierForShop(s.tier, signatureProperty, celebrityProfile);
     const c = makeCelebrityCustomer(s, celebrityTier);
     arrivals.push({ at: 120 + Math.random() * 360, c });
   }
@@ -512,6 +523,9 @@ export function openShop(s0: GameState): GameState {
   }
   if (s.weather === 'harmattan') s = addShout(s, 'Deborah', 'Harmattan dust everywhere this morning. Keep the clothes covered, sis.', 'warn');
   let next: GameState = { ...s, slowWeek: slow, arrivals, outages, busy: null, power: { ...s.power, gen: false, solar: s.power?.solar || 0 } };
+  if (arrivals.some((arrival) => !!arrival.c.celebrity)) {
+    next = { ...next, lastCelebrityVisitDay: s.day };
+  }
   if (outageAt(next, 0)) {
     next = addShout(next, 'NEPA', 'No light this morning. NEPA took it before you opened.', 'nepa');
     if (stats(next).solarPanels && next.power.solar > 0) next = addShout(next, 'Solar', 'Solar is running the shop for now.', 'good');
@@ -888,12 +902,38 @@ export function applyLook(s0: GameState, c: Customer, choice: StyleChoice, st0: 
     next = money(next, -st.cost, c.celebrity && score.total >= 80 ? 'Celebrity order fulfilment, sourcing & tailoring' : 'Hair and makeup supplies');
   }
   if (c.influencer && score.total >= 80) next = { ...next, followers: (next.followers || 0) + Math.round(60 + Math.random() * 120) };
+  let celebrityFollowerGain = 0;
   if (c.celebrity && sold && score.total >= 80) {
     const gained = Math.round((8_000 + Math.random() * 10_000) * (1 + c.celebrity.tier * 0.85));
+    celebrityFollowerGain = gained;
     const rivals = next.rivals.map((r) => r.id === 'you' ? r : { ...r, feeling: clamp(r.feeling - (8 + c.celebrity!.tier * 3), -100, 100) });
     next = { ...next, followers: (next.followers || 0) + gained, rep: clamp(next.rep + 3 + c.celebrity.tier * 2, 0, 100), rivals,
       today: { ...next.today, events: [...next.today.events, `TRENDING IN LAGOS: ${c.name} paid ${naira(st.paid + st.tip)} including a ${naira(st.tip)} tip, then posted your look. +${gained?.toLocaleString('en-NG')} followers. Rivals are watching.`] } };
-    next = msg(next, 'Gidigram', `TRENDING NOW 🔥 ${c.name} posted the look from your shop! +${gained?.toLocaleString('en-NG')} followers, a huge reputation boost, and your rivals are jealous.`, 'good');
+  }
+  if (c.celebrity) {
+    const currentBrand = getBrandMetrics(next);
+    const bought = sold && st.paid > 0;
+    const premiumOrder = bought && score.total >= 80;
+    const rank = c.celebrity.tier;
+    next = {
+      ...next,
+      brand: {
+        ...currentBrand,
+        awareness: clamp(currentBrand.awareness + (premiumOrder ? 1.0 + rank * 0.25 : bought ? 0.25 : -0.15), 5, 100),
+        prestige: clamp(currentBrand.prestige + (premiumOrder ? 0.45 + rank * 0.15 : bought ? 0.10 : -0.25), 5, 100),
+        trendInfluence: clamp(currentBrand.trendInfluence + (premiumOrder ? 0.7 + rank * 0.25 : bought ? 0.25 : -0.30), 5, 100),
+      },
+    };
+    next = announceCelebrityVisit(next, {
+      shopId: 'you',
+      shopName: 'Asanwa Boutique',
+      ownerName: 'Divine',
+      celebrityName: `${c.name} · ${c.celebrity.rank}`,
+      spend: st.paid + st.tip,
+      bought,
+      premiumOrder,
+      followerGain: celebrityFollowerGain,
+    });
   }
   if (c.contest) next = judge(next, c, score.total);
   next = depart(next, c, lookOut, sold);

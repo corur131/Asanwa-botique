@@ -2,11 +2,17 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
   CELEBRITY_DAYS_BY_SHOP_TIER,
+  SIGNATURE_CELEBRITY_DAYS_BY_SHOP_TIER,
   CELEBRITY_SPEND_RANGES,
+  CELEBRITY_TIER_WEIGHTS_BY_SHOP_TIER,
   celebrityAmountsForTier,
+  celebrityAttractionMultiplier,
+  chooseCelebrityTierForShop,
   celebrityIsScheduled,
   celebrityVisitChance,
   maximumCelebrityTierForShop,
+  RICH_RETAIL_BUDGET_BANDS_BY_TIER,
+  SIGNATURE_RICH_RETAIL_BUDGET_BANDS_BY_TIER,
   richRetailBudget,
 } from './customers';
 import { BUDGET, SERVICE_BUDGET, CELEBRITY_FULFILMENT_RATE, TIERS } from './economy';
@@ -36,6 +42,48 @@ test('rich retail capacity expands to ₦100k–₦5m with a weighted, non-round
   assert.ok(topTail >= 0.003 && topTail <= 0.007, `₦4m+ budgets should be rare, got ${topTail}`);
 });
 
+
+test('rich clothing budgets progress by shop tier and Signature properties skew wealthier', () => {
+  assert.equal(RICH_RETAIL_BUDGET_BANDS_BY_TIER.length, 7);
+  assert.equal(SIGNATURE_RICH_RETAIL_BUDGET_BANDS_BY_TIER.length, 7);
+
+  for (let tier = 0; tier < 7; tier++) {
+    const ordinaryBands = RICH_RETAIL_BUDGET_BANDS_BY_TIER[tier];
+    const signatureBands = SIGNATURE_RICH_RETAIL_BUDGET_BANDS_BY_TIER[tier];
+    assert.ok(Math.abs(ordinaryBands.reduce((sum, band) => sum + band.weight, 0) - 1) < 1e-12,
+      `ordinary Level ${tier + 1} percentages must total 100%`);
+    assert.ok(Math.abs(signatureBands.reduce((sum, band) => sum + band.weight, 0) - 1) < 1e-12,
+      `Signature Level ${tier + 1} percentages must total 100%`);
+  }
+
+  const random = seededRandom(20261013);
+  const ordinaryMax = [1_250_000, 2_500_000, 5_000_000, 5_000_000, 7_500_000, 10_000_000, 10_000_000];
+  const signatureMax = [2_500_000, 4_000_000, 5_000_000, 5_000_000, 10_000_000, 10_000_000, 10_000_000];
+  for (let tier = 0; tier < 7; tier++) {
+    const ordinary = Array.from({ length: 8_000 }, () => richRetailBudget(random, tier, false));
+    const signature = Array.from({ length: 8_000 }, () => richRetailBudget(random, tier, true));
+    assert.ok(ordinary.every((budget) => budget <= ordinaryMax[tier]),
+      `ordinary Level ${tier + 1} must respect its top budget band`);
+    assert.ok(signature.every((budget) => budget <= signatureMax[tier]),
+      `Signature Level ${tier + 1} must respect its top budget band`);
+    const ordinaryMean = ordinary.reduce((sum, budget) => sum + budget, 0) / ordinary.length;
+    const signatureMean = signature.reduce((sum, budget) => sum + budget, 0) / signature.length;
+    assert.ok(signatureMean > ordinaryMean,
+      `Signature Level ${tier + 1} should have a wealthier rich-customer budget mix`);
+  }
+
+  assert.deepEqual(
+    RICH_RETAIL_BUDGET_BANDS_BY_TIER[4].map((band) => band.weight),
+    [0.39, 0.24, 0.18, 0.12, 0.05, 0.02],
+    'ordinary Flagship uses the proposed Level 5 mix',
+  );
+  assert.deepEqual(
+    SIGNATURE_RICH_RETAIL_BUDGET_BANDS_BY_TIER[4].map((band) => band.weight),
+    [0.28, 0.23, 0.22, 0.15, 0.07, 0.04, 0.01],
+    'Signature Flagship uses the proposed Signature mix',
+  );
+});
+
 test('celebrity spend bands are tiered and every lower-tier maximum obeys the ₦5m overlap rule', () => {
   assert.equal(CELEBRITY_SPEND_RANGES.length, 5);
   assert.deepEqual(CELEBRITY_SPEND_RANGES[4], { min: 30_000_000, max: 210_000_000 });
@@ -60,6 +108,30 @@ test('celebrity spend bands are tiered and every lower-tier maximum obeys the �
   }
 });
 
+
+test('Signature properties receive more celebrity opportunities than ordinary shops', () => {
+  assert.deepEqual(
+    CELEBRITY_DAYS_BY_SHOP_TIER.slice(2).map((days) => days.length),
+    [1, 2, 3, 4, 6],
+  );
+  assert.deepEqual(
+    SIGNATURE_CELEBRITY_DAYS_BY_SHOP_TIER.slice(2).map((days) => days.length),
+    [2, 4, 6, 8, 10],
+  );
+
+  for (let tier = 2; tier <= 6; tier++) {
+    assert.ok(
+      SIGNATURE_CELEBRITY_DAYS_BY_SHOP_TIER[tier].length > CELEBRITY_DAYS_BY_SHOP_TIER[tier].length,
+      `Signature Level ${tier + 1} should have more candidate days`,
+    );
+    for (const day of SIGNATURE_CELEBRITY_DAYS_BY_SHOP_TIER[tier]) {
+      assert.ok(celebrityIsScheduled(tier, day + 1, true), `Signature Level ${tier + 1} must recognize cycle day ${day}`);
+    }
+  }
+  assert.ok(!celebrityIsScheduled(4, 3, false), 'ordinary Flagship should not inherit the Signature-only schedule');
+  assert.ok(celebrityIsScheduled(4, 3, true), 'Signature Flagship should have an extra eligible day');
+});
+
 test('celebrity eligibility opens at Level 3 and lower celebrity ranks can visit higher shops', () => {
   assert.equal(maximumCelebrityTierForShop(0), -1);
   assert.equal(maximumCelebrityTierForShop(1), -1);
@@ -76,8 +148,38 @@ test('celebrity eligibility opens at Level 3 and lower celebrity ranks can visit
     const signature = celebrityVisitChance(shopTier, true);
     assert.ok(ordinary > 0 && ordinary < 1);
     assert.ok(signature > ordinary && signature <= 0.95);
+    assert.ok(Math.abs(signature - ordinary * 1.25) < 1e-12,
+      `Signature Level ${shopTier + 1} should have exactly 1.25x the ordinary celebrity chance before brand heat`);
   }
   assert.equal(celebrityVisitChance(1, true), 0, 'Signature status cannot bypass the Level 3 gate');
+  assert.deepEqual(
+    [2, 3, 4, 5, 6].map((tier) => Number(celebrityVisitChance(tier, true).toFixed(2))),
+    [0.13, 0.20, 0.28, 0.35, 0.43],
+  );
+});
+
+test('reputation, audience and brand heat improve attraction without guaranteeing a celebrity', () => {
+  const cold = { reputation: 25, followers: 120, shopTierIndex: 5, awareness: 20, prestige: 25, trendInfluence: 18 };
+  const hot = { reputation: 92, followers: 250_000, shopTierIndex: 5, awareness: 92, prestige: 88, trendInfluence: 96 };
+  assert.ok(celebrityAttractionMultiplier(cold) < 1);
+  assert.ok(celebrityAttractionMultiplier(hot) > celebrityAttractionMultiplier(cold));
+  assert.ok(celebrityAttractionMultiplier(hot) <= 1.25);
+  assert.ok(celebrityVisitChance(5, true, hot) > celebrityVisitChance(5, true, cold));
+  assert.ok(celebrityVisitChance(5, true, hot) < 1, 'brand heat must never guarantee a visit');
+
+  assert.equal(CELEBRITY_TIER_WEIGHTS_BY_SHOP_TIER.length, 7);
+  const flagshipRandom = seededRandom(20261013);
+  const empireRandom = seededRandom(20261014);
+  const signatureRandom = seededRandom(20261015);
+  const samples = 12_000;
+  let flagshipTop = 0, empireTop = 0, signatureEmpireTop = 0;
+  for (let i = 0; i < samples; i++) {
+    if (chooseCelebrityTierForShop(4, false, undefined, flagshipRandom) === 4) flagshipTop++;
+    if (chooseCelebrityTierForShop(6, false, undefined, empireRandom) === 4) empireTop++;
+    if (chooseCelebrityTierForShop(6, true, undefined, signatureRandom) === 4) signatureEmpireTop++;
+  }
+  assert.ok(empireTop > flagshipTop, 'Fashion Empire should attract more top-tier celebrities than Flagship');
+  assert.ok(signatureEmpireTop > empireTop, 'Signature should modestly improve the top-rank celebrity mix');
 });
 
 test('visit-frequency simulation scales gradually with shop tier and Signature improves odds', () => {

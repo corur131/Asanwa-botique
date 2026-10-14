@@ -169,6 +169,8 @@ export interface Rival {
   speciality: Speciality;
   area: string;
   tier: number;
+  /** Signature-grade premium premises; optional in legacy saves. */
+  signature?: boolean;
   stars: number;
   cash: number;
   rep: number;
@@ -197,6 +199,8 @@ export interface Rival {
   feeling: number;
   look: CharacterConfig;
   male?: boolean;
+  /** Most recent day a celebrity actually arrived; prevents routine back-to-back visits. */
+  lastCelebrityVisitDay?: number;
   /** Day they last moved shop (up or down). */
   moved: number;
   /** Days with cash below zero. */
@@ -796,6 +800,8 @@ export interface GameState {
   visit: Visit | null;
   /** Deborah's tip: a celebrity is coming on this day. */
   celebDay?: number;
+  /** Last day a celebrity arrived at Divine's shop; optional in existing saves. */
+  lastCelebrityVisitDay?: number;
   /** Times Divine has looked around Tolani's shop (Deborah notices). */
   spying: number;
   /** When this copy was saved (ms), to tell which copy is newest. */

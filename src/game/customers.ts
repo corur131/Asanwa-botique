@@ -127,22 +127,70 @@ const unitSample = (random: () => number) => {
 const roundToFiveThousand = (value: number) => Math.round(value / 5_000) * 5_000;
 
 /**
- * Rich retail customers have a ₦100k–₦5m spending capacity, not a promise to spend it.
- * The distribution is deliberately weighted toward sub-₦1.25m budgets; very large budgets are rare.
+ * Rich clothing shoppers receive budget distributions based on the shop tier.
+ * These are spending capacities, not promises to spend the full amount.
+ * Tier indexes 0–6 represent in-game Levels 1–7; service-only visitors keep SERVICE_BUDGET.
  */
-export const RICH_RETAIL_BUDGET_BANDS = [
-  { weight: 0.65, min: 100_000, max: 500_000 },
-  { weight: 0.22, min: 500_000, max: 1_250_000 },
-  { weight: 0.09, min: 1_250_000, max: 2_500_000 },
-  { weight: 0.035, min: 2_500_000, max: 4_000_000 },
-  { weight: 0.005, min: 4_000_000, max: 5_000_000 },
-] as const;
+type RichRetailBudgetBand = { readonly weight: number; readonly min: number; readonly max: number };
+const BUDGET_BANDS = {
+  entry: { min: 100_000, max: 500_000 },
+  growing: { min: 500_000, max: 1_250_000 },
+  premium: { min: 1_250_000, max: 2_500_000 },
+  luxury: { min: 2_500_000, max: 4_000_000 },
+  elite: { min: 4_000_000, max: 5_000_000 },
+  maison: { min: 5_000_000, max: 7_500_000 },
+  empire: { min: 7_500_000, max: 10_000_000 },
+} as const;
 
-export function richRetailBudget(random: () => number = Math.random): number {
+const bands = (weights: readonly number[]): RichRetailBudgetBand[] => [
+  ...(weights[0] ? [{ weight: weights[0], ...BUDGET_BANDS.entry }] : []),
+  ...(weights[1] ? [{ weight: weights[1], ...BUDGET_BANDS.growing }] : []),
+  ...(weights[2] ? [{ weight: weights[2], ...BUDGET_BANDS.premium }] : []),
+  ...(weights[3] ? [{ weight: weights[3], ...BUDGET_BANDS.luxury }] : []),
+  ...(weights[4] ? [{ weight: weights[4], ...BUDGET_BANDS.elite }] : []),
+  ...(weights[5] ? [{ weight: weights[5], ...BUDGET_BANDS.maison }] : []),
+  ...(weights[6] ? [{ weight: weights[6], ...BUDGET_BANDS.empire }] : []),
+];
+
+/** Ordinary-shop chances, ordered from Level 1 through Level 7. Every row totals 100%. */
+export const RICH_RETAIL_BUDGET_BANDS_BY_TIER: readonly (readonly RichRetailBudgetBand[])[] = [
+  bands([0.95, 0.05, 0, 0, 0, 0, 0]),
+  bands([0.80, 0.18, 0.02, 0, 0, 0, 0]),
+  bands([0.65, 0.22, 0.09, 0.035, 0.005, 0, 0]),
+  bands([0.57, 0.22, 0.12, 0.07, 0.02, 0, 0]),
+  bands([0.39, 0.24, 0.18, 0.12, 0.05, 0.02, 0]),
+  bands([0.23, 0.23, 0.23, 0.18, 0.08, 0.03, 0.02]),
+  bands([0.12, 0.18, 0.23, 0.22, 0.12, 0.08, 0.05]),
+];
+
+/** Signature customers skew wealthier than customers at an ordinary shop of the same tier. */
+export const SIGNATURE_RICH_RETAIL_BUDGET_BANDS_BY_TIER: readonly (readonly RichRetailBudgetBand[])[] = [
+  bands([0.85, 0.13, 0.02, 0, 0, 0, 0]),
+  bands([0.68, 0.20, 0.10, 0.02, 0, 0, 0]),
+  bands([0.53, 0.22, 0.13, 0.08, 0.04, 0, 0]),
+  bands([0.45, 0.22, 0.16, 0.11, 0.06, 0, 0]),
+  bands([0.28, 0.23, 0.22, 0.15, 0.07, 0.04, 0.01]),
+  bands([0.15, 0.21, 0.25, 0.19, 0.09, 0.06, 0.05]),
+  bands([0.10, 0.15, 0.22, 0.23, 0.14, 0.10, 0.06]),
+];
+
+/** Backward-compatible export: the original Level 3 baseline mix. */
+export const RICH_RETAIL_BUDGET_BANDS = RICH_RETAIL_BUDGET_BANDS_BY_TIER[2];
+
+export function richRetailBudget(
+  random: () => number = Math.random,
+  shopTierIndex = 2,
+  signatureProperty = false,
+): number {
+  const tier = Math.max(0, Math.min(6, Math.floor(Number.isFinite(shopTierIndex) ? shopTierIndex : 2)));
+  const bandsByTier = signatureProperty
+    ? SIGNATURE_RICH_RETAIL_BUDGET_BANDS_BY_TIER
+    : RICH_RETAIL_BUDGET_BANDS_BY_TIER;
+  const selectedBands = bandsByTier[tier] || RICH_RETAIL_BUDGET_BANDS_BY_TIER[2];
   const roll = unitSample(random);
   let cumulative = 0;
-  let band = RICH_RETAIL_BUDGET_BANDS[RICH_RETAIL_BUDGET_BANDS.length - 1];
-  for (const candidate of RICH_RETAIL_BUDGET_BANDS) {
+  let band = selectedBands[selectedBands.length - 1];
+  for (const candidate of selectedBands) {
     cumulative += candidate.weight;
     if (roll < cumulative) {
       band = candidate;
@@ -150,7 +198,7 @@ export function richRetailBudget(random: () => number = Math.random): number {
     }
   }
   const value = band.min + unitSample(random) * (band.max - band.min);
-  return Math.max(100_000, Math.min(5_000_000, roundToFiveThousand(value)));
+  return Math.max(band.min, Math.min(band.max, roundToFiveThousand(value)));
 }
 
 /**
@@ -185,7 +233,7 @@ export function maximumCelebrityTierForShop(shopTierIndex: number): number {
   return Math.min(4, Math.floor(shopTierIndex));
 }
 
-/** Candidate days per 14-day cycle; actual visits are still randomized on these days. */
+/** Ordinary-shop candidate days per 14-day cycle; each is still a probability roll. */
 export const CELEBRITY_DAYS_BY_SHOP_TIER: readonly (readonly number[])[] = [
   [],
   [],
@@ -196,21 +244,110 @@ export const CELEBRITY_DAYS_BY_SHOP_TIER: readonly (readonly number[])[] = [
   [0, 2, 4, 7, 9, 12],
 ];
 
-export function celebrityIsScheduled(shopTierIndex: number, day: number): boolean {
+/**
+ * Signature properties earn extra celebrity opportunities per 14-day cycle:
+ * 2 at Level 3, 4 at Level 4, 6 at Flagship, 8 at Luxury Maison, and 10 at Level 7.
+ * The separate 1.5x visit probability still applies on each opportunity.
+ */
+export const SIGNATURE_CELEBRITY_DAYS_BY_SHOP_TIER: readonly (readonly number[])[] = [
+  [],
+  [],
+  [2, 9],
+  [1, 5, 9, 12],
+  [0, 2, 5, 7, 9, 12],
+  [0, 2, 4, 6, 8, 10, 12, 13],
+  [0, 1, 3, 4, 6, 7, 9, 10, 12, 13],
+];
+
+export function celebrityIsScheduled(shopTierIndex: number, day: number, signatureProperty = false): boolean {
   if (!Number.isFinite(shopTierIndex) || shopTierIndex < 2) return false;
   const tier = Math.min(6, Math.floor(shopTierIndex));
-  const days = CELEBRITY_DAYS_BY_SHOP_TIER[tier] || [];
+  const daysByTier = signatureProperty ? SIGNATURE_CELEBRITY_DAYS_BY_SHOP_TIER : CELEBRITY_DAYS_BY_SHOP_TIER;
+  const days = daysByTier[tier] || [];
   const fortnightDay = (Math.max(1, Math.floor(day)) - 1) % 14;
   return days.includes(fortnightDay);
 }
 
-/** Probability on a candidate day. Signature status raises the odds but is never required. */
-export function celebrityVisitChance(shopTierIndex: number, signatureProperty: boolean): number {
+/**
+ * Shared brand profile used by the player, competitors and Deborah's advance tips.
+ * Missing fields are backfilled from the game's legacy reputation/audience estimates.
+ */
+export interface CelebrityAttractionProfile {
+  reputation?: number;
+  followers?: number;
+  shopTierIndex?: number;
+  awareness?: number;
+  prestige?: number;
+  trendInfluence?: number;
+}
+
+/** Bounded 0.78–1.25 attraction multiplier: strong brands gain visibility, but nothing guarantees a visit. */
+export function celebrityAttractionMultiplier(profile?: CelebrityAttractionProfile): number {
+  if (!profile) return 1;
+  const clampScore = (value: number | undefined, fallback: number) =>
+    typeof value === 'number' && Number.isFinite(value)
+      ? Math.max(0, Math.min(100, value))
+      : Math.max(0, Math.min(100, fallback));
+  const reputation = clampScore(profile.reputation, 50);
+  const followers = typeof profile.followers === 'number' && Number.isFinite(profile.followers)
+    ? Math.max(0, profile.followers) : 0;
+  const social = Math.log10(followers + 1);
+  const tier = typeof profile.shopTierIndex === 'number' && Number.isFinite(profile.shopTierIndex)
+    ? Math.max(0, Math.min(6, Math.floor(profile.shopTierIndex))) : 0;
+  const awareness = clampScore(profile.awareness, 18 + social * 10 + tier * 4);
+  const prestige = clampScore(profile.prestige, 15 + reputation * 0.52 + tier * 3);
+  const trendInfluence = clampScore(profile.trendInfluence, 12 + social * 5);
+  const audienceScore = Math.max(0, Math.min(100, social / 5 * 100));
+  const brandHeat = reputation * 0.35 + awareness * 0.25 + prestige * 0.20 +
+    trendInfluence * 0.15 + audienceScore * 0.05;
+  return Math.max(0.78, Math.min(1.25, 0.78 + (brandHeat / 100) * 0.47));
+}
+
+/** Higher shop tiers increasingly attract the strongest ranks; Signature and brand heat tilt the mix upward. */
+export const CELEBRITY_TIER_WEIGHTS_BY_SHOP_TIER: readonly (readonly number[])[] = [
+  [],
+  [],
+  [0.55, 0.30, 0.15],
+  [0.38, 0.30, 0.22, 0.10],
+  [0.26, 0.24, 0.21, 0.17, 0.12],
+  [0.17, 0.20, 0.21, 0.22, 0.20],
+  [0.10, 0.14, 0.18, 0.25, 0.33],
+];
+
+/** Select a celebrity rank using one distribution shared by player and rivals. */
+export function chooseCelebrityTierForShop(
+  shopTierIndex: number,
+  signatureProperty = false,
+  profile?: CelebrityAttractionProfile,
+  random: () => number = Math.random,
+): number {
+  const highest = maximumCelebrityTierForShop(shopTierIndex);
+  if (highest < 0) return -1;
+  const tier = Math.min(6, Math.floor(shopTierIndex));
+  const source = CELEBRITY_TIER_WEIGHTS_BY_SHOP_TIER[tier] || [1];
+  const tilt = Math.max(0.75, Math.min(1.30,
+    1 + (celebrityAttractionMultiplier(profile) - 1) * 0.8 + (signatureProperty ? 0.06 : 0)));
+  const weights = source.slice(0, highest + 1).map((weight, index) => weight * Math.pow(tilt, index));
+  const total = weights.reduce((sum, weight) => sum + weight, 0);
+  let roll = unitSample(random) * total;
+  for (let index = 0; index < weights.length; index++) {
+    roll -= weights[index];
+    if (roll < 0) return index;
+  }
+  return Math.max(0, weights.length - 1);
+}
+
+/** Probability on a candidate day. Brand heat matters; Signature adds a moderated 1.25x odds advantage. */
+export function celebrityVisitChance(
+  shopTierIndex: number,
+  signatureProperty: boolean,
+  profile?: CelebrityAttractionProfile,
+): number {
   if (maximumCelebrityTierForShop(shopTierIndex) < 0) return 0;
   const tier = Math.min(6, Math.floor(shopTierIndex));
-  // Scheduled days are opportunities; higher tiers gain more dates, not a guaranteed visit.
   const baseByTier = [0, 0, 0.10, 0.16, 0.22, 0.28, 0.34];
-  return Math.min(0.95, (baseByTier[tier] || 0) + (signatureProperty ? 0.15 : 0));
+  const signatureMultiplier = signatureProperty ? 1.25 : 1;
+  return Math.min(0.65, (baseByTier[tier] || 0) * signatureMultiplier * celebrityAttractionMultiplier(profile));
 }
 
 const SERVICE_INTRO = {
@@ -314,10 +451,20 @@ const CELEBRITY_POOLS: { name: string; male: boolean; rank: string }[][] = [
   ],
 ];
 
+/** Return a named guest from the same rank pool used by player and rival celebrity visits. */
+export function celebrityProfileForTier(
+  celebrityTier: number,
+  random: () => number = Math.random,
+): { name: string; male: boolean; rank: string } {
+  const tier = Math.max(0, Math.min(4, Math.floor(Number.isFinite(celebrityTier) ? celebrityTier : 0)));
+  const profiles = CELEBRITY_POOLS[tier];
+  return profiles[Math.floor(unitSample(random) * profiles.length)];
+}
+
 export function makeCelebrityCustomer(state: GameState, celebrityTier: number): Customer {
   // Celebrity tier is its own five-level scale; shop level only controls eligibility.
   const tier = Math.max(0, Math.min(4, Math.floor(Number.isFinite(celebrityTier) ? celebrityTier : 0)));
-  const profile = pick(CELEBRITY_POOLS[tier]);
+  const profile = celebrityProfileForTier(tier);
   let base = makeCustomer(state, [0, 0, 1]);
   // The visual avatar is randomly generated, while the public figure is a fictional guest-event portrayal.
   if (base.male !== profile.male) {
@@ -358,7 +505,7 @@ export function makeCustomer(state: GameState, mix: [number, number, number]): C
   const budget = service
     ? roundBudget(lo + Math.random() * (hi - lo))
     : cls === 'rich'
-      ? richRetailBudget()
+      ? richRetailBudget(Math.random, state.tier, !!state.listing.signature)
       : roundBudget(lo + Math.random() * (hi - lo));
   const fav = regular ? { favColor: regular.favColor, favName: regular.favName } : (() => { const c = pick(WANTED_COLOURS); return { favColor: c.color, favName: c.name }; })();
   const base = {
