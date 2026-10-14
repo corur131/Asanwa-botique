@@ -18,8 +18,14 @@ function contractFor(s: GameState): PoliticianContract {
   return contract!;
 }
 
+test('low-level boutiques do not receive politician contract offers', () => {
+  const s = game({ tier: 0, politicianContracts: [] });
+  assert.equal(s.politicianContracts?.some((row) => row.status === 'offered'), false);
+  assert.equal(s.cash < 0, false);
+});
+
 test('new offer uses real catalogue items unlocked for the current boutique level', () => {
-  const s = game({ tier: 0 });
+  const s = game({ tier: 6 });
   const offer = contractFor(s);
   assert.equal(offer.status, 'offered');
   assert.ok(offer.reward > offer.requirements.reduce((sum, row) => sum + row.unitCost * row.quantity, 0));
