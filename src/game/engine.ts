@@ -494,9 +494,11 @@ export function openShop(s0: GameState): GameState {
   };
   const celebrityScheduled = celebrityIsScheduled(s.tier, s.day, signatureProperty);
   const highestEligibleCelebrityTier = maximumCelebrityTierForShop(s.tier);
+  const celebrityCooldownClear = s.lastCelebrityVisitDay !== s.day - 1;
   if (
     highestEligibleCelebrityTier >= 0 &&
     celebrityScheduled &&
+    celebrityCooldownClear &&
     chance(celebrityVisitChance(s.tier, signatureProperty, celebrityProfile))
   ) {
     const celebrityTier = chooseCelebrityTierForShop(s.tier, signatureProperty, celebrityProfile);
@@ -521,6 +523,9 @@ export function openShop(s0: GameState): GameState {
   }
   if (s.weather === 'harmattan') s = addShout(s, 'Deborah', 'Harmattan dust everywhere this morning. Keep the clothes covered, sis.', 'warn');
   let next: GameState = { ...s, slowWeek: slow, arrivals, outages, busy: null, power: { ...s.power, gen: false, solar: s.power?.solar || 0 } };
+  if (arrivals.some((arrival) => !!arrival.c.celebrity)) {
+    next = { ...next, lastCelebrityVisitDay: s.day };
+  }
   if (outageAt(next, 0)) {
     next = addShout(next, 'NEPA', 'No light this morning. NEPA took it before you opened.', 'nepa');
     if (stats(next).solarPanels && next.power.solar > 0) next = addShout(next, 'Solar', 'Solar is running the shop for now.', 'good');
