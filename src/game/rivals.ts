@@ -7,6 +7,7 @@
 import { CharacterConfig } from '../types/character';
 import { generateRandomCustomer } from '../utils/randomizer';
 import { TIERS } from './economy';
+import { celebrityIsScheduled, celebrityVisitChance } from './customers';
 import { GameState, Gist, Message, ReplyChoice, Rival, RivalPost } from './types';
 import { Topic, startConvo } from './convos';
 import { brandFromLegacy, brandPower, getBrandMetrics } from './business';
@@ -299,12 +300,11 @@ export function simulateRivals(s0: GameState): GameState {
       r.rep = clamp(r.rep + rand(0.2, 0.8), 5, 99);
       if (r.main) news.push({ kind: 'campaign', r });
     }
-    // Celebrity clients are a real, recurring source of prestige sales for rivals too.
-    // Higher-tier and more visible boutiques attract them more often, but any rival can land one.
-    // The rival economy now has seven shop tiers; luxury levels also need valid celebrity odds.
-    const celebrityChanceByTier = [0.12, 0.19, 0.27, 0.36, 0.45, 0.52, 0.58];
-    const celebrityChance = clamp((celebrityChanceByTier[r.tier] ?? celebrityChanceByTier[0]) + Math.min(0.06, r.followers / 2_000_000), 0.08, 0.64);
-    if (chance(celebrityChance)) {
+    // Rivals share the ordinary shop's 14-day celebrity calendar; visits only roll on eligible days.
+    // This prevents high-follower rivals (especially Tolani) from receiving celebrities almost daily.
+    const celebrityScheduled = celebrityIsScheduled(r.tier, today);
+    const celebrityChance = celebrityVisitChance(r.tier, false);
+    if (celebrityScheduled && chance(celebrityChance)) {
       const celebritySpendBase = [400_000, 1_200_000, 3_500_000, 9_000_000, 18_000_000, 32_000_000, 55_000_000][r.tier] ?? 400_000;
       const celebritySpend = Math.round(celebritySpendBase * rand(0.7, 2.2) * (0.8 + r.skill * 0.2));
       const celebrityGoodsCost = Math.round(celebritySpend * clamp(stockShare * rand(0.82, 1.05), 0.3, 0.78));
