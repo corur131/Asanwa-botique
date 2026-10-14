@@ -797,6 +797,60 @@ const bomberJacket: Build = (() => {
 })();
 
 // ---------------------------------------------------------------------------
+
+/** Original couture detailing: each collection SKU has its own cut plus a different hand-drawn signature motif. */
+function coutureSignature(c: Ctx, y: number, variant: number): React.ReactNode {
+  const s = c.s;
+  const left = 300 - Math.max(22, s.waist[1] * 0.62);
+  const right = 300 + Math.max(22, s.waist[1] * 0.62);
+  const stroke = variant % 2 ? c.p2.base : gold(c);
+  switch (variant % 5) {
+    case 0:
+      return <g>
+        <path d={`M ${300 - s.neck[1] - 4} ${s.neck[0] + 16} L 300 ${y + 18} L ${300 + s.neck[1] + 4} ${s.neck[0] + 16}`} fill="none" stroke={stroke} strokeWidth="3" />
+        <path d={`M ${left} ${y + 10} L 300 ${y + 38} L ${right} ${y + 10}`} fill="none" stroke={lighten(c.p.base, 0.35)} strokeWidth="2.2" />
+        {[0,1,2].map(i => <circle key={i} cx={300 + (i - 1) * 13} cy={y + 43} r="2.8" fill={gold(c)} />)}
+      </g>;
+    case 1:
+      return <g>
+        <path d={`M ${300 - s.bust[1] * 0.55} ${y + 6} C 360 ${y + 18} 235 ${y + 40} ${300 + s.waist[1] * 0.55} ${y + 66}`} fill="none" stroke={stroke} strokeWidth="7" strokeLinecap="round" />
+        <path d={`M ${300 + s.bust[1] * 0.42} ${y + 4} Q 260 ${y + 40} ${300 - s.waist[1] * 0.4} ${y + 68}`} fill="none" stroke={lighten(c.p.base, 0.42)} strokeWidth="2.2" />
+      </g>;
+    case 2:
+      return <g>
+        <path d={`M ${300 - s.bust[1] * 0.35} ${y + 2} L ${300 - s.waist[1] * 0.25} ${y + 74} L 300 ${y + 58} L ${300 + s.waist[1] * 0.25} ${y + 74} L ${300 + s.bust[1] * 0.35} ${y + 2}`} fill="none" stroke={stroke} strokeWidth="2.4" />
+        <path d={`M 300 ${y + 8} L 300 ${y + 64}`} stroke={lighten(c.p.base, 0.34)} strokeWidth="2" strokeDasharray="3 5" />
+      </g>;
+    case 3:
+      return <g>
+        {[0,1,2,3].map(i => <path key={i} d={`M ${300 - s.bust[1] * 0.42} ${y + 8 + i * 13} Q 300 ${y + 22 + i * 13} ${300 + s.bust[1] * 0.42} ${y + 8 + i * 13}`} fill="none" stroke={i % 2 ? stroke : lighten(c.p.base, 0.38)} strokeWidth={i === 0 ? 3 : 1.6} />)}
+      </g>;
+    default:
+      return <g>
+        <ellipse cx="300" cy={y + 34} rx={Math.max(20, s.waist[1] * 0.65)} ry="24" fill="none" stroke={stroke} strokeWidth="2.4" />
+        <path d={`M ${300 - s.shoulder[1] * 0.5} ${y + 2} Q 300 ${y + 52} ${300 + s.shoulder[1] * 0.5} ${y + 70}`} fill="none" stroke={lighten(c.p.base, 0.38)} strokeWidth="3.2" />
+        <path d={`M 290 ${y + 34} l 10 -8 l 10 8 l -10 8 Z`} fill="none" stroke={gold(c)} strokeWidth="2" />
+      </g>;
+  }
+}
+
+function coutureSuitBuild(o: { ease: number; flare: number; detail: number; longline?: number; double?: boolean; jumpsuit?: boolean }): Build {
+  const base = jacket({ hem: (s) => s.hip[0] + 28 + (o.longline || 0), lapels: true, collar: 'notch', ease: o.ease, opening: o.double ? 44 : 34, pockets: true, flare: o.flare });
+  return {
+    under: (c) => <>
+      {trouserSet(c, `couture-suit-trousers-${c.k}`, c.s.waist[0] + 10, c.s.ankle[1] + 10, { ease: o.jumpsuit ? 15 : o.ease, easeIn: 5, flare: o.flare, pleat: true })}
+      {base.under?.(c)}
+      {coutureSignature(c, c.s.bust[0] + 16, o.detail)}
+      <path d={`M ${300 - c.s.neck[1] - 2} ${c.s.neck[0] + 8} L ${300 - c.s.neck[1] - 18} ${c.s.bust[0] + 20} L 300 ${c.s.bust[0] + 42} Z`} fill={c.p2.base} stroke={gold(c)} strokeWidth="1.8" />
+      <path d={`M ${300 + c.s.neck[1] + 2} ${c.s.neck[0] + 8} L ${300 + c.s.neck[1] + 18} ${c.s.bust[0] + 20} L 300 ${c.s.bust[0] + 42} Z`} fill={c.p2.base} stroke={gold(c)} strokeWidth="1.8" />
+      {o.double && [0,1].map(row => [0,1].map(col => <circle key={row + "-" + col} cx={300 - 18 + col * 36} cy={c.s.bust[0] + 48 + row * 22} r="3.2" fill={gold(c)} />))}
+      {o.jumpsuit && <path d={`M ${300 - c.s.waist[1] - 6} ${c.s.waist[0] + 18} Q 300 ${c.s.waist[0] + 32} ${300 + c.s.waist[1] + 6} ${c.s.waist[0] + 18}`} fill="none" stroke={gold(c)} strokeWidth="4" />}
+    </>,
+    over: (c) => base.over?.(c),
+  };
+}
+
+
 // The registry
 // ---------------------------------------------------------------------------
 export const GARMENTS: Record<string, Build> = {
@@ -1716,6 +1770,46 @@ export const GARMENTS: Record<string, Build> = {
       </>, over: (c) => base.over?.(c),
     };
   })(),
+  couture26MaisonPrismFoldSilkBlouse: top('square', H.long, { sleeve: 'long', ease: 5, hemEase: 0, extra: (c, y) => <>{coutureSignature(c, y - 4, 0)}<path d={`M ${300 - c.s.bust[1] * 0.55} ${c.s.bust[0] + 16} L 300 ${c.s.waist[0] + 8} L ${300 + c.s.bust[1] * 0.55} ${c.s.bust[0] + 16}`} fill="none" stroke={gold(c)} strokeWidth="2.5" /></> }),
+  couture26MaisonSculptedCrescentCorset: top('sweetheart', H.waist, { sleeve: 'none', ease: 2, hemEase: 0, extra: (c, y) => <>{coutureSignature(c, y - 4, 1)}<>{corsetBones(c, y - 4)}<path d={`M ${300 - c.s.waist[1]} ${y - 2} Q 300 ${y + 10} ${300 + c.s.waist[1]} ${y - 2}`} fill="none" stroke={gold(c)} strokeWidth="3" /></></> }),
+  couture26EmpireLiquidMetalDrapeShell: top('scoop', H.hip, { sleeve: 'cap', ease: 8, hemEase: 4, extra: (c, y) => <>{coutureSignature(c, y - 4, 2)}</> }),
+  couture26EmpireAsymmetricGlassPleatBlouse: top('oneShoulder', H.long, { sleeve: 'threeQuarter', ease: 6, hemEase: 0, extra: (c, y) => <>{coutureSignature(c, y - 4, 3)}</> }),
+  couture26EmpireArchitecturalShoulderHaloTop: top('offShoulder', H.waist, { sleeve: 'bell', ease: 4, hemEase: 0, extra: (c, y) => <>{coutureSignature(c, y - 4, 4)}</> }),
+  couture26MaisonDoublePleatColumnTrousers: { under: (c) => <>{trouserSet(c, `couture-trouser-${c.k}`, c.s.waist[0] + 8, c.s.ankle[1] + 18, { ease: 9, easeIn: 6, flare: 2, pleat: true })}{waistband(c, c.s.waist[0] + 8, 16)}{coutureSignature(c, c.s.waist[0] + 8, 0)}<path d={`M ${300 - c.s.waist[1] * 0.6} ${c.s.waist[0] + 20} L ${300 - c.s.hip[1] * 0.45} ${c.s.hip[0] + 50}`} fill="none" stroke={c.p2.base} strokeWidth="2.2" /></> } },
+  couture26MaisonBiasCutSatinPalazzo: { under: (c) => <>{trouserSet(c, `couture-trouser-${c.k}`, c.s.waist[0] + 2, c.s.ankle[1] + 42, { ease: 22, easeIn: 13, flare: 54, pleat: false })}{waistband(c, c.s.waist[0] + 8, 16)}{coutureSignature(c, c.s.waist[0] + 8, 1)}<path d={`M ${300 - c.s.waist[1] * 0.6} ${c.s.waist[0] + 20} L ${300 - c.s.hip[1] * 0.45} ${c.s.hip[0] + 50}`} fill="none" stroke={c.p2.base} strokeWidth="2.2" /></> } },
+  couture26EmpireSculptedWaveFrontSkirt: { under: (c) => <>{skirtPiece(c, `couture-skirt-${c.k}`, c.s.waist[0] + 6, D.knee(c.s) - 10, 96, { pow: 0.8, pleats: 8 })}{waistband(c, c.s.waist[0] + 6, 16)}{coutureSignature(c, c.s.waist[0] + 12, 2)}<path d={`M ${300 - c.s.hip[1] - 12} ${c.s.hip[0] + 22} Q 248 ${c.s.knee[1]} 300 ${D.knee(c.s) - 10}`} fill="none" stroke={gold(c)} strokeWidth="2.4" /></> } },
+  couture26EmpireLiquidFoldWideLeg: { under: (c) => <>{trouserSet(c, `couture-trouser-${c.k}`, c.s.waist[0] + 8, c.s.ankle[1] + 18, { ease: 14, easeIn: 6, flare: 34, pleat: true })}{waistband(c, c.s.waist[0] + 8, 16)}{coutureSignature(c, c.s.waist[0] + 8, 3)}<path d={`M ${300 - c.s.waist[1] * 0.6} ${c.s.waist[0] + 20} L ${300 - c.s.hip[1] * 0.45} ${c.s.hip[0] + 50}`} fill="none" stroke={c.p2.base} strokeWidth="2.2" /></> } },
+  couture26EmpireOrbitPanelFishtailSkirt: { under: (c) => <>{skirtPiece(c, `couture-skirt-${c.k}`, c.s.waist[0] + 6, D.floor(c.s), 138, { pow: 0.62, pleats: 14 })}{waistband(c, c.s.waist[0] + 6, 16)}{coutureSignature(c, c.s.waist[0] + 12, 4)}<path d={`M ${300 - c.s.hip[1] - 12} ${c.s.hip[0] + 22} Q 248 ${c.s.knee[1]} 300 ${D.floor(c.s) - 10}`} fill="none" stroke={gold(c)} strokeWidth="2.4" /></> } },
+  couture26MaisonMidnightPetalColumnGown: dress('oneShoulder', { hem: D.floor(s), flare: 32, pow: 2.5, fitted: true,  extra: (c) => <>{coutureSignature(c, c.s.bust[0] + 14, 0)}<>{corsetBones(c, c.s.waist[0]+20)}<path d={`M ${300-c.s.shoulder[1]} ${c.s.shoulder[0]+10} Q 230 ${c.s.hip[0]} 220 ${D.floor(c.s)-8}`} fill="none" stroke={c.p2.base} strokeWidth="8" /></></> }),
+  couture26MaisonGlassPetalMidiDress: dress('square', { hem: D.midi(s), flare: 120, pow: 0.8, fitted: false, sleeve: "puff", sleeveFlare: 18, pleats: 7, extra: (c) => <>{coutureSignature(c, c.s.bust[0] + 14, 1)}</> }),
+  couture26EmpireSculpturalSpiralGalaGown: dress('sweetheart', { hem: D.floor(s), flare: 170, pow: 0.9, fitted: false,  extra: (c) => <>{coutureSignature(c, c.s.bust[0] + 14, 2)}<>{corsetBones(c, c.s.waist[0]+22)}<path d={`M 300 ${c.s.waist[0]+10} C 360 ${c.s.hip[0]} 238 ${c.s.knee[1]} 300 ${D.floor(c.s)-12}`} fill="none" stroke={c.p2.base} strokeWidth="12" /></></> }),
+  couture26EmpireFloatingPanelOperaGown: dress('offShoulder', { hem: D.floor(s), flare: 220, pow: 0.55, fitted: false, sleeve: "bell", sleeveFlare: 54, pleats: 10, extra: (c) => <>{coutureSignature(c, c.s.bust[0] + 14, 3)}<path d={`M ${300-c.s.shoulder[1]-10} ${c.s.shoulder[0]+8} Q 300 ${c.s.bust[0]-26} ${300+c.s.shoulder[1]+12} ${c.s.shoulder[0]+12} L ${300+c.s.hip[1]+50} ${c.s.hip[0]+34} Q 300 ${c.s.waist[0]+48} ${300-c.s.hip[1]-50} ${c.s.hip[0]+34} Z`} fill={c.p2.base} opacity=".48" stroke={gold(c)} strokeWidth="2" /></> }),
+  couture26EmpireEclipseCutoutColumnDress: dress('oneShoulder', { hem: D.floor(s), flare: 18, pow: 3, fitted: true, slit: true, extra: (c) => <>{coutureSignature(c, c.s.bust[0] + 14, 4)}</> }),
+  couture26MaisonCocoonCashmereCapeCoat: (() => { const base = jacket({ hem: (s) => s.knee[1] + 34, lapels: true, collar: 'notch', belt: false, zip: false, ease: 22, opening: 20, pockets: true, flare: 36, sleeve: 'bell' }); return { under: (c) => <>{base.under?.(c)}{coutureSignature(c, c.s.bust[0] + 10, 0)}<path d={`M ${300-c.s.shoulder[1]-12} ${c.s.shoulder[0]+6} Q 300 ${c.s.bust[0]-16} ${300+c.s.shoulder[1]+12} ${c.s.shoulder[0]+6} L ${300+c.s.waist[1]+38} ${c.s.hip[0]+4} Q 300 ${c.s.waist[0]+54} ${300-c.s.waist[1]-38} ${c.s.hip[0]+4} Z`} fill={c.p2.base} stroke={gold(c)} strokeWidth="1.8" opacity=".8" /></>, over: (c) => base.over?.(c) }; })(),
+  couture26MaisonSculptedShoulderMoto: (() => { const base = jacket({ hem: (s) => s.waist[0] + 42, lapels: false, collar: 'shirt', belt: false, zip: true, ease: 10, opening: 36, pockets: true, flare: 2, sleeve: 'long' }); return { under: (c) => <>{base.under?.(c)}{coutureSignature(c, c.s.bust[0] + 10, 1)}<path d={`M ${300-c.s.shoulder[1]+6} ${c.s.shoulder[0]+10} C 240 ${c.s.bust[0]+28} 270 ${c.s.waist[0]+20} ${300-c.s.waist[1]-12} ${c.s.waist[0]+40}`} fill="none" stroke={c.p2.base} strokeWidth="4" /></>, over: (c) => base.over?.(c) }; })(),
+  couture26EmpireWingedLapelOperaCoat: (() => { const base = jacket({ hem: (s) => D.floor(s), lapels: true, collar: 'notch', belt: false, zip: false, ease: 18, opening: 20, pockets: false, flare: 48, sleeve: 'long' }); return { under: (c) => <>{base.under?.(c)}{coutureSignature(c, c.s.bust[0] + 10, 2)}</>, over: (c) => base.over?.(c) }; })(),
+  couture26EmpireOrigamiStormTrench: (() => { const base = jacket({ hem: (s) => s.knee[1] + 26, lapels: true, collar: 'notch', belt: true, zip: false, ease: 14, opening: 20, pockets: true, flare: 26, sleeve: 'long' }); return { under: (c) => <>{base.under?.(c)}{coutureSignature(c, c.s.bust[0] + 10, 3)}</>, over: (c) => base.over?.(c) }; })(),
+  couture26EmpireFluidLonglineSculptorCoat: (() => { const base = jacket({ hem: (s) => s.knee[1] + 64, lapels: true, collar: 'notch', belt: false, zip: false, ease: 26, opening: 20, pockets: true, flare: 16, sleeve: 'long' }); return { under: (c) => <>{base.under?.(c)}{coutureSignature(c, c.s.bust[0] + 10, 4)}</>, over: (c) => base.over?.(c) }; })(),
+  couture26MaisonIvoryArchitecturalPantsuit: coutureSuitBuild({ ease: 8, flare: 8, detail: 0, longline: 0, double: false, jumpsuit: false }),
+  couture26MaisonSculptedDoubleBreastedSuit: coutureSuitBuild({ ease: 6, flare: 3, detail: 1, longline: 0, double: true, jumpsuit: false }),
+  couture26EmpireAsymmetricTuxedoJumpsuit: coutureSuitBuild({ ease: 10, flare: 26, detail: 2, longline: 0, double: false, jumpsuit: true }),
+  couture26EmpireSatinLapelTrouserSuit: coutureSuitBuild({ ease: 7, flare: 12, detail: 3, longline: 20, double: false, jumpsuit: false }),
+  couture26EmpireMonolithLonglinePowerSuit: coutureSuitBuild({ ease: 15, flare: 4, detail: 4, longline: 44, double: true, jumpsuit: false }),
+  couture26MaisonMonolithBandCollarShirt: (() => { const base = mensTop('shirt'); return { under: (c) => <>{base.under?.(c)}{coutureSignature(c, c.s.bust[0] + 6, 0)}<path d={`M 300 ${c.s.neck[0] + 22} L 300 ${c.s.hip[0] + 18}`} stroke={gold(c)} strokeWidth="2.4" /></>, over: (c) => base.over?.(c) }; })(),
+  couture26MaisonLiquidSatinDrapeShirt: (() => { const base = mensTop('shirt'); return { under: (c) => <>{base.under?.(c)}{coutureSignature(c, c.s.bust[0] + 6, 1)}<path d={`M 300 ${c.s.neck[0] + 22} L 300 ${c.s.hip[0] + 18}`} stroke={c.p2.base} strokeWidth="2.4" /></>, over: (c) => base.over?.(c) }; })(),
+  couture26EmpirePleatFrontTuxedoShirt: (() => { const base = mensTop('shirt'); return { under: (c) => <>{base.under?.(c)}{coutureSignature(c, c.s.bust[0] + 6, 2)}<path d={`M 300 ${c.s.neck[0] + 22} L 300 ${c.s.hip[0] + 18}`} stroke={gold(c)} strokeWidth="5" /><>{[0,1,2,3,4].map(i => <path key={i} d={`M ${282+i*9} ${c.s.bust[0]+14} l 6 7 l -6 7 l -6 -7 Z`} fill="none" stroke={gold(c)} strokeWidth="1.5" />)}</></>, over: (c) => base.over?.(c) }; })(),
+  couture26MaisonTaperedSideStripeTrouser: { under: (c) => <>{trouserSet(c, `couture-mens-trouser-${c.k}`, c.s.waist[0] + 8, c.s.ankle[1] + 8, { ease: 6, easeIn: 4, flare: -2, pleat: true })}{waistband(c, c.s.waist[0] + 8, 15)}{coutureSignature(c, c.s.waist[0] + 6, 0)}<path d={`M ${300 - c.s.hip[1] * 0.65} ${c.s.hip[0] + 14} L ${300 - c.s.ankle[0] - 8} ${c.s.ankle[1] + 6}`} stroke={c.p2.base} strokeWidth="3" /></> } },
+  couture26MaisonDoublePleatWideLegTrouser: { under: (c) => <>{trouserSet(c, `couture-mens-trouser-${c.k}`, c.s.waist[0] + 8, c.s.ankle[1] + 32, { ease: 18, easeIn: 4, flare: 38, pleat: true })}{waistband(c, c.s.waist[0] + 8, 15)}{coutureSignature(c, c.s.waist[0] + 6, 1)}<path d={`M ${300 - c.s.hip[1] * 0.65} ${c.s.hip[0] + 14} L ${300 - c.s.ankle[0] - 8} ${c.s.ankle[1] + 6}`} stroke={c.p2.base} strokeWidth="3" /></> } },
+  couture26EmpireSculptedSeamWideLegTrouser: { under: (c) => <>{trouserSet(c, `couture-mens-trouser-${c.k}`, c.s.waist[0] + 8, c.s.ankle[1] + 8, { ease: 24, easeIn: 12, flare: 58, pleat: true })}{waistband(c, c.s.waist[0] + 8, 15)}{coutureSignature(c, c.s.waist[0] + 6, 2)}<path d={`M ${300 - c.s.hip[1] * 0.65} ${c.s.hip[0] + 14} L ${300 - c.s.ankle[0] - 8} ${c.s.ankle[1] + 6}`} stroke={c.p2.base} strokeWidth="3" /></> } },
+  couture26MaisonDeconstructedDinnerSuit: coutureSuitBuild({ ease: 10, flare: 7, detail: 0, longline: 0, double: false, jumpsuit: false }),
+  couture26MaisonSculpturalLonglineSuit: coutureSuitBuild({ ease: 14, flare: 3, detail: 1, longline: 42, double: false, jumpsuit: false }),
+  couture26EmpireLiquidTuxedoJumpsuit: coutureSuitBuild({ ease: 15, flare: 24, detail: 2, longline: 0, double: false, jumpsuit: true }),
+  couture26MaisonMonolithWrapOvercoat: (() => { const base = jacket({ hem: (s) => s.knee[1] + 42, lapels: true, collar: 'notch', belt: true, ease: 22, opening: 26, pockets: true, flare: 26 }); return { under: (c) => <>{base.under?.(c)}{coutureSignature(c, c.s.bust[0] + 8, 0)}</>, over: (c) => base.over?.(c) }; })(),
+  couture26MaisonDoubleBreastedCocoonCoat: (() => { const base = jacket({ hem: (s) => s.knee[1] + 28, lapels: true, collar: 'notch', belt: false, ease: 20, opening: 46, pockets: true, flare: 14 }); return { under: (c) => <>{base.under?.(c)}{coutureSignature(c, c.s.bust[0] + 8, 1)}<>{[0,1,2].map(row => [0,1].map(col => <circle key={row+"-"+col} cx={300-24+col*48} cy={c.s.bust[0]+22+row*32} r="3.4" fill={gold(c)} />))}</></>, over: (c) => base.over?.(c) }; })(),
+  couture26EmpireFeatherlineOperaCoat: (() => { const base = jacket({ hem: (s) => D.floor(s), lapels: true, collar: 'notch', belt: false, ease: 18, opening: 26, pockets: true, flare: 54 }); return { under: (c) => <>{base.under?.(c)}{coutureSignature(c, c.s.bust[0] + 8, 2)}<>{Array.from({length:5},(_,i)=><path key={i} d={`M ${300-c.s.shoulder[1]-8} ${c.s.shoulder[0]+18+i*7} Q 300 ${c.s.bust[0]+i*12} ${300+c.s.shoulder[1]+8} ${c.s.shoulder[0]+18+i*7}`} fill="none" stroke={i%2?c.p2.base:gold(c)} strokeWidth={i%2?2.4:1.6} />)}</></>, over: (c) => base.over?.(c) }; })(),
+  couture26MaisonArchitecturalPeakLapelSuit: coutureSuitBuild({ ease: 8, flare: 8, detail: 0, longline: 0, double: false, jumpsuit: false }),
+  couture26MaisonSculptedLonglineDinnerSuit: coutureSuitBuild({ ease: 6, flare: 3, detail: 1, longline: 0, double: true, jumpsuit: false }),
+  couture26EmpireLiquidSatinEveningTuxedo: coutureSuitBuild({ ease: 10, flare: 26, detail: 2, longline: 0, double: false, jumpsuit: true }),
 
 };
 
