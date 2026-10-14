@@ -52,7 +52,7 @@ test('accepting a contract sets a deadline but never charges the player', () => 
 });
 
 test('shopper sources only missing quantities for the accepted contract and delivery pays after stock is verified', () => {
-  const s = game({ cash: 500_000, tier: 0, marketCart: [] });
+  const s = game({ cash: 500_000, tier: 6, marketCart: [] });
   const offer = contractFor(s);
   const accepted = acceptPoliticianContract(s, offer.id);
   const contract = accepted.politicianContracts!.find((row) => row.id === offer.id)!;
