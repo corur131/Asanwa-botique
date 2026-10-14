@@ -590,7 +590,8 @@ test('rivals announce celebrity visits in news, chat, and their social feed on a
     const updated = simulateRivals(base);
     assert.ok(updated.gist.some((item) => /celebrity client/i.test(item.title)));
     assert.ok(updated.messages.some((item) => item.from === 'GistLagos' && /CELEBRITY SIGHTING/i.test(item.text)));
-    assert.ok(updated.rivalPosts.some((post) => /Celebrity client|special guest/i.test(post.caption)));
+    assert.ok(updated.messages.some((item) => item.from === 'Gidigram' && /FASHION ALERT|CELEBRITY SPOTTED/i.test(item.text)));
+    assert.ok(updated.rivalPosts.some((post) => /celebrity|special guest/i.test(post.caption)));
   } finally {
     Math.random = originalRandom;
   }
