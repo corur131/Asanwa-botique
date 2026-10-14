@@ -40,6 +40,13 @@ export const PATIENCE: Record<CustomerClass, number> = { poor: 150, middle: 120,
 export const staffMinutes = (level: number) => Math.max(30, 90 - 6 * level);
 
 export const START_CASH = 200_000;
+
+/**
+ * High-value celebrity orders represent a fulfilled premium commission, not just one garment's
+ * sticker price. Reserve this share of the order receipt for external sourcing, priority tailoring,
+ * fitting and delivery. This is an explicit operating cost, separate from the stock bought earlier.
+ */
+export const CELEBRITY_FULFILMENT_RATE = 0.45;
 export const MARKUP = 1.35;
 export const PIECES_PER_DESIGN = 1;
 export const DIVINE_CAPACITY = 8;
