@@ -6,7 +6,7 @@
  */
 import { CharacterConfig } from '../types/character';
 import { generateRandomCustomer } from '../utils/randomizer';
-import { CELEBRITY_FULFILMENT_RATE, TIERS } from './economy';
+import { CELEBRITY_FULFILMENT_RATE, TIERS, naira } from './economy';
 import { celebrityAmountsForTier, celebrityIsScheduled, celebrityVisitChance, chooseCelebrityTierForShop, celebrityProfileForTier } from './customers';
 import { GameState, Gist, Message, ReplyChoice, Rival, RivalPost } from './types';
 import { Topic, startConvo } from './convos';
@@ -168,7 +168,7 @@ export interface CelebrityVisitAnnouncement {
 export function announceCelebrityVisit(s0: GameState, event: CelebrityVisitAnnouncement): GameState {
   let s = s0;
   const spend = Math.max(0, Math.round(event.spend || 0));
-  const moneyText = `₦${spend.toLocaleString('en-NG')}`;
+  const moneyText = naira(spend);
   const headline = event.premiumOrder
     ? `${event.shopName} welcomes a celebrity client ✨`
     : event.bought
@@ -185,7 +185,7 @@ export function announceCelebrityVisit(s0: GameState, event: CelebrityVisitAnnou
     `🚨 CELEBRITY SIGHTING: ${event.shopName} (${event.ownerName}) — ${event.premiumOrder ? `premium order reported at ${moneyText}` : event.bought ? `a purchase reported at ${moneyText}` : 'no purchase was recorded'}.`,
     { chat: GROUP, tone: event.bought ? 'good' : 'warn' });
   if (event.shopId === 'you') {
-    const gainText = event.followerGain ? ` +${event.followerGain.toLocaleString('en-NG')} followers.` : '';
+    const gainText = event.followerGain ? ` +${event.followerGain?.toLocaleString('en-NG')} followers.` : '';
     s = say(s, 'Gidigram', event.premiumOrder
       ? `TRENDING NOW 🔥 ${event.celebrityName} placed a premium order at Asanwa Boutique and posted the look.${gainText}`
       : event.bought
