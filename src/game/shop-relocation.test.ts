@@ -232,7 +232,7 @@ test('Level 6 and Level 7 furnished packages contain practical luxury equipment 
   }
 });
 
-test('player celebrity visits observe the one-day cooldown but Deborah tips remain special leads', () => {
+test('Signature Fashion Empire can receive multiple celebrity guests on adjacent scheduled days', () => {
   const originalRandom = Math.random;
   try {
     Math.random = () => 0.001;
@@ -242,16 +242,17 @@ test('player celebrity visits observe the one-day cooldown but Deborah tips rema
     const day1 = openShop({
       ...fresh, tier: 6, listing: signatureListing!, day: 1, phase: 'morning' as const,
     });
-    assert.ok(day1.arrivals.some((arrival) => !!arrival.c.celebrity), 'a scheduled Signature Fashion Empire opportunity should be able to arrive');
+    assert.ok(day1.arrivals.filter((arrival) => !!arrival.c.celebrity).length >= 2,
+      'a Signature Fashion Empire can receive a second celebrity on a scheduled VIP day');
     assert.equal(day1.lastCelebrityVisitDay, 1);
 
     const day2 = openShop({ ...day1, day: 2, phase: 'morning' as const, celebDay: undefined });
-    assert.ok(!day2.arrivals.some((arrival) => !!arrival.c.celebrity),
-      'a routine day-2 opportunity is skipped after a day-1 celebrity visit');
+    assert.ok(day2.arrivals.some((arrival) => !!arrival.c.celebrity),
+      'a second scheduled opportunity can produce another visit on the following day');
 
     const tippedDay2 = openShop({ ...day1, day: 2, phase: 'morning' as const, celebDay: 2 });
     assert.ok(tippedDay2.arrivals.some((arrival) => !!arrival.c.celebrity),
-      'Deborah’s confirmed lead can be a special exception to the routine cooldown');
+      'Deborah’s confirmed lead remains an additional opportunity when daily capacity is available');
     assert.equal(tippedDay2.lastCelebrityVisitDay, 2);
   } finally {
     Math.random = originalRandom;

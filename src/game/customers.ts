@@ -206,12 +206,13 @@ export function richRetailBudget(
  * Each lower tier tops out no more than ₦5m above the next tier's minimum.
  * Squared randomness favours attainable lower-end orders while retaining the rare upper end.
  */
+/** Rank-based baseline spending capacity at a Flagship shop; venue prestige scales it further. */
 export const CELEBRITY_SPEND_RANGES = [
-  { min: 750_000, max: 8_500_000 },
-  { min: 3_500_000, max: 12_500_000 },
-  { min: 7_500_000, max: 20_000_000 },
-  { min: 15_000_000, max: 35_000_000 },
-  { min: 30_000_000, max: 210_000_000 },
+  { min: 1_500_000, max: 12_000_000 },
+  { min: 7_000_000, max: 25_000_000 },
+  { min: 20_000_000, max: 45_000_000 },
+  { min: 40_000_000, max: 90_000_000 },
+  { min: 85_000_000, max: 250_000_000 },
 ] as const;
 
 function lowWeightedAmount(min: number, max: number, random: () => number): number {
@@ -219,11 +220,21 @@ function lowWeightedAmount(min: number, max: number, random: () => number): numb
   return Math.max(min, Math.min(max, roundToFiveThousand(min + (max - min) * sample * sample)));
 }
 
-export function celebrityAmountsForTier(tier: number, random: () => number = Math.random): { budget: number; spendFloor: number } {
+/** Celebrity purchasing power reflects both their rank and the prestige of the shop hosting them. */
+export function celebrityAmountsForTier(
+  tier: number,
+  random: () => number = Math.random,
+  shopTierIndex = 4,
+  signatureProperty = false,
+): { budget: number; spendFloor: number } {
   const index = Math.max(0, Math.min(4, Math.floor(Number.isFinite(tier) ? tier : 0)));
-  const range = CELEBRITY_SPEND_RANGES[index];
-  const budget = lowWeightedAmount(range.min, range.max, random);
-  const spendFloor = lowWeightedAmount(range.min, budget, random);
+  const shopTier = Math.max(0, Math.min(6, Math.floor(Number.isFinite(shopTierIndex) ? shopTierIndex : 4)));
+  const venueMultiplier = [0.65, 0.72, 0.78, 0.90, 1.00, 1.15, 1.30][shopTier] * (signatureProperty ? 1.10 : 1);
+  const baseline = CELEBRITY_SPEND_RANGES[index];
+  const minimum = Math.round((baseline.min * venueMultiplier) / 5_000) * 5_000;
+  const maximum = Math.max(minimum, Math.round((baseline.max * venueMultiplier) / 5_000) * 5_000);
+  const budget = lowWeightedAmount(minimum, maximum, random);
+  const spendFloor = lowWeightedAmount(minimum, budget, random);
   return { budget, spendFloor };
 }
 
@@ -345,9 +356,40 @@ export function celebrityVisitChance(
 ): number {
   if (maximumCelebrityTierForShop(shopTierIndex) < 0) return 0;
   const tier = Math.min(6, Math.floor(shopTierIndex));
-  const baseByTier = [0, 0, 0.10, 0.16, 0.22, 0.28, 0.34];
+  // High-end boutiques should have genuinely frequent celebrity opportunities, not a token chance.
+  const baseByTier = [0, 0, 0.18, 0.28, 0.40, 0.48, 0.56];
   const signatureMultiplier = signatureProperty ? 1.25 : 1;
-  return Math.min(0.65, (baseByTier[tier] || 0) * signatureMultiplier * celebrityAttractionMultiplier(profile));
+  return Math.min(0.80, (baseByTier[tier] || 0) * signatureMultiplier * celebrityAttractionMultiplier(profile));
+}
+
+/** On a scheduled celebrity day, top shops can attract a second guest after the first one arrives. */
+export function additionalCelebrityVisitChance(
+  shopTierIndex: number,
+  signatureProperty: boolean,
+  profile?: CelebrityAttractionProfile,
+): number {
+  if (maximumCelebrityTierForShop(shopTierIndex) < 0) return 0;
+  const tier = Math.min(6, Math.floor(shopTierIndex));
+  const baseByTier = [0, 0, 0, 0.04, 0.08, 0.18, 0.25];
+  return Math.min(0.35, (baseByTier[tier] || 0) * (signatureProperty ? 1.25 : 1) * celebrityAttractionMultiplier(profile));
+}
+
+/** Fashion Empire Signature can occasionally draw a third celebrity into a busy VIP day. */
+export function thirdCelebrityVisitChance(
+  shopTierIndex: number,
+  signatureProperty: boolean,
+  profile?: CelebrityAttractionProfile,
+): number {
+  if (Math.floor(shopTierIndex) < 6 || !signatureProperty) return 0;
+  return Math.min(0.15, 0.12 * celebrityAttractionMultiplier(profile));
+}
+
+/** Daily guest capacity expands with the venue, up to three at a Signature Fashion Empire. */
+export function maximumCelebrityVisitsPerDay(shopTierIndex: number, signatureProperty: boolean): number {
+  const tier = Math.max(0, Math.min(6, Math.floor(Number.isFinite(shopTierIndex) ? shopTierIndex : 0)));
+  if (tier >= 6 && signatureProperty) return 3;
+  if (tier >= 4) return 2;
+  return 1;
 }
 
 const SERVICE_INTRO = {
@@ -471,7 +513,7 @@ export function makeCelebrityCustomer(state: GameState, celebrityTier: number): 
     const candidates = Array.from({ length: 12 }, () => generateRandomCustomer('plain')).find((c) => (c.body === 'male') === profile.male);
     if (candidates) base = { ...base, look: { ...candidates, state: 'plain' }, male: profile.male };
   }
-  const { budget, spendFloor } = celebrityAmountsForTier(tier);
+  const { budget, spendFloor } = celebrityAmountsForTier(tier, Math.random, state.tier, !!state.listing.signature);
   const guest = {
     ...base,
     id: `vip-${state.day}-${Math.random().toString(36).slice(2, 8)}`,

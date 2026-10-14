@@ -7,8 +7,8 @@
 import { CharacterConfig } from '../types/character';
 import { generateRandomCustomer } from '../utils/randomizer';
 import { CELEBRITY_FULFILMENT_RATE, TIERS, naira } from './economy';
-import { celebrityAmountsForTier, celebrityIsScheduled, celebrityVisitChance, chooseCelebrityTierForShop, celebrityProfileForTier } from './customers';
-import { GameState, Gist, Message, ReplyChoice, Rival, RivalPost } from './types';
+import { celebrityAmountsForTier, celebrityIsScheduled, celebrityVisitChance, chooseCelebrityTierForShop, celebrityProfileForTier, additionalCelebrityVisitChance, thirdCelebrityVisitChance, maximumCelebrityVisitsPerDay } from './customers';
+import { BrandMetrics, GameState, Gist, Message, ReplyChoice, Rival, RivalPost } from './types';
 import { Topic, startConvo } from './convos';
 import { brandFromLegacy, brandPower, getBrandMetrics } from './business';
 
@@ -383,49 +383,55 @@ export function simulateRivals(s0: GameState): GameState {
       trendInfluence: r.brand?.trendInfluence,
     };
     const celebrityScheduled = celebrityIsScheduled(r.tier, today, signatureProperty);
-    const celebrityCooldownClear = r.lastCelebrityVisitDay !== today - 1;
     const celebrityChance = celebrityVisitChance(r.tier, signatureProperty, celebrityProfile);
-    if (celebrityScheduled && celebrityCooldownClear && chance(celebrityChance)) {
+    const maxDailyCelebrityVisits = maximumCelebrityVisitsPerDay(r.tier, signatureProperty);
+    if (celebrityScheduled && chance(celebrityChance)) {
       r.lastCelebrityVisitDay = today;
-      const celebrityTier = chooseCelebrityTierForShop(r.tier, signatureProperty, celebrityProfile);
-      const namedGuest = celebrityProfileForTier(celebrityTier);
-      const { budget, spendFloor } = celebrityAmountsForTier(celebrityTier);
-      const currentBrand = r.brand || brandFromLegacy(r.rep, r.followers || 0, r.tier);
-      const purchaseChance = clamp(0.80 + (r.skill - 1) * 0.20 + (r.rep - 50) / 500, 0.55, 0.92);
-      const premiumOrderChance = clamp(0.48 + (r.skill - 1) * 0.60 + (r.rep - 50) * 0.002 +
-        (currentBrand.reliability - 50) * 0.0015, 0.15, 0.90);
-      const bought = chance(purchaseChance);
-      const premiumOrder = bought && chance(premiumOrderChance);
-      const regularOrderFloor = [250_000, 900_000, 1_500_000, 3_000_000, 5_000_000][celebrityTier] || 250_000;
-      const celebritySpend = !bought ? 0 : premiumOrder
-        ? Math.min(budget, spendFloor)
-        : Math.min(budget, Math.max(regularOrderFloor, Math.round(budget * rand(0.08, 0.18))));
-      const tipRate = premiumOrder ? 0.05 + celebrityTier * 0.02 : 0.015 + celebrityTier * 0.005;
-      const celebrityTip = Math.round(celebritySpend * tipRate);
-      const celebrityRevenue = celebritySpend + celebrityTip;
-      const celebrityCosts = premiumOrder
-        ? Math.round(celebritySpend * CELEBRITY_FULFILMENT_RATE)
-        : Math.round(celebritySpend * clamp(stockShare * rand(0.82, 1.05) + 0.025, 0.3, 0.85));
-      r.week[r.week.length - 1] = (r.week[r.week.length - 1] || 0) + celebrityRevenue;
-      r.cash += celebrityRevenue - celebrityCosts;
-      r.weekCosts[r.weekCosts.length - 1] = (r.weekCosts[r.weekCosts.length - 1] || 0) + celebrityCosts;
-      dailyCosts += celebrityCosts;
-      r.rep = clamp(r.rep + (premiumOrder ? rand(0.8, 2.2) : bought ? rand(0.1, 0.5) : -rand(0.3, 1.1)), 5, 99);
-      if (bought) {
-        r.followers += premiumOrder
-          ? Math.round(rand(250, 1_800) * (r.tier + 1) + celebritySpend / 100_000 * rand(2, 8))
-          : Math.round(rand(20, 100) * (r.tier + 1));
+      let guestCount = 1;
+      if (guestCount < maxDailyCelebrityVisits &&
+          chance(additionalCelebrityVisitChance(r.tier, signatureProperty, celebrityProfile))) guestCount++;
+      if (guestCount < maxDailyCelebrityVisits &&
+          chance(thirdCelebrityVisitChance(r.tier, signatureProperty, celebrityProfile))) guestCount++;
+
+      // Each guest is a separate purchase outcome, so publicity, followers, revenue and stock costs
+      // can all accumulate when a busy premium shop receives more than one celebrity.
+      for (let guestIndex = 0; guestIndex < guestCount; guestIndex++) {
+        const celebrityTier = chooseCelebrityTierForShop(r.tier, signatureProperty, celebrityProfile);
+        const namedGuest = celebrityProfileForTier(celebrityTier);
+        const { budget, spendFloor } = celebrityAmountsForTier(celebrityTier, Math.random, r.tier, signatureProperty);
+        const currentBrand: BrandMetrics = r.brand || brandFromLegacy(r.rep, r.followers || 0, r.tier);
+        const purchaseChance = clamp(0.80 + (r.skill - 1) * 0.20 + (r.rep - 50) / 500, 0.55, 0.92);
+        const premiumOrderChance = clamp(0.48 + (r.skill - 1) * 0.60 + (r.rep - 50) * 0.002 +
+          (currentBrand.reliability - 50) * 0.0015, 0.15, 0.90);
+        const bought = chance(purchaseChance);
+        const premiumOrder = bought && chance(premiumOrderChance);
+        const regularOrderFloor = [250_000, 900_000, 1_500_000, 3_000_000, 5_000_000][celebrityTier] || 250_000;
+        const celebritySpend = !bought ? 0 : Math.min(budget, Math.max(spendFloor, regularOrderFloor));
+        const tipRate = premiumOrder ? 0.05 + celebrityTier * 0.02 : 0.015 + celebrityTier * 0.005;
+        const celebrityTip = Math.round(celebritySpend * tipRate);
+        const celebrityRevenue = celebritySpend + celebrityTip;
+        const celebrityCosts = Math.round(celebritySpend * CELEBRITY_FULFILMENT_RATE);
+        r.week[r.week.length - 1] = (r.week[r.week.length - 1] || 0) + celebrityRevenue;
+        r.cash += celebrityRevenue - celebrityCosts;
+        r.weekCosts[r.weekCosts.length - 1] = (r.weekCosts[r.weekCosts.length - 1] || 0) + celebrityCosts;
+        dailyCosts += celebrityCosts;
+        r.rep = clamp(r.rep + (premiumOrder ? rand(0.8, 2.2) : bought ? rand(0.1, 0.5) : -rand(0.3, 1.1)), 5, 99);
+        if (bought) {
+          r.followers += premiumOrder
+            ? Math.round(rand(250, 1_800) * (r.tier + 1) + celebritySpend / 100_000 * rand(2, 8))
+            : Math.round(rand(20, 100) * (r.tier + 1));
+        }
+        r.brand = {
+          ...currentBrand,
+          awareness: clamp(currentBrand.awareness + (premiumOrder ? rand(0.8, 2.1) : bought ? rand(0.1, 0.6) : -rand(0.2, 0.7)), 5, 100),
+          prestige: clamp(currentBrand.prestige + (premiumOrder ? rand(0.4, 1.4) : bought ? rand(0.1, 0.5) : -rand(0.5, 1.1)), 5, 100),
+          trendInfluence: clamp(currentBrand.trendInfluence + (premiumOrder ? rand(0.5, 1.7) : bought ? rand(0.1, 0.7) : -rand(0.3, 0.9)), 5, 100),
+        };
+        news.push({
+          kind: 'celebrity', r, spend: celebrityRevenue, bought, premiumOrder, celebrityTier,
+          celebrityName: `${namedGuest.name} · ${namedGuest.rank}`,
+        });
       }
-      r.brand = {
-        ...currentBrand,
-        awareness: clamp(currentBrand.awareness + (premiumOrder ? rand(0.8, 2.1) : bought ? rand(0.1, 0.6) : -rand(0.2, 0.7)), 5, 100),
-        prestige: clamp(currentBrand.prestige + (premiumOrder ? rand(0.4, 1.4) : bought ? rand(0.1, 0.5) : -rand(0.5, 1.1)), 5, 100),
-        trendInfluence: clamp(currentBrand.trendInfluence + (premiumOrder ? rand(0.5, 1.7) : bought ? rand(0.1, 0.7) : -rand(0.3, 0.9)), 5, 100),
-      };
-      news.push({
-        kind: 'celebrity', r, spend: celebrityRevenue, bought, premiumOrder, celebrityTier,
-        celebrityName: `${namedGuest.name} · ${namedGuest.rank}`,
-      });
     }
     // Bad weeks still hurt: theft, a landlord's surprise charge or a dead generator.
     if (chance(0.025)) { const incidentCost = Math.round(takings * rand(2, 4)); r.cash -= incidentCost; r.weekCosts[r.weekCosts.length - 1] = (r.weekCosts[r.weekCosts.length - 1] || 0) + incidentCost; }
