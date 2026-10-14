@@ -188,9 +188,7 @@ export function drainRate(s: GameState, cls: CustomerClass): number {
 export const fuelPerHour = (s: GameState) => {
   const g = generatorKind(s);
   if (!g) return 0;
-  const capacity = POWER.capacityKw[g];
   const demand = loadKw(s);
-  const loadFraction = Math.min(1, demand / capacity);
   return generatorFuelBurnForLoad(g, demand);
 };
 
