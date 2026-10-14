@@ -9,7 +9,7 @@ import {
   maximumCelebrityTierForShop,
   richRetailBudget,
 } from './customers';
-import { BUDGET, SERVICE_BUDGET, CELEBRITY_FULFILMENT_RATE } from './economy';
+import { BUDGET, SERVICE_BUDGET, CELEBRITY_FULFILMENT_RATE, TIERS } from './economy';
 import { settle } from './engine';
 import type { Customer, ScoreBreakdown } from './types';
 
@@ -135,4 +135,40 @@ test('rich and celebrity checkout payments respect budget and high-value orders 
   assert.equal(rejected.outcome, 'refused');
   assert.equal(rejected.paid, 0, 'poor styling must not create an automatic celebrity payout');
   assert.equal(rejected.cost, 0, 'rejected looks must not charge consumable costs as though a sale occurred');
+});
+
+
+test('14-day celebrity payout simulation keeps premium orders below shop rent on their own', () => {
+  // A stress-case planning assumption: 60% of celebrity visits achieve the score needed for a premium order.
+  // The rest of the boutique still has to earn its keep through normal sales and services.
+  const random = seededRandom(20261013);
+  const cycles = 4_000;
+
+  for (let shopTier = 2; shopTier <= 6; shopTier++) {
+    for (const signature of [false, true]) {
+      let premiumOrders = 0;
+      let netPremiumReceipts = 0;
+      const days = CELEBRITY_DAYS_BY_SHOP_TIER[shopTier];
+      const maxCelebrityTier = maximumCelebrityTierForShop(shopTier);
+
+      for (let cycle = 0; cycle < cycles; cycle++) {
+        for (const _day of days) {
+          if (random() >= celebrityVisitChance(shopTier, signature)) continue;
+          const celebrityTier = Math.floor(random() * (maxCelebrityTier + 1));
+          const { budget, spendFloor } = celebrityAmountsForTier(celebrityTier, random);
+          if (random() >= 0.6) continue;
+          const gross = Math.min(budget, spendFloor);
+          const fulfilment = Math.max(0, Math.round(gross * CELEBRITY_FULFILMENT_RATE));
+          premiumOrders++;
+          netPremiumReceipts += gross - fulfilment;
+        }
+      }
+
+      const averageNetPerFortnight = netPremiumReceipts / cycles;
+      assert.ok(premiumOrders > 0, 'simulation should observe premium orders at shop tier ' + shopTier);
+      assert.ok(averageNetPerFortnight < TIERS[shopTier].rent * 2,
+        'celebrity premium receipts should not cover all rent by themselves at shop tier ' + shopTier +
+        (signature ? ' with Signature status' : ' without Signature status'));
+    }
+  }
 });
