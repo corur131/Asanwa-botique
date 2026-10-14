@@ -106,10 +106,10 @@ test('visit-frequency simulation scales gradually with shop tier and Signature i
   assert.ok(means[4] > means[0], 'Level 7 should offer more visit opportunities than Level 3');
 });
 
-test('rich and celebrity checkout payments cannot exceed their stated budget', () => {
+test('rich and celebrity checkout payments respect budget and high-value orders require a strong look', () => {
   const rich = { cls: 'rich', budget: 500_000, male: false, influencer: false } as Customer;
-  const score = { total: 100 } as ScoreBreakdown;
-  const richSale = settle(rich, score, 2_000_000, 10_000, { hasPOS: true });
+  const excellent = { total: 100 } as ScoreBreakdown;
+  const richSale = settle(rich, excellent, 2_000_000, 10_000, { hasPOS: true });
   assert.ok(richSale.paid <= rich.budget);
 
   const celebrity = {
@@ -120,7 +120,16 @@ test('rich and celebrity checkout payments cannot exceed their stated budget', (
     name: 'SSS guest',
     celebrity: { tier: 4, rank: 'SSS guest', spendFloor: 30_000_000 },
   } as Customer;
-  const vipSale = settle(celebrity, score, 1_000_000, 10_000, { hasPOS: true });
-  assert.ok(vipSale.paid >= celebrity.celebrity!.spendFloor);
-  assert.ok(vipSale.paid <= celebrity.budget);
+  const premiumSale = settle(celebrity, excellent, 1_000_000, 10_000, { hasPOS: true });
+  assert.ok(premiumSale.paid >= celebrity.celebrity!.spendFloor);
+  assert.ok(premiumSale.paid <= celebrity.budget);
+
+  const average = settle(celebrity, { total: 72 } as ScoreBreakdown, 1_000_000, 10_000);
+  assert.ok(average.paid > 0, 'a passable look can still sell at its normal price');
+  assert.ok(average.paid < celebrity.celebrity!.spendFloor, 'passable styling must not trigger the guaranteed premium order');
+
+  const rejected = settle(celebrity, { total: 48 } as ScoreBreakdown, 1_000_000, 10_000);
+  assert.equal(rejected.outcome, 'refused');
+  assert.equal(rejected.paid, 0, 'poor styling must not create an automatic celebrity payout');
+  assert.equal(rejected.cost, 0, 'rejected looks must not charge consumable costs as though a sale occurred');
 });
