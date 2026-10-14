@@ -469,7 +469,7 @@ function laceYoke(c: Ctx) {
 // ---------------------------------------------------------------------------
 // Jackets
 // ---------------------------------------------------------------------------
-function jacket(o: { hem: (s: BodySpec) => number; lapels?: boolean; collar?: 'notch' | 'shirt' | 'none'; ease?: number; sleeve?: SleeveLen; sleeveFlare?: number; sheer?: boolean; belt?: boolean; zip?: boolean; pockets?: boolean; opening?: number; flare?: number }): Build {
+function jacket(o: { hem: (s: BodySpec) => number; lapels?: boolean; lapelStyle?: 'notch' | 'peak' | 'shawl'; collar?: 'notch' | 'shirt' | 'none'; ease?: number; sleeve?: SleeveLen; sleeveFlare?: number; sheer?: boolean; belt?: boolean; zip?: boolean; pockets?: boolean; opening?: number; flare?: number }): Build {
   return {
     under: (c) => {
       const { s, p } = c;
@@ -477,6 +477,11 @@ function jacket(o: { hem: (s: BodySpec) => number; lapels?: boolean; collar?: 'n
       const e = o.ease ?? 8;
       const [ny, nh] = s.neck;
       const open = o.opening ?? 30;
+      const lapelD = o.lapelStyle === 'peak'
+        ? 'M ' + (300 - nh + 2) + ' ' + (ny + 4) + ' L ' + (300 - nh - 18) + ' ' + (s.pit[0] + 2) + ' L ' + (300 - open - 30) + ' ' + (s.bust[0] + 16) + ' L ' + (300 - open + 4) + ' ' + (s.bust[0] - 8) + ' L ' + (300 - open + 6) + ' ' + (s.bust[0] + 24) + ' Z'
+        : o.lapelStyle === 'shawl'
+          ? 'M ' + (300 - nh + 2) + ' ' + (ny + 4) + ' C ' + (300 - nh - 22) + ' ' + (ny + 44) + ' ' + (300 - open - 34) + ' ' + (s.bust[0] - 28) + ' ' + (300 - open + 8) + ' ' + (s.bust[0] + 4) + ' Q ' + (300 - open + 18) + ' ' + (s.bust[0] + 20) + ' ' + (300 - open - 2) + ' ' + (s.bust[0] + 34) + ' L ' + (300 - open - 25) + ' ' + (s.pit[0] + 18) + ' Z'
+          : 'M ' + (300 - nh + 2) + ' ' + (ny + 4) + ' L ' + (300 - nh - 22) + ' ' + (s.pit[0] + 20) + ' L ' + (300 - open - 2) + ' ' + (s.bust[0] + 20) + ' L ' + (300 - open + 6) + ' ' + (s.bust[0]) + ' Z';
       const outer: Pt[] = [
         [300 - nh - 4, ny],
         [300 - s.shoulder[1] * 0.56, ny + 4],
@@ -494,7 +499,7 @@ function jacket(o: { hem: (s: BodySpec) => number; lapels?: boolean; collar?: 'n
       const panel = (side: string) => (
         <g opacity={o.sheer ? 0.88 : 1}>
           <Piece id={c.id} name={`jk-${c.k}${side}`} d={d} paint={p} folds={[`M ${300 - s.pit[1] + 2} ${s.pit[0] + 20} Q ${300 - s.waist[1] - 2} ${s.waist[0]} ${300 - s.waist[1] + 10} ${hemY}`]} plain={c.plain} box={[300 - s.hip[1] - 40, 300, ny, hemY]} />
-          {o.lapels && <path d={`M ${300 - nh + 2} ${ny + 4} L ${300 - nh - 22} ${s.pit[0] + 20} L ${300 - open - 2} ${s.bust[0] + 20} L ${300 - open + 6} ${s.bust[0]} Z`} fill={darken(p.base, 0.12)} stroke={darken(p.base, 0.4)} strokeWidth="1.2" />}
+          {o.lapels && <path d={lapelD} fill={o.lapelStyle ? c.p2.base : darken(p.base, 0.12)} stroke={o.lapelStyle ? gold(c) : darken(p.base, 0.4)} strokeWidth={o.lapelStyle ? 2.2 : 1.2} />}
           {o.collar === 'shirt' && <path d={`M ${300 - nh - 4} ${ny - 6} L ${300 - nh + 6} ${ny + 30} L ${300 - nh - 30} ${s.pit[0] - 10} L ${300 - nh - 20} ${ny + 4} Z`} fill={darken(p.base, 0.1)} stroke={darken(p.base, 0.4)} strokeWidth="1.2" />}
           {o.pockets && (
             <>
@@ -834,17 +839,181 @@ function coutureSignature(c: Ctx, y: number, variant: number): React.ReactNode {
   }
 }
 
-function coutureSuitBuild(o: { ease: number; flare: number; detail: number; longline?: number; double?: boolean; jumpsuit?: boolean }): Build {
-  const base = jacket({ hem: (s) => s.hip[0] + 28 + (o.longline || 0), lapels: true, collar: 'notch', ease: o.ease, opening: o.double ? 44 : 34, pockets: true, flare: o.flare });
+
+/**
+ * Original menswear builder: longline band collar, dropped split hem and a concealed
+ * placket. This is a separate pattern, not the shared off-the-rack shirt silhouette.
+ */
+function coutureBandCollarShirt(): Build {
+  return {
+    under: (c) => {
+      const s = c.s;
+      const p = c.p;
+      const ny = s.neck[0];
+      const nh = s.neck[1];
+      const hemY = s.hip[0] + 8;
+      const left: Pt[] = [
+        ...shoulderLeft(s, 2),
+        [300 - s.pit[1] - 6, s.pit[0]],
+        [300 - s.bust[1] - 8, s.bust[0]],
+        [300 - s.under[1] - 8, s.under[0]],
+        [300 - s.waist[1] - 8, s.waist[0]],
+        [300 - s.hip[1] - 4, s.hip[0]],
+        [300 - s.hip[1] - 10, hemY],
+      ];
+      const body = symmetric(left, crew(s, 16, 3));
+      return <>
+        <Piece id={c.id} name={'band-collar-body-' + c.k} d={body} paint={p}
+          folds={[
+            'M ' + (300 - s.pit[1] + 4) + ' ' + (s.pit[0] + 18) + ' Q 270 ' + (s.waist[0] + 8) + ' ' + (300 - s.hip[1] - 6) + ' ' + (hemY - 6),
+            'M ' + (300 + s.pit[1] - 4) + ' ' + (s.pit[0] + 18) + ' Q 330 ' + (s.waist[0] + 8) + ' ' + (300 + s.hip[1] + 6) + ' ' + (hemY - 6),
+          ]}
+          plain={c.plain} box={box(s, ny, hemY, 18)} />
+        <path d={'M ' + (300 - nh - 4) + ' ' + (ny + 1) + ' Q 300 ' + (ny + 14) + ' ' + (300 + nh + 4) + ' ' + (ny + 1) + ' L ' + (300 + nh + 2) + ' ' + (ny + 16) + ' Q 300 ' + (ny + 25) + ' ' + (300 - nh - 2) + ' ' + (ny + 16) + ' Z'}
+          fill={darken(p.base, 0.18)} stroke={gold(c)} strokeWidth="2" />
+        <path d={'M 300 ' + (ny + 24) + ' L 300 ' + (hemY - 2) + ' M ' + (300 - s.hip[1] - 3) + ' ' + (s.hip[0] + 2) + ' L 300 ' + (hemY + 9) + ' L ' + (300 + s.hip[1] + 3) + ' ' + (s.hip[0] + 2)}
+          fill="none" stroke={c.p2.base} strokeWidth="2.5" />
+        {Array.from({ length: 5 }, (_, i) => <circle key={i} cx="300" cy={ny + 38 + i * 25} r="2.2" fill={gold(c)} />)}
+        {coutureSignature(c, s.bust[0] + 12, 0)}
+      </>;
+    },
+    over: (c) => sleeves(cut(c), c.p, c.s.wrist[1] - 12, true, 4),
+  };
+}
+
+/**
+ * Original liquid-satin menswear pattern: a shaped base with a diagonal, gathered
+ * silk panel that extends beyond one hip like a controlled draped sash.
+ */
+function coutureLiquidDrapeShirt(): Build {
+  return {
+    under: (c) => {
+      const s = c.s;
+      const ny = s.neck[0];
+      const nh = s.neck[1];
+      const hemY = s.hip[0] + 2;
+      const left: Pt[] = [
+        ...shoulderLeft(s),
+        [300 - s.pit[1] - 5, s.pit[0]],
+        [300 - s.bust[1] - 5, s.bust[0]],
+        [300 - s.under[1] - 4, s.under[0]],
+        [300 - s.waist[1] - 3, s.waist[0]],
+        [300 - s.hip[1] - 3, s.hip[0]],
+        [300 - s.hip[1] - 3, hemY],
+      ];
+      const body = symmetric(left, neckRun(s, 'deepV'));
+      const drape = 'M ' + (300 + nh + 3) + ' ' + (ny + 8)
+        + ' C ' + (300 + s.shoulder[1] * 0.72) + ' ' + (s.shoulder[0] + 14)
+        + ' ' + (300 + s.bust[1] * 0.82) + ' ' + (s.bust[0] - 24)
+        + ' ' + (300 + s.bust[1] * 0.26) + ' ' + (s.bust[0] + 12)
+        + ' C ' + (300 + s.waist[1] * 0.55) + ' ' + (s.waist[0] + 25)
+        + ' ' + (300 - s.waist[1] * 0.28) + ' ' + (s.waist[0] + 48)
+        + ' ' + (300 - s.hip[1] - 18) + ' ' + (s.hip[0] + 26)
+        + ' L ' + (300 - s.hip[1] - 30) + ' ' + (s.hip[0] + 74)
+        + ' C ' + (300 - s.waist[1] * 0.05) + ' ' + (s.waist[0] + 72)
+        + ' ' + (300 + s.waist[1] * 0.44) + ' ' + (s.waist[0] + 45)
+        + ' ' + (300 + s.bust[1] * 0.26) + ' ' + (s.bust[0] + 12) + ' Z';
+      return <>
+        <Piece id={c.id} name={'liquid-drape-shirt-body-' + c.k} d={body} paint={c.p}
+          folds={[
+            'M ' + (300 - s.pit[1] + 8) + ' ' + (s.pit[0] + 20) + ' Q 300 ' + (s.under[0] + 28) + ' ' + (300 + s.waist[1]) + ' ' + (s.hip[0] - 2),
+          ]}
+          plain={c.plain} box={box(s, ny, hemY, 16)} />
+        <Piece id={c.id} name={'liquid-drape-sash-' + c.k} d={drape} paint={{ ...c.p2, kind: 'satin' }}
+          folds={[
+            'M ' + (300 + s.bust[1] * 0.55) + ' ' + (s.bust[0] - 12) + ' Q 300 ' + (s.waist[0] + 8) + ' ' + (300 - s.waist[1] * 0.5) + ' ' + (s.hip[0] + 48),
+            'M ' + (300 + s.bust[1] * 0.62) + ' ' + (s.bust[0] + 6) + ' Q 310 ' + (s.waist[0] + 36) + ' ' + (300 - s.waist[1] * 0.25) + ' ' + (s.hip[0] + 58),
+          ]}
+          plain={c.plain} box={box(s, ny, s.hip[0] + 80, 38)} />
+        <path d={'M ' + (300 - nh + 4) + ' ' + (ny + 6) + ' Q 300 ' + (ny + 27) + ' ' + (300 + nh - 4) + ' ' + (ny + 6)}
+          fill="none" stroke={gold(c)} strokeWidth="2.4" />
+        {coutureSignature(c, s.bust[0] + 20, 1)}
+      </>;
+    },
+    over: (c) => sleeves(cut(c), c.p, c.s.wrist[1] - 12, true, 3),
+  };
+}
+
+/**
+ * Original formal tuxedo shirt with a broad wing collar and raised, pleated satin bib.
+ * The bib is a separate sewn shape with fold shadows, not a decorative line on a stock shirt.
+ */
+function couturePleatFrontTuxedoShirt(): Build {
+  return {
+    under: (c) => {
+      const s = c.s;
+      const ny = s.neck[0];
+      const nh = s.neck[1];
+      const hemY = s.waist[0] + 54;
+      const left: Pt[] = [
+        ...shoulderLeft(s),
+        [300 - s.pit[1] - 4, s.pit[0]],
+        [300 - s.bust[1] - 5, s.bust[0]],
+        [300 - s.under[1] - 2, s.under[0]],
+        [300 - s.waist[1] - 2, s.waist[0]],
+        [300 - s.waist[1] - 2, hemY],
+      ];
+      const body = symmetric(left, crew(s, 28, 5));
+      const bib = 'M ' + (300 - nh - 7) + ' ' + (ny + 14)
+        + ' L ' + (300 + nh + 7) + ' ' + (ny + 14)
+        + ' L ' + (300 + 32) + ' ' + (s.bust[0] + 100)
+        + ' Q 300 ' + (s.bust[0] + 112) + ' ' + (300 - 32) + ' ' + (s.bust[0] + 100) + ' Z';
+      return <>
+        <Piece id={c.id} name={'tuxedo-shirt-body-' + c.k} d={body} paint={c.p}
+          folds={[
+            'M ' + (300 - s.pit[1] + 8) + ' ' + (s.pit[0] + 18) + ' Q 270 ' + (s.waist[0] + 4) + ' 276 ' + (hemY - 8),
+            'M ' + (300 + s.pit[1] - 8) + ' ' + (s.pit[0] + 18) + ' Q 330 ' + (s.waist[0] + 4) + ' 324 ' + (hemY - 8),
+          ]}
+          plain={c.plain} box={box(s, ny, hemY, 16)} />
+        <path d={'M ' + (300 - nh - 4) + ' ' + (ny + 12) + ' L 300 ' + (ny + 40) + ' L ' + (300 - nh - 26) + ' ' + (ny + 25) + ' Z'}
+          fill={c.p2.base} stroke={gold(c)} strokeWidth="2" />
+        <path d={'M ' + (300 + nh + 4) + ' ' + (ny + 12) + ' L 300 ' + (ny + 40) + ' L ' + (300 + nh + 26) + ' ' + (ny + 25) + ' Z'}
+          fill={c.p2.base} stroke={gold(c)} strokeWidth="2" />
+        <Piece id={c.id} name={'tuxedo-pleat-bib-' + c.k} d={bib} paint={{ ...c.p2, kind: 'satin' }}
+          folds={[
+            'M 284 ' + (ny + 28) + ' L 284 ' + (s.bust[0] + 91),
+            'M 294 ' + (ny + 28) + ' L 294 ' + (s.bust[0] + 99),
+            'M 306 ' + (ny + 28) + ' L 306 ' + (s.bust[0] + 99),
+            'M 316 ' + (ny + 28) + ' L 316 ' + (s.bust[0] + 91),
+          ]}
+          plain={c.plain} box={box(s, ny + 12, s.bust[0] + 112, 12)} />
+        {Array.from({ length: 5 }, (_, i) => <circle key={i} cx="300" cy={ny + 50 + i * 24} r="2.2" fill={gold(c)} />)}
+        <path d={'M ' + (300 - s.shoulder[1] * 0.4) + ' ' + (s.shoulder[0] + 16) + ' Q 300 ' + (s.bust[0] - 24) + ' ' + (300 + s.shoulder[1] * 0.4) + ' ' + (s.shoulder[0] + 16)}
+          fill="none" stroke={c.p2.base} strokeWidth="2.4" />
+        {coutureSignature(c, s.bust[0] + 18, 2)}
+      </>;
+    },
+    over: (c) => sleeves(cut(c), c.p, c.s.wrist[1] - 10, true, 6),
+  };
+}
+
+function coutureSuitBuild(o: { ease: number; flare: number; detail: number; longline?: number; double?: boolean; jumpsuit?: boolean; lapelStyle?: 'notch' | 'peak' | 'shawl'; deconstructed?: boolean; architectural?: boolean; wrap?: boolean; drape?: boolean }): Build {
+  const base = jacket({ hem: (s) => s.hip[0] + 28 + (o.longline || 0), lapels: true, lapelStyle: o.lapelStyle, collar: 'notch', ease: o.ease, opening: o.double ? 44 : 34, pockets: true, flare: o.flare });
   return {
     under: (c) => <>
       {trouserSet(c, `couture-suit-trousers-${c.k}`, c.s.waist[0] + 10, c.s.ankle[1] + 10, { ease: o.jumpsuit ? 15 : o.ease, easeIn: 5, flare: o.flare, pleat: true })}
       {base.under?.(c)}
       {coutureSignature(c, c.s.bust[0] + 16, o.detail)}
-      <path d={`M ${300 - c.s.neck[1] - 2} ${c.s.neck[0] + 8} L ${300 - c.s.neck[1] - 18} ${c.s.bust[0] + 20} L 300 ${c.s.bust[0] + 42} Z`} fill={c.p2.base} stroke={gold(c)} strokeWidth="1.8" />
-      <path d={`M ${300 + c.s.neck[1] + 2} ${c.s.neck[0] + 8} L ${300 + c.s.neck[1] + 18} ${c.s.bust[0] + 20} L 300 ${c.s.bust[0] + 42} Z`} fill={c.p2.base} stroke={gold(c)} strokeWidth="1.8" />
-      {o.double && [0,1].map(row => [0,1].map(col => <circle key={row + "-" + col} cx={300 - 18 + col * 36} cy={c.s.bust[0] + 48 + row * 22} r="3.2" fill={gold(c)} />))}
-      {o.jumpsuit && <path d={`M ${300 - c.s.waist[1] - 6} ${c.s.waist[0] + 18} Q 300 ${c.s.waist[0] + 32} ${300 + c.s.waist[1] + 6} ${c.s.waist[0] + 18}`} fill="none" stroke={gold(c)} strokeWidth="4" />}
+      <path d={'M ' + (300 - c.s.neck[1] - 2) + ' ' + (c.s.neck[0] + 8) + ' L ' + (300 - c.s.neck[1] - 18) + ' ' + (c.s.bust[0] + 20) + ' L 300 ' + (c.s.bust[0] + 42) + ' Z'} fill={c.p2.base} stroke={gold(c)} strokeWidth="1.8" />
+      <path d={'M ' + (300 + c.s.neck[1] + 2) + ' ' + (c.s.neck[0] + 8) + ' L ' + (300 + c.s.neck[1] + 18) + ' ' + (c.s.bust[0] + 20) + ' L 300 ' + (c.s.bust[0] + 42) + ' Z'} fill={c.p2.base} stroke={gold(c)} strokeWidth="1.8" />
+      {o.double && [0,1].map(row => [0,1].map(col => <circle key={row + '-' + col} cx={300 - 18 + col * 36} cy={c.s.bust[0] + 48 + row * 22} r="3.2" fill={gold(c)} />))}
+      {o.jumpsuit && <path d={'M ' + (300 - c.s.waist[1] - 6) + ' ' + (c.s.waist[0] + 18) + ' Q 300 ' + (c.s.waist[0] + 32) + ' ' + (300 + c.s.waist[1] + 6) + ' ' + (c.s.waist[0] + 18)} fill="none" stroke={gold(c)} strokeWidth="4" />}
+      {o.deconstructed && <Piece id={c.id} name={'deconstructed-panel-' + c.k}
+        d={'M ' + (300 - c.s.neck[1] - 4) + ' ' + (c.s.neck[0] + 18) + ' C ' + (300 - c.s.neck[1] - 15) + ' ' + (c.s.bust[0] - 8) + ' ' + (300 + c.s.bust[1] * 0.72) + ' ' + (c.s.waist[0] - 34) + ' ' + (300 + c.s.waist[1] * 0.7) + ' ' + (c.s.hip[0] + 12) + ' L ' + (300 + c.s.waist[1] * 0.45) + ' ' + (c.s.hip[0] + 34) + ' C ' + (300 + c.s.waist[1] * 0.08) + ' ' + (c.s.waist[0] + 48) + ' ' + (300 - c.s.bust[1] * 0.48) + ' ' + (c.s.bust[0] + 52) + ' ' + (300 - c.s.neck[1] - 8) + ' ' + (c.s.neck[0] + 18) + ' Z'}
+        paint={{ ...c.p2, kind: 'satin' }} folds={['M ' + (300 - c.s.neck[1]) + ' ' + (c.s.bust[0] + 4) + ' Q 300 ' + (c.s.waist[0] + 10) + ' ' + (300 + c.s.waist[1] * 0.5) + ' ' + (c.s.hip[0] + 22)]}
+        plain={c.plain} box={box(c.s, c.s.neck[0], c.s.hip[0] + 50, 32)} />}
+      {o.architectural && <>
+        <path d={'M ' + (300 - c.s.neck[1]) + ' ' + (c.s.neck[0] + 8) + ' L ' + (300 - c.s.shoulder[1]) + ' ' + (c.s.shoulder[0] + 4) + ' L ' + (300 - c.s.shoulder[1] - 24) + ' ' + (c.s.shoulder[0] + 24) + ' L ' + (300 - c.s.pit[1] + 4) + ' ' + (c.s.pit[0] - 10) + ' Z'} fill={c.p2.base} stroke={gold(c)} strokeWidth="2.2" />
+        <path d={'M ' + (300 + c.s.neck[1]) + ' ' + (c.s.neck[0] + 8) + ' L ' + (300 + c.s.shoulder[1]) + ' ' + (c.s.shoulder[0] + 4) + ' L ' + (300 + c.s.shoulder[1] + 24) + ' ' + (c.s.shoulder[0] + 24) + ' L ' + (300 + c.s.pit[1] - 4) + ' ' + (c.s.pit[0] - 10) + ' Z'} fill={c.p2.base} stroke={gold(c)} strokeWidth="2.2" />
+      </>}
+      {o.wrap && <Piece id={c.id} name={'wrap-overlap-' + c.k}
+        d={'M ' + (300 + c.s.neck[1]) + ' ' + (c.s.neck[0] + 8) + ' Q ' + (300 + c.s.bust[1] + 16) + ' ' + (c.s.bust[0] + 20) + ' ' + (300 - c.s.waist[1] * 0.4) + ' ' + (c.s.waist[0] + 34) + ' L ' + (300 - c.s.waist[1] * 0.75) + ' ' + (c.s.waist[0] + 50) + ' Q 300 ' + (c.s.bust[0] + 60) + ' ' + (300 + c.s.neck[1] - 4) + ' ' + (c.s.neck[0] + 8) + ' Z'}
+        paint={{ ...c.p2, kind: 'velvet' }} folds={['M ' + (300 + c.s.bust[1] * 0.5) + ' ' + (c.s.bust[0] + 26) + ' Q 300 ' + (c.s.waist[0] + 32) + ' ' + (300 - c.s.waist[1] * 0.6) + ' ' + (c.s.waist[0] + 42)]}
+        plain={c.plain} box={box(c.s, c.s.neck[0], c.s.waist[0] + 56, 38)} />}
+      {o.drape && <Piece id={c.id} name={'liquid-lapel-drape-' + c.k}
+        d={'M ' + (300 - c.s.neck[1]) + ' ' + (c.s.neck[0] + 10) + ' C ' + (300 - c.s.neck[1] - 20) + ' ' + (c.s.bust[0] - 28) + ' ' + (300 + c.s.bust[1] * 0.62) + ' ' + (c.s.bust[0] - 8) + ' ' + (300 + c.s.waist[1] * 0.5) + ' ' + (c.s.waist[0] + 18) + ' L ' + (300 + c.s.waist[1] * 0.62) + ' ' + (c.s.waist[0] + 40) + ' C 300 ' + (c.s.waist[0] + 56) + ' ' + (300 - c.s.bust[1] * 0.3) + ' ' + (c.s.bust[0] + 18) + ' ' + (300 - c.s.neck[1]) + ' ' + (c.s.neck[0] + 10) + ' Z'}
+        paint={{ ...c.p2, kind: 'satin' }} folds={['M ' + (300 - c.s.neck[1]) + ' ' + (c.s.bust[0] - 8) + ' Q 300 ' + (c.s.waist[0] + 10) + ' ' + (300 + c.s.waist[1] * 0.4) + ' ' + (c.s.waist[0] + 26), 'M ' + (300 - c.s.neck[1] + 10) + ' ' + (c.s.bust[0] + 4) + ' Q 300 ' + (c.s.waist[0] + 26) + ' ' + (300 + c.s.waist[1] * 0.5) + ' ' + (c.s.waist[0] + 38)]}
+        plain={c.plain} box={box(c.s, c.s.neck[0], c.s.waist[0] + 62, 28)} />}
     </>,
     over: (c) => base.over?.(c),
   };
@@ -1772,7 +1941,29 @@ export const GARMENTS: Record<string, Build> = {
   })(),
   couture26MaisonPrismFoldSilkBlouse: top('square', H.long, { sleeve: 'long', ease: 5, hemEase: 0, extra: (c, y) => <>{coutureSignature(c, y - 4, 0)}<path d={`M ${300 - c.s.bust[1] * 0.55} ${c.s.bust[0] + 16} L 300 ${c.s.waist[0] + 8} L ${300 + c.s.bust[1] * 0.55} ${c.s.bust[0] + 16}`} fill="none" stroke={gold(c)} strokeWidth="2.5" /></> }),
   couture26MaisonSculptedCrescentCorset: top('sweetheart', H.waist, { sleeve: 'none', ease: 2, hemEase: 0, extra: (c, y) => <>{coutureSignature(c, y - 4, 1)}<>{corsetBones(c, y - 4)}<path d={`M ${300 - c.s.waist[1]} ${y - 2} Q 300 ${y + 10} ${300 + c.s.waist[1]} ${y - 2}`} fill="none" stroke={gold(c)} strokeWidth="3" /></></> }),
-  couture26EmpireLiquidMetalDrapeShell: top('scoop', H.hip, { sleeve: 'cap', ease: 8, hemEase: 4, extra: (c, y) => <>{coutureSignature(c, y - 4, 2)}</> }),
+  couture26EmpireLiquidMetalDrapeShell: top('scoop', H.hip, {
+    sleeve: 'cap', ease: 8, hemEase: 4,
+    extra: (c, y) => {
+      const s = c.s;
+      const d = 'M ' + (300 + s.bust[1] * 0.38) + ' ' + (s.bust[0] - 8)
+        + ' C ' + (300 + s.bust[1] * 0.95) + ' ' + (s.bust[0] + 20)
+        + ' ' + (300 + s.waist[1] * 0.65) + ' ' + (s.waist[0] + 26)
+        + ' ' + (300 - s.waist[1] * 0.1) + ' ' + (s.waist[0] + 42)
+        + ' L ' + (300 - s.hip[1] - 22) + ' ' + (s.hip[0] + 34)
+        + ' L ' + (300 - s.hip[1] - 34) + ' ' + (s.hip[0] + 62)
+        + ' C 280 ' + (s.waist[0] + 66) + ' ' + (300 - s.waist[1] * 0.25) + ' ' + (s.waist[0] + 42)
+        + ' ' + (300 - s.waist[1] * 0.1) + ' ' + (s.waist[0] + 42) + ' Z';
+      return <>
+        {coutureSignature(c, y - 4, 2)}
+        <Piece id={c.id} name={'metal-drape-panel-' + c.k} d={d} paint={{ ...c.p2, kind: 'satin' }}
+          folds={[
+            'M ' + (300 + s.bust[1] * 0.6) + ' ' + (s.bust[0] + 4) + ' Q 300 ' + (s.waist[0] + 24) + ' ' + (300 - s.hip[1] - 12) + ' ' + (s.hip[0] + 42),
+            'M ' + (300 + s.bust[1] * 0.45) + ' ' + (s.bust[0] + 18) + ' Q 300 ' + (s.waist[0] + 40) + ' ' + (300 - s.hip[1] - 18) + ' ' + (s.hip[0] + 52),
+          ]}
+          plain={c.plain} box={box(s, s.bust[0] - 12, s.hip[0] + 68, 36)} />
+      </>;
+    },
+  }),
   couture26EmpireAsymmetricGlassPleatBlouse: top('oneShoulder', H.long, { sleeve: 'threeQuarter', ease: 6, hemEase: 0, extra: (c, y) => <>{coutureSignature(c, y - 4, 3)}</> }),
   couture26EmpireArchitecturalShoulderHaloTop: top('offShoulder', H.waist, { sleeve: 'bell', ease: 4, hemEase: 0, extra: (c, y) => <>{coutureSignature(c, y - 4, 4)}</> }),
   couture26MaisonDoublePleatColumnTrousers: { under: (c) => <>{trouserSet(c, `couture-trouser-${c.k}`, c.s.waist[0] + 8, c.s.ankle[1] + 18, { ease: 9, easeIn: 6, flare: 2, pleat: true })}{waistband(c, c.s.waist[0] + 8, 16)}{coutureSignature(c, c.s.waist[0] + 8, 0)}<path d={`M ${300 - c.s.waist[1] * 0.6} ${c.s.waist[0] + 20} L ${300 - c.s.hip[1] * 0.45} ${c.s.hip[0] + 50}`} fill="none" stroke={c.p2.base} strokeWidth="2.2" /></> },
@@ -1795,21 +1986,21 @@ export const GARMENTS: Record<string, Build> = {
   couture26EmpireAsymmetricTuxedoJumpsuit: coutureSuitBuild({ ease: 10, flare: 26, detail: 2, longline: 0, double: false, jumpsuit: true }),
   couture26EmpireSatinLapelTrouserSuit: coutureSuitBuild({ ease: 7, flare: 12, detail: 3, longline: 20, double: false, jumpsuit: false }),
   couture26EmpireMonolithLonglinePowerSuit: coutureSuitBuild({ ease: 15, flare: 4, detail: 4, longline: 44, double: true, jumpsuit: false }),
-  couture26MaisonMonolithBandCollarShirt: (() => { const base = mensTop('shirt'); return { under: (c) => <>{base.under?.(c)}{coutureSignature(c, c.s.bust[0] + 6, 0)}<path d={`M 300 ${c.s.neck[0] + 22} L 300 ${c.s.hip[0] + 18}`} stroke={gold(c)} strokeWidth="2.4" /></>, over: (c) => base.over?.(c) }; })(),
-  couture26MaisonLiquidSatinDrapeShirt: (() => { const base = mensTop('shirt'); return { under: (c) => <>{base.under?.(c)}{coutureSignature(c, c.s.bust[0] + 6, 1)}<path d={`M 300 ${c.s.neck[0] + 22} L 300 ${c.s.hip[0] + 18}`} stroke={c.p2.base} strokeWidth="2.4" /></>, over: (c) => base.over?.(c) }; })(),
-  couture26EmpirePleatFrontTuxedoShirt: (() => { const base = mensTop('shirt'); return { under: (c) => <>{base.under?.(c)}{coutureSignature(c, c.s.bust[0] + 6, 2)}<path d={`M 300 ${c.s.neck[0] + 22} L 300 ${c.s.hip[0] + 18}`} stroke={gold(c)} strokeWidth="5" /><>{[0,1,2,3,4].map(i => <path key={i} d={`M ${282+i*9} ${c.s.bust[0]+14} l 6 7 l -6 7 l -6 -7 Z`} fill="none" stroke={gold(c)} strokeWidth="1.5" />)}</></>, over: (c) => base.over?.(c) }; })(),
+  couture26MaisonMonolithBandCollarShirt: coutureBandCollarShirt(),
+  couture26MaisonLiquidSatinDrapeShirt: coutureLiquidDrapeShirt(),
+  couture26EmpirePleatFrontTuxedoShirt: couturePleatFrontTuxedoShirt(),
   couture26MaisonTaperedSideStripeTrouser: { under: (c) => <>{trouserSet(c, `couture-mens-trouser-${c.k}`, c.s.waist[0] + 8, c.s.ankle[1] + 8, { ease: 6, easeIn: 4, flare: -2, pleat: true })}{waistband(c, c.s.waist[0] + 8, 15)}{coutureSignature(c, c.s.waist[0] + 6, 0)}<path d={`M ${300 - c.s.hip[1] * 0.65} ${c.s.hip[0] + 14} L ${300 - c.s.ankle[0] - 8} ${c.s.ankle[1] + 6}`} stroke={c.p2.base} strokeWidth="3" /></> },
   couture26MaisonDoublePleatWideLegTrouser: { under: (c) => <>{trouserSet(c, `couture-mens-trouser-${c.k}`, c.s.waist[0] + 8, c.s.ankle[1] + 32, { ease: 18, easeIn: 4, flare: 38, pleat: true })}{waistband(c, c.s.waist[0] + 8, 15)}{coutureSignature(c, c.s.waist[0] + 6, 1)}<path d={`M ${300 - c.s.hip[1] * 0.65} ${c.s.hip[0] + 14} L ${300 - c.s.ankle[0] - 8} ${c.s.ankle[1] + 6}`} stroke={c.p2.base} strokeWidth="3" /></> },
   couture26EmpireSculptedSeamWideLegTrouser: { under: (c) => <>{trouserSet(c, `couture-mens-trouser-${c.k}`, c.s.waist[0] + 8, c.s.ankle[1] + 8, { ease: 24, easeIn: 12, flare: 58, pleat: true })}{waistband(c, c.s.waist[0] + 8, 15)}{coutureSignature(c, c.s.waist[0] + 6, 2)}<path d={`M ${300 - c.s.hip[1] * 0.65} ${c.s.hip[0] + 14} L ${300 - c.s.ankle[0] - 8} ${c.s.ankle[1] + 6}`} stroke={c.p2.base} strokeWidth="3" /></> },
-  couture26MaisonDeconstructedDinnerSuit: coutureSuitBuild({ ease: 10, flare: 7, detail: 0, longline: 0, double: false, jumpsuit: false }),
-  couture26MaisonSculpturalLonglineSuit: coutureSuitBuild({ ease: 14, flare: 3, detail: 1, longline: 42, double: false, jumpsuit: false }),
-  couture26EmpireLiquidTuxedoJumpsuit: coutureSuitBuild({ ease: 15, flare: 24, detail: 2, longline: 0, double: false, jumpsuit: true }),
+  couture26MaisonDeconstructedDinnerSuit: coutureSuitBuild({ ease: 13, flare: 14, detail: 1, longline: 8, double: false, jumpsuit: false, lapelStyle: 'notch', deconstructed: true }),
+  couture26MaisonSculpturalLonglineSuit: coutureSuitBuild({ ease: 20, flare: 21, detail: 3, longline: 60, double: true, jumpsuit: false, lapelStyle: 'peak', architectural: true }),
+  couture26EmpireLiquidTuxedoJumpsuit: coutureSuitBuild({ ease: 8, flare: 44, detail: 4, longline: 0, double: false, jumpsuit: true, lapelStyle: 'shawl', drape: true }),
   couture26MaisonMonolithWrapOvercoat: (() => { const base = jacket({ hem: (s) => s.knee[1] + 42, lapels: true, collar: 'notch', belt: true, ease: 22, opening: 26, pockets: true, flare: 26 }); return { under: (c) => <>{base.under?.(c)}{coutureSignature(c, c.s.bust[0] + 8, 0)}</>, over: (c) => base.over?.(c) }; })(),
   couture26MaisonDoubleBreastedCocoonCoat: (() => { const base = jacket({ hem: (s) => s.knee[1] + 28, lapels: true, collar: 'notch', belt: false, ease: 20, opening: 46, pockets: true, flare: 14 }); return { under: (c) => <>{base.under?.(c)}{coutureSignature(c, c.s.bust[0] + 8, 1)}<>{[0,1,2].map(row => [0,1].map(col => <circle key={row+"-"+col} cx={300-24+col*48} cy={c.s.bust[0]+22+row*32} r="3.4" fill={gold(c)} />))}</></>, over: (c) => base.over?.(c) }; })(),
   couture26EmpireFeatherlineOperaCoat: (() => { const base = jacket({ hem: (s) => D.floor(s), lapels: true, collar: 'notch', belt: false, ease: 18, opening: 26, pockets: true, flare: 54 }); return { under: (c) => <>{base.under?.(c)}{coutureSignature(c, c.s.bust[0] + 8, 2)}<>{Array.from({length:5},(_,i)=><path key={i} d={`M ${300-c.s.shoulder[1]-8} ${c.s.shoulder[0]+18+i*7} Q 300 ${c.s.bust[0]+i*12} ${300+c.s.shoulder[1]+8} ${c.s.shoulder[0]+18+i*7}`} fill="none" stroke={i%2?c.p2.base:gold(c)} strokeWidth={i%2?2.4:1.6} />)}</></>, over: (c) => base.over?.(c) }; })(),
-  couture26MaisonArchitecturalPeakLapelSuit: coutureSuitBuild({ ease: 8, flare: 8, detail: 0, longline: 0, double: false, jumpsuit: false }),
-  couture26MaisonSculptedLonglineDinnerSuit: coutureSuitBuild({ ease: 6, flare: 3, detail: 1, longline: 0, double: true, jumpsuit: false }),
-  couture26EmpireLiquidSatinEveningTuxedo: coutureSuitBuild({ ease: 10, flare: 26, detail: 2, longline: 0, double: false, jumpsuit: true }),
+  couture26MaisonArchitecturalPeakLapelSuit: coutureSuitBuild({ ease: 9, flare: 17, detail: 2, longline: 0, double: false, jumpsuit: false, lapelStyle: 'peak', architectural: true }),
+  couture26MaisonSculptedLonglineDinnerSuit: coutureSuitBuild({ ease: 12, flare: 6, detail: 4, longline: 36, double: true, jumpsuit: false, lapelStyle: 'peak', wrap: true }),
+  couture26EmpireLiquidSatinEveningTuxedo: coutureSuitBuild({ ease: 9, flare: 12, detail: 3, longline: 18, double: false, jumpsuit: false, lapelStyle: 'shawl', drape: true }),
 
 };
 
