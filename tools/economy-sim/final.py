@@ -50,6 +50,9 @@ for name in planned_shock:
     print(name, planned_shock[name]['reach'], 'demotions', planned_shock[name]['demotions'], 'broke days', planned_shock[name]['broke_days'])
 
 celebrity_forecast = econ.simulate_celebrity_forecast(days=200, runs=1000)
+rent_coverage = [(shop, property_name) for shop, scenarios in celebrity_forecast.items() for property_name, values in scenarios.items() if values['premiumReceiptsAloneCoverFortnightRent']]
+if rent_coverage:
+    raise AssertionError('Celebrity premium receipts alone cover fortnightly rent under the current assumptions: ' + repr(rent_coverage))
 print('=== Fixed-tier celebrity frequency and net payout forecast (200 days x 1,000 runs; 60% premium-quality assumption) ===')
 for shop_name, scenarios in celebrity_forecast.items():
     print(shop_name, scenarios)
