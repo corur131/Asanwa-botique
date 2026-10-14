@@ -763,7 +763,7 @@ export const NECKLACES: AccessoryItem[] = [
   A('atelierSculptedArcChoker', 'Sculpted Arc Choker', 'f', 260_000, false, { renderId: 'atelierSculptedArcChoker', minTier: 5 }),
   A('empireLiquidGoldCascade', 'Liquid-Gold Cascade Necklace', 'f', 620_000, false, { renderId: 'empireLiquidGoldCascade', minTier: 6 }),
   A('atelierObsidianLinkNecklace', 'Obsidian Link Necklace', 'm', 230_000, false, { renderId: 'atelierObsidianLinkNecklace', minTier: 5 }),
-  A('atelierMonolithChainPendant', 'Monolith Chain Pendant', 'm', 280_000, false, { renderId: 'atelierMonolithChainPendant', minTier: 5 }),
+
 ];
 
 export const WRIST: AccessoryItem[] = [
