@@ -1,13 +1,16 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { DIVINE_CONFIG } from '../constants/presets';
+import { MARKUP } from './economy';
 import { acceptPoliticianContract, buyCart, deliverPoliticianContract, ensurePoliticianContractOffer, newGame, politicianContractProgress } from './engine';
 import { canBuy, MARKET } from './market';
 import { prepareShopperOrder } from './shopper';
 import type { GameState, PoliticianContract } from './types';
 
 function game(overrides: Partial<GameState> = {}): GameState {
-  return { ...newGame(DIVINE_CONFIG), ...overrides } as GameState;
+  // Most contract workflow tests exercise the late-game eligible tier.
+  const state = { ...newGame(DIVINE_CONFIG), tier: 6, ...overrides } as GameState;
+  return ensurePoliticianContractOffer(state, true);
 }
 
 function contractFor(s: GameState): PoliticianContract {
@@ -16,10 +19,18 @@ function contractFor(s: GameState): PoliticianContract {
   return contract!;
 }
 
+test('low-level boutiques do not receive politician contract offers', () => {
+  const s = game({ tier: 0, politicianContracts: [] });
+  assert.equal(s.politicianContracts?.some((row) => row.status === 'offered'), false);
+  assert.equal(s.cash < 0, false);
+});
+
 test('new offer uses real catalogue items unlocked for the current boutique level', () => {
-  const s = game({ tier: 0 });
+  const s = game({ tier: 6 });
   const offer = contractFor(s);
   assert.equal(offer.status, 'offered');
+  assert.ok(offer.reward >= 500_000_000 && offer.reward <= 1_000_000_000,
+    'Level 7 major contracts must offer ₦500m–₦1bn');
   assert.ok(offer.reward > offer.requirements.reduce((sum, row) => sum + row.unitCost * row.quantity, 0));
   assert.ok(offer.requirements.length >= 1);
   for (const requirement of offer.requirements) {
@@ -29,6 +40,75 @@ test('new offer uses real catalogue items unlocked for the current boutique leve
     assert.ok(Number.isInteger(requirement.quantity) && requirement.quantity > 0);
   }
   assert.equal(s.cash < 0, false);
+});
+
+test('Level 6 and Level 7 major contracts use the proposed late-game payout scale', () => {
+  const level6 = contractFor(game({ tier: 5, politicianContracts: [] }));
+  assert.ok(level6.reward >= 220_000_000 && level6.reward <= 500_000_000,
+    'Level 6 major contracts must offer ₦220m–₦500m');
+
+  const level7 = contractFor(game({ tier: 6, politicianContracts: [] }));
+  assert.ok(level7.reward >= 500_000_000 && level7.reward <= 1_000_000_000,
+    'Level 7 major contracts must offer ₦500m–₦1bn');
+});
+
+test('200-day contract economy sample uses actual unlocked catalogue offers at Levels 6 and 7', () => {
+  const scenarios = [
+    { tier: 5, label: 'Level 6', lines: 3, minQty: 40, maxQty: 55, retailCeiling: 1_500_000, minUnitCost: 460_000, minReward: 220_000_000, maxReward: 500_000_000, weeklyRent: 30_000_000 },
+    { tier: 6, label: 'Level 7', lines: 4, minQty: 45, maxQty: 65, retailCeiling: 3_000_000, minUnitCost: 700_000, minReward: 500_000_000, maxReward: 1_000_000_000, weeklyRent: 75_000_000 },
+  ] as const;
+
+  for (const scenario of scenarios) {
+    const goodsCosts: number[] = [];
+    const rewards: number[] = [];
+    const contributions: number[] = [];
+    for (let sample = 0; sample < 400; sample++) {
+      const day = (sample % 200) + 1;
+      const seed = (sample * 104_729 + 17) % 1_000_000_000;
+      const base = newGame(DIVINE_CONFIG);
+      const state = ensurePoliticianContractOffer({
+        ...base,
+        tier: scenario.tier,
+        day,
+        seed,
+        politicianContracts: [],
+      }, true);
+      const offer = contractFor(state);
+      assert.equal(offer.requirements.length, scenario.lines);
+      assert.ok(offer.reward >= scenario.minReward && offer.reward <= scenario.maxReward);
+      assert.ok(offer.requirements.every((row) =>
+        Number.isInteger(row.quantity) &&
+        row.quantity >= scenario.minQty &&
+        row.quantity <= scenario.maxQty &&
+        row.unitCost >= scenario.minUnitCost &&
+        row.unitCost * MARKUP <= scenario.retailCeiling));
+      const goodsCost = offer.requirements.reduce((sum, row) => sum + row.unitCost * row.quantity, 0);
+      assert.ok(goodsCost >= scenario.minUnitCost * scenario.minQty * scenario.lines,
+        'major order must carry meaningful minimum wholesale sourcing exposure');
+      assert.ok(offer.reward > goodsCost, 'the contract payout must cover the actual catalogue goods cost');
+      goodsCosts.push(goodsCost);
+      rewards.push(offer.reward);
+      contributions.push(offer.reward - goodsCost);
+    }
+
+    goodsCosts.sort((a, b) => a - b);
+    contributions.sort((a, b) => a - b);
+    const medianGoodsCost = goodsCosts[Math.floor(goodsCosts.length / 2)];
+    const medianContribution = contributions[Math.floor(contributions.length / 2)];
+    const meanReward = rewards.reduce((sum, amount) => sum + amount, 0) / rewards.length;
+    console.log(
+      '[Batch 6 economy sample] ' + scenario.label + ': 400 actual-catalogue offers; ' +
+      'goods cost min/median/max ₦' + Math.round(goodsCosts[0]) + '/' +
+      Math.round(medianGoodsCost) + '/' +
+      Math.round(goodsCosts[goodsCosts.length - 1]) +
+      '; median contribution ₦' + Math.round(medianContribution) +
+      '; mean reward ₦' + Math.round(meanReward) +
+      '; median contribution equals ' +
+      (medianContribution / scenario.weeklyRent).toFixed(2) + ' weeks of standard tier rent.'
+    );
+    assert.ok(medianContribution > 0);
+    assert.ok(meanReward >= scenario.minReward && meanReward <= scenario.maxReward);
+  }
 });
 
 test('accepting a contract sets a deadline but never charges the player', () => {
@@ -44,11 +124,14 @@ test('accepting a contract sets a deadline but never charges the player', () => 
 });
 
 test('shopper sources only missing quantities for the accepted contract and delivery pays after stock is verified', () => {
-  const s = game({ cash: 500_000, tier: 0, marketCart: [] });
+  const s = game({ cash: 1_000_000_000, tier: 6, marketCart: [] });
   const offer = contractFor(s);
   const accepted = acceptPoliticianContract(s, offer.id);
   const contract = accepted.politicianContracts!.find((row) => row.id === offer.id)!;
-  const shopper = prepareShopperOrder(accepted, 'contract', 300_000, contract.brief, contract.id);
+  // This is a fulfilment regression test, so fund the late-game sourcing order
+  // generously enough to cover every required line. This is test-only money.
+  const sourcingBudget = 500_000_000;
+  const shopper = prepareShopperOrder(accepted, 'contract', sourcingBudget, contract.brief, contract.id);
   assert.ok(shopper.job, shopper.error);
   assert.equal(shopper.job.contractId, contract.id);
   assert.ok(shopper.job.items.every((line) => contract.requirements.some((row) => row.kind === line.kind && row.itemId === line.itemId)));
@@ -73,6 +156,21 @@ test('shopper sources only missing quantities for the accepted contract and deli
   assert.ok(delivered.cash >= cashBeforeDelivery + contract.reward);
   assert.equal(politicianContractProgress(delivered, contract).complete, false, 'delivery consumes the contracted stock');
   assert.ok(delivered.today.events.some((event) => event.includes('Contract delivered')));
+});
+
+test('fulfilled major contracts keep a 45-day cooldown before another offer', () => {
+  const s = game({ tier: 6, politicianContracts: [] });
+  const offer = contractFor(s);
+  const completed = {
+    ...s,
+    politicianContracts: s.politicianContracts!.map((row) =>
+      row.id === offer.id ? { ...row, status: 'fulfilled' as const, completedDay: s.day } : row),
+  };
+  const stillCoolingDown = ensurePoliticianContractOffer({ ...completed, day: s.day + 44 });
+  assert.equal(stillCoolingDown.politicianContracts?.some((row) => row.status === 'offered'), false);
+
+  const readyForNext = ensurePoliticianContractOffer({ ...completed, day: s.day + 45 });
+  assert.equal(readyForNext.politicianContracts?.some((row) => row.status === 'offered'), true);
 });
 
 test('an accepted contract that passes its deadline fails and applies a fee and reputation consequence', () => {
@@ -107,6 +205,9 @@ test('expired offers do not incur a penalty and a fresh offer arrives after the 
   assert.equal(expired.politicianContracts!.find((row) => row.id === offer.id)!.status, 'expired');
   assert.equal(expired.cash, s.cash);
   assert.equal(expired.today.costs, s.today.costs);
-  const nextDay = ensurePoliticianContractOffer({ ...expired, day: (offer.completedDay || offer.offerExpiresDay + 1) + 3 });
+  const expirationDay = expired.politicianContracts!.find((row) => row.id === offer.id)!.completedDay!;
+  const beforeCooldownEnds = ensurePoliticianContractOffer({ ...expired, day: expirationDay + 44 });
+  assert.equal(beforeCooldownEnds.politicianContracts!.some((row) => row.status === 'offered'), false);
+  const nextDay = ensurePoliticianContractOffer({ ...expired, day: expirationDay + 45 });
   assert.ok(nextDay.politicianContracts!.some((row) => row.status === 'offered'));
 });

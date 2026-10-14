@@ -155,7 +155,7 @@ export const ContractsApp: React.FC<{
           <section className="rounded-xl border border-white/10 bg-white/[0.035] p-4 text-center space-y-2">
             <div className="text-2xl">📄</div>
             <div className="font-semibold text-sm">No open contract offers</div>
-            <p className="text-xs text-slate-400">New offers arrive every few in-game days. You never pay just to inspect or decline one.</p>
+            <p className="text-xs text-slate-400">Major offers unlock at boutique Level 6. After an offer is declined, expires, or a contract is resolved, a 45-day cooldown applies before another opportunity. You never pay just to inspect or decline one.</p>
           </section>
         )}
 

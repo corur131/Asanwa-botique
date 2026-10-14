@@ -124,14 +124,19 @@ export function rivalDefaults() {
 
 const freshDay = { clock: 0, arrivals: [], inShop: [], serving: null, left: [], outages: [] as GameState['outages'], shouts: [] as GameState['shouts'] };
 
+// Large government/organization contracts must remain rare enough not to replace ordinary shop progression.
+const POLITICIAN_CONTRACT_COOLDOWN_DAYS = 45;
+
 const CONTRACT_TIER_RULES = [
-  { retailCeiling: 18_000, lines: 1, minQty: 2, maxQty: 3, deadlineDays: 5 },
-  { retailCeiling: 60_000, lines: 1, minQty: 3, maxQty: 5, deadlineDays: 6 },
-  { retailCeiling: 100_000, lines: 2, minQty: 4, maxQty: 6, deadlineDays: 7 },
-  { retailCeiling: 200_000, lines: 2, minQty: 6, maxQty: 9, deadlineDays: 8 },
-  { retailCeiling: 300_000, lines: 3, minQty: 8, maxQty: 12, deadlineDays: 10 },
-  { retailCeiling: 1_000_000, lines: 3, minQty: 10, maxQty: 16, deadlineDays: 12 },
-  { retailCeiling: 3_000_000, lines: 4, minQty: 12, maxQty: 20, deadlineDays: 14 },
+  { retailCeiling: 18_000, lines: 1, minQty: 2, maxQty: 3, deadlineDays: 5, minUnitCost: 0 },
+  { retailCeiling: 60_000, lines: 1, minQty: 3, maxQty: 5, deadlineDays: 6, minUnitCost: 0 },
+  { retailCeiling: 100_000, lines: 2, minQty: 4, maxQty: 6, deadlineDays: 7, minUnitCost: 0 },
+  { retailCeiling: 200_000, lines: 2, minQty: 6, maxQty: 9, deadlineDays: 8, minUnitCost: 0 },
+  { retailCeiling: 300_000, lines: 3, minQty: 8, maxQty: 12, deadlineDays: 10, minUnitCost: 0 },
+  // Major contracts require luxury catalogue items so the proposed rewards are backed by
+  // substantial sourcing costs, not hundreds of pieces of cheap everyday stock.
+  { retailCeiling: 1_500_000, lines: 3, minQty: 40, maxQty: 55, deadlineDays: 12, minUnitCost: 460_000 },
+  { retailCeiling: 3_000_000, lines: 4, minQty: 45, maxQty: 65, deadlineDays: 14, minUnitCost: 700_000 },
 ] as const;
 
 const CONTRACT_CLIENTS = [
@@ -161,7 +166,7 @@ function makePoliticianContractOffer(s: GameState): PoliticianContract | null {
       unitCost: pieceCost(entry, isClothing(entry.kind) ? entry.fabric || 'plain' : undefined),
     }))
     .filter((row) => {
-      if (row.unitCost <= 0 || row.unitCost * MARKUP > rule.retailCeiling) return false;
+      if (row.unitCost < rule.minUnitCost || row.unitCost * MARKUP > rule.retailCeiling) return false;
       const held = (s.stock || []).filter((design) => design.kind === row.entry.kind && design.itemId === row.entry.id)
         .reduce((sum, design) => sum + Math.max(0, design.pieces), 0);
       // Keep contracts meaningful even for a new kiosk: offers require at least a little new sourcing.
@@ -175,7 +180,7 @@ function makePoliticianContractOffer(s: GameState): PoliticianContract | null {
   const requirements: PoliticianContractRequirement[] = [];
   const seen = new Set<string>();
   for (let i = 0; i < eligible.length && requirements.length < lineCount; i++) {
-    const row = eligible[(start + i * 7) % eligible.length];
+    const row = eligible[(start + i) % eligible.length];
     const key = row.entry.kind + '|' + row.entry.id;
     if (seen.has(key)) continue;
     seen.add(key);
@@ -191,7 +196,15 @@ function makePoliticianContractOffer(s: GameState): PoliticianContract | null {
   if (!requirements.length) return null;
 
   const goodsCost = requirements.reduce((sum, row) => sum + row.unitCost * row.quantity, 0);
-  const reward = Math.ceil((goodsCost * 1.65) / 1_000) * 1_000;
+  const tierIndex = clamp(Math.floor(s.tier || 0), 0, CONTRACT_TIER_RULES.length - 1);
+  const costScaledReward = Math.ceil((goodsCost * 4) / 1_000) * 1_000;
+  // Major late-game contracts use the roadmap's proposed scale. The value is an
+  // offer only: the game still pays it exclusively after verified delivery.
+  const reward = tierIndex === 5
+    ? Math.min(500_000_000, Math.max(220_000_000, costScaledReward))
+    : tierIndex >= 6
+      ? Math.min(1_000_000_000, Math.max(500_000_000, costScaledReward))
+      : Math.ceil((goodsCost * 1.65) / 1_000) * 1_000;
   const titleIndex = Math.min(CONTRACT_TITLES.length - 1, Math.floor(s.tier || 0));
   const client = CONTRACT_CLIENTS[Math.abs(Math.floor((s.seed || 0) + s.day * 13)) % CONTRACT_CLIENTS.length];
   const title = CONTRACT_TITLES[titleIndex];
@@ -238,9 +251,13 @@ export function ensurePoliticianContractOffer(s0: GameState, force = false): Gam
   contracts = [...(s.politicianContracts || contracts)];
   const hasLive = contracts.some((row) => row.status === 'offered' || row.status === 'accepted');
   const lastActivityDay = contracts.reduce((latest, row) => Math.max(latest, row.completedDay || row.offeredDay), 0);
-  if (hasLive || (!force && contracts.length > 0 && s.day < lastActivityDay + 3)) {
+  if (hasLive || (!force && contracts.length > 0 && s.day < lastActivityDay + POLITICIAN_CONTRACT_COOLDOWN_DAYS)) {
     return contracts.length ? { ...s, politicianContracts: contracts.slice(-20) } : s;
   }
+  // Politician contracts are rare late-game opportunities, not day-one walk-in orders.
+  // Tier indexes 5 and 6 correspond to boutique Levels 6 and 7.
+  if (Math.floor(s.tier || 0) < 5) return contracts.length ? { ...s, politicianContracts: contracts.slice(-20) } : s;
+
   const offer = makePoliticianContractOffer(s);
   if (!offer) return s;
   s = { ...s, politicianContracts: [...contracts, offer].slice(-20) };
@@ -1734,6 +1751,25 @@ export interface CartValidation {
   errors: string[];
 }
 
+/** Match official palette colours robustly without allowing unsupported colours. */
+function officialMarketColour(value: unknown, palette: readonly string[]): string | undefined {
+  if (typeof value !== 'string') return undefined;
+  const normalised = value.trim().toLowerCase();
+  return palette.find((colour) => colour.toLowerCase() === normalised);
+}
+
+/** Convert known palette colours back to their official hex form before saving stock. */
+function canonicaliseCartColours(line: CartLine): CartLine {
+  const palette = line.kind === 'hair' ? HAIR_SWATCHES.map((swatch) => swatch.color) : FABRIC_COLORS;
+  const colour = officialMarketColour(line.color, palette);
+  const colour2 = isClothing(line.kind) ? officialMarketColour(line.color2, FABRIC_COLORS) : undefined;
+  return {
+    ...line,
+    color: colour || line.color,
+    ...(isClothing(line.kind) && colour2 ? { color2: colour2 } : {}),
+  };
+}
+
 /** Validate the entire order before any cash or inventory is changed. */
 export function validateCart(s: GameState, lines: CartLine[]): CartValidation {
   const errors: string[] = [];
@@ -1741,11 +1777,12 @@ export function validateCart(s: GameState, lines: CartLine[]): CartValidation {
   if (Array.isArray(lines) && lines.length > 250) errors.push('Your cart contains too many separate lines.');
   const seen = new Set<string>();
   let total = 0;
-  for (const line of Array.isArray(lines) ? lines : []) {
-    if (!line || typeof line !== 'object') {
+  for (const rawLine of Array.isArray(lines) ? lines : []) {
+    if (!rawLine || typeof rawLine !== 'object') {
       errors.push('The cart contains an invalid item.');
       continue;
     }
+    const line = canonicaliseCartColours(rawLine);
     const entry = entryFor(line.kind, line.itemId);
     if (!entry) {
       errors.push('A cart item is not in the official Yaba Mart catalogue.');
@@ -1760,15 +1797,18 @@ export function validateCart(s: GameState, lines: CartLine[]): CartValidation {
       continue;
     }
     const palette = line.kind === 'hair' ? HAIR_SWATCHES.map((swatch) => swatch.color) : FABRIC_COLORS;
-    if (!palette.includes(line.color) || !palette.includes(line.color2)) {
-      errors.push(`${entry.label} has a colour that is not offered by the official market palette.`);
+    const colour = officialMarketColour(line.color, palette);
+    const colour2 = isClothing(line.kind) ? officialMarketColour(line.color2, FABRIC_COLORS) : undefined;
+    if (!colour || (isClothing(line.kind) && !colour2)) {
+      const badPart = !colour ? 'main colour' : 'second/trim colour';
+      errors.push(`${entry.label} has a ${badPart} that is not offered by the official market palette.`);
       continue;
     }
     if (!Number.isInteger(line.pattern) || line.pattern < 0 || line.pattern > 32) {
       errors.push(`${entry.label} has an invalid pattern.`);
       continue;
     }
-    if (line.kind === 'hair' && HAIR_SWATCHES[line.pattern]?.color !== line.color) {
+    if (line.kind === 'hair' && HAIR_SWATCHES[line.pattern]?.color.toLowerCase() !== colour.toLowerCase()) {
       errors.push(`${entry.label} has a hair colour/pattern combination that is not offered by the market.`);
       continue;
     }
@@ -1777,7 +1817,7 @@ export function validateCart(s: GameState, lines: CartLine[]): CartValidation {
       errors.push(`${entry.label} has an invalid fabric selection.`);
       continue;
     }
-    const canonicalKey = [line.kind, line.itemId, line.fabric || '', line.color, line.color2, line.pattern].join('|');
+    const canonicalKey = [line.kind, line.itemId, line.fabric || '', colour, colour2 || line.color2, line.pattern].join('|');
     if (seen.has(canonicalKey)) {
       errors.push(`Duplicate cart lines found for ${entry.label}. Combine duplicate quantities before checkout.`);
       continue;
@@ -1807,10 +1847,11 @@ export const cartNewDesigns = (s: GameState, lines: CartLine[]) => {
 
 /** Pay for everything in the cart. Matching designs already in stock get topped up. */
 export function buyCart(s0: GameState, lines: CartLine[]): GameState {
-  const validation = validateCart(s0, lines);
+  const canonicalLines = lines.map(canonicaliseCartColours);
+  const validation = validateCart(s0, canonicalLines);
   if (!validation.ok) return s0;
   let s = s0;
-  for (const l of lines) {
+  for (const l of canonicalLines) {
     const e = entryFor(l.kind, l.itemId);
     if (!e || !canBuy(e, s.tier) || l.pieces <= 0) continue;
     const have = s.stock.find((d) => sameDesign(d, l));
@@ -1822,7 +1863,7 @@ export function buyCart(s0: GameState, lines: CartLine[]): GameState {
   // actually present in this successful checkout. Keep quantities separate so
   // two similar pending orders cannot both claim the same cart pieces.
   const purchasedCounts = new Map<string, number>();
-  for (const line of lines) {
+  for (const line of canonicalLines) {
     const key = [line.kind, line.itemId, line.fabric || '', line.color, line.color2, line.pattern].join('|');
     purchasedCounts.set(key, (purchasedCounts.get(key) || 0) + line.pieces);
   }

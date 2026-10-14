@@ -4,7 +4,7 @@ import { ANKARA_PRINTS, DEFAULT_WARDROBE, FABRICS, FABRIC_COLORS } from '../../c
 import { DIVINE_CONFIG, MALE_CONFIG } from '../../constants/presets';
 import { CharacterConfig, FabricId } from '../../types/character';
 import { MARKUP, TIERS, naira } from '../economy';
-import { CartLine, cartLineCost, cartNewDesigns, cartTotal, displayCap, displayedCount } from '../engine';
+import { CartLine, cartLineCost, cartNewDesigns, cartTotal, displayCap, displayedCount, validateCart } from '../engine';
 import { HAIR_SWATCHES, MARKET, MARKET_CATEGORIES, MarketCategory, MarketEntry, canBuy, entryFor, inCategory, isClothing, minTierFor, pieceCost, priceBand, takesColour } from '../market';
 import { colourName } from '../colours';
 import { GameState } from '../types';
@@ -40,11 +40,11 @@ export function mannequin(e: MarketEntry, fabric: FabricId, color: string, color
 
 const lineKey = (l: Omit<CartLine, 'key' | 'pieces'>) => [l.kind, l.itemId, l.fabric || '', l.color, l.color2, l.pattern].join('|');
 
-const Stepper: React.FC<{ n: number; set: (n: number) => void; min?: number }> = ({ n, set, min = 0 }) => (
+const Stepper: React.FC<{ n: number; set: (n: number) => void; min?: number; max?: number }> = ({ n, set, min = 0, max }) => (
   <span className="inline-flex items-center rounded-full bg-white/10 text-white text-sm">
     <button className="w-8 h-8 rounded-full hover:bg-white/10 disabled:opacity-30" disabled={n <= min} onClick={() => set(n - 1)} aria-label="One less">−</button>
     <span className="w-6 text-center font-semibold">{n}</span>
-    <button className="w-8 h-8 rounded-full hover:bg-white/10" onClick={() => set(n + 1)} aria-label="One more">+</button>
+    <button className="w-8 h-8 rounded-full hover:bg-white/10 disabled:opacity-30" disabled={max !== undefined && n >= max} onClick={() => set(Math.min(max ?? Number.MAX_SAFE_INTEGER, n + 1))} aria-label="One more">+</button>
   </span>
 );
 
@@ -97,6 +97,7 @@ export const MarketApp: React.FC<{ s: GameState; cart: CartLine[]; setCart: (f: 
 
   if (view === 'cart') {
     const total = cartTotal(cart);
+    const validation = validateCart(s, cart);
     const fresh = cartNewDesigns(s, cart);
     const free = Math.max(0, displayCap(s) - displayedCount(s));
     const toStorage = Math.max(0, fresh - free);
@@ -114,7 +115,7 @@ export const MarketApp: React.FC<{ s: GameState; cart: CartLine[]; setCart: (f: 
                   <div className="text-sm font-semibold text-white truncate">{e?.label}</div>
                   <div className="text-[11px] text-slate-400 truncate">{takesColour(l.kind) ? colourName(l.color) : ''}{isClothing(l.kind) && l.fabric ? ` · ${l.fabric}` : ''} · {naira(cartLineCost(l))}</div>
                 </div>
-                <Stepper n={l.pieces} set={(n) => setCart((c) => (n <= 0 ? c.filter((x) => x.key !== l.key) : c.map((x) => (x.key === l.key ? { ...x, pieces: n } : x))))} />
+                <Stepper n={l.pieces} max={500} set={(n) => setCart((c) => (n <= 0 ? c.filter((x) => x.key !== l.key) : c.map((x) => (x.key === l.key ? { ...x, pieces: Math.min(500, n) } : x))))} />
               </div>
             );
           })}
@@ -126,10 +127,17 @@ export const MarketApp: React.FC<{ s: GameState; cart: CartLine[]; setCart: (f: 
             <div className="text-[11px] text-slate-400">
               {fresh} new design{fresh === 1 ? '' : 's'}, {free} free display space{free === 1 ? '' : 's'}.{toStorage > 0 ? ` ${toStorage} will go to storage until you buy more rails.` : ''}
             </div>
+            {!validation.ok && validation.errors.length > 0 && (
+              <div role="alert" className="rounded-lg border border-amber-400/30 bg-amber-500/10 p-2.5 text-xs text-amber-100 space-y-1">
+                <div className="font-semibold">Checkout issue</div>
+                {validation.errors.slice(0, 3).map((error, i) => <div key={i}>• {error}</div>)}
+                {validation.errors.some((error) => error.includes('available cash')) && <div className="text-amber-200/80">Only spending cash is available here. Money in KoboBank savings and fixed deposits is not counted until you transfer it to cash.</div>}
+              </div>
+            )}
             <div className="flex gap-2 pt-1">
               <button className="rounded-full border border-white/20 text-slate-200 text-sm px-4 py-2.5" onClick={() => setCart(() => [])}>Clear</button>
-              <button className="flex-1 rounded-full bg-orange-500 text-white font-bold py-2.5 disabled:opacity-40" disabled={s.cash < total} onClick={() => { const paid = onPay(); setFlash(paid ? `Paid ${naira(total)}. It's in the shop.` : 'Checkout was blocked. Check your funds and cart items, then try again.'); if (paid) setView('list'); setTimeout(() => setFlash(''), 3500); }}>
-                {s.cash < total ? 'Not enough money' : `Pay ${naira(total)}`}
+              <button className="flex-1 rounded-full bg-orange-500 text-white font-bold py-2.5 disabled:opacity-40" disabled={!validation.ok} onClick={() => { const paid = onPay(); setFlash(paid ? `Paid ${naira(total)}. It's in the shop.` : 'Checkout did not complete. No money was deducted. Your cart is unchanged; try removing and re-adding the affected item, then check again.'); if (paid) setView('list'); setTimeout(() => setFlash(''), 4500); }}>
+                {!validation.ok ? (validation.errors[0]?.includes('available cash') ? 'Not enough spending cash' : 'Fix cart issue to pay') : `Pay ${naira(total)}`}
               </button>
             </div>
           </div>
