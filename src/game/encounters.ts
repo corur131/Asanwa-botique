@@ -12,6 +12,7 @@ import { FURNITURE, Listing, Placed, autoPlace, newUid, shopStats } from './shop
 import { startConvo } from './convos';
 import { GROUP, REPLIES, ladder, mainRivals, playerRank, rivalById } from './rivals';
 import { Customer, Design, Drop, GameState, Message, ReplyChoice, Rival, ShowEvent } from './types';
+import { celebrityAttractionMultiplier } from './customers';
 
 const pick = <T,>(a: readonly T[]): T => a[Math.floor(Math.random() * a.length)];
 const chance = (p: number) => Math.random() < p;
@@ -361,7 +362,16 @@ export function planTips(s0: GameState): GameState {
   // No celebrity tips before Level 3; luxury properties can earn more opportunities through openShop.
   if (s.tier < 2 || s.day < 5 || s.celebDay && s.celebDay >= s.day) return s;
   const chanceByTier = [0, 0, 0.04, 0.045, 0.05, 0.055, 0.06];
-  const visitChance = Math.min(0.1, chanceByTier[Math.min(6, Math.floor(s.tier))] * (s.listing.signature ? 1.5 : 1));
+  const profile = {
+    reputation: s.rep,
+    followers: s.followers || 0,
+    shopTierIndex: s.tier,
+    awareness: s.brand?.awareness,
+    prestige: s.brand?.prestige,
+    trendInfluence: s.brand?.trendInfluence,
+  };
+  const visitChance = Math.min(0.1, chanceByTier[Math.min(6, Math.floor(s.tier))] *
+    (s.listing.signature ? 1.25 : 1) * celebrityAttractionMultiplier(profile));
   if (!chance(visitChance)) return s;
   const day = s.day + 2;
   s = { ...s, celebDay: day };
