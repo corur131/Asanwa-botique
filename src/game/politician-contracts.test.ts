@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { DIVINE_CONFIG } from '../constants/presets';
+import { MARKUP } from './economy';
 import { acceptPoliticianContract, buyCart, deliverPoliticianContract, ensurePoliticianContractOffer, newGame, politicianContractProgress } from './engine';
 import { canBuy, MARKET } from './market';
 import { prepareShopperOrder } from './shopper';
@@ -49,6 +50,62 @@ test('Level 6 and Level 7 major contracts use the proposed late-game payout scal
   const level7 = contractFor(game({ tier: 6, politicianContracts: [] }));
   assert.ok(level7.reward >= 500_000_000 && level7.reward <= 1_000_000_000,
     'Level 7 major contracts must offer ₦500m–₦1bn');
+});
+
+test('200-day contract economy sample uses actual unlocked catalogue offers at Levels 6 and 7', () => {
+  const scenarios = [
+    { tier: 5, label: 'Level 6', lines: 3, minQty: 40, maxQty: 55, retailCeiling: 1_500_000, minReward: 220_000_000, maxReward: 500_000_000, weeklyRent: 30_000_000 },
+    { tier: 6, label: 'Level 7', lines: 4, minQty: 45, maxQty: 65, retailCeiling: 3_000_000, minReward: 500_000_000, maxReward: 1_000_000_000, weeklyRent: 75_000_000 },
+  ] as const;
+
+  for (const scenario of scenarios) {
+    const goodsCosts: number[] = [];
+    const rewards: number[] = [];
+    const contributions: number[] = [];
+    for (let sample = 0; sample < 400; sample++) {
+      const day = (sample % 200) + 1;
+      const seed = (sample * 104_729 + 17) % 1_000_000_000;
+      const base = newGame(DIVINE_CONFIG);
+      const state = ensurePoliticianContractOffer({
+        ...base,
+        tier: scenario.tier,
+        day,
+        seed,
+        politicianContracts: [],
+      }, true);
+      const offer = contractFor(state);
+      assert.equal(offer.requirements.length, scenario.lines);
+      assert.ok(offer.reward >= scenario.minReward && offer.reward <= scenario.maxReward);
+      assert.ok(offer.requirements.every((row) =>
+        Number.isInteger(row.quantity) &&
+        row.quantity >= scenario.minQty &&
+        row.quantity <= scenario.maxQty &&
+        row.unitCost * MARKUP <= scenario.retailCeiling));
+      const goodsCost = offer.requirements.reduce((sum, row) => sum + row.unitCost * row.quantity, 0);
+      assert.ok(offer.reward > goodsCost, 'the contract payout must cover the actual catalogue goods cost');
+      goodsCosts.push(goodsCost);
+      rewards.push(offer.reward);
+      contributions.push(offer.reward - goodsCost);
+    }
+
+    goodsCosts.sort((a, b) => a - b);
+    contributions.sort((a, b) => a - b);
+    const medianGoodsCost = goodsCosts[Math.floor(goodsCosts.length / 2)];
+    const medianContribution = contributions[Math.floor(contributions.length / 2)];
+    const meanReward = rewards.reduce((sum, amount) => sum + amount, 0) / rewards.length;
+    console.log(
+      '[Batch 6 economy sample] ' + scenario.label + ': 400 actual-catalogue offers; ' +
+      'goods cost min/median/max ₦' + Math.round(goodsCosts[0]).toLocaleString('en-NG') + '/' +
+      Math.round(medianGoodsCost).toLocaleString('en-NG') + '/' +
+      Math.round(goodsCosts[goodsCosts.length - 1]).toLocaleString('en-NG') +
+      '; median contribution ₦' + Math.round(medianContribution).toLocaleString('en-NG') +
+      '; mean reward ₦' + Math.round(meanReward).toLocaleString('en-NG') +
+      '; one contract's median contribution equals ' +
+      (medianContribution / scenario.weeklyRent).toFixed(2) + ' weeks of standard tier rent.'
+    );
+    assert.ok(medianContribution > 0);
+    assert.ok(meanReward >= scenario.minReward && meanReward <= scenario.maxReward);
+  }
 });
 
 test('accepting a contract sets a deadline but never charges the player', () => {
