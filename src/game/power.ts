@@ -23,12 +23,18 @@ export const POWER = {
   chargePerPanelPerMinute: 0.45,
   acPanels: 3,
   maxPanels: 8,
-  /** Litres an hour. */
-  burn: { small: 1.2, big: 2.6 } as const,
+  /** Litres per hour at full rated load. */
+  burn: { small: 1.2, big: 2.6, industrial: 5.5 } as const,
   /** Tank size in litres. */
-  tank: { small: 10, big: 30 } as const,
-  /** Naira per kWh from NEPA. */
+  tank: { small: 10, big: 30, industrial: 80 } as const,
+  /** Rated electrical output in kW. */
+  capacityKw: { small: 0.8, big: 4.5, industrial: 14 } as const,
+  /** Configurable in-game tariff options (₦/kWh). */
+  tariffs: { residential: 225, commercial: 310, premium: 390 } as const,
+  /** Default tariff for legacy saves. */
   tariff: 225,
+  /** Typical open hours used for daily estimates. */
+  openMinutesPerDay: 600,
 };
 
 /** This week's petrol price per litre: it wobbles, and some weeks there is scarcity. */
@@ -53,7 +59,7 @@ export const activeGeneratorUid = (s: GameState) => s.furniture
 /** Tank size can be queried for one generator, or for the active generator. */
 export const tankSize = (s: GameState, uid?: string) => {
   const piece = uid ? s.furniture.find((p) => p.uid === uid && p.placed) : undefined;
-  const g = piece ? furnitureById(piece.id).gen : liveStats(s).gen;
+  const g = piece ? (piece.id === 'industrialGen' ? 'industrial' : furnitureById(piece.id).gen) : generatorKind(s);
   return g ? POWER.tank[g] : 0;
 };
 /** Litres in a particular tank. Old saves use power.fuel for their active generator. */
@@ -67,20 +73,49 @@ export const fuelOf = (s: GameState, uid?: string) => {
   return 0;
 };
 
-/** Electricity the shop pulls right now, in kW, if it is on NEPA. */
+/** Typical real-world running wattage for powered equipment. Unlisted stock/decor draws zero. */
+export const EQUIPMENT_WATTS: Readonly<Record<string, number>> = {
+  fan: 75, ceilingFan: 65, ac: 1500, standingAc: 2200,
+  bareBulb: 60, tubeLight: 40, pendants: 45, trackLights: 120,
+  ledStrip: 30, chandelier: 300, ringLight: 55, vanity: 45,
+  neon: 80, shopSign: 100, displayWall: 90, speaker: 35,
+  waterDispenser: 120, tv: 110, steamer: 1800, hoodDryer: 1200,
+  salonChair: 250, rechargeableFan: 35,
+};
+
+/** Sum active powered equipment only; clothing and non-powered inventory never enter this calculation. */
+export function equipmentLoadKw(items: readonly { id: string }[]): number {
+  return items.reduce((sum, item) => sum + (EQUIPMENT_WATTS[item.id] || 0) / 1000, 0);
+}
+export const kwhForLoad = (kw: number, minutes: number) => Math.max(0, kw) * Math.max(0, minutes) / 60;
+export const tariffFor = (s: GameState) => {
+  const tariff = s.power?.tariff;
+  return typeof tariff === 'number' && Number.isFinite(tariff) && tariff > 0 ? tariff : POWER.tariff;
+};
+export const dailyEnergyKwh = (s: GameState) => kwhForLoad(loadKw(s), POWER.openMinutesPerDay);
+export const dailyEnergyCost = (s: GameState) => Math.round(dailyEnergyKwh(s) * tariffFor(s));
+
+/** Installed generator class, including the new commercial/industrial unit. */
+export function generatorKind(s: GameState, uid?: string): 'small' | 'big' | 'industrial' | undefined {
+  const piece = s.furniture.find((p) => p.placed && (uid ? p.uid === uid : p.uid === activeGeneratorUid(s)));
+  if (!piece) return liveStats(s).gen || undefined;
+  if (piece.id === 'industrialGen') return 'industrial';
+  return furnitureById(piece.id).gen;
+}
+export const generatorCapacityKw = (s: GameState, uid?: string) => {
+  const kind = generatorKind(s, uid);
+  return kind ? POWER.capacityKw[kind] : 0;
+};
+export const generatorOverloaded = (s: GameState) => !!s.power?.gen && loadKw(s) > generatorCapacityKw(s) + 0.001;
+
+/** Electricity drawn right now, in kW. Baseline lighting scales with floor area and display capacity. */
 export function loadKw(s: GameState): number {
-  let kw = 0.08;
-  for (const p of liveItems(s.furniture, s.off)) {
-    if (!p.placed) continue;
-    const f = furnitureById(p.id);
-    if (!f) continue;
-    if (f.ac) kw += 1.4;
-    else if (f.cool) kw += 0.07;
-    else if (f.group === 'Lighting') kw += f.id === 'chandelier' ? 0.3 : 0.06;
-    else if (f.id === 'tv') kw += 0.12;
-    else if (['ringLight', 'vanity', 'neon', 'shopSign', 'displayWall', 'speaker', 'waterDispenser', 'steamer', 'hoodDryer', 'salonChair'].includes(f.id)) kw += f.id === 'hoodDryer' || f.id === 'salonChair' ? 0.25 : f.id === 'waterDispenser' ? 0.1 : 0.05;
-  }
-  return kw;
+  const st = liveStats(s);
+  const size = Math.max(20, (s.listing?.area ? 1 : 0) + 1);
+  const slots = Math.max(0, st.display || 0);
+  const room = (s.listing as any)?.w && (s.listing as any)?.d ? (s.listing as any).w * (s.listing as any).d : 30;
+  const baseline = 0.08 + Math.min(0.8, room / 100 * 0.12) + Math.min(0.6, slots / 100 * 0.18) + Math.max(0, (s.tier || 0)) * 0.025;
+  return baseline + equipmentLoadKw(liveItems(s.furniture, s.off).filter((p) => p.placed));
 }
 
 export type Source = 'grid' | 'solar' | 'gen' | 'none';
@@ -112,8 +147,8 @@ export const solarCap = (s: GameState) => liveStats(s).solarPanels * POWER.minut
 export function source(s: GameState, t = s.clock): Source {
   if (!nepaOff(s, t)) return 'grid';
   const st = liveStats(s);
-  if (s.power?.gen && st.gen) return 'gen';
-  if (st.solarPanels && (s.power?.solar || 0) > 0) return 'solar';
+  if (s.power?.gen && st.gen && loadKw(s) <= generatorCapacityKw(s) + 0.001) return 'gen';
+  if (st.solarPanels && (s.power?.solar || 0) > 0 && loadKw(s) <= st.solarPanels * 0.35 + 0.001) return 'solar';
   return 'none';
 }
 
@@ -146,8 +181,12 @@ export function drainRate(s: GameState, cls: CustomerClass): number {
 
 /** Litres an hour the generator burns. */
 export const fuelPerHour = (s: GameState) => {
-  const g = liveStats(s).gen;
-  return g ? POWER.burn[g] : 0;
+  const g = generatorKind(s);
+  if (!g) return 0;
+  const capacity = POWER.capacityKw[g];
+  const demand = loadKw(s);
+  const loadFraction = Math.min(1, demand / capacity);
+  return POWER.burn[g] * (0.35 + 0.65 * loadFraction);
 };
 
 const pick = <T,>(a: readonly T[]): T => a[Math.floor(Math.random() * a.length)];
@@ -192,7 +231,9 @@ export function powerStep(s0: GameState, from: number, to: number): GameState {
   if (isOff) {
     s = { ...s, today: { ...s.today, outageMinutes: (s.today.outageMinutes || 0) + minutes } };
     if (power.gen && st.gen) {
-      power.fuel = Math.max(0, power.fuel - (POWER.burn[st.gen] * minutes) / 60);
+      const g = generatorKind(s, activeUid);
+      const rate = g ? POWER.burn[g] * (0.35 + 0.65 * Math.min(1, loadKw(s) / POWER.capacityKw[g])) : POWER.burn[st.gen];
+      power.fuel = Math.max(0, power.fuel - (rate * minutes) / 60);
       if (activeUid) power.generatorFuel[activeUid] = power.fuel;
       if (power.fuel <= 0) {
         power.gen = false;
@@ -200,7 +241,8 @@ export function powerStep(s0: GameState, from: number, to: number): GameState {
       } else if (power.fuel < 1 && power.fuel + (POWER.burn[st.gen] * minutes) / 60 >= 1) s = addShout(s, 'Deborah', 'Sis, the gen is almost out of fuel. Refuel it!', 'warn');
     } else if (st.solarPanels && power.solar > 0) {
       const acOn = st.coolAc > 0 && st.solarPanels >= POWER.acPanels;
-      power.solar = Math.max(0, power.solar - minutes * (acOn ? 2 : 1));
+      const demandFactor = Math.max(1, loadKw(s) / Math.max(0.35, st.solarPanels * 0.35));
+      power.solar = Math.max(0, power.solar - minutes * Math.max(acOn ? 2 : 1, demandFactor));
       if (power.solar <= 0) s = addShout(s, 'Solar', st.gen ? 'Solar battery is flat. Start the generator!' : 'Solar battery is flat. The shop is dark now.', 'warn');
     } else if (s.furniture.some((p) => p.placed && p.id === 'rechargeableFan') && power.fanBattery > 0) {
       power.fanBattery = Math.max(0, power.fanBattery - minutes);
@@ -213,7 +255,7 @@ export function powerStep(s0: GameState, from: number, to: number): GameState {
       power.solar = Math.min(cap, power.solar + minutes * POWER.chargePerPanelPerMinute * st.solarPanels);
     }
     // on NEPA: the meter runs
-    if (s.phase === 'shop') s = { ...s, meter: { kwh: (s.meter?.kwh || 0) + (loadKw(s) * minutes) / 60 } };
+    if (s.phase === 'shop') s = { ...s, meter: { kwh: (s.meter?.kwh || 0) + kwhForLoad(loadKw(s), minutes) } };
   }
   s = { ...s, power };
 
@@ -240,7 +282,7 @@ export function setGen(s: GameState, on: boolean): GameState {
   if (on && (!st.gen || !nepaOff(s))) return s;
   if (on && fuelOf(s) <= 0) return addShout(s, 'Generator', 'No fuel in the tank. Refuel the gen first.', 'warn');
   let next: GameState = { ...s, power: { ...s.power, gen: on, fuel: fuelOf(s), generatorFuel: { ...(s.power?.generatorFuel || {}), ...(activeGeneratorUid(s) ? { [activeGeneratorUid(s)!]: fuelOf(s) } : {}) } } };
-  if (on) next = addShout(next, 'Generator', st.gen === 'small' ? 'Brrrrrm! The generator is on: lights and fans running.' : 'The generator is on: everything is running.', 'good');
+  if (on) next = addShout(next, 'Generator', generatorKind(s) === 'small' ? 'Brrrrrm! The generator is on: lights and fans running.' : generatorKind(s) === 'industrial' ? 'Commercial generator online. High-load equipment is supported.' : 'The generator is on. Check the load meter: equipment demand above capacity will still lose power.', 'good');
   return next;
 }
 
