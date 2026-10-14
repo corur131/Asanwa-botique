@@ -383,8 +383,10 @@ export function simulateRivals(s0: GameState): GameState {
       trendInfluence: r.brand?.trendInfluence,
     };
     const celebrityScheduled = celebrityIsScheduled(r.tier, today, signatureProperty);
+    const celebrityCooldownClear = r.lastCelebrityVisitDay !== today - 1;
     const celebrityChance = celebrityVisitChance(r.tier, signatureProperty, celebrityProfile);
-    if (celebrityScheduled && chance(celebrityChance)) {
+    if (celebrityScheduled && celebrityCooldownClear && chance(celebrityChance)) {
+      r.lastCelebrityVisitDay = today;
       const celebrityTier = chooseCelebrityTierForShop(r.tier, signatureProperty, celebrityProfile);
       const namedGuest = celebrityProfileForTier(celebrityTier);
       const { budget, spendFloor } = celebrityAmountsForTier(celebrityTier);
