@@ -355,35 +355,79 @@ export function Room({ r, tier, painted }: { r: RoomStyle; tier: number; painted
 
           {tier === 5 && (
             <>
-              {/* Luxury Maison - connected rooms with dark steel partitions */}
-              {/* Main showroom dividing wall leaving an arched double-doorway */}
-              <B p={[r.w * 0.35, H / 2, r.d * 0.5]} s={[r.w * 0.7, H, 0.15]} c={signatureAccent} m={0.3} />
-              <B p={[r.w * 0.85, H / 2, r.d * 0.5]} s={[r.w * 0.3, H, 0.15]} c={signatureAccent} m={0.3} />
-              {/* VIP consultation room partition */}
-              <B p={[r.w * 0.7, H / 2, r.d * 0.75]} s={[0.15, H, r.d * 0.5]} c={signatureAccent} m={0.3} />
-              {/* Neon accent strips */}
-              <B p={[r.w * 0.35, H * 0.85, r.d * 0.5 + 0.08]} s={[r.w * 0.6, 0.05, 0.02]} c="#2A3B4C" e="#5C8EB8" ei={0.8} />
-              <B p={[r.w * 0.85, H * 0.85, r.d * 0.5 + 0.08]} s={[r.w * 0.2, 0.05, 0.02]} c="#2A3B4C" e="#5C8EB8" ei={0.8} />
-              <B p={[r.w * 0.7 - 0.08, H * 0.85, r.d * 0.75]} s={[0.02, 0.05, r.d * 0.4]} c="#2A3B4C" e="#5C8EB8" ei={0.8} />
+              {/* Luxury Maison - Immersive ambient redesign */}
+              {/* Accent wall with wainscoting texture effect (using multiple vertical slat geometries) */}
+              {Array.from({ length: Math.floor(r.w * 2) }, (_, i) => (
+                <B key={`maison-slat-back-${i}`} p={[i * 0.5 + 0.25, H / 2, 0.04]} s={[0.2, H, 0.04]} c="#1C212B" m={0.4} r={0.2} />
+              ))}
+
+              {/* Sculptural wall sconces (lighting) */}
+              {Array.from({ length: 4 }, (_, i) => (
+                <group key={`maison-sconce-${i}`} position={[r.w * (0.2 + i * 0.2), H * 0.6, 0.1]}>
+                  <mesh rotation={[Math.PI / 2, 0, 0]}><cylinderGeometry args={[0.1, 0.1, 0.3, 16]} /><meshStandardMaterial color="#A4B5C4" metalness={0.8} roughness={0.2} /></mesh>
+                  <mesh position={[0, -0.15, 0]}><sphereGeometry args={[0.12, 16, 16]} /><meshStandardMaterial color="#FFF5E6" emissive="#FFDDAA" emissiveIntensity={0.6} roughness={0.1} /></mesh>
+                </group>
+              ))}
+
+              {/* Main showroom dividing wall leaving an arched double-doorway - now with acoustic wood-panel detailing */}
+              <B p={[r.w * 0.35, H / 2, r.d * 0.5]} s={[r.w * 0.7, H, 0.2]} c="#1A1F29" m={0.2} />
+              <B p={[r.w * 0.85, H / 2, r.d * 0.5]} s={[r.w * 0.3, H, 0.2]} c="#1A1F29" m={0.2} />
+
+              {/* LED cove strips along the ceiling edges of the main partition */}
+              <B p={[r.w * 0.35, H - 0.05, r.d * 0.5 + 0.1]} s={[r.w * 0.7, 0.02, 0.04]} c="#3A4B5C" e="#7CB4E6" ei={0.9} />
+              <B p={[r.w * 0.85, H - 0.05, r.d * 0.5 + 0.1]} s={[r.w * 0.3, 0.02, 0.04]} c="#3A4B5C" e="#7CB4E6" ei={0.9} />
+
+              {/* VIP consultation room partition with floating oak shelves */}
+              <B p={[r.w * 0.7, H / 2, r.d * 0.75]} s={[0.15, H, r.d * 0.5]} c="#1A1F29" m={0.2} />
+              <B p={[r.w * 0.7 - 0.15, H * 0.4, r.d * 0.75]} s={[0.15, 0.04, 1.2]} c="#8B5A2B" m={0.1} r={0.8} />
+              <B p={[r.w * 0.7 - 0.15, H * 0.6, r.d * 0.75]} s={[0.15, 0.04, 1.2]} c="#8B5A2B" m={0.1} r={0.8} />
+
+              {/* Velvet drapery flanking the VIP entrance (simulated with cylinders) */}
+              <mesh position={[r.w * 0.7 - 0.15, H / 2, r.d * 0.55]}><cylinderGeometry args={[0.2, 0.25, H, 16]} /><meshStandardMaterial color="#2D3B4C" roughness={0.9} /></mesh>
+
+              {/* Large Jute Area Rug in VIP section */}
+              <B p={[r.w * 0.85, 0.02, r.d * 0.75]} s={[r.w * 0.25, 0.015, r.d * 0.35]} c="#A6957B" r={1.0} />
             </>
           )}
 
           {tier === 6 && (
             <>
-              {/* Fashion Empire House - grandiose partitions, private suites */}
-              {/* Grand showroom partition */}
-              <B p={[r.w * 0.3, H / 2, r.d * 0.4]} s={[r.w * 0.6, H, 0.2]} c={signatureAccent} m={0.4} />
-              <B p={[r.w * 0.8, H / 2, r.d * 0.4]} s={[r.w * 0.4, H, 0.2]} c={signatureAccent} m={0.4} />
+              {/* Fashion Empire House - Ultimate Luxury Overhaul */}
+
+              {/* Monumental Art Piece (Statement Canvas) on the back wall */}
+              <B p={[r.w / 2, H * 0.5, 0.06]} s={[r.w * 0.3, H * 0.6, 0.02]} c="#0A0506" m={0.1} r={0.8} />
+              <B p={[r.w / 2, H * 0.5, 0.08]} s={[r.w * 0.28, H * 0.56, 0.01]} c="#4A2A2A" />
+              <B p={[r.w / 2, H * 0.5, 0.09]} s={[r.w * 0.25, H * 0.5, 0.01]} c="#E0A39F" e="#8A4A4A" ei={0.1} />
+
+              {/* Grand showroom partition with crown molding styling at top */}
+              <B p={[r.w * 0.3, H / 2, r.d * 0.4]} s={[r.w * 0.6, H, 0.25]} c="#14090A" m={0.3} />
+              <B p={[r.w * 0.8, H / 2, r.d * 0.4]} s={[r.w * 0.4, H, 0.25]} c="#14090A" m={0.3} />
+              <B p={[r.w / 2, H - 0.1, r.d * 0.4 + 0.14]} s={[r.w, 0.15, 0.06]} c="#1C1113" m={0.4} />
+
+              {/* Heavy velvet drapes on the windows/front wall */}
+              {Array.from({ length: 6 }, (_, i) => (
+                <mesh key={`empire-drape-${i}`} position={[r.w * 0.1 + i * 1.5, H / 2, r.d - 0.15]}><cylinderGeometry args={[0.3, 0.4, H, 16]} /><meshStandardMaterial color="#3A1A22" roughness={0.9} /></mesh>
+              ))}
+
               {/* Private VIP suite and staff office separation */}
-              <B p={[r.w * 0.6, H / 2, r.d * 0.7]} s={[0.2, H, r.d * 0.6]} c={signatureAccent} m={0.4} />
-              {/* Grand runway in the center room */}
-              <B p={[r.w * 0.5, 0.05, r.d * 0.7]} s={[2.5, 0.1, r.d * 0.5]} c="#3B1A22" e="#6B2A3B" ei={0.2} m={0.2} />
-              {/* Rose gold geometric ceiling fixtures */}
-              {Array.from({ length: 8 }, (_, i) => (
-                <mesh key={'empire-ceiling-' + i} position={[r.w * (0.2 + (i % 4) * 0.2), H - 0.15, r.d * (i < 4 ? 0.2 : 0.6)]} rotation={[Math.PI / 2, 0, Math.PI / 4]}>
-                  <torusGeometry args={[0.8, 0.03, 4, 4]} />
-                  <meshStandardMaterial color="#E0A39F" metalness={0.9} roughness={0.1} emissive="#C27A75" emissiveIntensity={0.5} />
-                </mesh>
+              <B p={[r.w * 0.6, H / 2, r.d * 0.7]} s={[0.2, H, r.d * 0.6]} c="#14090A" m={0.3} />
+
+              {/* Inner VIP Suite Ambient Wall Wash (LED up-lighting) */}
+              <B p={[r.w * 0.8, 0.1, r.d * 0.9]} s={[r.w * 0.3, 0.05, 0.1]} c="#2A1A1E" e="#E0A39F" ei={0.6} />
+
+              {/* Plush Wool Rug covering the central grand runway */}
+              <B p={[r.w * 0.5, 0.02, r.d * 0.7]} s={[3.2, 0.02, r.d * 0.5]} c="#2C1A1E" m={0.1} r={0.95} />
+
+              {/* Massive Travertine display pedestals in showroom corners */}
+              <B p={[r.w * 0.15, 0.4, r.d * 0.2]} s={[0.8, 0.8, 0.8]} c="#DCD0C0" m={0.1} r={0.7} />
+              <B p={[r.w * 0.85, 0.4, r.d * 0.2]} s={[0.8, 0.8, 0.8]} c="#DCD0C0" m={0.1} r={0.7} />
+
+              {/* Rose gold geometric ceiling fixtures transformed into dramatic layered pendants */}
+              {Array.from({ length: 12 }, (_, i) => (
+                <group key={'empire-ceiling-' + i} position={[r.w * (0.15 + (i % 6) * 0.14), H - (i % 3) * 0.2 - 0.2, r.d * (i < 6 ? 0.25 : 0.65)]}>
+                  <mesh rotation={[Math.PI / 2, 0, 0]}><cylinderGeometry args={[0.02, 0.02, 1.5, 8]} /><meshStandardMaterial color="#E0A39F" metalness={0.9} roughness={0.1} /></mesh>
+                  <mesh position={[0, -0.7, 0]}><sphereGeometry args={[0.15, 16, 16]} /><meshStandardMaterial color="#FFF0E6" emissive="#FFBBAA" emissiveIntensity={0.8} roughness={0.2} /></mesh>
+                </group>
               ))}
             </>
           )}
