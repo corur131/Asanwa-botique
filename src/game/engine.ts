@@ -192,7 +192,15 @@ function makePoliticianContractOffer(s: GameState): PoliticianContract | null {
   if (!requirements.length) return null;
 
   const goodsCost = requirements.reduce((sum, row) => sum + row.unitCost * row.quantity, 0);
-  const reward = Math.ceil((goodsCost * 1.65) / 1_000) * 1_000;
+  const tierIndex = clamp(Math.floor(s.tier || 0), 0, CONTRACT_TIER_RULES.length - 1);
+  const costScaledReward = Math.ceil((goodsCost * 4) / 1_000) * 1_000;
+  // Major late-game contracts use the roadmap's proposed scale. The value is an
+  // offer only: the game still pays it exclusively after verified delivery.
+  const reward = tierIndex === 5
+    ? Math.min(500_000_000, Math.max(220_000_000, costScaledReward))
+    : tierIndex >= 6
+      ? Math.min(1_000_000_000, Math.max(500_000_000, costScaledReward))
+      : Math.ceil((goodsCost * 1.65) / 1_000) * 1_000;
   const titleIndex = Math.min(CONTRACT_TITLES.length - 1, Math.floor(s.tier || 0));
   const client = CONTRACT_CLIENTS[Math.abs(Math.floor((s.seed || 0) + s.day * 13)) % CONTRACT_CLIENTS.length];
   const title = CONTRACT_TITLES[titleIndex];
