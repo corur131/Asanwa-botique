@@ -217,7 +217,7 @@ export function powerStep(s0: GameState, from: number, to: number): GameState {
   const wasOff = !!outageAt(s, from);
   const isOff = !!outageAt(s, to);
   const activeUid = activeGeneratorUid(s);
-  const power = { gen: !!s.power?.gen, solar: s.power?.solar || 0, fuel: fuelOf(s), generatorFuel: { ...(s.power?.generatorFuel || {}) }, fanBattery: s.power?.fanBattery || 0 };
+  const power = { ...s.power, gen: !!s.power?.gen, solar: s.power?.solar || 0, fuel: fuelOf(s), generatorFuel: { ...(s.power?.generatorFuel || {}) }, fanBattery: s.power?.fanBattery || 0 };
   const cap = st.solarPanels * POWER.minutesPerPanel;
 
   if (!wasOff && isOff) {
