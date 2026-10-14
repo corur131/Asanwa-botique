@@ -1016,7 +1016,7 @@ const PowerChip: React.FC<{ s: GameState; up: (f: (g: GameState) => GameState) =
             {powered.length === 0 ? <div className="text-slate-500">No powered equipment installed.</div> : powered.slice(0, 12).map((p) => (
               <div key={p.uid} className="flex items-center justify-between gap-2">
                 <span className="truncate">{furnitureById(p.id).name} · {E.EQUIPMENT_WATTS[p.id]} W</span>
-                <Btn size="sm" tone={s.off?.[p.uid] ? 'muted' : 'green'} onClick={() => up((g) => ({ ...g, off: { ...(g.off || {}), [p.uid]: !g.off?.[p.uid] } }))}>{s.off?.[p.uid] ? 'Off · switch on' : 'On · switch off'}</Btn>
+                <Btn size="sm" tone={s.off?.[p.uid] ? 'ghost' : 'green'} onClick={() => up((g) => ({ ...g, off: { ...(g.off || {}), [p.uid]: !g.off?.[p.uid] } }))}>{s.off?.[p.uid] ? 'Off · switch on' : 'On · switch off'}</Btn>
               </div>
             ))}
           </div>
