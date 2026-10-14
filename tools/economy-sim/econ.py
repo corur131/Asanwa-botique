@@ -319,13 +319,14 @@ def simulate(pl, days=200, seed=0, shock_day=None, shock=0.0, fixed_tier=None):
                         log['quits'] += 1
                         hire_ok = day + 7
             # rent: unpaid rent gets the landlord's grace period, then demotion
-            if cash >= t['rent']:
-                cash -= t['rent']
+            rent_due = round(t['rent'] * (2.7 if P.get('celebrity_signature', False) else 1.0))
+            if cash >= rent_due:
+                cash -= rent_due
             else:
                 grace = rnd.choice([0, 2, 7, 7, 14])
                 late_due = day + grace
-                late_amount = t['rent']
-                cash -= t['rent']          # owed; must be back above zero by late_due
+                late_amount = rent_due
+                cash -= rent_due          # owed; must be back above zero by late_due
         if late_due and day >= late_due:
             if cash < 0 and tier > 0:
                 tier -= 1
@@ -337,7 +338,8 @@ def simulate(pl, days=200, seed=0, shock_day=None, shock=0.0, fixed_tier=None):
             # upgrade decision (once a week, after rent)
             if tier + 1 < len(TIERS) and fixed_tier is None:
                 nt = TIERS[tier + 1]
-                need = nt['up'] + (stock_needed(tier + 1) - stock_needed(tier)) * 0.7 + pl['buffer'] * nt['rent']
+                next_rent = nt['rent'] * (2.7 if P.get('celebrity_signature', False) else 1.0)
+                need = nt['up'] + (stock_needed(tier + 1) - stock_needed(tier)) * 0.7 + pl['buffer'] * next_rent
                 if cash >= need:
                     cash -= nt['up'] + (stock_needed(tier + 1) - stock_needed(tier)) * 0.7
                     tier += 1
@@ -399,8 +401,8 @@ def simulate_celebrity_forecast(days=200, runs=1000):
                 'grossPremiumReceiptsPerFortnight': round(total_gross / fortnights),
                 'fulfilmentCostsPerFortnight': round(total_cost / fortnights),
                 'netPremiumReceiptsPerFortnight': round(average_net),
-                'fortnightRent': TIERS[shop_tier]['rent'] * 2,
-                'premiumReceiptsAloneCoverFortnightRent': average_net >= TIERS[shop_tier]['rent'] * 2,
+                'fortnightRent': TIERS[shop_tier]['rent'] * 2 * (2.7 if signature else 1.0),
+                'premiumReceiptsAloneCoverFortnightRent': average_net >= TIERS[shop_tier]['rent'] * 2 * (2.7 if signature else 1.0),
             }
         forecast[TIERS[shop_tier]['name']] = by_property
     return forecast
