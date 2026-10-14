@@ -1,4 +1,5 @@
 import React, { Suspense, lazy, useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { CharacterSvg } from '../components/renderer/renderCharacter';
 import { DIVINE_CONFIG } from '../constants/presets';
 import { CharacterConfig } from '../types/character';
@@ -1018,6 +1019,25 @@ const SecurityMenu: React.FC<{
 
 /** NEPA status and the generator switch. */
 const PowerChip: React.FC<{ s: GameState; up: (f: (g: GameState) => GameState) => void }> = ({ s, up }) => {
+  const [open, setOpen] = useState(false);
+  const chipRef = useRef<HTMLDivElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const closeOutside = (event: PointerEvent) => {
+      const target = event.target as Node;
+      if (!chipRef.current?.contains(target) && !panelRef.current?.contains(target)) setOpen(false);
+    };
+    const closeEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setOpen(false);
+    };
+    document.addEventListener('pointerdown', closeOutside);
+    document.addEventListener('keydown', closeEscape);
+    return () => {
+      document.removeEventListener('pointerdown', closeOutside);
+      document.removeEventListener('keydown', closeEscape);
+    };
+  }, [open]);
   const st = E.stats(s);
   const src = E.source(s);
   const off = E.inBlackout(s);
@@ -1029,12 +1049,19 @@ const PowerChip: React.FC<{ s: GameState; up: (f: (g: GameState) => GameState) =
   const powered = s.furniture.filter((p) => p.placed && !!E.EQUIPMENT_WATTS[p.id]);
   const sourceLabel = src === 'grid' ? (off ? 'Grid unavailable' : 'Grid supply') : src === 'gen' ? 'Generator supply' : src === 'solar' ? 'Solar / battery' : 'Power shortage';
   return (
-    <details className="relative text-xs text-slate-200">
-      <summary className="cursor-pointer list-none rounded-lg border border-white/15 bg-white/5 px-3 py-1.5 font-semibold hover:bg-white/10">
+    <div ref={chipRef} className="relative text-xs text-slate-200">
+      <button
+        type="button"
+        aria-expanded={open}
+        aria-haspopup="dialog"
+        onClick={() => setOpen((value) => !value)}
+        className="rounded-lg border border-white/15 bg-white/5 px-3 py-1.5 font-semibold hover:bg-white/10"
+      >
         ⚡ Power &amp; Utilities · {src === 'grid' && !off ? 'NEPA' : src === 'none' ? 'Shortage' : src === 'solar' ? 'Solar' : 'Generator'}
-      </summary>
-      <div className="absolute right-0 top-full z-50 mt-2 w-[min(92vw,360px)] space-y-2 rounded-xl border border-white/15 bg-[#11141d] p-3 shadow-2xl">
-        <div className="flex items-center justify-between gap-2"><b className="text-sm text-white">Power &amp; Utilities</b><span className={src === 'none' ? 'text-rose-300' : 'text-emerald-300'}>{sourceLabel}</span></div>
+      </button>
+      {open && typeof document !== 'undefined' && createPortal(
+        <div ref={panelRef} role="dialog" aria-label="Power & Utilities" className="fixed right-3 top-20 z-[70] w-[min(92vw,360px)] max-h-[calc(100dvh-6rem)] overflow-y-auto overscroll-contain space-y-2 rounded-xl border border-white/15 bg-[#11141d] p-3 shadow-2xl">
+          <div className="flex items-center justify-between gap-2"><b className="text-sm text-white">Power &amp; Utilities</b><div className="flex items-center gap-2"><span className={src === 'none' ? 'text-rose-300' : 'text-emerald-300'}>{sourceLabel}</span><button type="button" aria-label="Close Power & Utilities" onClick={() => setOpen(false)} className="rounded-md px-2 py-1 text-lg leading-none text-slate-300 hover:bg-white/10">×</button></div></div>
         <div className="grid grid-cols-2 gap-2">
           <div className="rounded-lg bg-white/5 p-2"><div className="text-slate-400">Current load</div><b>{load.toFixed(2)} kW</b></div>
           <div className="rounded-lg bg-white/5 p-2"><div className="text-slate-400">Daily energy estimate</div><b>{dailyKwh.toFixed(1)} kWh</b></div>
@@ -1069,8 +1096,9 @@ const PowerChip: React.FC<{ s: GameState; up: (f: (g: GameState) => GameState) =
             ))}
           </div>
         </div>
-      </div>
-    </details>
+        </div>, document.body
+      )}
+    </div>
   );
 };
 const PhoneButton: React.FC<{ unread: number; onClick: () => void }> = ({ unread, onClick }) => (
