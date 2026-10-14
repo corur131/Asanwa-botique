@@ -923,7 +923,7 @@ export function applyLook(s0: GameState, c: Customer, choice: StyleChoice, st0: 
       shopId: 'you',
       shopName: 'Asanwa Boutique',
       ownerName: 'Divine',
-      celebrityName: c.name,
+      celebrityName: `${c.name} · ${c.celebrity.rank}`,
       spend: st.paid + st.tip,
       bought,
       premiumOrder,
