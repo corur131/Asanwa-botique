@@ -282,44 +282,51 @@ export const MovePanel: React.FC<{ s: GameState; onMove: (l: Listing, plan: Move
   const [pick, setPick] = useState<Listing | null>(null);
   const [movePlan, setMovePlan] = useState<MoveEquipmentPlan>('arrange');
   const resaleValue = s.furniture.filter((p) => furnitureById(p.id).mount !== 'finish').reduce((sum, p) => sum + Math.round(furnitureById(p.id).price * 0.4), 0);
-  const next = TIERS[s.tier + 1];
+  const [selectedTier, setSelectedTier] = useState(Math.min(TIERS.length - 1, s.tier + 1));
+  const [selectedListingId, setSelectedListingId] = useState('');
+  const [retainedStaffIds, setRetainedStaffIds] = useState<string[]>(s.staff.map((member) => member.id));
   const weekNo = Math.floor((s.day - 1) / 7);
-  const sameTierSignatures = !s.listing.signature
-    ? listingsFor(s.tier, weekNo).filter((l) => l.signature && l.tier === s.tier)
-    : [];
-  const nextTierListings = next ? listingsNow(s) : [];
-  // Put the same-size alternative first, then the genuinely larger next-tier choices.
-  const list = [...sameTierSignatures, ...nextTierListings];
+  const tierListings = listingsFor(selectedTier, weekNo).filter((l) => l.id !== s.listing.id);
+  const selectedListing = tierListings.find((l) => l.id === selectedListingId) || tierListings[0];
+  const list = selectedListing ? [selectedListing] : [];
   return (
     <div className="space-y-3">
       <div className="text-sm text-slate-300">
         Now: <b className="text-white">{TIERS[s.tier].name}</b>, {s.listing.street}, {s.listing.area} <Stars n={s.listing.stars} /> · rent {naira(s.listing.rent)}
       </div>
-      {next ? <div className="rounded-lg border border-white/10 bg-white/5 p-3 text-xs text-slate-300">
-        <b className="text-white">{next.name}</b>: bigger, better listings are roomier and hold more{next.staff ? `, ${next.staff} staff` : ''}{next.luxury ? ', luxury suppliers' : ''}. Choose what happens to your reusable equipment when you move. You can arrange it in the new shop, keep it in storage, or sell it for cash. Listings change every week.
-      </div> : <div className="rounded-lg border border-white/10 bg-white/5 p-3 text-xs text-slate-300">You have reached the highest standard shop level. A same-level Signature property may still be available as an alternative if you are currently in a standard shop.</div>}
-      <div className="rounded-lg border border-amber-500/25 bg-amber-500/5 p-3 text-xs text-amber-100">Signature properties are purpose-built luxury spaces with extra customer traffic and scheduled celebrity opportunities. Higher-tier Signature properties offer more frequent visit opportunities, alongside substantially higher rent and move-in costs.</div>
-      <p className="text-xs text-slate-400">A same-tier Signature is an alternative to your current standard shop at the same size. A next-tier Signature is a larger shop upgrade; those are separate levels, not duplicate properties at one level.</p>
-      {list.map((l0, index) => {
-        const sameTier = l0.signature && l0.tier === s.tier;
+      <div className="rounded-lg border border-white/10 bg-white/5 p-3 text-xs text-slate-300">
+        Browse every tier, including smaller shops. You can relocate directly to any available property without buying intermediate tiers. Listings refresh with the in-game week.
+        <label className="mt-3 block text-xs font-semibold text-slate-200">Choose shop tier
+          <select value={selectedTier} onChange={(e) => { setSelectedTier(Number(e.target.value)); setSelectedListingId(''); }} className="mt-1 block w-full rounded-lg border border-white/15 bg-[#181b24] p-2 text-sm text-white">
+            {TIERS.map((tier, index) => <option key={index} value={index}>{tier.name}{index === s.tier ? ' · current tier' : ''}</option>)}
+          </select>
+        </label>
+        <label className="mt-3 block text-xs font-semibold text-slate-200">Choose property
+          <select value={selectedListing?.id || ''} onChange={(e) => setSelectedListingId(e.target.value)} className="mt-1 block w-full rounded-lg border border-white/15 bg-[#181b24] p-2 text-sm text-white">
+            {tierListings.map((listing) => <option key={listing.id} value={listing.id}>{listing.street}{listing.signature ? ' · Signature' : ''} — {listing.area}</option>)}
+          </select>
+        </label>
+        {!tierListings.length && <p className="mt-2 text-amber-200">No other property is available in this tier this week.</p>}
+      </div>
+      <div className="rounded-lg border border-amber-500/25 bg-amber-500/5 p-3 text-xs text-amber-100">Signature properties offer extra customer traffic and celebrity opportunities, but usually carry substantially higher rent and move-in costs.</div>
+      {list.map((l0) => {
+        const sameTier = l0.tier === s.tier;
         const fight = contestFor(s, l0);
         const l = fight ? { ...l0, moveIn: l0.moveIn + fight.extra } : l0;
         const after = s.cash - l.moveIn;
         const risky = after < l.rent * 2;
         return (
           <React.Fragment key={l.id}>
-          {index === 0 && sameTierSignatures.length > 0 && <div className="pt-1 text-[10px] font-bold uppercase tracking-[0.16em] text-amber-200">Same shop size · Signature alternative</div>}
-          {index === sameTierSignatures.length && nextTierListings.length > 0 && <div className="pt-3 text-[10px] font-bold uppercase tracking-[0.16em] text-amber-200">Next shop level · larger floor plan</div>}
           <div className="rounded-xl border border-white/10 bg-[#15171f] p-3">
             <div className="flex items-start justify-between gap-2">
               <div>
                 <div className="text-sm font-semibold text-white">{l.street} {l.signature && <Pill tone="gold">✦ SIGNATURE</Pill>}</div>
-                <div className="text-[10px] font-semibold uppercase tracking-wider text-amber-300">{sameTier ? `SAME-TIER ALTERNATIVE · ${TIERS[l.tier].name} Signature` : l.signature ? `NEXT-TIER UPGRADE · ${TIERS[l.tier].name} Signature` : `${TIERS[l.tier].name} · Standard listing`}</div>
+                <div className="text-[10px] font-semibold uppercase tracking-wider text-amber-300">{sameTier ? `SAME-TIER ALTERNATIVE · ${TIERS[l.tier].name}` : l.tier < s.tier ? `DOWNGRADE OPTION · ${TIERS[l.tier].name}` : l.tier > s.tier ? `UPGRADE OPTION · ${TIERS[l.tier].name}` : `${TIERS[l.tier].name} · Alternative listing`}</div>
                 {l.signature && l.tier === 5 && <div className="mt-1 text-[10px] font-bold uppercase tracking-wide text-emerald-200">Botanical Atrium · living greenery · copper-framed windows</div>}
                 {l.signature && l.tier === 6 && <div className="mt-1 text-[10px] font-bold uppercase tracking-wide text-sky-200">Cobalt Gallery · ivory stone · cobalt and coral architecture</div>}
                 <div className="text-[11px] text-slate-400">{l.area} · <Stars n={l.stars} /> · {roomOf(l).w}×{roomOf(l).d} m floor</div>
               </div>
-              <Btn size="sm" tone="gold" onClick={() => { setMovePlan('arrange'); setPick(l0); }}>View</Btn>
+              <Btn size="sm" tone="gold" onClick={() => { setMovePlan('arrange'); setPick(l0); setRetainedStaffIds(s.staff.length <= TIERS[l0.tier].staff ? s.staff.map((member) => member.id) : []); }}>View</Btn>
             </div>
             <div className="grid grid-cols-3 gap-2 mt-2 text-[11px]">
               <div><div className="text-slate-500">Rent/week</div><div className="text-white font-semibold">{naira(l.rent)}</div></div>
@@ -350,6 +357,19 @@ export const MovePanel: React.FC<{ s: GameState; onMove: (l: Listing, plan: Move
             {pick.signature && <li className="text-amber-200">Signature benefits: extra customer traffic, rich-only walk-ins, much larger tips, celebrity visits with multi-million-naira spending, trending posts and large follower gains. Scheduled celebrity visits become more frequent at each Signature tier.</li>}
           </ul>
           {s.cash - pick.moveIn - (movePlan === 'furnished' ? readyFurnishedCost(pick) : 0) < pick.rent * 2 && <p className="text-sm text-rose-300 mb-3">Careful: after move-in{movePlan === 'furnished' ? ' and the furnishing package' : ''}, you would have less than two weeks of rent saved. The first two weeks in a new shop are quiet.</p>}
+          {s.staff.length > TIERS[pick.tier].staff && (
+            <section className="mb-4 rounded-xl border border-amber-500/40 bg-amber-500/10 p-3">
+              <h3 className="text-sm font-semibold text-amber-100">Choose who stays before moving</h3>
+              <p className="mt-1 text-xs text-slate-300">This shop supports {TIERS[pick.tier].staff} staff member(s), but you currently employ {s.staff.length}. Select up to {TIERS[pick.tier].staff} people to retain. Anyone unchecked will leave only after you confirm the move.</p>
+              <div className="mt-3 space-y-2">
+                {s.staff.map((member) => <label key={member.id} className="flex items-center gap-2 rounded-lg border border-white/10 bg-black/10 p-2 text-sm text-white">
+                  <input type="checkbox" checked={retainedStaffIds.includes(member.id)} disabled={!retainedStaffIds.includes(member.id) && retainedStaffIds.length >= TIERS[pick.tier].staff} onChange={(event) => setRetainedStaffIds((current) => event.target.checked ? [...current, member.id] : current.filter((id) => id !== member.id))} />
+                  <span>{member.name}</span><span className="ml-auto text-xs text-slate-400">Level {member.level}</span>
+                </label>)}
+              </div>
+              <p className="mt-2 text-xs font-semibold text-amber-100">Selected: {retainedStaffIds.length} / {TIERS[pick.tier].staff}</p>
+            </section>
+          )}
           <section className="space-y-2 mb-4">
             <h3 className="text-sm font-semibold text-white">What should happen to your equipment?</h3>
             {([
@@ -376,7 +396,7 @@ export const MovePanel: React.FC<{ s: GameState; onMove: (l: Listing, plan: Move
           )}
           <div className="flex gap-2 justify-end">
             <Btn onClick={() => setPick(null)}>Not yet</Btn>
-            <Btn tone="gold" disabled={s.cash + (movePlan === 'sell' ? resaleValue : 0) < pick.moveIn + (contestFor(s, pick)?.extra || 0) + (movePlan === 'furnished' ? readyFurnishedCost(pick) : 0)} onClick={() => { onMove(pick, movePlan); setPick(null); }}>
+            <Btn tone="gold" disabled={retainedStaffIds.length > TIERS[pick.tier].staff || s.cash + (movePlan === 'sell' ? resaleValue : 0) < pick.moveIn + (contestFor(s, pick)?.extra || 0) + (movePlan === 'furnished' ? readyFurnishedCost(pick) : 0)} onClick={() => { onMove(pick, movePlan, retainedStaffIds); setPick(null); }}>
               {s.cash + (movePlan === 'sell' ? resaleValue : 0) < pick.moveIn + (contestFor(s, pick)?.extra || 0) + (movePlan === 'furnished' ? readyFurnishedCost(pick) : 0)
                 ? `Need ${naira(Math.max(0, pick.moveIn + (contestFor(s, pick)?.extra || 0) + (movePlan === 'furnished' ? readyFurnishedCost(pick) : 0) - (movePlan === 'sell' ? resaleValue : 0)))} to move`
                 : movePlan === 'sell' ? 'Sell equipment and move'
