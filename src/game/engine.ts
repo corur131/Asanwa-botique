@@ -822,17 +822,22 @@ export function settle(c: Customer, score: ScoreBreakdown, price: number, suppli
   else if (s >= 75) tip = { poor: 0.01, middle: 0.04, rich: 0.07 }[c.cls] * paid;
   if (c.male) tip *= 1.5; // men tip big
   if (c.celebrity) {
+    // Every completed celebrity purchase honours the guest's rank/venue spend floor.
+    // Styling score determines premium status, tip level and publicity—not whether a celebrity's
+    // minimum order value can silently collapse to a low-priced individual item.
+    paid = Math.min(c.budget, Math.max(paid, c.celebrity.spendFloor));
+    fulfilmentCost = Math.max(supplies, Math.round(paid * CELEBRITY_FULFILMENT_RATE));
     if (s >= 80) {
-      // The premium order is earned by a strong look; mediocre styling sells only at its normal price.
-      paid = Math.min(c.budget, Math.max(paid, c.celebrity.spendFloor));
-      fulfilmentCost = Math.max(supplies, Math.round(paid * CELEBRITY_FULFILMENT_RATE));
       outcome = 'paid';
       const celebrityTipRate = 0.05 + c.celebrity.tier * 0.02;
       tip = Math.max(tip, Math.round(paid * celebrityTipRate / 100) * 100);
       line = `${c.name} loved the luxury look and placed a premium celebrity order, with a generous tip.`;
     } else {
-      paid = Math.min(paid, c.budget);
-      line = `${c.name} liked parts of the look and bought it at the regular price, but did not place a premium order.`;
+      if (s >= 75) {
+        const regularCelebrityTipRate = 0.03 + c.celebrity.tier * 0.01;
+        tip = Math.max(tip, Math.round(paid * regularCelebrityTipRate / 100) * 100);
+      }
+      line = `${c.name} bought the look at their celebrity spending level, but the styling did not qualify for a premium order.`;
     }
   }
   const repDelta = ((s - 65) / 18) * (c.influencer ? 3 : 1);
