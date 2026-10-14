@@ -1537,15 +1537,23 @@ export function listingsNow(s: GameState): Listing[] {
   return listingsFor(s.tier + 1, week(s.day));
 }
 
-export function moveTo(s0: GameState, l0: Listing, equipmentPlan: MoveEquipmentPlan = 'arrange'): GameState {
+export function moveTo(s0: GameState, l0: Listing, equipmentPlan: MoveEquipmentPlan = 'arrange', retainedStaffIds?: string[]): GameState {
+  // Any currently offered tier can be selected, but relocating to the exact same listing is a no-op.
+  if (l0.id === s0.listing.id || l0.tier < 0 || l0.tier >= TIERS.length) return s0;
+  const staffLimit = TIERS[l0.tier].staff;
+  const mustChooseStaff = s0.staff.length > staffLimit;
+  // Never silently dismiss employees: a downward move requiring cuts must carry an explicit selection.
+  if (mustChooseStaff && !retainedStaffIds) return s0;
+  const retainedIds = retainedStaffIds ? new Set(retainedStaffIds) : new Set(s0.staff.map((member) => member.id));
+  if (retainedIds.size > staffLimit || [...retainedIds].some((id) => !s0.staff.some((member) => member.id === id))) return s0;
   const fight = contestFor(s0, l0);
   const l = fight ? { ...l0, moveIn: l0.moveIn + fight.extra } : l0;
   const move = prepareFurnitureForMove(s0.furniture, l, equipmentPlan);
-  if ((l.tier !== s0.tier + 1 && !(l.signature && l.tier === s0.tier && !s0.listing.signature)) || s0.cash + move.saleProceeds < l.moveIn + move.packageCost) return s0;
+  if (s0.cash + move.saleProceeds < l.moveIn + move.packageCost) return s0;
   const s = fight ? wonListing(s0, l0) : s0;
   const tier = l.tier;
   const t = TIERS[tier];
-  let next: GameState = { ...s, tier, listing: l, furniture: move.furniture, movedDay: s.day, grace: l.grace };
+  let next: GameState = { ...s, tier, listing: l, furniture: move.furniture, staff: s.staff.filter((member) => retainedIds.has(member.id)), movedDay: s.day, grace: l.grace };
   // Credit sale proceeds before charging move-in so the transaction never creates a temporary payable.
   if (move.saleProceeds > 0) next = money(next, move.saleProceeds, 'Sold shop equipment during move');
   next = money(next, -l.moveIn, `Move-in: ${l.street}`);
