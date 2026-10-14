@@ -8,7 +8,7 @@ import { answerInvite, contestFor, contestModel, dropStep, judge, planDrop, plan
 import { POWER as POWER_CFG, activeGeneratorUid, addShout, coolRunning, drainRate, fuelOf, fuelPrice, liveStats, nepaOff, outageAt, planOutages, pourFuel, powerStep, scarcity, source, tankSize } from './power';
 import { answerConvo, startGist } from './convos';
 import { ENERGY, busyNow, divineBonus, energyOf, energyStep, exhausted, payBills, spendEnergy } from './life';
-import { makeCustomer, makeCelebrityCustomer, celebrityIsScheduled, celebrityVisitChance, maximumCelebrityTierForShop, chooseCelebrityTierForShop } from './customers';
+import { makeCustomer, makeCelebrityCustomer, celebrityIsScheduled, celebrityVisitChance, maximumCelebrityTierForShop, chooseCelebrityTierForShop, additionalCelebrityVisitChance, thirdCelebrityVisitChance, maximumCelebrityVisitsPerDay } from './customers';
 import { buildLook, hairGroup, lookCost, scoreLook } from './scoring';
 import { FABRIC_COLORS, FEMALE_HAIR, MAKEUP_LOOKS } from '../constants/catalog';
 import { colourName } from './colours';
@@ -482,7 +482,7 @@ export function openShop(s0: GameState): GameState {
     mix[2] = Math.max(0, mix[2] + shift);
   }
   const arrivals = Array.from({ length: n }, () => ({ at: arrivalMinute(), c: makeCustomer(s, mix) }));
-  // One shared celebrity model serves the player and rivals: schedule, brand heat, then celebrity rank.
+  // Shared player/rival logic: tier calendar, brand attraction, rank mix and multiple VIP capacity.
   const signatureProperty = !!s.listing.signature;
   const celebrityProfile = {
     reputation: s.rep,
@@ -494,21 +494,31 @@ export function openShop(s0: GameState): GameState {
   };
   const celebrityScheduled = celebrityIsScheduled(s.tier, s.day, signatureProperty);
   const highestEligibleCelebrityTier = maximumCelebrityTierForShop(s.tier);
-  const celebrityCooldownClear = s.lastCelebrityVisitDay !== s.day - 1;
+  const maxDailyCelebrityVisits = maximumCelebrityVisitsPerDay(s.tier, signatureProperty);
   if (
     highestEligibleCelebrityTier >= 0 &&
     celebrityScheduled &&
-    celebrityCooldownClear &&
     chance(celebrityVisitChance(s.tier, signatureProperty, celebrityProfile))
   ) {
-    const celebrityTier = chooseCelebrityTierForShop(s.tier, signatureProperty, celebrityProfile);
-    const c = makeCelebrityCustomer(s, celebrityTier);
-    arrivals.push({ at: 100 + Math.random() * 560, c });
+    const guests = [makeCelebrityCustomer(
+      s, chooseCelebrityTierForShop(s.tier, signatureProperty, celebrityProfile),
+    )];
+    if (guests.length < maxDailyCelebrityVisits &&
+        chance(additionalCelebrityVisitChance(s.tier, signatureProperty, celebrityProfile))) {
+      guests.push(makeCelebrityCustomer(s, chooseCelebrityTierForShop(s.tier, signatureProperty, celebrityProfile)));
+    }
+    if (guests.length < maxDailyCelebrityVisits &&
+        chance(thirdCelebrityVisitChance(s.tier, signatureProperty, celebrityProfile))) {
+      guests.push(makeCelebrityCustomer(s, chooseCelebrityTierForShop(s.tier, signatureProperty, celebrityProfile)));
+    }
+    guests.forEach((c, index) => arrivals.push({ at: 100 + Math.random() * 560 + index, c }));
   }
   const model = contestModel(s);
   if (model) arrivals.push(model);
-  // Deborah's advance tip represents a confirmed lead. Avoid stacking two celebrity arrivals on one day.
-  if (s.celebDay === s.day && highestEligibleCelebrityTier >= 0 && !arrivals.some((arrival) => !!arrival.c.celebrity)) {
+  // Deborah's confirmed lead can add another guest if the property has remaining VIP capacity.
+  const alreadyScheduledCelebrities = arrivals.filter((arrival) => !!arrival.c.celebrity).length;
+  if (s.celebDay === s.day && highestEligibleCelebrityTier >= 0 &&
+      alreadyScheduledCelebrities < maxDailyCelebrityVisits) {
     const celebrityTier = chooseCelebrityTierForShop(s.tier, signatureProperty, celebrityProfile);
     const c = makeCelebrityCustomer(s, celebrityTier);
     arrivals.push({ at: 120 + Math.random() * 360, c });
