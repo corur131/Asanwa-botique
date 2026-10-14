@@ -1,6 +1,6 @@
 import { CharacterConfig } from '../types/character';
 import { generateRandomCustomer } from '../utils/randomizer';
-import { DIVINE_CAPACITY, HOUR_WEIGHTS, PATIENCE, SHOP_MINUTES, staffMinutes, NEW_SHOP_RAMP_DAYS, NEW_SHOP_START, SERVICE_FEE, SLOW_WEEK_CHANCE, STAFF, STAFF_CAPACITY, START_CASH, SUPPLIES_SHARE, MARKUP, TIERS, FABRIC_COST, naira } from './economy';
+import { DIVINE_CAPACITY, HOUR_WEIGHTS, PATIENCE, SHOP_MINUTES, staffMinutes, NEW_SHOP_RAMP_DAYS, NEW_SHOP_START, SERVICE_FEE, SLOW_WEEK_CHANCE, STAFF, STAFF_CAPACITY, START_CASH, SUPPLIES_SHARE, MARKUP, TIERS, FABRIC_COST, CELEBRITY_FULFILMENT_RATE, naira } from './economy';
 import { canBuy, entryFor, HAIR_SWATCHES, isClothing, makeDesign, pieceCost, productKey, MARKET } from './market';
 import { FabricId } from '../types/character';
 import { answerRival, competition, initRivals, poacher, reactToMove, simulateRivals } from './rivals';
@@ -793,6 +793,7 @@ export function settle(c: Customer, score: ScoreBreakdown, price: number, suppli
   // Budget is a spending ceiling, not a guarantee that every rich customer spends it all.
   if (c.cls === 'rich') paid = Math.min(paid, c.budget);
   let tip = 0;
+  let fulfilmentCost = supplies;
   if (s >= 85) tip = { poor: 0.03, middle: 0.08, rich: 0.15 }[c.cls] * paid;
   else if (s >= 75) tip = { poor: 0.01, middle: 0.04, rich: 0.07 }[c.cls] * paid;
   if (c.male) tip *= 1.5; // men tip big
@@ -800,6 +801,7 @@ export function settle(c: Customer, score: ScoreBreakdown, price: number, suppli
     if (s >= 80) {
       // The premium order is earned by a strong look; mediocre styling sells only at its normal price.
       paid = Math.min(c.budget, Math.max(paid, c.celebrity.spendFloor));
+      fulfilmentCost = Math.max(supplies, Math.round(paid * CELEBRITY_FULFILMENT_RATE));
       outcome = 'paid';
       const celebrityTipRate = 0.05 + c.celebrity.tier * 0.02;
       tip = Math.max(tip, Math.round(paid * celebrityTipRate / 100) * 100);
@@ -810,7 +812,7 @@ export function settle(c: Customer, score: ScoreBreakdown, price: number, suppli
     }
   }
   const repDelta = ((s - 65) / 18) * (c.influencer ? 3 : 1);
-  return { price, paid: Math.round(paid), tip: Math.round(tip / 100) * 100, cost: supplies, outcome, line, reaction, repDelta, becameRegular: s >= 80 && !c.regularId };
+  return { price, paid: Math.round(paid), tip: Math.round(tip / 100) * 100, cost: fulfilmentCost, outcome, line, reaction, repDelta, becameRegular: s >= 80 && !c.regularId };
 }
 
 /** Applies a finished look: stock leaves the shop, money and reputation move, the customer walks out. */
@@ -883,7 +885,7 @@ export function applyLook(s0: GameState, c: Customer, choice: StyleChoice, st0: 
       ? `${c.name} · celebrity payment including tip`
       : `${c.name}${c.service ? ` (${c.service === 'makeup' ? 'makeup' : c.service === 'both' ? 'hair & makeup' : 'hair'})` : ''}${st.tip ? ', with tip' : ''}`;
     next = money(next, st.paid + st.tip, customerReceiptLabel);
-    next = money(next, -st.cost, 'Hair and makeup supplies');
+    next = money(next, -st.cost, c.celebrity && score.total >= 80 ? 'Celebrity order fulfilment, sourcing & tailoring' : 'Hair and makeup supplies');
   }
   if (c.influencer && score.total >= 80) next = { ...next, followers: (next.followers || 0) + Math.round(60 + Math.random() * 120) };
   if (c.celebrity && sold && score.total >= 80) {
