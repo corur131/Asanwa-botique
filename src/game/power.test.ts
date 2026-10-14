@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  EQUIPMENT_WATTS, POWER, equipmentLoadKw, generatorFuelBurnForLoad,
+  EQUIPMENT_WATTS, POWER, equipmentLoadKw, generatorFuelBurnForLoad, loadExceedsCapacity,
   kwhForLoad, solarChargeMinutes, solarDrainMinutes, tariffFor,
 } from './power';
 import type { GameState } from './types';
@@ -12,6 +12,8 @@ test('powered equipment contributes its rated load; clothing stock contributes n
   assert.equal(equipmentLoadKw([{ id: 'ac' }, { id: 'tubeLight' }]), 1.54);
   assert.equal(equipmentLoadKw([{ id: 'silkDress' }, { id: 'chromeRail' }]), 0);
   assert.equal(equipmentLoadKw([]), 0);
+  assert.equal(equipmentLoadKw([{ id: 'ac', uid: 'ac-1' }], { 'ac-1': true }), 0);
+  assert.equal(equipmentLoadKw([{ id: 'ac', uid: 'ac-1' }], {}), 1.5);
 });
 
 test('energy use is load multiplied by operating time', () => {
@@ -51,6 +53,9 @@ test('generator and solar capacities make undersized installations distinguishab
   assert.ok(1.5 > POWER.capacityKw.small);
   assert.ok(5 > POWER.capacityKw.big);
   assert.ok(5 < POWER.capacityKw.industrial);
+  assert.equal(loadExceedsCapacity(1.5, POWER.capacityKw.small), true);
+  assert.equal(loadExceedsCapacity(5, POWER.capacityKw.big), true);
+  assert.equal(loadExceedsCapacity(5, POWER.capacityKw.industrial), false);
 });
 
 test('utility bill estimate uses the chosen tariff once for actual metered kWh', () => {
