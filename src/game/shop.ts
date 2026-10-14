@@ -28,6 +28,8 @@ const AREAS: [string, string][][] = [
   [['Bode Thomas St', 'Surulere'], ['Opebi Road', 'Ikeja'], ['Ikeja City Mall row', 'Ikeja'], ['Admiralty Way', 'Lekki Phase 1']],
   [['Admiralty Way', 'Lekki Phase 1'], ['Awolowo Road', 'Ikoyi'], ['Bourdillon Road', 'Ikoyi'], ['Adeola Odeku St', 'Victoria Island']],
   [['Ozumba Mbadiwe Ave', 'Victoria Island'], ['Kingsway Road', 'Ikoyi'], ['Akin Adesola St', 'Victoria Island'], ['Banana Island Road', 'Ikoyi']],
+  [['Eko Atlantic Boulevard', 'Eko Atlantic'], ['Akin Adesola Avenue', 'Victoria Island'], ['Banana Island Road', 'Ikoyi'], ['Ozumba Mbadiwe Avenue', 'Victoria Island']],
+  [['Banana Island Avenue', 'Banana Island'], ['Bourdillon Road', 'Ikoyi'], ['Eko Atlantic Boulevard', 'Eko Atlantic'], ['Oniru Waterfront Drive', 'Oniru']],
 ];
 const LANDLORDS = [
   ['Mama Bisi', 'Pastor Emeka', 'Iya Tolu', 'Mr Danjuma'],
@@ -72,7 +74,7 @@ export function listingsFor(tier: number, week: number): Listing[] {
     };
   }).concat({
     id: `signature-${tier}-${week}`, tier, area: tier >= 3 ? 'Victoria Island' : tier === 2 ? 'Lekki Phase 1' : 'Ikeja',
-    street: ['','Allen Avenue Signature Maison','Lekki Signature Atelier','Ikoyi Grand Maison','Banana Island Crown House'][tier],
+    street: ['','Allen Avenue Signature Maison','Lekki Signature Atelier','Ikoyi Grand Maison','Banana Island Crown House','Eko Atlantic Maison','Banana Island Empire House'][tier],
     stars: 4, signature: true,
     rent: Math.round(t.rent * 2.7 / 5_000) * 5_000,
     moveIn: Math.round(t.moveIn * 3.2 / 5_000) * 5_000,
@@ -94,39 +96,118 @@ export interface RoomStyle {
   floor: string;
   floor2: string;
   trim: string;
-  kind: 'container' | 'plaster' | 'boutique' | 'marble' | 'flagship';
+  kind: 'container' | 'plaster' | 'boutique' | 'marble' | 'flagship' | 'maison' | 'empire';
   height: number;
   /** 1..4: how well kept the place is (the listing's stars). Never as fine as the next size up. */
   finish: number;
+  /** Real internal partitions; doorway cells remain clear for walking between rooms. */
+  partitions?: RoomPartition[];
   /** Signature properties get unique architectural details in the 3D room. */
   signature?: boolean;
+  /** Architectural identity of the premium Level 6/7 Signature homes; independent of room size/tier. */
+  signatureTheme?: 'botanical-atrium' | 'cobalt-gallery';
 }
+
+export interface RoomPartition {
+  axis: 'horizontal' | 'vertical';
+  at: number;
+  start: number;
+  end: number;
+  openings: number[];
+}
+
 export const ROOMS: RoomStyle[] = [
   { w: 5, d: 3, wall: '#5E7A86', wallLow: '#3E525C', floor: '#8C8C86', floor2: '#7C7C76', trim: '#9A5A2E', kind: 'container', height: 2.4, finish: 2 },
   { w: 7, d: 5, wall: '#E2D2AE', wallLow: '#B9A57D', floor: '#C9C2B4', floor2: '#B8B0A0', trim: '#7A5A3A', kind: 'plaster', height: 2.8, finish: 2 },
   { w: 9, d: 6, wall: '#F2C8CC', wallLow: '#D9A3AA', floor: '#B98A5E', floor2: '#A97A50', trim: '#F4E4C8', kind: 'boutique', height: 3, finish: 2 },
   { w: 11, d: 8, wall: '#F4F0EA', wallLow: '#E2D8CA', floor: '#ECE6DC', floor2: '#DCD3C6', trim: '#C9A163', kind: 'marble', height: 3.2, finish: 2 },
   { w: 13, d: 9, wall: '#1E1B22', wallLow: '#141217', floor: '#F2EDE6', floor2: '#1E1B22', trim: '#D4AF37', kind: 'flagship', height: 3.6, finish: 2 },
+  { w: 24, d: 15, wall: '#D6D0C6', wallLow: '#A99E8F', floor: '#D9CEBC', floor2: '#F4EEE4', trim: '#C6A66D', kind: 'maison', height: 4.1, finish: 2 },
+  { w: 32, d: 20, wall: '#211B2B', wallLow: '#3D3046', floor: '#DED4C4', floor2: '#F7F0E5', trim: '#E4C56E', kind: 'empire', height: 4.6, finish: 2 },
 ];
 
-/** Floor size by shop size and stars: better listings are bigger. */
 const SIZES: [number, number][][] = [
   [[5, 3]],
   [[8, 5], [9, 5], [9, 6], [10, 6]],
   [[10, 6], [11, 7], [12, 7], [12, 8]],
   [[12, 8], [13, 8], [14, 9], [14, 10]],
   [[14, 9], [15, 10], [16, 10], [17, 11]],
+  [[20, 13], [22, 14], [24, 15], [26, 16]],
+  [[28, 18], [31, 19], [34, 21], [36, 22]],
 ];
 
-// Signature is a different class of property, not a slightly larger standard
-// room. Every tier gains a substantial, purpose-designed luxury floor plate.
 const SIGNATURE_SIZES: [number, number][] = [
-  [10, 7],
-  [15, 10],
-  [20, 13],
-  [25, 17],
-  [30, 20],
+  [10, 7], [15, 10], [20, 13], [25, 17], [30, 20], [36, 23], [44, 28],
 ];
+
+function partitionLayout(tier: number, w: number, d: number): RoomPartition[] {
+  const cell = (value: number, min: number, max: number) => Math.max(min, Math.min(max, Math.round(value)));
+  if (tier === 5) {
+    const north = cell(d * 0.38, 3, d - 4);
+    const middle = cell(d * 0.70, north + 3, d - 2);
+    const left = cell(w * 0.38, 3, w - 4);
+    const right = cell(w * 0.70, left + 2, w - 2);
+    return [
+      { axis: 'horizontal', at: north, start: 1, end: w - 2, openings: [cell(w * 0.25, 2, w - 3), cell(w * 0.74, 2, w - 3)] },
+      { axis: 'vertical', at: left, start: 1, end: north - 1, openings: [cell(north * 0.5, 2, north - 2)] },
+      { axis: 'vertical', at: right, start: north + 1, end: middle - 1, openings: [cell((north + middle) / 2, north + 2, middle - 2)] },
+      { axis: 'horizontal', at: middle, start: cell(w * 0.33, 1, w - 3), end: w - 2, openings: [cell(w * 0.71, 2, w - 3)] },
+    ];
+  }
+  if (tier === 6) {
+    const north = cell(d * 0.31, 3, d - 6);
+    const middle = cell(d * 0.65, north + 3, d - 4);
+    const south = cell(d * 0.84, middle + 2, d - 2);
+    const backLeft = cell(w * 0.31, 3, w - 5);
+    const backRight = cell(w * 0.68, backLeft + 2, w - 3);
+    const centre = cell(w * 0.51, backLeft + 1, backRight - 1);
+    const frontRight = cell(w * 0.78, centre + 1, w - 3);
+    return [
+      { axis: 'horizontal', at: north, start: 1, end: w - 2, openings: [cell(w * 0.22, 2, w - 3), cell(w * 0.52, 2, w - 3), cell(w * 0.82, 2, w - 3)] },
+      { axis: 'vertical', at: backLeft, start: 1, end: north - 1, openings: [cell(north * 0.5, 2, north - 2)] },
+      { axis: 'vertical', at: backRight, start: 1, end: north - 1, openings: [cell(north * 0.68, 2, north - 2)] },
+      { axis: 'horizontal', at: middle, start: 1, end: w - 2, openings: [cell(w * 0.39, 2, w - 3), cell(w * 0.75, 2, w - 3)] },
+      { axis: 'vertical', at: centre, start: north + 1, end: middle - 1, openings: [cell((north + middle) / 2, north + 2, middle - 2)] },
+      { axis: 'vertical', at: frontRight, start: north + 1, end: middle - 1, openings: [cell((north + middle) / 2, north + 2, middle - 2)] },
+      { axis: 'horizontal', at: south, start: cell(w * 0.35, 1, w - 3), end: w - 2, openings: [cell(w * 0.79, 2, w - 3)] },
+      { axis: 'vertical', at: centre, start: middle + 1, end: south - 1, openings: [cell((middle + south) / 2, middle + 2, south - 2)] },
+    ];
+  }
+  return [];
+}
+
+/** Premium Signature homes use deliberately different circulation, not the same floorplan scaled up. */
+function signaturePartitionLayout(tier: number, w: number, d: number): RoomPartition[] {
+  const cell = (value: number, min: number, max: number) => Math.max(min, Math.min(max, Math.round(value)));
+  if (tier === 5) {
+    // Botanical conservatory: an open central promenade, a rear glass studio, and two garden wings.
+    const rear = cell(d * 0.31, 3, d - 6);
+    const mid = cell(d * 0.60, rear + 3, d - 3);
+    const left = cell(w * 0.30, 3, w - 5);
+    const right = cell(w * 0.70, left + 2, w - 3);
+    return [
+      { axis: 'horizontal', at: rear, start: 1, end: w - 2, openings: [cell(w * 0.22, 2, w - 3), cell(w * 0.50, 2, w - 3), cell(w * 0.78, 2, w - 3)] },
+      { axis: 'vertical', at: left, start: 1, end: rear - 1, openings: [cell(rear * 0.52, 2, rear - 2)] },
+      { axis: 'vertical', at: right, start: 1, end: rear - 1, openings: [cell(rear * 0.52, 2, rear - 2)] },
+      { axis: 'horizontal', at: mid, start: 1, end: cell(w * 0.86, 1, w - 3), openings: [cell(w * 0.40, 2, w - 3), cell(w * 0.69, 2, w - 3)] },
+    ];
+  }
+  if (tier === 6) {
+    // Cobalt gallery: a broad runway, side galleries and two shallow viewing suites.
+    const runway = cell(d * 0.43, 4, d - 4);
+    const left = cell(w * 0.25, 4, w - 6);
+    const right = cell(w * 0.75, left + 3, w - 3);
+    const rear = cell(d * 0.72, runway + 2, d - 2);
+    return [
+      { axis: 'horizontal', at: runway, start: left + 1, end: right - 1, openings: [cell(w * 0.50, left + 2, right - 2)] },
+      { axis: 'vertical', at: left, start: 2, end: rear - 1, openings: [cell(d * 0.56, 3, rear - 2)] },
+      { axis: 'vertical', at: right, start: 2, end: rear - 1, openings: [cell(d * 0.56, 3, rear - 2)] },
+      { axis: 'horizontal', at: rear, start: 1, end: left - 1, openings: [cell(left * 0.5, 2, left - 2)] },
+      { axis: 'horizontal', at: rear, start: right + 1, end: w - 2, openings: [cell((right + w) / 2, right + 2, w - 3)] },
+    ];
+  }
+  return partitionLayout(tier, w, d);
+}
 
 function shade(hex: string, toward: string, k: number) {
   const a = parseInt(hex.slice(1), 16);
@@ -138,38 +219,35 @@ function shade(hex: string, toward: string, k: number) {
 
 /** The room a listing comes with: size and how well kept it is. */
 export function roomOf(l: Pick<Listing, 'tier' | 'stars'> & Partial<Pick<Listing, 'signature'>>): RoomStyle {
-  const base = ROOMS[l.tier];
-  const sizes = SIZES[l.tier];
-  const [w, d] = l.signature ? SIGNATURE_SIZES[l.tier] : sizes[Math.min(sizes.length, Math.max(1, l.stars)) - 1];
-  const finish = l.signature ? 4 : l.tier === 0 ? 1 : l.stars;
-  // tired places look dull and grubby; the best ones are fresh and bright
+  const safeTier = Math.max(0, Math.min(ROOMS.length - 1, Math.floor(l.tier || 0)));
+  const base = ROOMS[safeTier] || ROOMS[0];
+  const sizes = SIZES[safeTier] || SIZES[0];
+  const signatureSizes = SIGNATURE_SIZES[safeTier] || SIGNATURE_SIZES[SIGNATURE_SIZES.length - 1];
+  const [w, d] = l.signature ? signatureSizes : sizes[Math.min(sizes.length, Math.max(1, l.stars)) - 1];
+  const finish = l.signature ? 4 : safeTier === 0 ? 1 : l.stars;
   const dull = [0, 0.32, 0.16, 0, 0][finish];
   const bright = finish === 4 ? 0.12 : 0;
-  const tone = (c: string) => (bright ? shade(c, '#FFFFFF', base.kind === 'flagship' ? 0.02 : bright) : shade(c, '#6E6A62', dull));
+  const tone = (colour: string) => (bright ? shade(colour, '#FFFFFF', base.kind === 'flagship' ? 0.02 : bright) : shade(colour, '#6E6A62', dull));
   const signaturePalette = [
-    // Level 0: an airy glasshouse with cool daylight and pale glass-stone flooring.
     { wall: '#D6EEF2', wallLow: '#90C0CB', floor: '#CFE3E6', floor2: '#F3FBFC', trim: '#75B5C4' },
-    // Level 1: an astonishing sky pavilion, with luminous periwinkle and pearl.
     { wall: '#E9EEFF', wallLow: '#7887B6', floor: '#C9D3F0', floor2: '#F8FAFF', trim: '#A9BDF7' },
-    // Level 2: an unapologetically golden salon with warm reflective stone.
     { wall: '#FFF3C2', wallLow: '#B47A16', floor: '#E4BD3F', floor2: '#FFF2A9', trim: '#FFD54A' },
-    // Level 3: emerald and champagne artisan couture.
     { wall: '#173F34', wallLow: '#0A2924', floor: '#C7B995', floor2: '#F0E6D0', trim: '#D9B965' },
-    // Level 4: the flagship—deep aubergine, pale marble, and heirloom gold.
     { wall: '#241824', wallLow: '#111017', floor: '#E8E3DD', floor2: '#F7F3EB', trim: '#F0CF78' },
-  ][l.tier];
+    { wall: '#123D36', wallLow: '#082A27', floor: '#D8D0B8', floor2: '#1B4D41', trim: '#D28A5F' },
+    { wall: '#F2EEE6', wallLow: '#294A80', floor: '#F2EBDC', floor2: '#405C92', trim: '#CF7052' },
+  ][safeTier];
   return {
-    ...base,
-    w,
-    d,
-    finish,
+    ...base, w, d, finish,
     wall: l.signature ? signaturePalette.wall : tone(base.wall),
     wallLow: l.signature ? signaturePalette.wallLow : tone(base.wallLow),
     floor: l.signature ? signaturePalette.floor : tone(base.floor),
     floor2: l.signature ? signaturePalette.floor2 : tone(base.floor2),
     trim: l.signature ? signaturePalette.trim : base.trim,
-    height: base.height + (finish - 2) * 0.1 + (l.signature ? 0.9 + l.tier * 0.18 : 0),
+    height: base.height + (finish - 2) * 0.1 + (l.signature ? 0.9 + safeTier * 0.18 : 0),
     signature: !!l.signature,
+    signatureTheme: l.signature && safeTier === 5 ? 'botanical-atrium' : l.signature && safeTier === 6 ? 'cobalt-gallery' : undefined,
+    partitions: l.signature && safeTier >= 5 ? signaturePartitionLayout(safeTier, w, d) : partitionLayout(safeTier, w, d),
   };
 }
 
@@ -447,6 +525,15 @@ export function cellsBlocked(items: Placed[], tier: RoomKey, except?: string): b
     const { w, d } = footprint(p);
     for (let z = p.z; z < p.z + d; z++) for (let x = p.x; x < p.x + w; x++) if (g[z] && x < r.w) g[z][x] = true;
   }
+  // Internal partitions block movement/placement, while their doorway cells stay open.
+  for (const wall of r.partitions || []) {
+    for (let along = wall.start; along <= wall.end; along++) {
+      if (wall.openings.includes(along)) continue;
+      if (wall.axis === 'horizontal') {
+        if (g[wall.at] && along >= 0 && along < r.w) g[wall.at][along] = true;
+      } else if (g[along] && wall.at >= 0 && wall.at < r.w) g[along][wall.at] = true;
+    }
+  }
   return g;
 }
 
@@ -456,7 +543,12 @@ export function canPlace(items: Placed[], tier: RoomKey, p: Placed): boolean {
   if (f.mount !== 'floor') return true;
   const { w, d } = footprint(p);
   if (p.x < 0 || p.z < 0 || p.x + w > r.w || p.z + d > r.d - 1) return false;
-  if (f.walkable) return true;
+  if (f.walkable) {
+    // Rugs can overlap furniture as decoration, but must never be placed through an internal wall.
+    const walls = cellsBlocked([], tier);
+    for (let z = p.z; z < p.z + d; z++) for (let x = p.x; x < p.x + w; x++) if (walls[z][x]) return false;
+    return true;
+  }
   const g = cellsBlocked(items, tier, p.uid);
   for (let z = p.z; z < p.z + d; z++) for (let x = p.x; x < p.x + w; x++) if (g[z][x]) return false;
   // nothing may wall off part of the floor: every free cell must still be reachable from the door
@@ -549,19 +641,79 @@ export function autoPlace(items: Placed[], tier: RoomKey): Placed[] {
   return out;
 }
 
-export type MoveEquipmentPlan = 'arrange' | 'store' | 'sell';
+export type MoveEquipmentPlan = 'arrange' | 'store' | 'sell' | 'furnished';
+
+/** Catalog-backed furniture packages for each destination tier. */
+const READY_FURNISHED_KITS: Record<number, string[]> = {
+  0: ['chromeRail', 'woodTable', 'standMirror', 'plasticChair', 'tubeLight', 'shopSign', 'paintWhite', 'vinylFloor'],
+  1: ['doubleRail', 'woodShelving', 'jewelCounter', 'goldMirror', 'fittingRoom', 'sofa', 'pendants', 'plant', 'paintWhite', 'woodFloor'],
+  2: ['goldRail', 'islandTable', 'glassCabinet', 'goldMirror', 'premiumFitting', 'sofa', 'trackLights', 'palm', 'goldWallpaper', 'marbleFloor'],
+  3: ['goldRail', 'glassCabinet', 'displayWall', 'goldMirror', 'premiumFitting', 'velvetSofa', 'chandelier', 'windowPodium', 'jewelCounter', 'goldWallpaper', 'marbleFloor'],
+  4: ['goldRail', 'glassCabinet', 'displayWall', 'mirrorWall', 'premiumFitting', 'velvetSofa', 'chandelier', 'windowPodium', 'jewelCounter', 'palm', 'goldWallpaper', 'marbleFloor'],
+  // Level 6: Luxury Maison — tailored rails, VIP fitting, beauty stations, lounge seating,
+  // practical climate control, abundant warm lighting and restrained ivory/brass finishes.
+  5: [
+    'goldRail', 'goldRail', 'goldRail', 'glassCabinet', 'glassCabinet',
+    'displayWall', 'displayWall', 'mirrorWall', 'premiumFitting', 'fittingRoom', 'fittingRoom',
+    'velvetSofa', 'velvetSofa', 'jewelCounter', 'jewelCounter', 'archMirror',
+    'vanity', 'salonChair', 'makeupStation', 'boutiqueDesk', 'posTerminal',
+    'ceilingFan', 'ceilingFan', 'ceilingFan', 'ac', 'ac', 'standingAc', 'rechargeableFan', 'generator',
+    'chandelier', 'chandelier', 'trackLights', 'trackLights', 'ceilingSpots',
+    'ledStrip', 'ledStrip', 'ledStrip', 'ledStrip',
+    'bagWall', 'bagWall', 'neon', 'wallArt', 'wallArt', 'palm', 'palm', 'flowers',
+    'diffuser', 'waterDispenser', 'fireExtinguisher', 'paintWhite', 'herringbone',
+  ],
+  // Level 7: Fashion Empire House — a flagship showroom, several climate units, premium workrooms,
+  // an extensive media wall and a dramatic midnight/navy-and-gold visual treatment.
+  6: [
+    'goldRail', 'goldRail', 'goldRail', 'goldRail',
+    'glassCabinet', 'glassCabinet', 'glassCabinet', 'displayWall', 'displayWall', 'displayWall',
+    'mirrorWall', 'mirrorWall', 'premiumFitting', 'premiumFitting',
+    'fittingRoom', 'fittingRoom', 'fittingRoom', 'velvetSofa', 'velvetSofa', 'velvetSofa',
+    'jewelCounter', 'jewelCounter', 'jewelCounter', 'archMirror', 'archMirror',
+    'vanity', 'vanity', 'salonChair', 'salonChair', 'makeupStation', 'makeupStation',
+    'boutiqueDesk', 'posTerminal',
+    'ceilingFan', 'ceilingFan', 'ceilingFan', 'ceilingFan',
+    'ac', 'ac', 'ac', 'standingAc', 'standingAc', 'rechargeableFan', 'rechargeableFan', 'generator',
+    'chandelier', 'chandelier', 'chandelier', 'trackLights', 'trackLights', 'ceilingSpots', 'ceilingSpots',
+    'ledStrip', 'ledStrip', 'ledStrip', 'ledStrip', 'ledStrip', 'ledStrip',
+    'bagWall', 'bagWall', 'bagWall', 'neon', 'neon', 'wallArt', 'wallArt', 'wallArt',
+    'flowerWall', 'cctv', 'fireExtinguisher',
+    'palm', 'palm', 'palm', 'flowers', 'flowers', 'diffuser', 'diffuser',
+    'waterDispenser', 'waterDispenser', 'fluffyRug', 'fluffyRug',
+    'paintNavy', 'marbleFloor',
+  ],
+};
+
+function furnishedKitIds(tier: RoomKey): string[] {
+  const level = Math.max(0, Math.min(ROOMS.length - 1, Math.floor(typeof tier === 'number' ? tier : tier.tier)));
+  return (READY_FURNISHED_KITS[level] || READY_FURNISHED_KITS[0]).filter((id) => {
+    const def = FURNITURE.find((item) => item.id === id);
+    return !!def && (def.minTier || 0) <= level;
+  });
+}
+
+/** Price shown before the player confirms a ready-furnished move. */
+export function readyFurnishedCost(tier: RoomKey): number {
+  return furnishedKitIds(tier).reduce((sum, id) => sum + furnitureById(id).price, 0);
+}
 
 /** Apply the player's chosen equipment plan. Shop finishes stay with the old premises. */
-export function prepareFurnitureForMove(items: Placed[], tier: RoomKey, plan: MoveEquipmentPlan): { furniture: Placed[]; saleProceeds: number } {
+export function prepareFurnitureForMove(items: Placed[], tier: RoomKey, plan: MoveEquipmentPlan): { furniture: Placed[]; saleProceeds: number; packageCost: number } {
   const equipment = items.filter((item) => furnitureById(item.id).mount !== 'finish');
   if (plan === 'sell') {
     const saleProceeds = equipment.reduce((sum, item) => sum + Math.round(furnitureById(item.id).price * 0.4), 0);
-    return { furniture: [], saleProceeds };
+    return { furniture: [], saleProceeds, packageCost: 0 };
   }
   if (plan === 'store') {
-    return { furniture: equipment.map((item) => ({ ...item, placed: false, x: 0, z: 0 })), saleProceeds: 0 };
+    return { furniture: equipment.map((item) => ({ ...item, placed: false, x: 0, z: 0 })), saleProceeds: 0, packageCost: 0 };
   }
-  return { furniture: autoPlace(equipment, tier), saleProceeds: 0 };
+  if (plan === 'furnished') {
+    const stored = equipment.map((item) => ({ ...item, placed: false, x: 0, z: 0 }));
+    const packageItems: Placed[] = furnishedKitIds(tier).map((id) => ({ uid: newUid(), id, x: 0, z: 0, rot: 0, placed: true }));
+    return { furniture: [...stored, ...autoPlace(packageItems, tier)], saleProceeds: 0, packageCost: readyFurnishedCost(tier) };
+  }
+  return { furniture: autoPlace(equipment, tier), saleProceeds: 0, packageCost: 0 };
 }
 
 // ---------------------------------------------------------------------------

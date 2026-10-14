@@ -9,9 +9,10 @@
     "preview": "vite preview",
     "clean": "rm -rf dist server.js",
     "lint": "tsc --noEmit",
-    "test": "tsx --test src/game/business.test.ts src/game/shop-relocation.test.ts src/game/shopper.test.ts src/game/politician-contracts.test.ts",
+    "test": "tsx --test src/game/business.test.ts src/game/shop-relocation.test.ts src/game/shopper.test.ts src/game/politician-contracts.test.ts src/game/market-catalog.test.ts",
     "server": "tsx server.ts",
-    "start": "npm run build && tsx server.ts"
+    "start": "npm run build && tsx server.ts",
+    "check:locale-safe": "node tools/check-locale-safe.mjs"
   },
   "dependencies": {
     "@google/genai": "^2.4.0",

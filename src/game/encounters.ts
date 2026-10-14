@@ -64,14 +64,14 @@ export function planEvents(s0: GameState): GameState {
     const r = rivalAbove(s);
     const e: ShowEvent = { id: `e${s.day}`, title, host, day: s.day + 2, rivalId: r.id, prize: PRIZE[s.tier], followers: FOLLOW[s.tier], status: 'invited' };
     s = { ...s, events: [...(s.events || []), e].slice(-12) };
-    s = say(s, host, `Hello Divine! You're invited to our ${title} on day ${e.day}. You and ${r.owner} (${r.shop}) will each style a model; the judges pick the best look. Prize: ₦${e.prize.toLocaleString('en-NG')} and a shout-out to our followers. Are you in?`, { choices: INVITE, ctx: { kind: 'invite', eventId: e.id, rivalId: r.id } });
+    s = say(s, host, `Hello Divine! You're invited to our ${title} on day ${e.day}. You and ${r.owner} (${r.shop}) will each style a model; the judges pick the best look. Prize: ₦${e.prize?.toLocaleString('en-NG')} and a shout-out to our followers. Are you in?`, { choices: INVITE, ctx: { kind: 'invite', eventId: e.id, rivalId: r.id } });
   }
   // Lagos Fashion Week: once a month, only for the top 10
   if (s.day % 28 === 21 && playerRank(s) <= 10 && !(s.events || []).some((e) => e.title === 'Lagos Fashion Week' && e.day > s.day)) {
     const r = rivalById(s, 'tolani')!;
     const e: ShowEvent = { id: `fw${s.day}`, title: 'Lagos Fashion Week', host: 'Lagos Fashion Week', day: s.day + 7, rivalId: r.id, prize: PRIZE[s.tier] * 5, followers: FOLLOW[s.tier] * 6, status: 'invited' };
     s = { ...s, events: [...(s.events || []), e].slice(-12) };
-    s = say(s, 'Lagos Fashion Week', `Divine, congratulations: you made the Top 10. You're invited to show at Lagos Fashion Week on day ${e.day}, against ${r.shop}. Prize ₦${e.prize.toLocaleString('en-NG')} and the whole country watching.`, { choices: INVITE, ctx: { kind: 'invite', eventId: e.id, rivalId: r.id }, tone: 'good' });
+    s = say(s, 'Lagos Fashion Week', `Divine, congratulations: you made the Top 10. You're invited to show at Lagos Fashion Week on day ${e.day}, against ${r.shop}. Prize ₦${e.prize?.toLocaleString('en-NG')} and the whole country watching.`, { choices: INVITE, ctx: { kind: 'invite', eventId: e.id, rivalId: r.id }, tone: 'good' });
   }
   // a missed show: the rival wins by default
   for (const e of s.events || []) {
@@ -104,7 +104,7 @@ function addExpansionEventReward(s0: GameState, creditAmount: number, brandBoost
     ...s0,
     businessExpansion: { ...current, expansionCredit: credit },
     brand,
-    today: earned > 0 ? { ...s0.today, events: [...s0.today.events, reason + ' earned ' + earned.toLocaleString('en-NG') + ' naira in expansion credit.'] } : s0.today,
+    today: earned > 0 ? { ...s0.today, events: [...s0.today.events, reason + ' earned ' + earned?.toLocaleString('en-NG') + ' naira in expansion credit.'] } : s0.today,
   };
 }
 
@@ -167,7 +167,7 @@ export function judge(s0: GameState, c: Customer, score: number): GameState {
       s = startConvo(s, { with: r.owner, rivalId: r.id, chat: GROUP, topic: 'lostShow', opener: pick(['The judges were paid. Everybody knows 🙄', 'Congrats I guess. Next time.', 'Hmm. Enjoy it while it lasts 😏', 'My model\'s shoes were wrong size, that\'s the only reason 😤', 'Beginner\'s luck. Let\'s see next month.']) });
       s = feel(s, r.id, -12);
     }
-    s = say(s, 'Deborah', `SISSSS YOU WON!!! ₦${k.prize.toLocaleString('en-NG')}! 🎉🎉 I'm screaming!`, { tone: 'good' });
+    s = say(s, 'Deborah', `SISSSS YOU WON!!! ₦${k.prize?.toLocaleString('en-NG')}! 🎉🎉 I'm screaming!`, { tone: 'good' });
   } else {
     s = { ...s, rep: clamp(s.rep - 1, 0, 100) };
     s = gist(s, `${r?.shop || 'Rival'} wins the ${k.title}`, `${r?.owner} scored ${k.rivalScore}; Divine scored ${score}. Close one!`, r?.id);

@@ -106,7 +106,7 @@ export const ShopperApp: React.FC<{
         <div className="grid grid-cols-2 gap-2 mt-3">
           <div className="rounded-xl bg-black/15 border border-white/10 p-2">
             <div className="text-[10px] uppercase tracking-wide text-white/60">Your boutique</div>
-            <div className="font-semibold text-sm">{TIERS[Math.max(0, Math.min(4, s.tier))]?.name || 'Boutique'}</div>
+            <div className="font-semibold text-sm">{TIERS[Math.max(0, Math.min(TIERS.length - 1, Math.floor(s.tier || 0)))]?.name || 'Boutique'}</div>
           </div>
           <div className="rounded-xl bg-black/15 border border-white/10 p-2">
             <div className="text-[10px] uppercase tracking-wide text-white/60">Spendable for a new order</div>

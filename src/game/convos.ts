@@ -119,7 +119,7 @@ const FIGHT: Partial<Record<Move, Line[]>> = {
   ],
   receipts: [
     (c) => (c.rank && c.theirRank && c.rank < c.theirRank ? `Top 20 says I'm #${c.rank}. You're #${c.theirRank}. Numbers don't lie 📊` : null),
-    (c) => (c.followers > c.theirFollowers ? `${c.followers.toLocaleString('en-NG')} followers on Gidigram. Count yours and come back 😌` : null),
+    (c) => (c.followers > c.theirFollowers ? `${Math.max(0, Number(c.followers) || 0)?.toLocaleString('en-NG')} followers on Gidigram. Count yours and come back 😌` : null),
     (c) => (c.rank && c.theirRank && c.rank > c.theirRank ? `You're ahead on the Top 20 this week, I see it. Check again next Sunday 😉` : null),
     'Should I post the screenshot of you asking my supplier for a discount? 👀',
     'My customers leave reviews. Go and read yours before you talk.',
@@ -206,7 +206,7 @@ const BRAG: Partial<Record<Move, Line[]>> = {
   ],
   receipts: [
     (c) => (c.rank && c.theirRank && c.rank < c.theirRank ? `Congrats! Still behind me on the Top 20 though 😌 #${c.rank} here.` : null),
-    (c) => (c.followers > c.theirFollowers ? `Lovely. ${c.followers.toLocaleString('en-NG')} people will see my reply 😘` : null),
+    (c) => (c.followers > c.theirFollowers ? `Lovely. ${Math.max(0, Number(c.followers) || 0)?.toLocaleString('en-NG')} people will see my reply 😘` : null),
   ],
 };
 

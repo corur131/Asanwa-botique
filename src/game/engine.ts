@@ -13,7 +13,7 @@ import { buildLook, hairGroup, lookCost, scoreLook } from './scoring';
 import { FABRIC_COLORS, FEMALE_HAIR, MAKEUP_LOOKS } from '../constants/catalog';
 import { colourName } from './colours';
 import { FURNITURE, KIOSK_LISTING, Listing, Placed, STARTER_FURNITURE, autoPlace, prepareFurnitureForMove,
-  findSpot, canPlace, turn, Rot, ceilingCapacity, ceilingUsed, yardCapacity, yardUsed, cheapestListing, furnitureById, listingsFor, newUid, prestigeRichShift, prestigeTraffic, shopStats, usesFloor, wallCapacity, wallUsed } from './shop';
+  findSpot, canPlace, turn, Rot, ceilingCapacity, ceilingUsed, yardCapacity, yardUsed, cheapestListing, furnitureById, listingsFor, newUid, prestigeRichShift, prestigeTraffic, shopStats, usesFloor, wallCapacity, wallUsed, MoveEquipmentPlan } from './shop';
 import { CharacterMemory, CollaborationEvent, CollaborationReply, Customer, DayLog, Departure, Design, ReplyChoice, GameState, LedgerLine, Message, PoliticianContract, PoliticianContractRequirement, Regular, ScoreBreakdown, Settlement, SponsorshipOffer, StaffMember, StaffProfession, StyleChoice } from './types';
 import { closeBrandDay, ensureBusinessState, getBrandMetrics, initialBankState, processBankWeekly, processFixedDepositMaturities, processPromotionAtClose, processExpansionAtClose, promotionTrafficBoost, recordWeeklyWealth, saveRentAtClose } from './business';
 
@@ -82,7 +82,7 @@ export function money(s: GameState, amount: number, label: string): GameState {
     cash -= paid;
     operatingPayables += shortfall;
     entries.push({ day: s.day, t, label, amount: -paid, category: 'operating' });
-    if (shortfall > 0) entries.unshift({ day: s.day, t, label: 'Unpaid operating cost: ' + label + ' (' + shortfall.toLocaleString('en-NG') + ' naira)', amount: 0, category: 'operating' });
+    if (shortfall > 0) entries.unshift({ day: s.day, t, label: 'Unpaid operating cost: ' + label + ' (' + shortfall?.toLocaleString('en-NG') + ' naira)', amount: 0, category: 'operating' });
   } else {
     cash += value;
     entries.push({ day: s.day, t, label, amount: value, category: 'operating' });
@@ -130,6 +130,8 @@ const CONTRACT_TIER_RULES = [
   { retailCeiling: 100_000, lines: 2, minQty: 4, maxQty: 6, deadlineDays: 7 },
   { retailCeiling: 200_000, lines: 2, minQty: 6, maxQty: 9, deadlineDays: 8 },
   { retailCeiling: 300_000, lines: 3, minQty: 8, maxQty: 12, deadlineDays: 10 },
+  { retailCeiling: 1_000_000, lines: 3, minQty: 10, maxQty: 16, deadlineDays: 12 },
+  { retailCeiling: 3_000_000, lines: 4, minQty: 12, maxQty: 20, deadlineDays: 14 },
 ] as const;
 
 const CONTRACT_CLIENTS = [
@@ -480,19 +482,23 @@ export function openShop(s0: GameState): GameState {
     mix[2] = Math.max(0, mix[2] + shift);
   }
   const arrivals = Array.from({ length: n }, () => ({ at: arrivalMinute(), c: makeCustomer(s, mix) }));
-  // Premium access scales with property tier. These are the scheduled visit
-  // days within each 14-day cycle (2, 3, 4, 5, and 6 visits, respectively).
+  // Scheduled visit days per 14-day cycle scale with the seven shop tiers.
+  // The visitor's celebrity rank is rolled separately from shop level, using the existing five-rank scale.
   const celebrityDaysByTier: number[][] = [
     [2, 9],
     [1, 5, 10],
     [0, 4, 7, 11],
     [1, 4, 7, 10, 13],
     [0, 2, 4, 7, 9, 12],
+    [0, 1, 3, 4, 6, 8, 10, 12, 13],
+    [0, 1, 2, 3, 4, 6, 7, 8, 9, 11, 12, 13],
   ];
   const fortnightDay = (s.day - 1) % 14;
   const celebrityScheduled = (celebrityDaysByTier[s.tier] || []).includes(fortnightDay);
-  if (s.listing.signature && celebrityScheduled) {
-    const c = makeCelebrityCustomer(s);
+  if ((s.listing.signature || s.tier >= 5) && celebrityScheduled) {
+    const highestEligibleCelebrityTier = Math.min(4, Math.max(0, Math.floor(s.tier || 0)));
+    const celebrityTier = Math.floor(Math.random() * (highestEligibleCelebrityTier + 1));
+    const c = makeCelebrityCustomer(s, celebrityTier);
     arrivals.push({ at: 100 + Math.random() * 560, c });
   }
   const model = contestModel(s);
@@ -870,8 +876,8 @@ export function applyLook(s0: GameState, c: Customer, choice: StyleChoice, st0: 
     const gained = Math.round((8_000 + Math.random() * 10_000) * (1 + c.celebrity.tier * 0.85));
     const rivals = next.rivals.map((r) => r.id === 'you' ? r : { ...r, feeling: clamp(r.feeling - (8 + c.celebrity!.tier * 3), -100, 100) });
     next = { ...next, followers: (next.followers || 0) + gained, rep: clamp(next.rep + 3 + c.celebrity.tier * 2, 0, 100), rivals,
-      today: { ...next.today, events: [...next.today.events, `TRENDING IN LAGOS: ${c.name} paid ${naira(st.paid + st.tip)} including a ${naira(st.tip)} tip, then posted your look. +${gained.toLocaleString('en-NG')} followers. Rivals are watching.`] } };
-    next = msg(next, 'Gidigram', `TRENDING NOW 🔥 ${c.name} posted the look from your shop! +${gained.toLocaleString('en-NG')} followers, a huge reputation boost, and your rivals are jealous.`, 'good');
+      today: { ...next.today, events: [...next.today.events, `TRENDING IN LAGOS: ${c.name} paid ${naira(st.paid + st.tip)} including a ${naira(st.tip)} tip, then posted your look. +${gained?.toLocaleString('en-NG')} followers. Rivals are watching.`] } };
+    next = msg(next, 'Gidigram', `TRENDING NOW 🔥 ${c.name} posted the look from your shop! +${gained?.toLocaleString('en-NG')} followers, a huge reputation boost, and your rivals are jealous.`, 'good');
   }
   if (c.contest) next = judge(next, c, score.total);
   next = depart(next, c, lookOut, sold);
@@ -1053,7 +1059,7 @@ export function confirmCollaboration(s0: GameState, messageId: number): GameStat
     return collaborationOutcome(s0, messageId, 'already_booked', 'I already have a pop-up scheduled with you. Let’s finish that one before booking another.');
   }
 
-  const tierBudgetMax = [250_000, 2_000_000, 10_000_000, 50_000_000, 150_000_000][clamp(s0.tier, 0, 4)];
+  const tierBudgetMax = [250_000, 2_000_000, 10_000_000, 50_000_000, 150_000_000, 300_000_000, 600_000_000][clamp(s0.tier, 0, 6)];
   const cashBudgetMax = Math.max(25_000, Math.min(tierBudgetMax, Math.max(0, s0.cash) * 2 + Math.max(0, partner.cash) * 2));
   const totalCost = Math.round(clamp(Number.isFinite(offer.totalCost) ? offer.totalCost : 20000, 15_000, cashBudgetMax) / 2500) * 2500;
   const playerCostSharePct = Math.round(Math.max(10, Math.min(90, Number.isFinite(offer.playerCostSharePct) ? offer.playerCostSharePct : 50)));
@@ -1412,11 +1418,11 @@ export function listingsNow(s: GameState): Listing[] {
   return listingsFor(s.tier + 1, week(s.day));
 }
 
-export function moveTo(s0: GameState, l0: Listing, equipmentPlan: 'arrange' | 'store' | 'sell' = 'arrange'): GameState {
+export function moveTo(s0: GameState, l0: Listing, equipmentPlan: MoveEquipmentPlan = 'arrange'): GameState {
   const fight = contestFor(s0, l0);
   const l = fight ? { ...l0, moveIn: l0.moveIn + fight.extra } : l0;
   const move = prepareFurnitureForMove(s0.furniture, l, equipmentPlan);
-  if ((l.tier !== s0.tier + 1 && !(l.signature && l.tier === s0.tier && !s0.listing.signature)) || s0.cash + move.saleProceeds < l.moveIn) return s0;
+  if ((l.tier !== s0.tier + 1 && !(l.signature && l.tier === s0.tier && !s0.listing.signature)) || s0.cash + move.saleProceeds < l.moveIn + move.packageCost) return s0;
   const s = fight ? wonListing(s0, l0) : s0;
   const tier = l.tier;
   const t = TIERS[tier];
@@ -1424,12 +1430,15 @@ export function moveTo(s0: GameState, l0: Listing, equipmentPlan: 'arrange' | 's
   // Credit sale proceeds before charging move-in so the transaction never creates a temporary payable.
   if (move.saleProceeds > 0) next = money(next, move.saleProceeds, 'Sold shop equipment during move');
   next = money(next, -l.moveIn, `Move-in: ${l.street}`);
+  if (move.packageCost > 0) next = money(next, -move.packageCost, 'Ready-furnished shop package');
   next = fitDisplay(next);
   const equipmentMessage = equipmentPlan === 'store'
     ? ' I have put your reusable equipment in storage; the new shop starts empty, and you can bring items out from Build mode.'
     : equipmentPlan === 'sell'
       ? ` I sold your reusable shop equipment for ${naira(move.saleProceeds)} at the usual 40% resale value. Your clothing stock and business records are still yours.`
-      : ' I arranged your equipment around the new floor plan. You can still drag pieces to different areas in Build mode.';
+      : equipmentPlan === 'furnished'
+        ? ` The ready-furnished package cost ${naira(move.packageCost)} and has been arranged for this shop. Your previously owned reusable equipment is safely in storage.`
+        : ' I arranged your equipment around the new floor plan. You can still drag pieces to different areas in Build mode.';
   next = msg(next, 'Deborah', `We moved! Welcome to your ${t.name} on ${l.street}, ${l.area}. Rent is ${naira(l.rent)} a week and the landlord is ${l.landlord}. The shop holds up to ${t.slots} designs.${equipmentMessage} It will be quiet for two weeks while people find us.`, 'good');
   next = reactToMove(next, !fight);
   if (t.staff && !s.staff.length) next = msg(next, 'Deborah', `You can hire staff now! Trainees are cheap and loyal; experts are good from day one but they leave for money.`, 'info');

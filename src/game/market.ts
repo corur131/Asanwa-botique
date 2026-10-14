@@ -65,6 +65,9 @@ export const MARKET: MarketEntry[] = [
   { kind: 'earrings', id: 'heirloomCoralDrops', label: 'Heirloom Coral Drops', price: 360_000, for: 'f', native: true, luxury: true, group: 'Fine Jewellery', renderId: 'heirloomCoralDrops', minTier: 3 },
   { kind: 'earrings', id: 'diamondStatementHoops', label: 'Diamond-Statement Hoops', price: 620_000, for: 'f', native: false, luxury: true, group: 'Couture Jewellery', renderId: 'diamondStatementHoops', minTier: 4 },
   { kind: 'earrings', id: 'royalPearlChandeliers', label: 'Royal Pearl Chandeliers', price: 890_000, for: 'f', native: false, luxury: true, group: 'Couture Jewellery', renderId: 'royalPearlChandeliers', minTier: 4 },
+  { kind: 'earrings', id: 'atelierPearlDriftEarClimbers', label: 'Pearl-Drift Ear Climbers', price: 220_000, for: 'f', native: false, luxury: true, group: 'Sculptural Fine Jewellery', renderId: 'atelierPearlDriftEarClimbers', minTier: 5 },
+  { kind: 'earrings', id: 'atelierOrbitHaloDrops', label: 'Orbit Halo Crystal Drops', price: 340_000, for: 'f', native: false, luxury: true, group: 'Sculptural Fine Jewellery', renderId: 'atelierOrbitHaloDrops', minTier: 5 },
+  { kind: 'earrings', id: 'atelierGlassShardChandeliers', label: 'Glass-Shard Chandelier Earrings', price: 720_000, for: 'f', native: false, luxury: true, group: 'Empire Fine Jewellery', renderId: 'atelierGlassShardChandeliers', minTier: 6 },
 ];
 
 export const entryFor = (kind: StockKind, id: string) => MARKET.find((m) => m.kind === kind && m.id === id);

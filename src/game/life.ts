@@ -279,17 +279,17 @@ export function postSelfie(s: GameState, look: CharacterConfig): GameState {
 // ---------------------------------------------------------------------------
 // Weekly bills, paid on Sunday with the rent
 // ---------------------------------------------------------------------------
-const LAWMA = [1_500, 2_500, 4_000, 6_000, 9_000];
-const DUES = [2_000, 3_500, 6_000, 10_000, 15_000];
+const LAWMA = [1_500, 2_500, 5_000, 8_000, 12_000, 18_000, 30_000];
+const DUES = [2_000, 3_500, 8_000, 15_000, 25_000, 40_000, 60_000];
 /** Market and estate dues are steeper on the Island. */
 const AREA_DUES: Record<string, number> = { 'Victoria Island': 1.6, Ikoyi: 1.6, 'Lekki Phase 1': 1.4, Lekki: 1.3, 'Admiralty Way': 1.4, Ikeja: 1.15, Surulere: 1.05, Yaba: 1 };
-const DATA = [3_500, 5_000, 8_000, 12_000, 18_000];
+const DATA = [3_500, 5_000, 10_000, 15_000, 22_000, 35_000, 50_000];
 
 export interface Bill { label: string; amount: number }
 
 export function weeklyBills(s: GameState): Bill[] {
   const kwh = Math.round(s.meter?.kwh || 0);
-  const t = Math.min(4, s.tier);
+  const t = Math.max(0, Math.min(LAWMA.length - 1, Math.floor(s.tier || 0)));
   const size = roomOf(s.listing);
   const lawma = Math.round((LAWMA[t] * (0.8 + (size.w * size.d) / 60)) / 100) * 100;
   const area = s.listing.area || 'Yaba';

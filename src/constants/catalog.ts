@@ -74,6 +74,11 @@ export const FEMALE_HAIR: Option<FemaleHairStyle>[] = [
   { id: 'shortNatural', label: 'Short Natural (TWA)', note: 'natural' },
   { id: 'highBun', label: 'High Bun', note: 'updo' },
   { id: 'sleekPonytail', label: 'Sleek Ponytail', note: 'updo' },
+  { id: 'atelierGlassSilkBob', label: 'Glass-Silk Sculpted Bob', note: 'Original Level 6 runway cut' },
+  { id: 'atelierSculptedSWave', label: 'Sculpted S-Wave Lengths', note: 'Original Level 6 couture style' },
+  { id: 'atelierCurtainLayers', label: 'Curtain-Frame Layered Hair', note: 'Original Level 6 layered cut' },
+  { id: 'empireOrbitHaloCurls', label: 'Orbit Halo Curl Sculpture', note: 'Original Level 7 couture style' },
+  { id: 'empireLiquidSidePony', label: 'Liquid-Swept Side Ponytail', note: 'Original Level 7 couture style' },
 ];
 
 export const MALE_HAIR: Option<MaleHairStyle>[] = [
@@ -84,6 +89,9 @@ export const MALE_HAIR: Option<MaleHairStyle>[] = [
   { id: 'shortDreads', label: 'Short Twists' },
   { id: 'longLocs', label: 'Long Locs' },
   { id: 'bald', label: 'Clean Bald' },
+  { id: 'atelierMonolithTaper', label: 'Monolith Tapered Cut', note: 'Original Level 6 sculpted style' },
+  { id: 'atelierSculptedQuiff', label: 'Sculpted Architectural Quiff', note: 'Original Level 6 sculpted style' },
+  { id: 'empireSilkCurtainWaves', label: 'Empire Silk Curtain Waves', note: 'Original Level 7 sculpted style' },
 ];
 
 export const HAIR_COLORS: Option<HairColorId>[] = [
@@ -540,6 +548,86 @@ export const WARDROBE: WardrobeItem[] = [
   W('unstructuredNotchLapelBlazer', 'Unstructured Notch-Lapel Blazer', 'outer', 'New English Menswear', false, ['office', 'dateNight', 'wedding'], 'middle', 85_000, 'plain', 'm', { renderId: 'unstructuredNotchLapelBlazer', minTier: 2 }),
   W('doubleBreastedEveningSuit', 'Double-Breasted Evening Suit', 'dress', 'New English Menswear', false, ['wedding', 'office', 'redCarpet'], 'rich', 210_000, 'plain', 'm', { renderId: 'doubleBreastedEveningSuit', minTier: 3 }),
   W('satinLapelTuxedoSet', 'Satin-Lapel Tuxedo Set', 'dress', 'New English Menswear', false, ['wedding', 'redCarpet'], 'rich', 550_000, 'plain', 'm', { renderId: 'satinLapelTuxedoSet', minTier: 4 }),
+
+  // ---- Level 6: Maison private-client collection (tier index 5) ----
+  // Entry pieces remain attainable for a top-budget regular; couture pieces serve celebrity/VIP orders.
+
+  // ---- Level 7: Fashion Empire House collection (tier index 6) ----
+  // ---- Original global couture collection: bespoke, non-native silhouettes ----
+  W('atelierPrismPleatBlouse', 'Prism-Pleat Atelier Blouse', 'top', 'Architectural Blouses', false, ['office', 'brunch', 'dateNight'], 'rich', 125_000, 'satin', 'f', { renderId: 'atelierPrismPleatBlouse', minTier: 5 }),
+  W('atelierLiquidCowlShell', 'Liquid-Satin Cowl Shell', 'top', 'Fluid Designer Tops', false, ['office', 'brunch', 'dateNight'], 'rich', 95_000, 'satin', 'f', { renderId: 'atelierLiquidCowlShell', minTier: 5 }),
+  W('atelierOrigamiPeplumTop', 'Origami-Panel Peplum Top', 'top', 'Sculpted Designer Tops', false, ['office', 'dateNight', 'party'], 'rich', 180_000, 'plain', 'f', { renderId: 'atelierOrigamiPeplumTop', minTier: 5 }),
+  W('atelierSculptedShoulderTop', 'Sculpted-Shoulder Evening Top', 'top', 'Empire Designer Tops', false, ['party', 'redCarpet', 'dateNight'], 'rich', 280_000, 'velvet', 'f', { renderId: 'atelierSculptedShoulderTop', minTier: 6 }),
+  W('empireCrystalSheerSleeveBlouse', 'Crystal-Sheer Sleeve Blouse', 'top', 'Empire Atelier Tops', false, ['party', 'redCarpet', 'wedding'], 'rich', 420_000, 'chiffon', 'f', { renderId: 'empireCrystalSheerSleeveBlouse', minTier: 6 }),
+  W('atelierMonolithStandCollarShirt', 'Monolith Stand-Collar Shirt', 'top', 'Modern Menswear Shirts', false, ['office', 'dateNight', 'wedding'], 'rich', 85_000, 'plain', 'm', { renderId: 'atelierMonolithStandCollarShirt', minTier: 5 }),
+  W('atelierLiquidSatinBandShirt', 'Liquid-Satin Band-Collar Shirt', 'top', 'Fluid Menswear', false, ['party', 'dateNight', 'redCarpet'], 'rich', 125_000, 'satin', 'm', { renderId: 'atelierLiquidSatinBandShirt', minTier: 5 }),
+  W('empireArchitecturalPleatTuxedoShirt', 'Architectural-Pleat Tuxedo Shirt', 'top', 'Empire Formal Menswear', false, ['wedding', 'redCarpet', 'office'], 'rich', 260_000, 'plain', 'm', { renderId: 'empireArchitecturalPleatTuxedoShirt', minTier: 6 }),
+  W('atelierLiquidDrapePalazzo', 'Liquid-Drape Palazzo Trousers', 'bottom', 'Sculpted Designer Trousers', false, ['office', 'brunch', 'dateNight'], 'rich', 145_000, 'satin', 'f', { renderId: 'atelierLiquidDrapePalazzo', minTier: 5 }),
+  W('atelierOrigamiPleatMidi', 'Origami-Fold Pleated Midi Skirt', 'bottom', 'Architectural Skirts', false, ['office', 'brunch', 'party'], 'rich', 125_000, 'plain', 'f', { renderId: 'atelierOrigamiPleatMidi', minTier: 5 }),
+  W('atelierSplitHemColumnTrouser', 'Split-Hem Column Trousers', 'bottom', 'Designer Tailoring', false, ['office', 'dateNight', 'redCarpet'], 'rich', 180_000, 'plain', 'f', { renderId: 'atelierSplitHemColumnTrouser', minTier: 5 }),
+  W('atelierSculptedCocoonSkirt', 'Sculpted Cocoon Skirt', 'bottom', 'Sculpted Atelier Skirts', false, ['office', 'party', 'redCarpet'], 'rich', 260_000, 'velvet', 'f', { renderId: 'atelierSculptedCocoonSkirt', minTier: 6 }),
+  W('empireContourSeamWideLeg', 'Contour-Seam Wide-Leg Trousers', 'bottom', 'Empire Tailoring', false, ['office', 'dateNight', 'redCarpet'], 'rich', 310_000, 'plain', 'f', { renderId: 'empireContourSeamWideLeg', minTier: 6 }),
+  W('atelierDoublePleatPalazzo', 'Double-Pleat Palazzo Trousers', 'bottom', 'Modern Menswear Tailoring', false, ['office', 'wedding', 'dateNight'], 'rich', 125_000, 'plain', 'm', { renderId: 'atelierDoublePleatPalazzo', minTier: 5 }),
+  W('atelierTaperedSideStripeTrouser', 'Tapered Side-Stripe Trousers', 'bottom', 'Designer Menswear', false, ['office', 'dateNight', 'party'], 'rich', 145_000, 'plain', 'm', { renderId: 'atelierTaperedSideStripeTrouser', minTier: 5 }),
+  W('empireSculptedSeamWideLeg', 'Sculpted-Seam Wide-Leg Trousers', 'bottom', 'Empire Menswear Tailoring', false, ['office', 'redCarpet', 'wedding'], 'rich', 260_000, 'plain', 'm', { renderId: 'empireSculptedSeamWideLeg', minTier: 6 }),
+  W('atelierOrbitSculptureGown', 'Orbit-Sculpture Evening Gown', 'dress', 'Sculptural Evening Couture', false, ['redCarpet', 'wedding', 'party'], 'rich', 1_150_000, 'satin', 'f', { renderId: 'atelierOrbitSculptureGown', minTier: 5 }),
+  W('atelierGlassPetalBallgown', 'Glass-Petal Ball Gown', 'dress', 'Sculptural Bridal Couture', false, ['wedding', 'redCarpet', 'party'], 'rich', 1_350_000, 'sequin', 'f', { renderId: 'atelierGlassPetalBallgown', minTier: 5 }),
+  W('atelierEclipseOneShoulderColumn', 'Eclipse One-Shoulder Column Gown', 'dress', 'Column Evening Couture', false, ['redCarpet', 'wedding', 'party'], 'rich', 980_000, 'velvet', 'f', { renderId: 'atelierEclipseOneShoulderColumn', minTier: 5 }),
+  W('atelierLiquidCascadeGown', 'Liquid Cascade Draped Gown', 'dress', 'Fluid Couture', false, ['redCarpet', 'wedding', 'party'], 'rich', 1_650_000, 'satin', 'f', { renderId: 'atelierLiquidCascadeGown', minTier: 6 }),
+  W('empireArchitecturalCapeDress', 'Architectural Cape-Sleeve Gown', 'dress', 'Empire Couture', false, ['redCarpet', 'wedding', 'party'], 'rich', 2_200_000, 'velvet', 'f', { renderId: 'empireArchitecturalCapeDress', minTier: 6 }),
+  W('atelierDeconstructedDinnerSuit', 'Deconstructed Dinner Suit Set', 'dress', 'Modern Formal Menswear', false, ['wedding', 'redCarpet', 'office'], 'rich', 980_000, 'plain', 'm', { renderId: 'atelierDeconstructedDinnerSuit', minTier: 5 }),
+  W('atelierSculpturalLonglineSuit', 'Sculptural Longline Suit Set', 'dress', 'Designer Formal Menswear', false, ['wedding', 'redCarpet', 'office'], 'rich', 1_250_000, 'velvet', 'm', { renderId: 'atelierSculpturalLonglineSuit', minTier: 5 }),
+  W('empireLiquidTuxedoJumpsuit', 'Liquid-Tailored Tuxedo Jumpsuit', 'dress', 'Empire Formal Menswear', false, ['wedding', 'redCarpet', 'party'], 'rich', 1_850_000, 'satin', 'm', { renderId: 'empireLiquidTuxedoJumpsuit', minTier: 6 }),
+  W('atelierCocoonCashmereCoat', 'Cocoon-Silhouette Cashmere Coat', 'outer', 'Sculpted Designer Outerwear', false, ['office', 'brunch', 'dateNight'], 'rich', 480_000, 'plain', 'f', { renderId: 'atelierCocoonCashmereCoat', minTier: 5 }),
+  W('atelierHourglassCapeCoat', 'Hourglass Cape Coat', 'outer', 'Sculpted Designer Outerwear', false, ['office', 'redCarpet', 'wedding'], 'rich', 620_000, 'velvet', 'f', { renderId: 'atelierHourglassCapeCoat', minTier: 5 }),
+  W('atelierWingShoulderTrench', 'Wing-Shoulder Trench Coat', 'outer', 'Architectural Outerwear', false, ['office', 'brunch', 'dateNight'], 'rich', 520_000, 'plain', 'f', { renderId: 'atelierWingShoulderTrench', minTier: 5 }),
+  W('atelierCurvedPanelLeatherMoto', 'Curved-Panel Leather Moto Jacket', 'outer', 'Designer Leatherwear', false, ['casual', 'party', 'dateNight'], 'rich', 690_000, 'leather', 'f', { renderId: 'atelierCurvedPanelLeatherMoto', minTier: 6 }),
+  W('empireFeatherlineOperaCoat', 'Featherline Opera Coat', 'outer', 'Empire Evening Outerwear', false, ['redCarpet', 'wedding', 'party'], 'rich', 1_450_000, 'velvet', 'f', { renderId: 'empireFeatherlineOperaCoat', minTier: 6 }),
+  W('atelierMonolithWrapOvercoat', 'Monolith Wrap Overcoat', 'outer', 'Modern Menswear Outerwear', false, ['office', 'dateNight', 'redCarpet'], 'rich', 550_000, 'plain', 'm', { renderId: 'atelierMonolithWrapOvercoat', minTier: 5 }),
+  W('atelierDoubleBreastedCocoonCoat', 'Double-Breasted Cocoon Coat', 'outer', 'Designer Menswear Outerwear', false, ['office', 'dateNight', 'redCarpet'], 'rich', 680_000, 'velvet', 'm', { renderId: 'atelierDoubleBreastedCocoonCoat', minTier: 5 }),
+  W('empireSculptedShoulderLeatherJacket', 'Sculpted-Shoulder Leather Jacket', 'outer', 'Empire Menswear Outerwear', false, ['casual', 'party', 'dateNight'], 'rich', 1_150_000, 'leather', 'm', { renderId: 'empireSculptedShoulderLeatherJacket', minTier: 6 }),
+
+  // ---- 40 fresh original global-fashion silhouettes, each with its own renderer ----
+  W('couture26MaisonPrismFoldSilkBlouse', 'Prism-Fold Silk Blouse', 'top', 'Maison Original Tops', false, ['office', 'brunch', 'dateNight'], 'rich', 145000, 'satin', 'f', { renderId: 'couture26MaisonPrismFoldSilkBlouse', minTier: 5 }),
+  W('couture26MaisonSculptedCrescentCorset', 'Sculpted Crescent Corset Top', 'top', 'Maison Original Tops', false, ['party', 'dateNight', 'redCarpet'], 'rich', 220000, 'velvet', 'f', { renderId: 'couture26MaisonSculptedCrescentCorset', minTier: 5 }),
+  W('couture26EmpireLiquidMetalDrapeShell', 'Liquid-Metal Drape Shell', 'top', 'Empire Original Tops', false, ['brunch', 'dateNight', 'redCarpet'], 'rich', 360000, 'satin', 'f', { renderId: 'couture26EmpireLiquidMetalDrapeShell', minTier: 6 }),
+  W('couture26EmpireAsymmetricGlassPleatBlouse', 'Asymmetric Glass-Pleat Blouse', 'top', 'Empire Original Tops', false, ['office', 'party', 'redCarpet'], 'rich', 480000, 'chiffon', 'f', { renderId: 'couture26EmpireAsymmetricGlassPleatBlouse', minTier: 6 }),
+  W('couture26EmpireArchitecturalShoulderHaloTop', 'Architectural Shoulder-Halo Top', 'top', 'Empire Original Tops', false, ['party', 'redCarpet', 'dateNight'], 'rich', 620000, 'velvet', 'f', { renderId: 'couture26EmpireArchitecturalShoulderHaloTop', minTier: 6 }),
+  W('couture26MaisonDoublePleatColumnTrousers', 'Double-Pleat Column Trousers', 'bottom', 'Maison Original Bottoms', false, ['office', 'brunch', 'dateNight'], 'rich', 160000, 'plain', 'f', { renderId: 'couture26MaisonDoublePleatColumnTrousers', minTier: 5 }),
+  W('couture26MaisonBiasCutSatinPalazzo', 'Bias-Cut Satin Palazzo', 'bottom', 'Maison Original Bottoms', false, ['brunch', 'dateNight', 'party'], 'rich', 210000, 'satin', 'f', { renderId: 'couture26MaisonBiasCutSatinPalazzo', minTier: 5 }),
+  W('couture26EmpireSculptedWaveFrontSkirt', 'Sculpted Wave-Front Skirt', 'bottom', 'Empire Original Bottoms', false, ['party', 'redCarpet', 'dateNight'], 'rich', 340000, 'velvet', 'f', { renderId: 'couture26EmpireSculptedWaveFrontSkirt', minTier: 6 }),
+  W('couture26EmpireLiquidFoldWideLeg', 'Liquid-Fold Wide-Leg Trousers', 'bottom', 'Empire Original Bottoms', false, ['office', 'brunch', 'redCarpet'], 'rich', 460000, 'satin', 'f', { renderId: 'couture26EmpireLiquidFoldWideLeg', minTier: 6 }),
+  W('couture26EmpireOrbitPanelFishtailSkirt', 'Orbit-Panel Fishtail Skirt', 'bottom', 'Empire Original Bottoms', false, ['wedding', 'redCarpet', 'party'], 'rich', 620000, 'velvet', 'f', { renderId: 'couture26EmpireOrbitPanelFishtailSkirt', minTier: 6 }),
+  W('couture26MaisonMidnightPetalColumnGown', 'Midnight Petal Column Gown', 'dress', 'Maison Original Dresses', false, ['wedding', 'redCarpet', 'party'], 'rich', 780000, 'satin', 'f', { renderId: 'couture26MaisonMidnightPetalColumnGown', minTier: 5 }),
+  W('couture26MaisonGlassPetalMidiDress', 'Glass-Petal Midi Dress', 'dress', 'Maison Original Dresses', false, ['brunch', 'wedding', 'party'], 'rich', 320000, 'chiffon', 'f', { renderId: 'couture26MaisonGlassPetalMidiDress', minTier: 5 }),
+  W('couture26EmpireSculpturalSpiralGalaGown', 'Sculptural Spiral Gala Gown', 'dress', 'Empire Original Dresses', false, ['wedding', 'redCarpet'], 'rich', 1450000, 'satin', 'f', { renderId: 'couture26EmpireSculpturalSpiralGalaGown', minTier: 6 }),
+  W('couture26EmpireFloatingPanelOperaGown', 'Floating-Panel Opera Gown', 'dress', 'Empire Original Dresses', false, ['wedding', 'redCarpet'], 'rich', 1800000, 'velvet', 'f', { renderId: 'couture26EmpireFloatingPanelOperaGown', minTier: 6 }),
+  W('couture26EmpireEclipseCutoutColumnDress', 'Eclipse Cutout Column Dress', 'dress', 'Empire Original Dresses', false, ['dateNight', 'party', 'redCarpet'], 'rich', 1200000, 'satin', 'f', { renderId: 'couture26EmpireEclipseCutoutColumnDress', minTier: 6 }),
+  W('couture26MaisonCocoonCashmereCapeCoat', 'Cocoon Cashmere Cape Coat', 'outer', 'Maison Original Outerwear', false, ['office', 'brunch', 'redCarpet'], 'rich', 520000, 'velvet', 'f', { renderId: 'couture26MaisonCocoonCashmereCapeCoat', minTier: 5 }),
+  W('couture26MaisonSculptedShoulderMoto', 'Sculpted-Shoulder Moto Jacket', 'outer', 'Maison Original Outerwear', false, ['casual', 'party', 'dateNight'], 'rich', 420000, 'leather', 'f', { renderId: 'couture26MaisonSculptedShoulderMoto', minTier: 5 }),
+  W('couture26EmpireWingedLapelOperaCoat', 'Winged-Lapel Opera Coat', 'outer', 'Empire Original Outerwear', false, ['wedding', 'redCarpet'], 'rich', 1100000, 'velvet', 'f', { renderId: 'couture26EmpireWingedLapelOperaCoat', minTier: 6 }),
+  W('couture26EmpireOrigamiStormTrench', 'Origami Storm Trench', 'outer', 'Empire Original Outerwear', false, ['office', 'casual', 'brunch'], 'rich', 980000, 'leather', 'f', { renderId: 'couture26EmpireOrigamiStormTrench', minTier: 6 }),
+  W('couture26EmpireFluidLonglineSculptorCoat', 'Fluid Longline Sculptor Coat', 'outer', 'Empire Original Outerwear', false, ['office', 'redCarpet', 'dateNight'], 'rich', 1300000, 'plain', 'f', { renderId: 'couture26EmpireFluidLonglineSculptorCoat', minTier: 6 }),
+  W('couture26MaisonIvoryArchitecturalPantsuit', 'Ivory Architectural Pantsuit', 'dress', 'Maison Original Tailored Suits', false, ['office', 'wedding', 'redCarpet'], 'rich', 820000, 'plain', 'f', { renderId: 'couture26MaisonIvoryArchitecturalPantsuit', minTier: 5 }),
+  W('couture26MaisonSculptedDoubleBreastedSuit', 'Sculpted Double-Breasted Suit', 'dress', 'Maison Original Tailored Suits', false, ['office', 'dateNight', 'redCarpet'], 'rich', 750000, 'velvet', 'f', { renderId: 'couture26MaisonSculptedDoubleBreastedSuit', minTier: 5 }),
+  W('couture26EmpireAsymmetricTuxedoJumpsuit', 'Asymmetric Tuxedo Jumpsuit', 'dress', 'Empire Original Tailored Suits', false, ['party', 'wedding', 'redCarpet'], 'rich', 1300000, 'velvet', 'f', { renderId: 'couture26EmpireAsymmetricTuxedoJumpsuit', minTier: 6 }),
+  W('couture26EmpireSatinLapelTrouserSuit', 'Satin-Lapel Couture Trouser Suit', 'dress', 'Empire Original Tailored Suits', false, ['office', 'wedding', 'redCarpet'], 'rich', 1500000, 'satin', 'f', { renderId: 'couture26EmpireSatinLapelTrouserSuit', minTier: 6 }),
+  W('couture26EmpireMonolithLonglinePowerSuit', 'Monolith Longline Power Suit', 'dress', 'Empire Original Tailored Suits', false, ['office', 'redCarpet', 'dateNight'], 'rich', 1650000, 'plain', 'f', { renderId: 'couture26EmpireMonolithLonglinePowerSuit', minTier: 6 }),
+  W('couture26MaisonMonolithBandCollarShirt', 'Monolith Band-Collar Shirt', 'top', 'Maison Original Menswear Tops', false, ['office', 'dateNight', 'brunch'], 'rich', 125000, 'plain', 'm', { renderId: 'couture26MaisonMonolithBandCollarShirt', minTier: 5 }),
+  W('couture26MaisonLiquidSatinDrapeShirt', 'Liquid-Satin Drape Shirt', 'top', 'Maison Original Menswear Tops', false, ['party', 'dateNight', 'redCarpet'], 'rich', 185000, 'satin', 'm', { renderId: 'couture26MaisonLiquidSatinDrapeShirt', minTier: 5 }),
+  W('couture26EmpirePleatFrontTuxedoShirt', 'Pleat-Front Tuxedo Shirt', 'top', 'Empire Original Menswear Tops', false, ['wedding', 'redCarpet', 'office'], 'rich', 360000, 'plain', 'm', { renderId: 'couture26EmpirePleatFrontTuxedoShirt', minTier: 6 }),
+  W('couture26MaisonTaperedSideStripeTrouser', 'Tapered Side-Stripe Trouser', 'bottom', 'Maison Original Menswear Bottoms', false, ['office', 'dateNight', 'brunch'], 'rich', 145000, 'plain', 'm', { renderId: 'couture26MaisonTaperedSideStripeTrouser', minTier: 5 }),
+  W('couture26MaisonDoublePleatWideLegTrouser', 'Double-Pleat Wide-Leg Trouser', 'bottom', 'Maison Original Menswear Bottoms', false, ['office', 'brunch', 'dateNight'], 'rich', 180000, 'plain', 'm', { renderId: 'couture26MaisonDoublePleatWideLegTrouser', minTier: 5 }),
+  W('couture26EmpireSculptedSeamWideLegTrouser', 'Sculpted-Seam Wide-Leg Trouser', 'bottom', 'Empire Original Menswear Bottoms', false, ['office', 'redCarpet', 'dateNight'], 'rich', 320000, 'plain', 'm', { renderId: 'couture26EmpireSculptedSeamWideLegTrouser', minTier: 6 }),
+  W('couture26MaisonDeconstructedDinnerSuit', 'Deconstructed Dinner Suit', 'dress', 'Maison Original Menswear Suits', false, ['wedding', 'redCarpet', 'office'], 'rich', 850000, 'plain', 'm', { renderId: 'couture26MaisonDeconstructedDinnerSuit', minTier: 5 }),
+  W('couture26MaisonSculpturalLonglineSuit', 'Sculptural Longline Suit', 'dress', 'Maison Original Menswear Suits', false, ['wedding', 'redCarpet', 'office'], 'rich', 1100000, 'plain', 'm', { renderId: 'couture26MaisonSculpturalLonglineSuit', minTier: 5 }),
+  W('couture26EmpireLiquidTuxedoJumpsuit', 'Liquid Tuxedo Jumpsuit', 'dress', 'Empire Original Menswear Suits', false, ['wedding', 'redCarpet', 'party'], 'rich', 1600000, 'satin', 'm', { renderId: 'couture26EmpireLiquidTuxedoJumpsuit', minTier: 6 }),
+  W('couture26MaisonMonolithWrapOvercoat', 'Monolith Wrap Overcoat', 'outer', 'Maison Original Menswear Outerwear', false, ['office', 'dateNight', 'redCarpet'], 'rich', 650000, 'plain', 'm', { renderId: 'couture26MaisonMonolithWrapOvercoat', minTier: 5 }),
+  W('couture26MaisonDoubleBreastedCocoonCoat', 'Double-Breasted Cocoon Coat', 'outer', 'Maison Original Menswear Outerwear', false, ['office', 'wedding', 'redCarpet'], 'rich', 780000, 'velvet', 'm', { renderId: 'couture26MaisonDoubleBreastedCocoonCoat', minTier: 5 }),
+  W('couture26EmpireFeatherlineOperaCoat', 'Featherline Opera Coat', 'outer', 'Empire Original Menswear Outerwear', false, ['wedding', 'redCarpet'], 'rich', 1400000, 'velvet', 'm', { renderId: 'couture26EmpireFeatherlineOperaCoat', minTier: 6 }),
+  W('couture26MaisonArchitecturalPeakLapelSuit', 'Architectural Peak-Lapel Suit', 'dress', 'Maison Original Menswear Tailoring', false, ['office', 'wedding', 'redCarpet'], 'rich', 1100000, 'plain', 'm', { renderId: 'couture26MaisonArchitecturalPeakLapelSuit', minTier: 5 }),
+  W('couture26MaisonSculptedLonglineDinnerSuit', 'Sculpted Longline Dinner Suit', 'dress', 'Maison Original Menswear Tailoring', false, ['wedding', 'redCarpet', 'office'], 'rich', 1350000, 'plain', 'm', { renderId: 'couture26MaisonSculptedLonglineDinnerSuit', minTier: 5 }),
+  W('couture26EmpireLiquidSatinEveningTuxedo', 'Liquid-Satin Evening Tuxedo', 'dress', 'Empire Original Menswear Tailoring', false, ['wedding', 'redCarpet'], 'rich', 1900000, 'satin', 'm', { renderId: 'couture26EmpireLiquidSatinEveningTuxedo', minTier: 6 }),
 ];
 
 export const itemById = (id?: string) => WARDROBE.find((w) => w.id === id);
@@ -588,6 +676,15 @@ export const SHOES: AccessoryItem[] = [
   A('handFinishedOxfordCouture', 'Hand-Finished Oxford Couture', 'm', 780_000, false, { renderId: 'handFinishedOxfordCouture', minTier: 4 }),
   A('everydayCanvasSneakers', 'Everyday Canvas Sneakers', 'both', 7_500, false, { renderId: 'everydayCanvasSneakers', minTier: 0 }),
   A('atelierLeatherSneakers', 'Atelier Leather Sneakers', 'both', 65_000, false, { renderId: 'atelierLeatherSneakers', minTier: 2 }),
+  // Original high-fashion shoes designs — independently rendered.
+  A('atelierGlassPetalHeel', 'Glass-Petal Sculpted Heel', 'f', 280_000, false, { renderId: 'atelierGlassPetalHeel', minTier: 5 }),
+  A('atelierOrbitCagePump', 'Orbit Cage Leather Pump', 'f', 320_000, false, { renderId: 'atelierOrbitCagePump', minTier: 5 }),
+  A('atelierSculptedPearlMule', 'Sculpted Pearl-Bridge Mule', 'f', 245_000, false, { renderId: 'atelierSculptedPearlMule', minTier: 5 }),
+  A('atelierChromeArcSandal', 'Chrome Arc Evening Sandal', 'f', 490_000, false, { renderId: 'atelierChromeArcSandal', minTier: 6 }),
+  A('empireLiquidSculptureBoot', 'Liquid-Sculpture Knee Boot', 'f', 1_150_000, false, { renderId: 'empireLiquidSculptureBoot', minTier: 6 }),
+  A('atelierMonolithDerby', 'Monolith-Panel Derby Shoe', 'm', 240_000, false, { renderId: 'atelierMonolithDerby', minTier: 5 }),
+  A('atelierFoldedLeatherLoafer', 'Folded Leather Loafer', 'm', 285_000, false, { renderId: 'atelierFoldedLeatherLoafer', minTier: 5 }),
+  A('empireArchitecturalChelsea', 'Architectural Chelsea Boot', 'm', 780_000, false, { renderId: 'empireArchitecturalChelsea', minTier: 6 }),
 ];
 
 export const BAGS: AccessoryItem[] = [
@@ -608,6 +705,15 @@ export const BAGS: AccessoryItem[] = [
   A('handwovenCeremonyBag', 'Handwoven Ceremony Bag', 'both', 380_000, true, { renderId: 'handwovenCeremonyBag', minTier: 3 }),
   A('couturePearlEveningBag', 'Couture Pearl Evening Bag', 'f', 680_000, false, { renderId: 'couturePearlEveningBag', minTier: 4 }),
   A('heirloomLeatherWeekender', 'Heirloom Leather Weekender', 'm', 850_000, false, { renderId: 'heirloomLeatherWeekender', minTier: 4 }),
+  // Original high-fashion bags designs — independently rendered.
+  A('atelierOrbitTopHandle', 'Orbit-Frame Top-Handle Bag', 'f', 420_000, false, { renderId: 'atelierOrbitTopHandle', minTier: 5 }),
+  A('atelierSculptedShellClutch', 'Sculpted Shell Evening Clutch', 'f', 350_000, false, { renderId: 'atelierSculptedShellClutch', minTier: 5 }),
+  A('atelierGlassCubeMiniBag', 'Glass-Cube Mini Bag', 'f', 520_000, false, { renderId: 'atelierGlassCubeMiniBag', minTier: 5 }),
+  A('atelierLiquidFoldedHobo', 'Liquid-Fold Leather Hobo', 'f', 620_000, false, { renderId: 'atelierLiquidFoldedHobo', minTier: 6 }),
+  A('empireWingedEveningBag', 'Winged-Silhouette Evening Bag', 'f', 1_250_000, false, { renderId: 'empireWingedEveningBag', minTier: 6 }),
+  A('atelierMonolithBriefcase', 'Monolith Structured Briefcase', 'm', 380_000, false, { renderId: 'atelierMonolithBriefcase', minTier: 5 }),
+  A('atelierFoldedWeekender', 'Folded Leather Weekender', 'm', 470_000, false, { renderId: 'atelierFoldedWeekender', minTier: 5 }),
+  A('empireArchitecturalCrossbody', 'Architectural Crossbody Bag', 'm', 840_000, false, { renderId: 'empireArchitecturalCrossbody', minTier: 6 }),
 ];
 
 export const HEADWEAR: AccessoryItem[] = [
@@ -626,6 +732,15 @@ export const HEADWEAR: AccessoryItem[] = [
   A('coutureCrystalHeadpiece', 'Couture Crystal Headpiece', 'f', 340_000, false, { renderId: 'coutureCrystalHeadpiece', minTier: 3 }),
   A('royalFilaAsoOke', 'Royal Aso-Oke Fila', 'm', 250_000, true, { renderId: 'royalFilaAsoOke', minTier: 3 }),
   A('heirloomGoldGele', 'Heirloom Gold-Worked Gele', 'f', 720_000, true, { renderId: 'heirloomGoldGele', minTier: 4 }),
+  // Original high-fashion headwear designs — independently rendered.
+  A('atelierHaloDiscHat', 'Halo Disc Hat', 'f', 180_000, false, { renderId: 'atelierHaloDiscHat', minTier: 5 }),
+  A('atelierSculptedPillbox', 'Sculpted Pillbox Hat', 'f', 165_000, false, { renderId: 'atelierSculptedPillbox', minTier: 5 }),
+  A('atelierFoldedFascinator', 'Folded Architectural Fascinator', 'f', 220_000, false, { renderId: 'atelierFoldedFascinator', minTier: 5 }),
+  A('atelierCrystalHeadband', 'Crystal Arc Headband', 'f', 260_000, false, { renderId: 'atelierCrystalHeadband', minTier: 6 }),
+  A('empireArcTiara', 'Empire Arc Crystal Headpiece', 'f', 440_000, false, { renderId: 'empireArcTiara', minTier: 6 }),
+  A('atelierMonolithFedora', 'Monolith Fedora', 'm', 180_000, false, { renderId: 'atelierMonolithFedora', minTier: 5 }),
+  A('atelierArchitecturalCap', 'Architectural Panel Cap', 'm', 125_000, false, { renderId: 'atelierArchitecturalCap', minTier: 5 }),
+  A('empireCashmereBeanie', 'Empire Cashmere Beanie', 'm', 210_000, false, { renderId: 'empireCashmereBeanie', minTier: 6 }),
 ];
 
 /** Premium hairpieces are merchandise colourways; the renderer reuses its detailed hair silhouettes. */
@@ -649,6 +764,15 @@ export const HAIR_PRODUCTS: AccessoryItem[] = [
   A('handcraftedBraidCrown', 'Handcrafted Braid Crown', 'f', 680_000, true, { renderId: 'fulaniBraids', minTier: 4 }),
   A('mensLocsCrownPiece', 'Men’s Locs Crown Piece', 'm', 85_000, false, { renderId: 'longLocs', minTier: 2 }),
   A('mensPremiumHairSystem', 'Premium Men’s Hair System', 'm', 260_000, false, { renderId: 'shortDreads', minTier: 3 }),
+  // Original high-fashion hair_products designs — independently rendered.
+  A('atelierGlassSilkBob', 'Glass-Silk Sculpted Bob', 'f', 360_000, false, { renderId: 'atelierGlassSilkBob', minTier: 5 }),
+  A('atelierSculptedSWave', 'Sculpted S-Wave Lengths', 'f', 420_000, false, { renderId: 'atelierSculptedSWave', minTier: 5 }),
+  A('atelierCurtainLayers', 'Curtain-Frame Layered Hairpiece', 'f', 390_000, false, { renderId: 'atelierCurtainLayers', minTier: 5 }),
+  A('empireOrbitHaloCurls', 'Orbit Halo Curl Sculpture', 'f', 680_000, false, { renderId: 'empireOrbitHaloCurls', minTier: 6 }),
+  A('empireLiquidSidePony', 'Liquid-Swept Side Ponytail', 'f', 720_000, false, { renderId: 'empireLiquidSidePony', minTier: 6 }),
+  A('atelierMonolithTaper', 'Monolith Tapered Cut', 'm', 260_000, false, { renderId: 'atelierMonolithTaper', minTier: 5 }),
+  A('atelierSculptedQuiff', 'Sculpted Architectural Quiff', 'm', 340_000, false, { renderId: 'atelierSculptedQuiff', minTier: 5 }),
+  A('empireSilkCurtainWaves', 'Empire Silk Curtain Waves', 'm', 520_000, false, { renderId: 'empireSilkCurtainWaves', minTier: 6 }),
 ];
 
 export const EARRINGS: Option<EarringStyle>[] = [
@@ -677,6 +801,11 @@ export const NECKLACES: AccessoryItem[] = [
   A('handsetCoralNecklace', 'Hand-Set Coral Necklace', 'both', 180_000, true, { renderId: 'handsetCoralNecklace', minTier: 3 }),
   A('sculptedGoldChoker', 'Sculpted Gold Choker', 'f', 280_000, false, { renderId: 'sculptedGoldChoker', minTier: 3 }),
   A('heirloomCoralSet', 'Heirloom Coral Necklace', 'both', 650_000, true, { renderId: 'heirloomCoralSet', minTier: 4 }),
+  // Original high-fashion necklaces designs — independently rendered.
+  A('atelierSculptedArcChoker', 'Sculpted Arc Choker', 'f', 260_000, false, { renderId: 'atelierSculptedArcChoker', minTier: 5 }),
+  A('empireLiquidGoldCascade', 'Liquid-Gold Cascade Necklace', 'f', 620_000, false, { renderId: 'empireLiquidGoldCascade', minTier: 6 }),
+  A('atelierObsidianLinkNecklace', 'Obsidian Link Necklace', 'm', 230_000, false, { renderId: 'atelierObsidianLinkNecklace', minTier: 5 }),
+
 ];
 
 export const WRIST: AccessoryItem[] = [
@@ -689,6 +818,10 @@ export const WRIST: AccessoryItem[] = [
   A('goldBangleStack', 'Gold Bangle Stack', 'f', 72_000, false, { renderId: 'goldBangleStack', minTier: 2 }),
   A('designerSteelChronograph', 'Designer Steel Chronograph', 'both', 185_000, false, { renderId: 'designerSteelChronograph', minTier: 3 }),
   A('diamondDialWatch', 'Diamond-Dial Watch', 'both', 780_000, false, { renderId: 'diamondDialWatch', minTier: 4 }),
+  // Original high-fashion wrist designs — independently rendered.
+  A('empireDiamondBarrelWatch', 'Empire Diamond-Barrel Watch', 'f', 980_000, false, { renderId: 'empireDiamondBarrelWatch', minTier: 6 }),
+  A('atelierMonolithChronograph', 'Monolith Chronograph', 'm', 420_000, false, { renderId: 'atelierMonolithChronograph', minTier: 5 }),
+  A('empireArchitecturalCuff', 'Architectural Steel Cuff', 'm', 260_000, false, { renderId: 'empireArchitecturalCuff', minTier: 6 }),
 ];
 
 export const GLASSES: AccessoryItem[] = [
@@ -703,6 +836,15 @@ export const GLASSES: AccessoryItem[] = [
   A('goldTempleSunglasses', 'Gold-Temple Sunglasses', 'both', 165_000, false, { renderId: 'goldTempleSunglasses', minTier: 3 }),
   A('runwaySculptedShades', 'Runway Sculpted Shades', 'both', 420_000, false, { renderId: 'runwaySculptedShades', minTier: 3 }),
   A('heirloomGoldSunglasses', 'Heirloom Gold Sunglasses', 'both', 750_000, false, { renderId: 'heirloomGoldSunglasses', minTier: 4 }),
+  // Original high-fashion glasses designs — independently rendered.
+  A('atelierCathedralCatEye', 'Cathedral Cat-Eye Frames', 'f', 230_000, false, { renderId: 'atelierCathedralCatEye', minTier: 5 }),
+  A('atelierPrismShield', 'Prism Shield Sunglasses', 'f', 320_000, false, { renderId: 'atelierPrismShield', minTier: 5 }),
+  A('atelierRimlessOrbit', 'Rimless Orbit Frames', 'f', 190_000, false, { renderId: 'atelierRimlessOrbit', minTier: 5 }),
+  A('atelierButterflyArchitecture', 'Architectural Butterfly Shades', 'f', 440_000, false, { renderId: 'atelierButterflyArchitecture', minTier: 6 }),
+  A('empireLiquidWrapSunglasses', 'Liquid-Wrap Runway Sunglasses', 'f', 690_000, false, { renderId: 'empireLiquidWrapSunglasses', minTier: 6 }),
+  A('atelierMonolithAviator', 'Monolith Double-Bridge Aviators', 'm', 210_000, false, { renderId: 'atelierMonolithAviator', minTier: 5 }),
+  A('atelierDoubleBridgeSquare', 'Double-Bridge Square Frames', 'm', 185_000, false, { renderId: 'atelierDoubleBridgeSquare', minTier: 5 }),
+  A('empireArchitecturalSportFrame', 'Empire Architectural Sport Frames', 'm', 490_000, false, { renderId: 'empireArchitecturalSportFrame', minTier: 6 }),
 ];
 
 export const forBody = <T extends { for: 'f' | 'm' | 'both' }>(list: T[], male: boolean) => list.filter((i) => i.for === 'both' || i.for === (male ? 'm' : 'f'));

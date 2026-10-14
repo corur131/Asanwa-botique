@@ -20,14 +20,16 @@ P = dict(
 # name, display slots, weekly rent, one-off upgrade cost (deposit + fit-out), base customers/day,
 # class mix (poor, middle, rich) at 50 reputation, staff slots, daily running cost (light, fuel)
 TIERS = [
-    dict(name='Kiosk',        slots=12,  rent=15_000,  up=0,         cust=5,  mix=(.70, .27, .03), staff=0, run=1_500),
-    dict(name='Small shop',   slots=25,  rent=40_000,  up=300_000,   cust=7,  mix=(.55, .38, .07), staff=0, run=3_000),
-    dict(name='Boutique',     slots=45,  rent=100_000, up=1_200_000, cust=10, mix=(.42, .46, .12), staff=2, run=6_000),
-    dict(name='Big boutique', slots=70,  rent=250_000, up=3_500_000, cust=14, mix=(.32, .50, .18), staff=4, run=12_000),
-    dict(name='Flagship',     slots=100, rent=600_000, up=9_000_000, cust=18, mix=(.25, .50, .25), staff=6, run=25_000),
+    dict(name='Kiosk',                 slots=20,  rent=30_000,       up=0,           cust=9,  mix=(.70, .27, .03), staff=0,  run=1_500),
+    dict(name='Small shop',            slots=30,  rent=120_000,      up=100_000,     cust=12, mix=(.55, .38, .07), staff=0,  run=3_000),
+    dict(name='Boutique',              slots=50,  rent=1_000_000,    up=3_000_000,   cust=16, mix=(.42, .46, .12), staff=2,  run=12_000),
+    dict(name='Big boutique',          slots=75,  rent=4_000_000,    up=12_000_000,  cust=21, mix=(.32, .50, .18), staff=4,  run=35_000),
+    dict(name='Flagship',              slots=105, rent=12_000_000,   up=35_000_000,  cust=27, mix=(.25, .50, .25), staff=6,  run=80_000),
+    dict(name='Luxury Maison',         slots=140, rent=30_000_000,   up=75_000_000,  cust=34, mix=(.18, .46, .36), staff=8,  run=160_000),
+    dict(name='Fashion Empire House',  slots=180, rent=75_000_000,   up=180_000_000, cust=43, mix=(.12, .43, .45), staff=10, run=350_000),
 ]
-# how much choice each class needs on display for a top score; rich need luxury suppliers (Boutique+)
-AVG_W = [5_000, 6_500, 10_000, 15_000, 22_000]
+# Approximate wholesale value per display design for each tier; premium levels carry more expensive stock.
+AVG_W = [5_000, 6_500, 10_000, 15_000, 22_000, 35_000, 60_000]
 NEED = {'poor': 10, 'middle': 25, 'rich': 50}
 
 PLAYERS = {
@@ -91,7 +93,12 @@ def simulate(pl, days=200, seed=0, shock_day=None, shock=0.0, fixed_tier=None):
             if served_by_staff and cls == 'rich':
                 cls = 'middle'      # rich clients always wait for Divine; staff take the small ones
             lo, hi = P['budget'][cls]
-            budget = rnd.uniform(lo, hi)
+            if cls == 'rich' and P.get('weighted_rich_budget', False):
+                # Forecast the roadmap's wider rich-customer range without assigning every
+                # visitor a near-maximum budget; most budgets are weighted toward the lower end.
+                budget = rnd.triangular(lo, hi, lo + 0.25 * (hi - lo))
+            else:
+                budget = rnd.uniform(lo, hi)
             fee = P['fee'][cls]
             W = max(1_000, (budget - fee) / P['markup'])
             fair = W * P['markup'] + fee
@@ -191,12 +198,12 @@ def simulate(pl, days=200, seed=0, shock_day=None, shock=0.0, fixed_tier=None):
 def run(days=200, n=400, shock_day=None, shock=0.0):
     out = {}
     for name, pl in PLAYERS.items():
-        reach = {k: [] for k in range(1, 5)}
+        reach = {k: [] for k in range(1, len(TIERS))}
         tiers_by_day = [[] for _ in range(days)]
         demos, broke, lost, quits = [], [], [], []
         for seed in range(n):
             h, lg = simulate(pl, days, seed, shock_day, shock)
-            for k in range(1, 5):
+            for k in range(1, len(TIERS)):
                 if k in lg['upgrades']:
                     reach[k].append(lg['upgrades'][k])
             for d, t, c, r in h:

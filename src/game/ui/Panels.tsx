@@ -1,7 +1,7 @@
 import React, { Suspense, lazy, useMemo, useState } from 'react';
 import { MARKUP, STAFF, TIERS, naira } from '../economy';
 import { POWER, RICH_CUSTOMER_STAFF_LEVEL, contestFor, fuelOf, fuelPerHour, tankSize, Candidate, RaiseAnswer, candidates, canHire, daysToRent, displayCap, displayedCount, listingsNow, marketWage, restockAllCost, stats, waitingRoom } from '../engine';
-import { FURNITURE_GROUPS, FurnitureDef, FurnitureGroup, Listing, ceilingCapacity, ceilingUsed, finishes, furnitureById, furnitureForGroup, listingsFor, roomOf, wallCapacity, wallUsed } from '../shop';
+import { FURNITURE_GROUPS, FurnitureDef, FurnitureGroup, Listing, MoveEquipmentPlan, ceilingCapacity, ceilingUsed, finishes, furnitureById, furnitureForGroup, listingsFor, readyFurnishedCost, roomOf, wallCapacity, wallUsed } from '../shop';
 import { productKey } from '../market';
 
 const FurniturePreview = lazy(() => import('../scene/Previews').then((m) => ({ default: m.FurniturePreview })));
@@ -278,9 +278,9 @@ export const FurniturePanel: React.FC<{ s: GameState; a: FurnitureActions; selec
 // ---------------------------------------------------------------------------
 // Moving: four listings at the next size
 // ---------------------------------------------------------------------------
-export const MovePanel: React.FC<{ s: GameState; onMove: (l: Listing, plan: 'arrange' | 'store' | 'sell') => void }> = ({ s, onMove }) => {
+export const MovePanel: React.FC<{ s: GameState; onMove: (l: Listing, plan: MoveEquipmentPlan) => void }> = ({ s, onMove }) => {
   const [pick, setPick] = useState<Listing | null>(null);
-  const [movePlan, setMovePlan] = useState<'arrange' | 'store' | 'sell'>('arrange');
+  const [movePlan, setMovePlan] = useState<MoveEquipmentPlan>('arrange');
   const resaleValue = s.furniture.filter((p) => furnitureById(p.id).mount !== 'finish').reduce((sum, p) => sum + Math.round(furnitureById(p.id).price * 0.4), 0);
   const next = TIERS[s.tier + 1];
   const weekNo = Math.floor((s.day - 1) / 7);
@@ -297,8 +297,8 @@ export const MovePanel: React.FC<{ s: GameState; onMove: (l: Listing, plan: 'arr
       </div>
       {next ? <div className="rounded-lg border border-white/10 bg-white/5 p-3 text-xs text-slate-300">
         <b className="text-white">{next.name}</b>: bigger, better listings are roomier and hold more{next.staff ? `, ${next.staff} staff` : ''}{next.luxury ? ', luxury suppliers' : ''}. Choose what happens to your reusable equipment when you move. You can arrange it in the new shop, keep it in storage, or sell it for cash. Listings change every week.
-      </div> : <div className="rounded-lg border border-white/10 bg-white/5 p-3 text-xs text-slate-300">You have reached the highest standard level in Lagos. You can still upgrade to the Signature flagship if you have not already.</div>}
-      <div className="rounded-lg border border-amber-500/25 bg-amber-500/5 p-3 text-xs text-amber-100">Signature properties are purpose-built luxury spaces. Scheduled celebrity visits rise with the Signature tier: 2 per fortnight at level 0, increasing to 6 at the level-4 Flagship. Weekly rent and move-in costs are much higher.</div>
+      </div> : <div className="rounded-lg border border-white/10 bg-white/5 p-3 text-xs text-slate-300">You have reached the highest standard shop level. A same-level Signature property may still be available as an alternative if you are currently in a standard shop.</div>}
+      <div className="rounded-lg border border-amber-500/25 bg-amber-500/5 p-3 text-xs text-amber-100">Signature properties are purpose-built luxury spaces with extra customer traffic and scheduled celebrity opportunities. Higher-tier Signature properties offer more frequent visit opportunities, alongside substantially higher rent and move-in costs.</div>
       <p className="text-xs text-slate-400">A same-tier Signature is an alternative to your current standard shop at the same size. A next-tier Signature is a larger shop upgrade; those are separate levels, not duplicate properties at one level.</p>
       {list.map((l0, index) => {
         const sameTier = l0.signature && l0.tier === s.tier;
@@ -315,6 +315,8 @@ export const MovePanel: React.FC<{ s: GameState; onMove: (l: Listing, plan: 'arr
               <div>
                 <div className="text-sm font-semibold text-white">{l.street} {l.signature && <Pill tone="gold">✦ SIGNATURE</Pill>}</div>
                 <div className="text-[10px] font-semibold uppercase tracking-wider text-amber-300">{sameTier ? `SAME-TIER ALTERNATIVE · ${TIERS[l.tier].name} Signature` : l.signature ? `NEXT-TIER UPGRADE · ${TIERS[l.tier].name} Signature` : `${TIERS[l.tier].name} · Standard listing`}</div>
+                {l.signature && l.tier === 5 && <div className="mt-1 text-[10px] font-bold uppercase tracking-wide text-emerald-200">Botanical Atrium · living greenery · copper-framed windows</div>}
+                {l.signature && l.tier === 6 && <div className="mt-1 text-[10px] font-bold uppercase tracking-wide text-sky-200">Cobalt Gallery · ivory stone · cobalt and coral architecture</div>}
                 <div className="text-[11px] text-slate-400">{l.area} · <Stars n={l.stars} /> · {roomOf(l).w}×{roomOf(l).d} m floor</div>
               </div>
               <Btn size="sm" tone="gold" onClick={() => { setMovePlan('arrange'); setPick(l0); }}>View</Btn>
@@ -332,7 +334,7 @@ export const MovePanel: React.FC<{ s: GameState; onMove: (l: Listing, plan: 'arr
       })}
       {pick && (
         <Modal onClose={() => setPick(null)}>
-          <div className="h-56 -mx-1 mb-3 rounded-xl overflow-hidden">
+          <div className="h-64 -mx-1 mb-3 rounded-xl overflow-hidden">
             <Suspense fallback={<Loading />}>
               <RoomPreview tier={pick.tier} stars={pick.stars} signature={pick.signature} />
             </Suspense>
@@ -347,25 +349,40 @@ export const MovePanel: React.FC<{ s: GameState; onMove: (l: Listing, plan: 'arr
             <li>Prestige from location: <b>{pick.stars * 2}</b> (more customers, more rich ones)</li>
             {pick.signature && <li className="text-amber-200">Signature benefits: extra customer traffic, rich-only walk-ins, much larger tips, celebrity visits with multi-million-naira spending, trending posts and large follower gains. Scheduled celebrity visits become more frequent at each Signature tier.</li>}
           </ul>
-          {s.cash - pick.moveIn < pick.rent * 2 && <p className="text-sm text-rose-300 mb-3">Careful: the first two weeks in a new shop are quiet, and you'd have less than two weeks of rent saved.</p>}
+          {s.cash - pick.moveIn - (movePlan === 'furnished' ? readyFurnishedCost(pick) : 0) < pick.rent * 2 && <p className="text-sm text-rose-300 mb-3">Careful: after move-in{movePlan === 'furnished' ? ' and the furnishing package' : ''}, you would have less than two weeks of rent saved. The first two weeks in a new shop are quiet.</p>}
           <section className="space-y-2 mb-4">
             <h3 className="text-sm font-semibold text-white">What should happen to your equipment?</h3>
             {([
               { id: 'arrange' as const, title: '1. Move in and arrange', description: 'Bring your equipment into the new shop. The game will spread it across the usable floor and walls; you can still move individual pieces in Build mode.' },
               { id: 'store' as const, title: '2. Move everything into storage', description: 'Keep all reusable equipment, but start with an empty shop. Bring items out later from the Stored tab in Build mode.' },
               { id: 'sell' as const, title: '3. Sell all equipment', description: `Sell reusable furniture and equipment at the usual 40% resale value and receive ${naira(resaleValue)}. Your clothing stock and business records remain yours.` },
+              { id: 'furnished' as const, title: '4. Move into a ready-furnished shop', description: `Buy a pre-arranged set of display rails, mirrors, fitting facilities, seating and premium finishes selected for this shop's level. Package cost: ${naira(readyFurnishedCost(pick))}. Your old reusable equipment is kept in storage, not sold.` },
             ]).map((option) => (
               <button key={option.id} type="button" onClick={() => setMovePlan(option.id)} className={`w-full rounded-xl border p-3 text-left transition-colors ${movePlan === option.id ? 'border-amber-400 bg-amber-500/10' : 'border-white/10 bg-white/5 hover:border-white/25'}`}>
                 <div className="text-sm font-semibold text-white">{option.title}</div>
                 <p className="mt-1 text-xs leading-relaxed text-slate-300">{option.description}</p>
                 {option.id === 'sell' && <div className="mt-2 text-sm font-bold text-emerald-300">Estimated payout: {naira(resaleValue)}</div>}
+                {option.id === 'furnished' && <div className="mt-2 text-sm font-bold text-amber-200">Furnishing package: {naira(readyFurnishedCost(pick))}</div>}
               </button>
             ))}
             <p className="text-[11px] text-slate-500">Paint and flooring belong to the old premises and are not carried over or included in the sale. Equipment prices use the existing 40% resale rule.</p>
           </section>
+          {movePlan === 'furnished' && (
+            <div className="rounded-lg border border-white/10 bg-white/5 p-3 text-xs text-slate-300">
+              <div className="flex justify-between gap-3"><span>Move-in, including any shop contest</span><b>{naira(pick.moveIn + (contestFor(s, pick)?.extra || 0))}</b></div>
+              <div className="flex justify-between gap-3 mt-1"><span>Furnishing package</span><b>{naira(readyFurnishedCost(pick))}</b></div>
+              <div className="flex justify-between gap-3 mt-2 border-t border-white/10 pt-2 text-white"><span>Total before first week's rent</span><b>{naira(pick.moveIn + (contestFor(s, pick)?.extra || 0) + readyFurnishedCost(pick))}</b></div>
+            </div>
+          )}
           <div className="flex gap-2 justify-end">
             <Btn onClick={() => setPick(null)}>Not yet</Btn>
-            <Btn tone="gold" disabled={s.cash + (movePlan === 'sell' ? resaleValue : 0) < pick.moveIn + (contestFor(s, pick)?.extra || 0)} onClick={() => { onMove(pick, movePlan); setPick(null); }}>{s.cash + (movePlan === 'sell' ? resaleValue : 0) < pick.moveIn + (contestFor(s, pick)?.extra || 0) ? `Need ${Math.max(0, pick.moveIn + (contestFor(s, pick)?.extra || 0) - (movePlan === 'sell' ? resaleValue : 0))} after equipment sale` : movePlan === 'sell' ? 'Sell equipment and move' : movePlan === 'store' ? 'Store equipment and move' : 'Arrange equipment and move'}</Btn>
+            <Btn tone="gold" disabled={s.cash + (movePlan === 'sell' ? resaleValue : 0) < pick.moveIn + (contestFor(s, pick)?.extra || 0) + (movePlan === 'furnished' ? readyFurnishedCost(pick) : 0)} onClick={() => { onMove(pick, movePlan); setPick(null); }}>
+              {s.cash + (movePlan === 'sell' ? resaleValue : 0) < pick.moveIn + (contestFor(s, pick)?.extra || 0) + (movePlan === 'furnished' ? readyFurnishedCost(pick) : 0)
+                ? `Need ${naira(Math.max(0, pick.moveIn + (contestFor(s, pick)?.extra || 0) + (movePlan === 'furnished' ? readyFurnishedCost(pick) : 0) - (movePlan === 'sell' ? resaleValue : 0)))} to move`
+                : movePlan === 'sell' ? 'Sell equipment and move'
+                  : movePlan === 'store' ? 'Store equipment and move'
+                    : movePlan === 'furnished' ? 'Buy package and move' : 'Arrange equipment and move'}
+            </Btn>
           </div>
         </Modal>
       )}

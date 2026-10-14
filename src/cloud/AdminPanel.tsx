@@ -53,7 +53,7 @@ export const AdminPanel: React.FC<{ store: CloudStore; me: CloudUser; onClose: (
                   <span className="text-white font-semibold">{r.name}{r.uid === me.uid ? ' (you)' : ''}</span>
                   <span className="text-emerald-300 font-semibold">{naira(r.cash)}</span>
                 </div>
-                <div className="text-[11px] text-slate-400">{r.email} · day {r.day} · {TIERS[r.tier]?.name} · last saved {new Date(r.savedAt).toLocaleString()}</div>
+                <div className="text-[11px] text-slate-400">{r.email} · day {r.day} · {TIERS[r.tier]?.name} · last saved {new Date(r.savedAt)?.toLocaleString()}</div>
               </button>
               {open === r.uid && (
                 <div className="mt-2 space-y-1.5">

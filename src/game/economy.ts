@@ -20,9 +20,11 @@ export interface ShopTier {
 export const TIERS: ShopTier[] = [
   { name: 'Kiosk', slots: 20, rent: 30_000, moveIn: 0, customers: 9, mix: [0.7, 0.27, 0.03], staff: 0, running: 1_500, luxury: false, blurb: 'A container kiosk on Herbert Macaulay Way, Yaba.' },
   { name: 'Small shop', slots: 30, rent: 120_000, moveIn: 100_000, customers: 12, mix: [0.55, 0.38, 0.07], staff: 0, running: 3_000, luxury: false, blurb: 'A proper shop in a Yaba plaza, with a fitting room.' },
-  { name: 'Boutique', slots: 50, rent: 330_000, moveIn: 500_000, customers: 16, mix: [0.42, 0.46, 0.12], staff: 2, running: 6_000, luxury: true, blurb: 'A bright boutique in Surulere with a big mirror wall.' },
-  { name: 'Big boutique', slots: 75, rent: 600_000, moveIn: 3_000_000, customers: 21, mix: [0.32, 0.5, 0.18], staff: 4, running: 12_000, luxury: true, blurb: 'Two floors on Admiralty Way, Lekki.' },
-  { name: 'Flagship', slots: 105, rent: 850_000, moveIn: 8_500_000, customers: 27, mix: [0.25, 0.5, 0.25], staff: 6, running: 25_000, luxury: true, blurb: 'The flagship store on Victoria Island. Celebrities come here.' },
+  { name: 'Boutique', slots: 50, rent: 1_000_000, moveIn: 3_000_000, customers: 16, mix: [0.42, 0.46, 0.12], staff: 2, running: 12_000, luxury: true, blurb: 'A larger boutique with a dedicated styling area and luxury suppliers.' },
+  { name: 'Big boutique', slots: 75, rent: 4_000_000, moveIn: 12_000_000, customers: 21, mix: [0.32, 0.5, 0.18], staff: 4, running: 35_000, luxury: true, blurb: 'A substantial multi-zone boutique on the Lagos Island fashion circuit.' },
+  { name: 'Flagship', slots: 105, rent: 12_000_000, moveIn: 35_000_000, customers: 27, mix: [0.25, 0.5, 0.25], staff: 6, running: 80_000, luxury: true, blurb: 'A major flagship with premium shopping areas and celebrity clientele.' },
+  { name: 'Luxury Maison', slots: 140, rent: 30_000_000, moveIn: 75_000_000, customers: 34, mix: [0.18, 0.46, 0.36], staff: 8, running: 160_000, luxury: true, blurb: 'A prestigious multi-room maison with private fitting and VIP consultation spaces.' },
+  { name: 'Fashion Empire House', slots: 180, rent: 75_000_000, moveIn: 180_000_000, customers: 43, mix: [0.12, 0.43, 0.45], staff: 10, running: 350_000, luxury: true, blurb: 'An iconic fashion empire with grand showrooms, private suites and dedicated back-of-house rooms.' },
 ];
 
 /** The shop is open 8am–8pm: 720 game minutes, one per real second. */
@@ -88,4 +90,4 @@ export const STAFF = {
 
 export const GRACE_OPTIONS = [0, 2, 7, 7, 14];
 
-export const naira = (n: number) => `${n < 0 ? '-' : ''}₦${Math.abs(Math.round(n)).toLocaleString('en-NG')}`;
+export const naira = (n: number) => `${n < 0 ? '-' : ''}₦${Math.abs(Math.round(n))?.toLocaleString('en-NG')}`;

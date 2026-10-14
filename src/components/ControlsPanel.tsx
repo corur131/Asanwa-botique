@@ -511,7 +511,7 @@ export const ControlsPanel: React.FC<ControlsPanelProps> = ({ config, onChange, 
                       className={`p-2 rounded-lg border text-left transition-all ${current?.style === it.id ? 'border-amber-500 bg-amber-500/15 text-white' : 'border-white/10 bg-white/5 text-slate-300 hover:border-white/25'}`}
                     >
                       <div className="text-xs font-semibold leading-tight">{it.label}</div>
-                      <div className="text-[10px] text-slate-400 mt-0.5">₦{it.price.toLocaleString()} · {it.native ? 'Native' : 'English'}</div>
+                      <div className="text-[10px] text-slate-400 mt-0.5">₦{it.price?.toLocaleString()} · {it.native ? 'Native' : 'English'}</div>
                     </button>
                   ))}
                 </div>
