@@ -8,7 +8,7 @@ import { answerInvite, contestFor, contestModel, dropStep, judge, planDrop, plan
 import { POWER as POWER_CFG, activeGeneratorUid, addShout, coolRunning, drainRate, fuelOf, fuelPrice, liveStats, nepaOff, outageAt, planOutages, pourFuel, powerStep, scarcity, source, tankSize } from './power';
 import { answerConvo, startGist } from './convos';
 import { ENERGY, busyNow, divineBonus, energyOf, energyStep, exhausted, payBills, spendEnergy } from './life';
-import { makeCustomer, makeCelebrityCustomer } from './customers';
+import { makeCustomer, makeCelebrityCustomer, celebrityIsScheduled, celebrityVisitChance, maximumCelebrityTierForShop } from './customers';
 import { buildLook, hairGroup, lookCost, scoreLook } from './scoring';
 import { FABRIC_COLORS, FEMALE_HAIR, MAKEUP_LOOKS } from '../constants/catalog';
 import { colourName } from './colours';
@@ -482,21 +482,14 @@ export function openShop(s0: GameState): GameState {
     mix[2] = Math.max(0, mix[2] + shift);
   }
   const arrivals = Array.from({ length: n }, () => ({ at: arrivalMinute(), c: makeCustomer(s, mix) }));
-  // Scheduled visit days per 14-day cycle scale with the seven shop tiers.
-  // The visitor's celebrity rank is rolled separately from shop level, using the existing five-rank scale.
-  const celebrityDaysByTier: number[][] = [
-    [2, 9],
-    [1, 5, 10],
-    [0, 4, 7, 11],
-    [1, 4, 7, 10, 13],
-    [0, 2, 4, 7, 9, 12],
-    [0, 1, 3, 4, 6, 8, 10, 12, 13],
-    [0, 1, 2, 3, 4, 6, 7, 8, 9, 11, 12, 13],
-  ];
-  const fortnightDay = (s.day - 1) % 14;
-  const celebrityScheduled = (celebrityDaysByTier[s.tier] || []).includes(fortnightDay);
-  if ((s.listing.signature || s.tier >= 5) && celebrityScheduled) {
-    const highestEligibleCelebrityTier = Math.min(4, Math.max(0, Math.floor(s.tier || 0)));
+  // Celebrity eligibility starts at shop Level 3; signature properties improve odds without being a gate.
+  const celebrityScheduled = celebrityIsScheduled(s.tier, s.day);
+  const highestEligibleCelebrityTier = maximumCelebrityTierForShop(s.tier);
+  if (
+    highestEligibleCelebrityTier >= 0 &&
+    celebrityScheduled &&
+    chance(celebrityVisitChance(s.tier, !!s.listing.signature))
+  ) {
     const celebrityTier = Math.floor(Math.random() * (highestEligibleCelebrityTier + 1));
     const c = makeCelebrityCustomer(s, celebrityTier);
     arrivals.push({ at: 100 + Math.random() * 560, c });
@@ -748,10 +741,12 @@ export function settle(c: Customer, score: ScoreBreakdown, price: number, suppli
       outcome = 'bargained';
       line = `It's fine, but ${naira(price)} is too much. I'll give you ${naira(paid)}.`;
     }
-    if (c.cls === 'rich' && s < 80) {
+    if (c.cls === 'rich') {
       paid = c.budget;
       outcome = 'bargained';
-      line = `For this? ${naira(paid)}, take it or leave it.`;
+      line = s >= 80
+        ? `I love the look, but my budget is ${naira(c.budget)}. Can we keep it there?`
+        : `For this? ${naira(paid)}, take it or leave it.`;
     }
   }
   if (s < 50 && !c.celebrity) {
@@ -785,14 +780,18 @@ export function settle(c: Customer, score: ScoreBreakdown, price: number, suppli
       line = `${line} Transfer alert received. Thank goodness.`;
     }
   }
+  // Budget is a spending ceiling, not a guarantee that every rich customer spends it all.
+  if (c.cls === 'rich') paid = Math.min(paid, c.budget);
   let tip = 0;
   if (s >= 85) tip = { poor: 0.03, middle: 0.08, rich: 0.15 }[c.cls] * paid;
   else if (s >= 75) tip = { poor: 0.01, middle: 0.04, rich: 0.07 }[c.cls] * paid;
   if (c.male) tip *= 1.5; // men tip big
   if (c.celebrity) {
-    paid = Math.max(paid, c.celebrity.spendFloor);
+    // The premium visit is a valuable completed sale, but the payout can never exceed this guest's budget.
+    paid = Math.min(c.budget, Math.max(paid, c.celebrity.spendFloor));
     outcome = 'paid';
-    tip = Math.max(tip, Math.round(paid * (0.22 + c.celebrity.tier * 0.035) / 100) * 100);
+    const celebrityTipRate = 0.05 + c.celebrity.tier * 0.02;
+    tip = Math.max(tip, Math.round(paid * celebrityTipRate / 100) * 100);
     line = `${c.name} loved the luxury look and paid lavishly, with a generous celebrity tip.`;
   }
   const repDelta = ((s - 65) / 18) * (c.influencer ? 3 : 1);
