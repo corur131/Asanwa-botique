@@ -360,6 +360,33 @@ export const Ears: React.FC<{ id: (n: string) => string; look: HeadLook; earring
           {[0, 1, 2].map((row) => [-1, 0, 1].map((col) => <circle key={row + '-' + col} cx={x + col * (6 + row * 3)} cy={407 + row * 9 + Math.abs(col) * 2} r={3.8 - row * 0.4} fill={`url(#${id('pearl')})`} stroke="#C8BFB0" strokeWidth="0.5" />))}
         </g>
       ))}
+      {earrings === 'atelierPearlDriftEarClimbers' && both((x, side) => (
+        <g key={x}>
+          <path d={`M ${x} 388 C ${x + side * 14} 399 ${x + side * 18} 410 ${x + side * 12} 422 C ${x + side * 8} 432 ${x + side * 16} 440 ${x + side * 23} 439`} fill="none" stroke={`url(#${id('gold')})`} strokeWidth="2.3" />
+          {[0,1,2,3,4,5].map((i) => <circle key={i} cx={x + side * (i < 3 ? 4 + i * 3 : 12 + (i - 3) * 3)} cy={393 + i * 8} r={i % 2 ? 2.8 : 3.8} fill={`url(#${id('pearl')})`} stroke="#C8BFB0" strokeWidth="0.6" />)}
+          <circle cx={x + side * 23} cy="439" r="2.6" fill="#F8FBFF" stroke={`url(#${id('gold')})`} strokeWidth="1" />
+        </g>
+      ))}
+      {earrings === 'atelierOrbitHaloDrops' && both((x, side) => (
+        <g key={x}>
+          <circle cx={x} cy="388" r="3" fill={`url(#${id('gold')})`} />
+          <path d={`M ${x} 391 L ${x} 399`} stroke={`url(#${id('gold')})`} strokeWidth="2" />
+          <ellipse cx={x + side * 1.5} cy="414" rx="12.5" ry="16" transform={`rotate(${side * 16} ${x + side * 1.5} 414)`} fill="none" stroke={`url(#${id('gold')})`} strokeWidth="2.2" />
+          <ellipse cx={x + side * 1.5} cy="414" rx="8.2" ry="11.5" transform={`rotate(${-side * 16} ${x + side * 1.5} 414)`} fill="none" stroke="#F8FBFF" strokeWidth="1.3" />
+          <circle cx={x} cy="414" r="4.2" fill={`url(#${id('pearl')})`} stroke="#BAC6D4" strokeWidth="0.7" />
+          <path d={`M ${x + side * 8} 426 L ${x + side * 14} 434 L ${x + side * 8} 442 L ${x + side * 2} 434 Z`} fill="#E9F5FF" stroke="#A8BACC" strokeWidth="0.8" />
+        </g>
+      ))}
+      {earrings === 'atelierGlassShardChandeliers' && both((x, side) => (
+        <g key={x}>
+          <circle cx={x} cy="388" r="3.2" fill={`url(#${id('gold')})`} />
+          <path d={`M ${x} 392 L ${x} 400`} stroke={`url(#${id('gold')})`} strokeWidth="1.8" />
+          <path d={`M ${x} 400 L ${x + side * 11} 418 L ${x + side * 5} 440 L ${x - side * 2} 426 Z`} fill="#E6F5FF" stroke="#A9C0D4" strokeWidth="1" />
+          <path d={`M ${x} 400 L ${x - side * 12} 419 L ${x - side * 8} 435 L ${x - side * 2} 426 Z`} fill="#F7FCFF" stroke="#A9C0D4" strokeWidth="0.9" />
+          <path d={`M ${x} 404 L ${x + side * 4} 422 L ${x - side * 2} 426`} fill="none" stroke="#FFFFFF" strokeWidth="1.2" />
+          <circle cx={x + side * 2} cy="430" r="2.3" fill={`url(#${id('gold')})`} />
+        </g>
+      ))}
     </g>
   );
 };
