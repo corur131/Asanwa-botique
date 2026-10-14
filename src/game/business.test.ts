@@ -1,7 +1,13 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import type { Customer, GameState, Message } from './types';
-import { announceCelebrityVisit, initRivals, simulateRivals } from './rivals';
+import {
+  announceCelebrityVisit,
+  initRivals,
+  projectedRivalWeeklyProfitAtTier,
+  rivalCanAffordTierUpgrade,
+  simulateRivals,
+} from './rivals';
 import { judge } from './encounters';
 import { answerInvite } from './encounters';
 import { money, payRent, payRentEarly, settleLateRent, demote, closeShop, cashFlowSummary } from './engine';
@@ -27,7 +33,9 @@ import {
   upgradeWholesaleInventory,
   startPromotion,
   processPromotionAtClose,
+  recordWeeklyWealth,
 } from './business';
+import { TIERS } from './economy';
 
 function state(overrides: Partial<GameState> = {}): GameState {
   return {
@@ -1012,3 +1020,168 @@ test('warehouse promotion is recorded as a buyer-demand campaign, not a follower
 });
 
 
+
+
+test('rival tier upgrades require both protected liquidity and sustainable tier economics', () => {
+  const seed = initRivals().find((rival) => rival.id === 'ivory')!;
+  const sustainable = {
+    ...seed,
+    tier: 5,
+    stars: 3,
+    cash: 1_000_000_000,
+    savings: 0,
+    debt: 0,
+    week: Array.from({ length: 7 }, () => 40_000_000),
+    weekCosts: Array.from({ length: 7 }, () => 20_000_000),
+    profitHistory: Array.from({ length: 7 }, () => 20_000_000),
+  };
+  assert.ok(projectedRivalWeeklyProfitAtTier(sustainable, 6) > 0);
+  assert.equal(rivalCanAffordTierUpgrade(sustainable, 6), true,
+    'a well-capitalised Luxury Maison with sustained profit should be able to reach Fashion Empire');
+
+  const weakDemand = {
+    ...sustainable,
+    week: Array.from({ length: 7 }, () => 100_000),
+    weekCosts: Array.from({ length: 7 }, () => 1_000_000),
+    profitHistory: Array.from({ length: 7 }, () => -900_000),
+  };
+  assert.ok(projectedRivalWeeklyProfitAtTier(weakDemand, 6) < 0);
+  assert.equal(rivalCanAffordTierUpgrade(weakDemand, 6), false,
+    'large cash alone must not justify an upgrade whose projected trading economics lose money');
+
+  assert.equal(rivalCanAffordTierUpgrade({ ...sustainable, cash: 20_000_000 }, 6), false,
+    'cash and savings must cover the fit-out and protected rent reserve');
+});
+
+test('cash-rich but persistently unprofitable rivals do not upgrade tiers', () => {
+  const originalRandom = Math.random;
+  const seed = initRivals().find((rival) => rival.id === 'ivory')!;
+  const struggling = {
+    ...seed,
+    tier: 5,
+    stars: 3,
+    cash: 1_000_000_000,
+    savings: 0,
+    debt: 0,
+    moved: 0,
+    broke: 0,
+    week: Array.from({ length: 7 }, () => 100_000),
+    weekCosts: Array.from({ length: 7 }, () => 1_000_000),
+    profitHistory: Array.from({ length: 7 }, () => -900_000),
+  };
+  try {
+    Math.random = () => 0.999;
+    const result = simulateRivals(state({
+      day: 29,
+      history: [],
+      ranking: [],
+      dailyRanking: [],
+      listing: { area: 'Yaba' } as GameState['listing'],
+      today: { day: 29, bestScore: 0, events: [] } as unknown as GameState['today'],
+      rivals: [struggling],
+      messages: [],
+      gist: [],
+      rivalPosts: [],
+    }));
+    assert.equal(result.rivals[0].tier, 5);
+    assert.ok(!result.gist.some((item) => /Ivory Lane moves to a Fashion Empire House/i.test(item.title)));
+  } finally {
+    Math.random = originalRandom;
+  }
+});
+
+test('rival demotion rescue records family bridge credit as debt instead of free cash', () => {
+  const originalRandom = Math.random;
+  const seed = initRivals().find((rival) => rival.id === 'amaka')!;
+  const struggling = {
+    ...seed,
+    tier: 1,
+    stars: 2,
+    cash: -5_000_000,
+    savings: 0,
+    debt: 0,
+    moved: 0,
+    broke: 9,
+    week: Array.from({ length: 7 }, () => 400_000),
+    weekCosts: Array.from({ length: 7 }, () => 300_000),
+    profitHistory: Array.from({ length: 7 }, () => -100_000),
+  };
+  try {
+    Math.random = () => 0.999;
+    const result = simulateRivals(state({
+      day: 28,
+      history: [],
+      ranking: [],
+      dailyRanking: [],
+      listing: { area: 'Yaba' } as GameState['listing'],
+      today: { day: 28, bestScore: 0, events: [] } as unknown as GameState['today'],
+      rivals: [struggling],
+      messages: [],
+      gist: [],
+      rivalPosts: [],
+    }));
+    const rival = result.rivals.find((item) => item.id === 'amaka')!;
+    assert.equal(rival.tier, 0, 'after ten broke days, the rival should fall one tier');
+    assert.ok(rival.cash > 0, 'the recorded bridge loan keeps the rival trading after demotion');
+    assert.ok((rival.debt || 0) > 0, 'rescued cash must create an equal liability');
+    assert.ok(result.gist.some((item) => /family bridge credit/i.test(item.title)));
+    assert.ok(result.gist.some((item) => /borrowed/.test(item.body) && /liability/.test(item.body)));
+  } finally {
+    Math.random = originalRandom;
+  }
+});
+
+test('weekly wealth rankings and value changes reflect the new financial positions', () => {
+  const initial = initRivals();
+  const ivorySeed = initial.find((rival) => rival.id === 'ivory')!;
+  const tolaniSeed = initial.find((rival) => rival.id === 'tolani')!;
+  const ivory = {
+    ...ivorySeed,
+    cash: 1_000_000_000,
+    savings: 0,
+    debt: 0,
+    week: Array.from({ length: 7 }, () => 40_000_000),
+    weekCosts: Array.from({ length: 7 }, () => 20_000_000),
+    profitHistory: Array.from({ length: 7 }, () => 20_000_000),
+  };
+  const tolani = {
+    ...tolaniSeed,
+    cash: 300_000_000,
+    savings: 0,
+    debt: 0,
+    week: Array.from({ length: 7 }, () => 25_000_000),
+    weekCosts: Array.from({ length: 7 }, () => 14_000_000),
+    profitHistory: Array.from({ length: 7 }, () => 11_000_000),
+  };
+  const weekOne = recordWeeklyWealth(state({
+    day: 7,
+    cash: 5_000_000,
+    rep: 55,
+    tier: 0,
+    followers: 1_000,
+    listing: { area: 'Yaba' } as GameState['listing'],
+    stock: [],
+    furniture: [],
+    history: [],
+    wealthHistory: [],
+    rivals: [ivory, tolani],
+  }));
+  const first = weekOne.wealthHistory!.filter((item) => item.day === 7);
+  assert.ok(first.find((item) => item.ownerId === 'ivory')!.rank < first.find((item) => item.ownerId === 'tolani')!.rank);
+
+  const weekTwo = recordWeeklyWealth({
+    ...weekOne,
+    day: 14,
+    rivals: weekOne.rivals.map((rival) => rival.id === 'ivory'
+      ? { ...rival, cash: 200_000_000 }
+      : rival.id === 'tolani'
+        ? { ...rival, cash: 1_500_000_000 }
+        : rival),
+  });
+  const second = weekTwo.wealthHistory!.filter((item) => item.day === 14);
+  const ivoryNow = second.find((item) => item.ownerId === 'ivory')!;
+  const tolaniNow = second.find((item) => item.ownerId === 'tolani')!;
+  assert.ok(tolaniNow.rank < ivoryNow.rank, 'the richer rival should take the higher weekly wealth rank');
+  assert.ok(ivoryNow.wealthChange < 0, 'wealth history should record Ivory Lane losing value');
+  assert.ok(tolaniNow.wealthChange > 0, 'wealth history should record House of Tolani gaining value');
+});
