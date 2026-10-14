@@ -1751,6 +1751,25 @@ export interface CartValidation {
   errors: string[];
 }
 
+/** Match official palette colours robustly without allowing unsupported colours. */
+function officialMarketColour(value: unknown, palette: readonly string[]): string | undefined {
+  if (typeof value !== 'string') return undefined;
+  const normalised = value.trim().toLowerCase();
+  return palette.find((colour) => colour.toLowerCase() === normalised);
+}
+
+/** Convert known palette colours back to their official hex form before saving stock. */
+function canonicaliseCartColours(line: CartLine): CartLine {
+  const palette = line.kind === 'hair' ? HAIR_SWATCHES.map((swatch) => swatch.color) : FABRIC_COLORS;
+  const colour = officialMarketColour(line.color, palette);
+  const colour2 = isClothing(line.kind) ? officialMarketColour(line.color2, FABRIC_COLORS) : undefined;
+  return {
+    ...line,
+    color: colour || line.color,
+    ...(isClothing(line.kind) && colour2 ? { color2 } : {}),
+  };
+}
+
 /** Validate the entire order before any cash or inventory is changed. */
 export function validateCart(s: GameState, lines: CartLine[]): CartValidation {
   const errors: string[] = [];
@@ -1758,11 +1777,12 @@ export function validateCart(s: GameState, lines: CartLine[]): CartValidation {
   if (Array.isArray(lines) && lines.length > 250) errors.push('Your cart contains too many separate lines.');
   const seen = new Set<string>();
   let total = 0;
-  for (const line of Array.isArray(lines) ? lines : []) {
-    if (!line || typeof line !== 'object') {
+  for (const rawLine of Array.isArray(lines) ? lines : []) {
+    if (!rawLine || typeof rawLine !== 'object') {
       errors.push('The cart contains an invalid item.');
       continue;
     }
+    const line = canonicaliseCartColours(rawLine);
     const entry = entryFor(line.kind, line.itemId);
     if (!entry) {
       errors.push('A cart item is not in the official Yaba Mart catalogue.');
@@ -1777,15 +1797,18 @@ export function validateCart(s: GameState, lines: CartLine[]): CartValidation {
       continue;
     }
     const palette = line.kind === 'hair' ? HAIR_SWATCHES.map((swatch) => swatch.color) : FABRIC_COLORS;
-    if (!palette.includes(line.color) || !palette.includes(line.color2)) {
-      errors.push(`${entry.label} has a colour that is not offered by the official market palette.`);
+    const colour = officialMarketColour(line.color, palette);
+    const colour2 = isClothing(line.kind) ? officialMarketColour(line.color2, FABRIC_COLORS) : undefined;
+    if (!colour || (isClothing(line.kind) && !colour2)) {
+      const badPart = !colour ? 'main colour' : 'second/trim colour';
+      errors.push(`${entry.label} has a ${badPart} that is not offered by the official market palette.`);
       continue;
     }
     if (!Number.isInteger(line.pattern) || line.pattern < 0 || line.pattern > 32) {
       errors.push(`${entry.label} has an invalid pattern.`);
       continue;
     }
-    if (line.kind === 'hair' && HAIR_SWATCHES[line.pattern]?.color !== line.color) {
+    if (line.kind === 'hair' && HAIR_SWATCHES[line.pattern]?.color.toLowerCase() !== colour.toLowerCase()) {
       errors.push(`${entry.label} has a hair colour/pattern combination that is not offered by the market.`);
       continue;
     }
@@ -1794,7 +1817,7 @@ export function validateCart(s: GameState, lines: CartLine[]): CartValidation {
       errors.push(`${entry.label} has an invalid fabric selection.`);
       continue;
     }
-    const canonicalKey = [line.kind, line.itemId, line.fabric || '', line.color, line.color2, line.pattern].join('|');
+    const canonicalKey = [line.kind, line.itemId, line.fabric || '', colour, colour2 || line.color2, line.pattern].join('|');
     if (seen.has(canonicalKey)) {
       errors.push(`Duplicate cart lines found for ${entry.label}. Combine duplicate quantities before checkout.`);
       continue;
@@ -1824,10 +1847,11 @@ export const cartNewDesigns = (s: GameState, lines: CartLine[]) => {
 
 /** Pay for everything in the cart. Matching designs already in stock get topped up. */
 export function buyCart(s0: GameState, lines: CartLine[]): GameState {
-  const validation = validateCart(s0, lines);
+  const canonicalLines = lines.map(canonicaliseCartColours);
+  const validation = validateCart(s0, canonicalLines);
   if (!validation.ok) return s0;
   let s = s0;
-  for (const l of lines) {
+  for (const l of canonicalLines) {
     const e = entryFor(l.kind, l.itemId);
     if (!e || !canBuy(e, s.tier) || l.pieces <= 0) continue;
     const have = s.stock.find((d) => sameDesign(d, l));
@@ -1839,7 +1863,7 @@ export function buyCart(s0: GameState, lines: CartLine[]): GameState {
   // actually present in this successful checkout. Keep quantities separate so
   // two similar pending orders cannot both claim the same cart pieces.
   const purchasedCounts = new Map<string, number>();
-  for (const line of lines) {
+  for (const line of canonicalLines) {
     const key = [line.kind, line.itemId, line.fabric || '', line.color, line.color2, line.pattern].join('|');
     purchasedCounts.set(key, (purchasedCounts.get(key) || 0) + line.pieces);
   }
