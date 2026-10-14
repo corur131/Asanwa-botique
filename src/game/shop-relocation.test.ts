@@ -232,6 +232,32 @@ test('Level 6 and Level 7 furnished packages contain practical luxury equipment 
   }
 });
 
+test('player celebrity visits observe the one-day cooldown but Deborah tips remain special leads', () => {
+  const originalRandom = Math.random;
+  try {
+    Math.random = () => 0.001;
+    const fresh = newGame(DIVINE_CONFIG);
+    const signatureListing = listingsFor(6, 0).find((listing) => listing.signature);
+    assert.ok(signatureListing, 'Fashion Empire should have a Signature property option');
+    const day1 = openShop({
+      ...fresh, tier: 6, listing: signatureListing!, day: 1, phase: 'morning' as const,
+    });
+    assert.ok(day1.arrivals.some((arrival) => !!arrival.c.celebrity), 'a scheduled Signature Fashion Empire opportunity should be able to arrive');
+    assert.equal(day1.lastCelebrityVisitDay, 1);
+
+    const day2 = openShop({ ...day1, day: 2, phase: 'morning' as const, celebDay: undefined });
+    assert.ok(!day2.arrivals.some((arrival) => !!arrival.c.celebrity),
+      'a routine day-2 opportunity is skipped after a day-1 celebrity visit');
+
+    const tippedDay2 = openShop({ ...day1, day: 2, phase: 'morning' as const, celebDay: 2 });
+    assert.ok(tippedDay2.arrivals.some((arrival) => !!arrival.c.celebrity),
+      'Deborah’s confirmed lead can be a special exception to the routine cooldown');
+    assert.equal(tippedDay2.lastCelebrityVisitDay, 2);
+  } finally {
+    Math.random = originalRandom;
+  }
+});
+
 test('normal Level 6 and 7 properties can receive celebrities on candidate visit days', () => {
   // The visit is now an opportunity, not a guaranteed payout. Force a successful probability roll
   // to make this integration check deterministic; the frequency distribution is covered separately.
