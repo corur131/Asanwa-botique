@@ -2159,7 +2159,7 @@ function migrate(raw: GameState): GameState | null {
     msgSeq: messages.length,
     read: Object.fromEntries(messages.map((m) => [m.from, messages.length])),
   } as GameState;
-  return ensureBusinessState(upgraded);
+  return ensureBusinessState(sanitizeSavedCelebrityNameCollisions(upgraded));
 }
 /** The save on this device from before accounts existed. */
 export const LEGACY_KEY = KEY;
