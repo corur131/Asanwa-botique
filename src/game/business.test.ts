@@ -651,6 +651,43 @@ test('Tolani and other rivals do not receive celebrity clients on every day; off
   }
 });
 
+test('a rival cannot receive routine celebrity visits on consecutive days', () => {
+  const originalRandom = Math.random;
+  try {
+    Math.random = () => 0.001;
+    const seed = initRivals().find((rival) => rival.id === 'ivory')!;
+    const elite = {
+      ...seed,
+      tier: 6,
+      signature: true,
+      stars: 4,
+      cash: 1_000_000_000,
+      moved: 31,
+      week: Array.from({ length: 7 }, () => 10_000_000),
+      weekCosts: Array.from({ length: 7 }, () => 2_000_000),
+    };
+    const day29 = state({
+      day: 29, history: [], ranking: [], dailyRanking: [],
+      listing: { area: 'Yaba' } as GameState['listing'],
+      today: { day: 29, bestScore: 0, events: [] } as unknown as GameState['today'],
+      rivals: [elite], messages: [], gist: [], rivalPosts: [],
+    });
+    const first = simulateRivals(day29);
+    assert.ok(first.gist.some((item) => item.day === 29 && /celebrity client/i.test(item.title)));
+    assert.equal(first.rivals[0].lastCelebrityVisitDay, 29);
+
+    const day30 = state({
+      ...first, day: 30, history: [...(first.history || [])],
+      today: { day: 30, bestScore: 0, events: [] } as unknown as GameState['today'],
+    });
+    const second = simulateRivals(day30);
+    assert.ok(!second.gist.some((item) => item.day === 30 && /celebrity client/i.test(item.title)),
+      'Signature Level 7 has a scheduled candidate on day 30, but a day-29 visit triggers cooldown');
+  } finally {
+    Math.random = originalRandom;
+  }
+});
+
 test('Level 6 and Level 7 rivals retain finite celebrity finances and publicize visits', () => {
   const originalRandom = Math.random;
   try {
