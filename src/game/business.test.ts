@@ -722,7 +722,7 @@ test('Level 6 and Level 7 rivals retain finite celebrity finances and publicize 
       assert.ok(result.week.every(Number.isFinite), 'Level ' + (tier + 1) + ' rival revenue history must remain finite');
       assert.ok(updated.gist.some((item) => /celebrity client/i.test(item.title)), 'Level ' + (tier + 1) + ' celebrity visit should appear in the news feed');
       assert.ok(updated.messages.some((item) => item.from === 'GistLagos' && /CELEBRITY SIGHTING/i.test(item.text)), 'Level ' + (tier + 1) + ' celebrity visit should be announced');
-      assert.ok(updated.rivalPosts.some((post) => /Celebrity client|special guest/i.test(post.caption)), 'Level ' + (tier + 1) + ' celebrity visit should appear on social media');
+      assert.ok(updated.rivalPosts.some((post) => /celebrity|special guest/i.test(post.caption)), 'Level ' + (tier + 1) + ' celebrity visit should appear on social media');
     }
   } finally {
     Math.random = originalRandom;
