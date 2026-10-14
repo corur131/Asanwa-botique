@@ -2,7 +2,7 @@ import { Occasion } from '../constants/catalog';
 import { generateRandomCustomer } from '../utils/randomizer';
 import { BUDGET, SERVICE_BUDGET, SERVICE_SHARE } from './economy';
 import { WANTED_COLOURS } from './colours';
-import { Customer, CustomerClass, GameState, Regular, Want } from './types';
+import { Customer, CustomerClass, GameState, PromotionLevel, Regular, Want } from './types';
 import { shopStats } from './shop';
 
 const pick = <T,>(a: readonly T[]): T => a[Math.floor(Math.random() * a.length)];
@@ -290,30 +290,105 @@ export interface CelebrityAttractionProfile {
   awareness?: number;
   prestige?: number;
   trendInfluence?: number;
+  loyalty?: number;
+  reliability?: number;
 }
 
-/** Bounded 0.78–1.25 attraction multiplier: strong brands gain visibility, but nothing guarantees a visit. */
-export function celebrityAttractionMultiplier(profile?: CelebrityAttractionProfile): number {
-  if (!profile) return 1;
-  const clampScore = (value: number | undefined, fallback: number) =>
+/** Follower bonuses are percentage points, with interpolation between the agreed milestones. */
+const FOLLOWER_OPPORTUNITY_MILESTONES: readonly (readonly [number, number])[] = [
+  [0, 0],
+  [100_000, 2],
+  [200_000, 2.5],
+  [300_000, 3],
+  [400_000, 3.5],
+  [500_000, 4],
+  [1_000_000, 6.5],
+  [2_000_000, 11.5],
+  [5_000_000, 26.5],
+];
+
+export function followerOpportunityBonus(followers: number): number {
+  const audience = Math.max(0, Number.isFinite(followers) ? followers : 0);
+  if (audience >= 5_000_000) {
+    // No follower cap: each doubling after five million adds 12 percentage points.
+    return 26.5 + 12 * Math.log2(audience / 5_000_000);
+  }
+  for (let i = 1; i < FOLLOWER_OPPORTUNITY_MILESTONES.length; i++) {
+    const [upperFollowers, upperBonus] = FOLLOWER_OPPORTUNITY_MILESTONES[i];
+    const [lowerFollowers, lowerBonus] = FOLLOWER_OPPORTUNITY_MILESTONES[i - 1];
+    if (audience <= upperFollowers) {
+      const progress = (audience - lowerFollowers) / (upperFollowers - lowerFollowers);
+      return lowerBonus + (upperBonus - lowerBonus) * progress;
+    }
+  }
+  return 26.5;
+}
+
+/** Percentage-point discovery boost from the existing brand-promotion levels. */
+export function promotionDiscoveryBonus(level?: PromotionLevel): number {
+  if (!level) return 0;
+  return ({ local: 3, citywide: 6, premium: 10, luxury: 15 })[level];
+}
+
+/** Convert shared visibility into a probability; follower bonuses themselves remain uncapped. */
+export function visibilityDiscoveryChance(
+  baseChance: number,
+  followers: number,
+  promotionLevel?: PromotionLevel,
+): number {
+  const base = Number.isFinite(baseChance) ? Math.max(0, baseChance) : 0;
+  const bonus = (followerOpportunityBonus(followers) + promotionDiscoveryBonus(promotionLevel)) / 100;
+  // Natural probability limit only; this does not cap the follower-bonus curve.
+  return Math.max(0, Math.min(0.98, base + bonus));
+}
+
+/**
+ * Base chance that each of three candidate celebrities discovers the shop.
+ * These levels are calibrated to preserve the agreed high-frequency outcomes for
+ * Level 6/7 Signature boutiques before followers or promotions are added.
+ */
+const CELEBRITY_DISCOVERY_BASE_BY_TIER: readonly number[] = [
+  0, 0, 0.075, 0.122, 0.184, 0.23, 0.282,
+];
+const SIGNATURE_CELEBRITY_DISCOVERY_BASE_BY_TIER: readonly number[] = [
+  0, 0, 0.096, 0.157, 0.243, 0.31, 0.39,
+];
+
+export function celebrityDiscoveryChance(
+  shopTierIndex: number,
+  signatureProperty: boolean,
+  profile?: CelebrityAttractionProfile,
+  promotionLevel?: PromotionLevel,
+): number {
+  if (maximumCelebrityTierForShop(shopTierIndex) < 0) return 0;
+  const tier = Math.min(6, Math.floor(shopTierIndex));
+  const table = signatureProperty
+    ? SIGNATURE_CELEBRITY_DISCOVERY_BASE_BY_TIER
+    : CELEBRITY_DISCOVERY_BASE_BY_TIER;
+  return visibilityDiscoveryChance(table[tier] || 0, profile?.followers || 0, promotionLevel);
+}
+
+/** A discovered celebrity still has to decide whether the visit suits them. */
+export function celebrityVisitFollowThroughChance(profile?: CelebrityAttractionProfile): number {
+  const score = (value: number | undefined) =>
     typeof value === 'number' && Number.isFinite(value)
       ? Math.max(0, Math.min(100, value))
-      : Math.max(0, Math.min(100, fallback));
-  const reputation = clampScore(profile.reputation, 50);
-  const followers = typeof profile.followers === 'number' && Number.isFinite(profile.followers)
-    ? Math.max(0, profile.followers) : 0;
-  const social = Math.log10(followers + 1);
-  const tier = typeof profile.shopTierIndex === 'number' && Number.isFinite(profile.shopTierIndex)
-    ? Math.max(0, Math.min(6, Math.floor(profile.shopTierIndex))) : 0;
-  const awareness = clampScore(profile.awareness, 18 + social * 10 + tier * 4);
-  const prestige = clampScore(profile.prestige, 15 + reputation * 0.52 + tier * 3);
-  const trendInfluence = clampScore(profile.trendInfluence, 12 + social * 5);
-  const audienceScore = Math.max(0, Math.min(100, social / 5 * 100));
-  const brandHeat = reputation * 0.35 + awareness * 0.25 + prestige * 0.20 +
-    trendInfluence * 0.15 + audienceScore * 0.05;
-  return Math.max(0.78, Math.min(1.25, 0.78 + (brandHeat / 100) * 0.47));
+      : 50;
+  const adjustment =
+    (score(profile?.reputation) - 50) * 0.001 +
+    (score(profile?.prestige) - 50) * 0.0006 +
+    (score(profile?.loyalty) - 50) * 0.0004 +
+    (score(profile?.reliability) - 50) * 0.0004;
+  return Math.max(0.65, Math.min(0.95, 0.85 + adjustment));
 }
 
+/** Followers and brand campaigns shift customer composition towards affluent clients. */
+export function affluentCustomerShareShift(followers: number, promotionLevel?: PromotionLevel): number {
+  const campaignPoints = promotionLevel
+    ? ({ local: 0.5, citywide: 1, premium: 2, luxury: 3 })[promotionLevel]
+    : 0;
+  return (followerOpportunityBonus(followers) * 0.25 + campaignPoints) / 100;
+}
 /** Higher shop tiers increasingly attract the strongest ranks; Signature and brand heat tilt the mix upward. */
 export const CELEBRITY_TIER_WEIGHTS_BY_SHOP_TIER: readonly (readonly number[])[] = [
   [],
