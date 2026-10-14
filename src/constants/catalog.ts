@@ -74,6 +74,11 @@ export const FEMALE_HAIR: Option<FemaleHairStyle>[] = [
   { id: 'shortNatural', label: 'Short Natural (TWA)', note: 'natural' },
   { id: 'highBun', label: 'High Bun', note: 'updo' },
   { id: 'sleekPonytail', label: 'Sleek Ponytail', note: 'updo' },
+  { id: 'atelierGlassSilkBob', label: 'Glass-Silk Sculpted Bob', note: 'Original Level 6 runway cut' },
+  { id: 'atelierSculptedSWave', label: 'Sculpted S-Wave Lengths', note: 'Original Level 6 couture style' },
+  { id: 'atelierCurtainLayers', label: 'Curtain-Frame Layered Hair', note: 'Original Level 6 layered cut' },
+  { id: 'empireOrbitHaloCurls', label: 'Orbit Halo Curl Sculpture', note: 'Original Level 7 couture style' },
+  { id: 'empireLiquidSidePony', label: 'Liquid-Swept Side Ponytail', note: 'Original Level 7 couture style' },
 ];
 
 export const MALE_HAIR: Option<MaleHairStyle>[] = [
@@ -84,6 +89,9 @@ export const MALE_HAIR: Option<MaleHairStyle>[] = [
   { id: 'shortDreads', label: 'Short Twists' },
   { id: 'longLocs', label: 'Long Locs' },
   { id: 'bald', label: 'Clean Bald' },
+  { id: 'atelierMonolithTaper', label: 'Monolith Tapered Cut', note: 'Original Level 6 sculpted style' },
+  { id: 'atelierSculptedQuiff', label: 'Sculpted Architectural Quiff', note: 'Original Level 6 sculpted style' },
+  { id: 'empireSilkCurtainWaves', label: 'Empire Silk Curtain Waves', note: 'Original Level 7 sculpted style' },
 ];
 
 export const HAIR_COLORS: Option<HairColorId>[] = [
