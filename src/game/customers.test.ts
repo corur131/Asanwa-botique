@@ -7,6 +7,9 @@ import {
   CELEBRITY_TIER_WEIGHTS_BY_SHOP_TIER,
   celebrityAmountsForTier,
   celebrityAttractionMultiplier,
+  additionalCelebrityVisitChance,
+  thirdCelebrityVisitChance,
+  maximumCelebrityVisitsPerDay,
   chooseCelebrityTierForShop,
   celebrityIsScheduled,
   celebrityVisitChance,
@@ -154,8 +157,19 @@ test('celebrity eligibility opens at Level 3 and lower celebrity ranks can visit
   assert.equal(celebrityVisitChance(1, true), 0, 'Signature status cannot bypass the Level 3 gate');
   assert.deepEqual(
     [2, 3, 4, 5, 6].map((tier) => Number(celebrityVisitChance(tier, true).toFixed(2))),
-    [0.13, 0.20, 0.28, 0.35, 0.43],
+    [0.23, 0.35, 0.50, 0.60, 0.70],
   );
+});
+
+test('celebrity purchasing floors rise with shop prestige and Signature status', () => {
+  const baselineRandom = seededRandom(88442);
+  const luxuryRandom = seededRandom(88442);
+  const baseline = celebrityAmountsForTier(1, baselineRandom, 4, false);
+  const luxurySignature = celebrityAmountsForTier(1, luxuryRandom, 5, true);
+  assert.ok(luxurySignature.budget > baseline.budget);
+  assert.ok(luxurySignature.spendFloor > baseline.spendFloor);
+  assert.ok(luxurySignature.spendFloor >= Math.round(CELEBRITY_SPEND_RANGES[1].min * 1.265 / 5_000) * 5_000);
+  assert.ok(luxurySignature.budget <= Math.round(CELEBRITY_SPEND_RANGES[1].max * 1.265 / 5_000) * 5_000);
 });
 
 test('reputation, audience and brand heat improve attraction without guaranteeing a celebrity', () => {
@@ -182,30 +196,37 @@ test('reputation, audience and brand heat improve attraction without guaranteein
   assert.ok(signatureEmpireTop > empireTop, 'Signature should modestly improve the top-rank celebrity mix');
 });
 
-test('visit-frequency simulation scales gradually with shop tier and Signature improves odds', () => {
+test('visit frequency rises by level, Signature gets more scheduled days, and top shops can host multiple guests', () => {
   const random = seededRandom(20261013);
   const cycles = 4_000;
   const means: number[] = [];
   for (let shopTier = 2; shopTier <= 6; shopTier++) {
-    const candidateDays = CELEBRITY_DAYS_BY_SHOP_TIER[shopTier];
+    const normalDays = CELEBRITY_DAYS_BY_SHOP_TIER[shopTier];
+    const signatureDays = SIGNATURE_CELEBRITY_DAYS_BY_SHOP_TIER[shopTier];
     let normalVisits = 0;
     let signatureVisits = 0;
     for (let cycle = 0; cycle < cycles; cycle++) {
-      for (const _day of candidateDays) {
+      for (const _day of normalDays) {
         if (random() < celebrityVisitChance(shopTier, false)) normalVisits++;
+      }
+      for (const _day of signatureDays) {
         if (random() < celebrityVisitChance(shopTier, true)) signatureVisits++;
       }
     }
     const normalAverage = normalVisits / cycles;
     const signatureAverage = signatureVisits / cycles;
     means.push(normalAverage);
-    const normalExpected = candidateDays.length * celebrityVisitChance(shopTier, false);
-    const signatureExpected = candidateDays.length * celebrityVisitChance(shopTier, true);
+    const normalExpected = normalDays.length * celebrityVisitChance(shopTier, false);
+    const signatureExpected = signatureDays.length * celebrityVisitChance(shopTier, true);
     assert.ok(Math.abs(normalAverage - normalExpected) < 0.06);
     assert.ok(Math.abs(signatureAverage - signatureExpected) < 0.06);
     assert.ok(signatureAverage > normalAverage);
   }
-  assert.ok(means[4] > means[0], 'Level 7 should offer more visit opportunities than Level 3');
+  assert.ok(means[4] > means[0], 'Level 7 should have more visits than Level 3');
+  assert.ok(additionalCelebrityVisitChance(5, true) > 0.2, 'Signature Luxury Maison should have a meaningful second-guest chance');
+  assert.ok(thirdCelebrityVisitChance(6, true) > 0.1, 'Signature Fashion Empire can occasionally host a third guest');
+  assert.equal(maximumCelebrityVisitsPerDay(4, false), 2);
+  assert.equal(maximumCelebrityVisitsPerDay(6, true), 3);
 });
 
 test('rich and celebrity checkout payments respect budget and high-value orders require a strong look', () => {
@@ -229,9 +250,18 @@ test('rich and celebrity checkout payments respect budget and high-value orders 
   assert.ok(premiumSale.paid - premiumSale.cost < premiumSale.paid, 'gross celebrity receipt must not be treated as net profit');
 
   const average = settle(celebrity, { total: 72 } as ScoreBreakdown, 1_000_000, 10_000);
-  assert.ok(average.paid > 0, 'a passable look can still sell at its normal price');
-  assert.ok(average.paid < celebrity.celebrity!.spendFloor, 'passable styling must not trigger the guaranteed premium order');
-  assert.equal(average.cost, 10_000, 'ordinary celebrity purchases should not be charged premium-order costs');
+  assert.ok(average.paid >= celebrity.celebrity!.spendFloor, 'a completed standard celebrity purchase must honour the guest spend floor');
+  assert.ok(average.paid < celebrity.budget, 'the guest budget remains a ceiling, not an automatic full-budget charge');
+  assert.equal(average.cost, Math.round(average.paid * CELEBRITY_FULFILMENT_RATE), 'standard celebrity purchases must book fulfilment costs even when they are not premium orders');
+
+  const rema = {
+    cls: 'rich', budget: 18_000_000, male: true, influencer: true, name: 'Rema',
+    celebrity: { tier: 1, rank: 'Hitmaker', spendFloor: 8_000_000 },
+  } as Customer;
+  const remaSale = settle(rema, { total: 72 } as ScoreBreakdown, 1_865_000, 10_000);
+  assert.equal(remaSale.paid, 8_000_000, 'Rema cannot be charged an ordinary-item total below the supplied celebrity floor');
+  assert.equal(remaSale.cost, Math.round(8_000_000 * CELEBRITY_FULFILMENT_RATE));
+  assert.ok(!remaSale.line.includes('premium celebrity order'), 'a standard purchase remains distinct from a premium-quality order');
 
   const rejected = settle(celebrity, { total: 48 } as ScoreBreakdown, 1_000_000, 10_000);
   assert.equal(rejected.outcome, 'refused');
@@ -257,7 +287,7 @@ test('14-day celebrity payout simulation keeps premium orders below shop rent on
         for (const _day of days) {
           if (random() >= celebrityVisitChance(shopTier, signature)) continue;
           const celebrityTier = Math.floor(random() * (maxCelebrityTier + 1));
-          const { budget, spendFloor } = celebrityAmountsForTier(celebrityTier, random);
+          const { budget, spendFloor } = celebrityAmountsForTier(celebrityTier, random, shopTier, signature);
           if (random() >= 0.6) continue;
           const gross = Math.min(budget, spendFloor);
           const fulfilment = Math.max(0, Math.round(gross * CELEBRITY_FULFILMENT_RATE));
@@ -268,7 +298,8 @@ test('14-day celebrity payout simulation keeps premium orders below shop rent on
 
       const averageNetPerFortnight = netPremiumReceipts / cycles;
       assert.ok(premiumOrders > 0, 'simulation should observe premium orders at shop tier ' + shopTier);
-      assert.ok(averageNetPerFortnight < TIERS[shopTier].rent * 2,
+      const fortnightRent = TIERS[shopTier].rent * 2 * (signature ? 2.7 : 1);
+      assert.ok(averageNetPerFortnight < fortnightRent,
         'celebrity premium receipts should not cover all rent by themselves at shop tier ' + shopTier +
         (signature ? ' with Signature status' : ' without Signature status'));
     }
