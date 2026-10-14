@@ -33,7 +33,6 @@ const SHOPPER_CATEGORY_BY_KIND: Record<StockKind, ShopperProductCategory> = {
   outer: 'outer',
   shoes: 'shoes',
   bag: 'bag',
-  jewellery: 'jewellery',
   necklace: 'jewellery',
   wrist: 'jewellery',
   earrings: 'jewellery',
@@ -411,6 +410,7 @@ export function prepareShopperOrder(
           entry, line, unitCost,
           score: 3 + productDemand * 2 + recentUnits * 2 + (variant.pieces <= 0 ? 6 : variant.pieces === 1 ? 3 : 0),
           suggestedPieces: line.pieces,
+          preserveVariant: true,
         });
       }
       continue;
@@ -488,7 +488,6 @@ export function prepareShopperOrder(
       // Cover each available shopper category before spending the whole order on repeats.
       // Restock only targets categories that currently have no pieces; Variety/premium
       // missions spread their new assortment across the eligible categories in the catalogue.
-      const needsCategoryCoverage = mission !== 'restock' || true;
       const remainingBudget = budget - spent;
       const coverageOptions = remainingCandidates
         .map((candidate, index) => ({ candidate, index, category: shopperCategoryForKind(candidate.entry.kind) }))
@@ -501,7 +500,6 @@ export function prepareShopperOrder(
         .sort((a, b) => a.candidate.unitCost - b.candidate.unitCost ||
           b.candidate.score - a.candidate.score ||
           a.index - b.index);
-      void needsCategoryCoverage;
       if (coverageOptions.length && chosen.length < lineLimit) {
         bestIndex = coverageOptions[0].index;
         coveringCategory = coverageOptions[0].category;
