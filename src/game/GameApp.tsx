@@ -1,4 +1,5 @@
 import React, { Suspense, lazy, useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { CharacterSvg } from '../components/renderer/renderCharacter';
 import { DIVINE_CONFIG } from '../constants/presets';
 import { CharacterConfig } from '../types/character';
@@ -1018,6 +1019,7 @@ const SecurityMenu: React.FC<{
 
 /** NEPA status and the generator switch. */
 const PowerChip: React.FC<{ s: GameState; up: (f: (g: GameState) => GameState) => void }> = ({ s, up }) => {
+  const [open, setOpen] = useState(false);
   const st = E.stats(s);
   const src = E.source(s);
   const off = E.inBlackout(s);
@@ -1029,12 +1031,35 @@ const PowerChip: React.FC<{ s: GameState; up: (f: (g: GameState) => GameState) =
   const powered = s.furniture.filter((p) => p.placed && !!E.EQUIPMENT_WATTS[p.id]);
   const sourceLabel = src === 'grid' ? (off ? 'Grid unavailable' : 'Grid supply') : src === 'gen' ? 'Generator supply' : src === 'solar' ? 'Solar / battery' : 'Power shortage';
   return (
-    <details className="relative text-xs text-slate-200">
-      <summary className="cursor-pointer list-none rounded-lg border border-white/15 bg-white/5 px-3 py-1.5 font-semibold hover:bg-white/10">
+    <>
+      <button
+        type="button"
+        aria-haspopup="dialog"
+        aria-expanded={open}
+        onClick={() => setOpen(true)}
+        className="rounded-lg border border-white/15 bg-white/5 px-3 py-1.5 text-xs font-semibold text-slate-200 hover:bg-white/10"
+      >
         ⚡ Power &amp; Utilities · {src === 'grid' && !off ? 'NEPA' : src === 'none' ? 'Shortage' : src === 'solar' ? 'Solar' : 'Generator'}
-      </summary>
-      <div className="absolute right-0 top-full z-50 mt-2 w-[min(92vw,360px)] space-y-2 rounded-xl border border-white/15 bg-[#11141d] p-3 shadow-2xl">
-        <div className="flex items-center justify-between gap-2"><b className="text-sm text-white">Power &amp; Utilities</b><span className={src === 'none' ? 'text-rose-300' : 'text-emerald-300'}>{sourceLabel}</span></div>
+      </button>
+      {open && typeof document !== 'undefined' && createPortal(
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/55 p-3"
+          onClick={() => setOpen(false)}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label="Power and utilities"
+            className="w-[min(92vw,420px)] max-w-[calc(100vw-1.5rem)] max-h-[min(84dvh,720px)] overflow-y-auto overscroll-contain space-y-2 rounded-xl border border-white/15 bg-[#11141d] p-3 shadow-2xl"
+            onClick={(event) => event.stopPropagation()}
+          >
+        <div className="flex items-center justify-between gap-2">
+          <div className="min-w-0">
+            <b className="text-sm text-white">Power &amp; Utilities</b>
+            <span className={`ml-2 text-xs ${src === 'none' ? 'text-rose-300' : 'text-emerald-300'}`}>{sourceLabel}</span>
+          </div>
+          <button type="button" aria-label="Close Power and Utilities" onClick={() => setOpen(false)} className="shrink-0 rounded-lg border border-white/15 px-2.5 py-1 text-sm text-slate-200 hover:bg-white/10">✕</button>
+        </div>
         <div className="grid grid-cols-2 gap-2">
           <div className="rounded-lg bg-white/5 p-2"><div className="text-slate-400">Current load</div><b>{load.toFixed(2)} kW</b></div>
           <div className="rounded-lg bg-white/5 p-2"><div className="text-slate-400">Daily energy estimate</div><b>{dailyKwh.toFixed(1)} kWh</b></div>
@@ -1063,14 +1088,17 @@ const PowerChip: React.FC<{ s: GameState; up: (f: (g: GameState) => GameState) =
           <div className="max-h-36 space-y-1 overflow-auto">
             {powered.length === 0 ? <div className="text-slate-500">No powered equipment installed.</div> : powered.slice(0, 12).map((p) => (
               <div key={p.uid} className="flex items-center justify-between gap-2">
-                <span className="truncate">{furnitureById(p.id).name} · {E.EQUIPMENT_WATTS[p.id]} W</span>
+                <span className="min-w-0 flex-1 truncate">{furnitureById(p.id).name} · {E.EQUIPMENT_WATTS[p.id]} W</span>
                 <Btn size="sm" tone={s.off?.[p.uid] ? 'ghost' : 'green'} onClick={() => up((g) => ({ ...g, off: { ...(g.off || {}), [p.uid]: !g.off?.[p.uid] } }))}>{s.off?.[p.uid] ? 'Off · switch on' : 'On · switch off'}</Btn>
               </div>
             ))}
           </div>
         </div>
-      </div>
-    </details>
+          </div>
+        </div>,
+        document.body,
+      )}
+    </>
   );
 };
 const PhoneButton: React.FC<{ unread: number; onClick: () => void }> = ({ unread, onClick }) => (
