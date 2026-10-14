@@ -7,6 +7,12 @@ import {
   CELEBRITY_TIER_WEIGHTS_BY_SHOP_TIER,
   celebrityAmountsForTier,
   celebrityAttractionMultiplier,
+  followerOpportunityBonus,
+  promotionDiscoveryBonus,
+  visibilityDiscoveryChance,
+  celebrityDiscoveryChance,
+  celebrityVisitFollowThroughChance,
+  affluentCustomerShareShift,
   additionalCelebrityVisitChance,
   thirdCelebrityVisitChance,
   maximumCelebrityVisitsPerDay,
@@ -304,4 +310,50 @@ test('14-day celebrity payout simulation keeps premium orders below shop rent on
         (signature ? ' with Signature status' : ' without Signature status'));
     }
   }
+});
+
+
+test('follower opportunity bonus preserves the agreed milestones and diminishes only after 5 million', () => {
+  assert.equal(followerOpportunityBonus(0), 0);
+  assert.equal(followerOpportunityBonus(100_000), 2);
+  assert.equal(followerOpportunityBonus(200_000), 2.5);
+  assert.equal(followerOpportunityBonus(300_000), 3);
+  assert.equal(followerOpportunityBonus(400_000), 3.5);
+  assert.equal(followerOpportunityBonus(500_000), 4);
+  assert.equal(followerOpportunityBonus(1_000_000), 6.5);
+  assert.equal(followerOpportunityBonus(2_000_000), 11.5);
+  assert.equal(followerOpportunityBonus(5_000_000), 26.5);
+  assert.equal(followerOpportunityBonus(10_000_000), 38.5);
+  assert.equal(followerOpportunityBonus(20_000_000), 50.5);
+  assert.ok(followerOpportunityBonus(20_000_000) > followerOpportunityBonus(10_000_000),
+    'the follower bonus continues growing beyond five million');
+});
+
+test('one shared promotion increases discovery for celebrity and politician opportunities', () => {
+  assert.equal(promotionDiscoveryBonus(undefined), 0);
+  assert.equal(promotionDiscoveryBonus('local'), 3);
+  assert.equal(promotionDiscoveryBonus('citywide'), 6);
+  assert.equal(promotionDiscoveryBonus('premium'), 10);
+  assert.equal(promotionDiscoveryBonus('luxury'), 15);
+  assert.ok(visibilityDiscoveryChance(0.20, 5_000_000, 'luxury') > visibilityDiscoveryChance(0.20, 5_000_000));
+  assert.ok(visibilityDiscoveryChance(0.20, 100_000) < visibilityDiscoveryChance(0.20, 1_000_000));
+});
+
+test('celebrity discovery uses the agreed Level 6/7 Signature follower bonuses before visit follow-through', () => {
+  const level6 = { followers: 100 };
+  const level6OneMillion = { followers: 1_000_000 };
+  const level6FiveMillion = { followers: 5_000_000 };
+  assert.ok(Math.abs(celebrityDiscoveryChance(5, true, level6) - (0.31 + followerOpportunityBonus(100) / 100)) < 1e-12);
+  assert.ok(Math.abs(celebrityDiscoveryChance(5, true, level6OneMillion) - 0.375) < 1e-12);
+  assert.ok(Math.abs(celebrityDiscoveryChance(5, true, level6FiveMillion) - 0.575) < 1e-12);
+  assert.ok(Math.abs(celebrityDiscoveryChance(6, true, level6FiveMillion) - 0.655) < 1e-12);
+  assert.ok(celebrityDiscoveryChance(6, true, level6FiveMillion, 'luxury') > celebrityDiscoveryChance(6, true, level6FiveMillion));
+  assert.equal(celebrityVisitFollowThroughChance({ reputation: 50, prestige: 50, loyalty: 50, reliability: 50 }), 0.85);
+  assert.ok(celebrityVisitFollowThroughChance({ reputation: 100, prestige: 100, loyalty: 100, reliability: 100 }) < 1);
+});
+
+test('follower growth and a live brand campaign gently shift customer mix toward affluent clients', () => {
+  assert.ok(affluentCustomerShareShift(1_000_000) > affluentCustomerShareShift(100));
+  assert.ok(Math.abs(affluentCustomerShareShift(5_000_000) - 0.06625) < 1e-12);
+  assert.ok(affluentCustomerShareShift(5_000_000, 'luxury') > affluentCustomerShareShift(5_000_000));
 });

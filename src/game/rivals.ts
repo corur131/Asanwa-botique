@@ -7,7 +7,7 @@
 import { CharacterConfig } from '../types/character';
 import { generateRandomCustomer } from '../utils/randomizer';
 import { CELEBRITY_FULFILMENT_RATE, TIERS, naira } from './economy';
-import { celebrityAmountsForTier, celebrityIsScheduled, celebrityVisitChance, chooseCelebrityTierForShop, celebrityProfileForTier, additionalCelebrityVisitChance, thirdCelebrityVisitChance, maximumCelebrityVisitsPerDay } from './customers';
+import { celebrityAmountsForTier, celebrityIsScheduled, celebrityDiscoveryChance, celebrityVisitFollowThroughChance, chooseCelebrityTierForShop, celebrityProfileForTier, maximumCelebrityVisitsPerDay } from './customers';
 import { BrandMetrics, GameState, Gist, Message, ReplyChoice, Rival, RivalPost } from './types';
 import { Topic, startConvo } from './convos';
 import { brandFromLegacy, brandPower, getBrandMetrics } from './business';
@@ -435,7 +435,7 @@ export function simulateRivals(s0: GameState): GameState {
       r.rep = clamp(r.rep + rand(0.2, 0.8), 5, 99);
       if (r.main) news.push({ kind: 'campaign', r });
     }
-    // The player and every rival share one opportunity, brand-heat and celebrity-rank model.
+    // Player and rivals share the same follower/promotion discovery and visit-follow-through model.
     // Tolani retains premium positioning on existing saves as well as new games.
     const signatureProperty = !!r.signature || (r.id === 'tolani' && r.tier >= 4 && r.stars >= 3);
     const celebrityProfile = {
@@ -445,22 +445,33 @@ export function simulateRivals(s0: GameState): GameState {
       awareness: r.brand?.awareness,
       prestige: r.brand?.prestige,
       trendInfluence: r.brand?.trendInfluence,
+      loyalty: r.brand?.loyalty,
+      reliability: r.brand?.reliability,
     };
     const celebrityScheduled = celebrityIsScheduled(r.tier, today, signatureProperty);
-    const celebrityChance = celebrityVisitChance(r.tier, signatureProperty, celebrityProfile);
     const maxDailyCelebrityVisits = maximumCelebrityVisitsPerDay(r.tier, signatureProperty);
-    if (celebrityScheduled && chance(celebrityChance)) {
+    const promotionLevel = r.promotion?.active && r.promotion.target !== 'warehouse'
+      ? r.promotion.level
+      : dayEvent === 'campaign'
+        ? (r.tier >= 5 ? 'luxury' : r.tier >= 3 ? 'premium' : 'citywide')
+        : undefined;
+    const guestTiers: number[] = [];
+    if (celebrityScheduled) {
+      const discoveryChance = celebrityDiscoveryChance(r.tier, signatureProperty, celebrityProfile, promotionLevel);
+      const followThroughChance = celebrityVisitFollowThroughChance(celebrityProfile);
+      for (let candidate = 0; candidate < 3 && guestTiers.length < maxDailyCelebrityVisits; candidate++) {
+        if (!chance(discoveryChance)) continue;
+        if (!chance(followThroughChance)) continue;
+        const celebrityTier = chooseCelebrityTierForShop(r.tier, signatureProperty, celebrityProfile);
+        if (celebrityTier >= 0) guestTiers.push(celebrityTier);
+      }
+    }
+    if (guestTiers.length > 0) {
       r.lastCelebrityVisitDay = today;
-      let guestCount = 1;
-      if (guestCount < maxDailyCelebrityVisits &&
-          chance(additionalCelebrityVisitChance(r.tier, signatureProperty, celebrityProfile))) guestCount++;
-      if (guestCount < maxDailyCelebrityVisits &&
-          chance(thirdCelebrityVisitChance(r.tier, signatureProperty, celebrityProfile))) guestCount++;
-
       // Each guest is a separate purchase outcome, so publicity, followers, revenue and stock costs
       // can all accumulate when a busy premium shop receives more than one celebrity.
-      for (let guestIndex = 0; guestIndex < guestCount; guestIndex++) {
-        const celebrityTier = chooseCelebrityTierForShop(r.tier, signatureProperty, celebrityProfile);
+      for (let guestIndex = 0; guestIndex < guestTiers.length; guestIndex++) {
+        const celebrityTier = guestTiers[guestIndex];
         const namedGuest = celebrityProfileForTier(celebrityTier);
         const { budget, spendFloor } = celebrityAmountsForTier(celebrityTier, Math.random, r.tier, signatureProperty);
         const currentBrand: BrandMetrics = r.brand || brandFromLegacy(r.rep, r.followers || 0, r.tier);

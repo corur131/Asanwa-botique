@@ -8,7 +8,7 @@ import { answerInvite, contestFor, contestModel, dropStep, judge, planDrop, plan
 import { POWER as POWER_CFG, activeGeneratorUid, addShout, coolRunning, drainRate, fuelOf, fuelPrice, liveStats, nepaOff, outageAt, planOutages, pourFuel, powerStep, scarcity, source, tankSize } from './power';
 import { answerConvo, startGist } from './convos';
 import { ENERGY, busyNow, divineBonus, energyOf, energyStep, exhausted, payBills, spendEnergy } from './life';
-import { makeCustomer, makeCelebrityCustomer, celebrityIsScheduled, celebrityVisitChance, maximumCelebrityTierForShop, chooseCelebrityTierForShop, additionalCelebrityVisitChance, thirdCelebrityVisitChance, maximumCelebrityVisitsPerDay } from './customers';
+import { makeCustomer, makeCelebrityCustomer, celebrityIsScheduled, celebrityDiscoveryChance, celebrityVisitFollowThroughChance, affluentCustomerShareShift, visibilityDiscoveryChance, maximumCelebrityTierForShop, chooseCelebrityTierForShop, maximumCelebrityVisitsPerDay } from './customers';
 import { buildLook, hairGroup, lookCost, scoreLook } from './scoring';
 import { FABRIC_COLORS, FEMALE_HAIR, MAKEUP_LOOKS } from '../constants/catalog';
 import { colourName } from './colours';
@@ -260,6 +260,16 @@ export function ensurePoliticianContractOffer(s0: GameState, force = false): Gam
 
   const offer = makePoliticianContractOffer(s);
   if (!offer) return s;
+  if (!force) {
+    const tierIndex = clamp(Math.floor(s.tier || 0), 0, CONTRACT_TIER_RULES.length - 1);
+    const promotionLevel = s.promotion?.active && s.promotion.target !== 'warehouse'
+      ? s.promotion.level
+      : undefined;
+    const discoveryBase = tierIndex === 5 ? 0.20 : 0.25;
+    const issueChance = tierIndex === 5 ? 0.10 : 0.12;
+    const discovered = chance(visibilityDiscoveryChance(discoveryBase, s.followers || 0, promotionLevel));
+    if (!discovered || !chance(issueChance)) return s;
+  }
   s = { ...s, politicianContracts: [...contracts, offer].slice(-20) };
   s = msg(s, offer.client,
     `NEW CLOTHING CONTRACT OFFER: “${offer.title}”. Estimated payment on complete delivery: ${naira(offer.reward)}. The offer expires after Day ${offer.offerExpiresDay}. Open the Contracts app to inspect the required goods, accept or decline, and source stock through your Yaba Mart Shopper.`,
@@ -498,9 +508,25 @@ export function openShop(s0: GameState): GameState {
     mix[0] = Math.max(0.05, mix[0] - shift);
     mix[2] = Math.max(0, mix[2] + shift);
   }
-  const arrivals = Array.from({ length: n }, () => ({ at: arrivalMinute(), c: makeCustomer(s, mix) }));
-  // Shared player/rival logic: tier calendar, brand attraction, rank mix and multiple VIP capacity.
   const signatureProperty = !!s.listing.signature;
+  const promotionLevel = s.promotion?.active && s.promotion.target !== 'warehouse'
+    ? s.promotion.level
+    : undefined;
+
+  // Social growth and active brand campaigns move customer composition toward affluent shoppers,
+  // while preserving the total mix rather than multiplying every customer category.
+  const affluentShift = affluentCustomerShareShift(s.followers || 0, promotionLevel);
+  const nonAffluentShare = Math.max(0, mix[0] + mix[1]);
+  const appliedAffluentShift = Math.min(affluentShift, nonAffluentShare);
+  if (nonAffluentShare > 0 && appliedAffluentShift > 0) {
+    mix[0] -= appliedAffluentShift * (mix[0] / nonAffluentShare);
+    mix[1] -= appliedAffluentShift * (mix[1] / nonAffluentShare);
+    mix[2] = Math.min(1, mix[2] + appliedAffluentShift);
+  }
+
+  const arrivals = Array.from({ length: n }, () => ({ at: arrivalMinute(), c: makeCustomer(s, mix) }));
+  // Celebrity discovery and visit follow-through are separate rolls. Three possible guests
+  // may notice the shop on each scheduled day; the tier's daily capacity remains authoritative.
   const celebrityProfile = {
     reputation: s.rep,
     followers: s.followers || 0,
@@ -508,25 +534,23 @@ export function openShop(s0: GameState): GameState {
     awareness: s.brand?.awareness,
     prestige: s.brand?.prestige,
     trendInfluence: s.brand?.trendInfluence,
+    loyalty: s.brand?.loyalty,
+    reliability: s.brand?.reliability,
   };
   const celebrityScheduled = celebrityIsScheduled(s.tier, s.day, signatureProperty);
   const highestEligibleCelebrityTier = maximumCelebrityTierForShop(s.tier);
   const maxDailyCelebrityVisits = maximumCelebrityVisitsPerDay(s.tier, signatureProperty);
-  if (
-    highestEligibleCelebrityTier >= 0 &&
-    celebrityScheduled &&
-    chance(celebrityVisitChance(s.tier, signatureProperty, celebrityProfile))
-  ) {
-    const guests = [makeCelebrityCustomer(
-      s, chooseCelebrityTierForShop(s.tier, signatureProperty, celebrityProfile),
-    )];
-    if (guests.length < maxDailyCelebrityVisits &&
-        chance(additionalCelebrityVisitChance(s.tier, signatureProperty, celebrityProfile))) {
-      guests.push(makeCelebrityCustomer(s, chooseCelebrityTierForShop(s.tier, signatureProperty, celebrityProfile)));
-    }
-    if (guests.length < maxDailyCelebrityVisits &&
-        chance(thirdCelebrityVisitChance(s.tier, signatureProperty, celebrityProfile))) {
-      guests.push(makeCelebrityCustomer(s, chooseCelebrityTierForShop(s.tier, signatureProperty, celebrityProfile)));
+  let celebrityAttention = false;
+  if (highestEligibleCelebrityTier >= 0 && celebrityScheduled) {
+    const discoveryChance = celebrityDiscoveryChance(s.tier, signatureProperty, celebrityProfile, promotionLevel);
+    const followThroughChance = celebrityVisitFollowThroughChance(celebrityProfile);
+    const guests: Customer[] = [];
+    for (let candidate = 0; candidate < 3 && guests.length < maxDailyCelebrityVisits; candidate++) {
+      if (!chance(discoveryChance)) continue;
+      celebrityAttention = true;
+      if (!chance(followThroughChance)) continue;
+      const celebrityTier = chooseCelebrityTierForShop(s.tier, signatureProperty, celebrityProfile);
+      if (celebrityTier >= 0) guests.push(makeCelebrityCustomer(s, celebrityTier));
     }
     guests.forEach((c, index) => arrivals.push({ at: 100 + Math.random() * 560 + index, c }));
   }
@@ -552,6 +576,8 @@ export function openShop(s0: GameState): GameState {
   let next: GameState = { ...s, slowWeek: slow, arrivals, outages, busy: null, power: { ...s.power, gen: false, solar: s.power?.solar || 0 } };
   if (arrivals.some((arrival) => !!arrival.c.celebrity)) {
     next = { ...next, lastCelebrityVisitDay: s.day };
+  } else if (celebrityAttention) {
+    next = addShout(next, 'Deborah', 'Sis, word is reaching celebrity circles, but nobody confirmed a visit today. Keep the boutique ready; attention does not always turn into a visit.', 'good');
   }
   if (outageAt(next, 0)) {
     next = addShout(next, 'NEPA', 'No light this morning. NEPA took it before you opened.', 'nepa');

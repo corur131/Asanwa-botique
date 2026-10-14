@@ -169,7 +169,15 @@ test('fulfilled major contracts keep a 45-day cooldown before another offer', ()
   const stillCoolingDown = ensurePoliticianContractOffer({ ...completed, day: s.day + 44 });
   assert.equal(stillCoolingDown.politicianContracts?.some((row) => row.status === 'offered'), false);
 
-  const readyForNext = ensurePoliticianContractOffer({ ...completed, day: s.day + 45 });
+  const readyForNext = (() => {
+    const originalRandom = Math.random;
+    try {
+      Math.random = () => 0;
+      return ensurePoliticianContractOffer({ ...completed, day: s.day + 45 });
+    } finally {
+      Math.random = originalRandom;
+    }
+  })();
   assert.equal(readyForNext.politicianContracts?.some((row) => row.status === 'offered'), true);
 });
 
@@ -208,6 +216,32 @@ test('expired offers do not incur a penalty and a fresh offer arrives after the 
   const expirationDay = expired.politicianContracts!.find((row) => row.id === offer.id)!.completedDay!;
   const beforeCooldownEnds = ensurePoliticianContractOffer({ ...expired, day: expirationDay + 44 });
   assert.equal(beforeCooldownEnds.politicianContracts!.some((row) => row.status === 'offered'), false);
-  const nextDay = ensurePoliticianContractOffer({ ...expired, day: expirationDay + 45 });
+  const nextDay = (() => {
+    const originalRandom = Math.random;
+    try {
+      Math.random = () => 0;
+      return ensurePoliticianContractOffer({ ...expired, day: expirationDay + 45 });
+    } finally {
+      Math.random = originalRandom;
+    }
+  })();
   assert.ok(nextDay.politicianContracts!.some((row) => row.status === 'offered'));
+});
+
+
+test('eligible politician contracts require discovery and a separate offer roll', () => {
+  const base = { ...newGame(DIVINE_CONFIG), tier: 5, followers: 120, day: 60, politicianContracts: [] };
+  const originalRandom = Math.random;
+  try {
+    Math.random = () => 0.999999;
+    const notDiscovered = ensurePoliticianContractOffer(base);
+    assert.equal(notDiscovered.politicianContracts?.some((row) => row.status === 'offered'), false,
+      'a low-visibility boutique should not receive an automatic offer');
+    Math.random = () => 0;
+    const discoveredAndSelected = ensurePoliticianContractOffer(base);
+    assert.equal(discoveredAndSelected.politicianContracts?.some((row) => row.status === 'offered'), true,
+      'a successful discovery and issuance roll should create an offer');
+  } finally {
+    Math.random = originalRandom;
+  }
 });
