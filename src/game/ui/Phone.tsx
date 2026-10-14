@@ -978,26 +978,91 @@ const Bank: React.FC<{ s: GameState; up: PhoneProps['up'] }> = ({ s, up }) => {
   );
 };
 const Forbes: React.FC<{ s: GameState }> = ({ s }) => {
-  const rows = E.currentWealthRows(s).sort((a, b) => b.netWorth - a.netWorth);
   const history = s.wealthHistory || [];
+  const latestSnapshotDay = history.reduce(
+    (latestDay, item) => item.day <= s.day ? Math.max(latestDay, item.day) : latestDay,
+    0,
+  );
+  const officialRanks = new Map(
+    history
+      .filter((item) => item.day === latestSnapshotDay)
+      .map((item) => [item.ownerId, item] as const),
+  );
+  const latestByOwner = new Map<string, (typeof history)[number]>();
+  for (const item of history) {
+    if (item.day <= s.day) latestByOwner.set(item.ownerId, item);
+  }
+
+  // Keep row order and displayed ranks aligned with the most recent weekly publication.
+  // Before the first snapshot, use a live estimate ordered by net worth.
+  const rows = E.currentWealthRows(s).sort((a, b) => {
+    const rankA = officialRanks.get(a.ownerId)?.rank;
+    const rankB = officialRanks.get(b.ownerId)?.rank;
+    if (rankA !== undefined && rankB !== undefined) return rankA - rankB;
+    if (rankA !== undefined) return -1;
+    if (rankB !== undefined) return 1;
+    return b.netWorth - a.netWorth;
+  });
+
   return (
     <AppFrame title="Lagos Fashion Rich List" sub="In-game wealth estimates · weekly changes" tone="bg-gradient-to-r from-zinc-700 to-zinc-950">
       <div className="p-3 space-y-3">
-        <div className="rounded-xl border border-white/10 bg-white/5 p-3"><div className="text-xs uppercase tracking-wider text-amber-200">Your estimated net worth</div><div className="text-2xl font-bold text-white mt-1">{naira(E.netWorthPlayer(s))}</div><div className="text-xs text-slate-400 mt-1">Cash and bank accounts + stock at cost + fixtures and expansion assets + brand/follower value + 3× average weekly profit over up to 28 days − loans, rent arrears and unpaid bills. This is an estimate, not spendable cash.</div></div>
+        <div className="rounded-xl border border-white/10 bg-white/5 p-3">
+          <div className="text-xs uppercase tracking-wider text-amber-200">Your estimated net worth</div>
+          <div className="text-2xl font-bold text-white mt-1">{naira(E.netWorthPlayer(s))}</div>
+          <div className="text-xs text-slate-400 mt-1">
+            Cash and bank accounts + stock at cost + fixtures and expansion assets + brand/follower value + 3× average weekly profit over up to 28 days − loans, rent arrears and unpaid bills. This is an estimate, not spendable cash.
+          </div>
+        </div>
         {rows.map((row, index) => {
-          const latest = [...history].reverse().find(item => item.ownerId === row.ownerId && item.day <= s.day);
-          const change = latest ? latest.wealthChange : 0;
+          const latest = latestByOwner.get(row.ownerId);
+          const onSnapshotDay = !!latest && latest.day === s.day;
+          const change = latest
+            ? onSnapshotDay ? latest.wealthChange : row.netWorth - latest.netWorth
+            : 0;
           const previousRank = latest?.previousRank || 0;
-          const movement = previousRank > 0 ? previousRank - (latest?.rank || index + 1) : 0;
-          return <div key={row.ownerId} className="rounded-xl border border-white/10 p-3 flex gap-3 items-start"><div className="w-8 text-center text-lg font-bold text-amber-300">#{latest?.rank || index + 1}</div><div className="flex-1 min-w-0"><div className="font-semibold text-white">{row.owner}</div><div className="text-xs text-slate-400">{row.shop} · {TIERS[row.tier]?.name || 'Fashion business'}</div><div className="text-base font-bold text-white mt-1">{naira(row.netWorth)}</div><div className={change > 0 ? 'text-xs mt-1 text-emerald-300' : change < 0 ? 'text-xs mt-1 text-rose-300' : 'text-xs mt-1 text-slate-400'}>{latest ? (change >= 0 ? '+' : '') + naira(change) + ' since last snapshot' : 'First recorded estimate'}{movement ? ' · ' + (movement > 0 ? 'up ' : 'down ') + Math.abs(movement) + ' place(s)' : ''}</div><div className="grid grid-cols-2 gap-2 mt-2 text-[11px]"><div className="rounded-lg bg-white/5 p-2"><div className="text-slate-400">Weekly revenue</div><div className="text-white font-semibold">{naira(row.revenue)}</div></div><div className="rounded-lg bg-white/5 p-2"><div className="text-slate-400">Profit / loss</div><div className={row.profit >= 0 ? 'text-emerald-300' : 'text-rose-300'}>{naira(row.profit)}</div></div></div><div className="text-[11px] text-slate-400 mt-2">{Math.max(0, Number(row.followers) || 0)?.toLocaleString('en-NG')} followers · Brand Power {Math.max(0, Number(row.brandPower) || 0)?.toLocaleString('en-NG')}</div></div></div>;
+          const movement = onSnapshotDay && previousRank > 0
+            ? previousRank - (latest?.rank || index + 1)
+            : 0;
+          return (
+            <div key={row.ownerId} className="rounded-xl border border-white/10 p-3 flex gap-3 items-start">
+              <div className="w-8 text-center text-lg font-bold text-amber-300">#{latest?.rank || index + 1}</div>
+              <div className="flex-1 min-w-0">
+                <div className="font-semibold text-white">{row.owner}</div>
+                <div className="text-xs text-slate-400">{row.shop} · {TIERS[row.tier]?.name || 'Fashion business'}</div>
+                <div className="text-base font-bold text-white mt-1">{naira(row.netWorth)}</div>
+                <div className={change > 0 ? 'text-xs mt-1 text-emerald-300' : change < 0 ? 'text-xs mt-1 text-rose-300' : 'text-xs mt-1 text-slate-400'}>
+                  {latest
+                    ? (change >= 0 ? '+' : '') + naira(change) + (onSnapshotDay ? ' this week' : ` since Day ${latest.day} snapshot`)
+                    : 'First recorded estimate'}
+                  {movement ? ' · ' + (movement > 0 ? 'up ' : 'down ') + Math.abs(movement) + ' place(s)' : ''}
+                </div>
+                <div className="grid grid-cols-2 gap-2 mt-2 text-[11px]">
+                  <div className="rounded-lg bg-white/5 p-2">
+                    <div className="text-slate-400">Weekly revenue</div>
+                    <div className="text-white font-semibold">{naira(row.revenue)}</div>
+                  </div>
+                  <div className="rounded-lg bg-white/5 p-2">
+                    <div className="text-slate-400">Profit / loss</div>
+                    <div className={row.profit >= 0 ? 'text-emerald-300' : 'text-rose-300'}>{naira(row.profit)}</div>
+                  </div>
+                </div>
+                <div className="text-[11px] text-slate-400 mt-2">
+                  {Math.max(0, Number(row.followers) || 0)?.toLocaleString('en-NG')} followers · Brand Power {Math.max(0, Number(row.brandPower) || 0)?.toLocaleString('en-NG')}
+                </div>
+              </div>
+            </div>
+          );
         })}
-        <div className="rounded-xl border border-amber-400/20 bg-amber-400/5 p-3"><div className="font-semibold text-amber-100">Deborah's fashion empire</div><div className="text-xs text-slate-300 mt-1">Her exact business name and private financial figures are not yet modeled, so the game does not invent a precise fortune.</div></div>
-        <div className="text-[10px] text-slate-500">Estimates are in-game values, not real-world valuations. Snapshots are saved weekly.</div>
+        <div className="rounded-xl border border-amber-400/20 bg-amber-400/5 p-3">
+          <div className="font-semibold text-amber-100">Deborah's fashion empire</div>
+          <div className="text-xs text-slate-300 mt-1">Her exact business name and private financial figures are not yet modeled, so the game does not invent a precise fortune.</div>
+        </div>
+        <div className="text-[10px] text-slate-500">Estimates are in-game values, not real-world valuations. Published ranks are saved weekly; estimated net worth keeps updating between publications.</div>
       </div>
     </AppFrame>
   );
 };
-
 const PromotionApp: React.FC<{ s: GameState; up: PhoneProps['up'] }> = ({ s, up }) => {
   const [mode, setMode] = useState<'period' | 'always'>(s.promotion?.mode || 'period');
   const [target, setTarget] = useState<'brand' | 'warehouse'>(s.promotion?.target || 'brand');
