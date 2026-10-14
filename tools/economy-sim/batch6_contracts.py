@@ -107,7 +107,7 @@ def main():
         midpoint_qty = (tier["min_qty"] + tier["max_qty"]) // 2
         print("  Mid-quantity cost sensitivity (position within the eligible wholesale-cost range):")
         for share in COST_SHARES:
-            unit_cost = tier["min_unit_cost"] + floor(((max_unit_cost - tier["min_unit_cost"]) * share / 100) / 100) * 100
+            unit_cost = tier["min_unit_cost"] + floor(((max_unit_cost - tier["min_unit_cost"]) * share) / 100) * 100
             unit_cost = min(max_unit_cost, max(tier["min_unit_cost"], unit_cost))
             goods_cost = contract_cost(unit_cost, midpoint_qty, tier)
             reward = contract_reward(goods_cost, tier)
