@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import type { Customer, GameState, Message } from './types';
-import { initRivals, simulateRivals } from './rivals';
+import { announceCelebrityVisit, initRivals, simulateRivals } from './rivals';
 import { judge } from './encounters';
 import { answerInvite } from './encounters';
 import { money, payRent, payRentEarly, settleLateRent, demote, closeShop, cashFlowSummary } from './engine';
@@ -596,6 +596,28 @@ test('rivals announce celebrity visits in news, chat, and their social feed on a
   }
 });
 
+
+test('player celebrity visits are announced across gist, group chat and Gidigram', () => {
+  const base = state({
+    day: 29,
+    history: [],
+    today: { day: 29, bestScore: 0, events: [] } as unknown as GameState['today'],
+    messages: [],
+    msgSeq: 0,
+    gist: [],
+    rivalPosts: [],
+    rivals: initRivals(),
+  });
+  const updated = announceCelebrityVisit(base, {
+    shopId: 'you', shopName: 'Asanwa Boutique', ownerName: 'Divine',
+    celebrityName: 'Nollywood guest', spend: 80_000_000,
+    bought: true, premiumOrder: true, followerGain: 15_000,
+  });
+  assert.ok(updated.gist.some((item) => /celebrity client/i.test(item.title)));
+  assert.ok(updated.messages.some((item) => item.from === 'GistLagos' && /CELEBRITY SIGHTING/i.test(item.text)));
+  assert.ok(updated.messages.some((item) => item.from === 'Gidigram' && /TRENDING NOW/i.test(item.text)));
+  assert.ok(updated.messages.some((item) => item.from === 'Asanwa Boutique' && item.chat === 'Lagos Fashion Babes'));
+});
 
 test('Tolani and other rivals do not receive celebrity clients on every day; off-schedule days are quiet', () => {
   const originalRandom = Math.random;
