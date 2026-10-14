@@ -7,7 +7,7 @@
 import { CharacterConfig } from '../types/character';
 import { generateRandomCustomer } from '../utils/randomizer';
 import { CELEBRITY_FULFILMENT_RATE, TIERS } from './economy';
-import { celebrityAmountsForTier, celebrityIsScheduled, celebrityVisitChance, chooseCelebrityTierForShop } from './customers';
+import { celebrityAmountsForTier, celebrityIsScheduled, celebrityVisitChance, chooseCelebrityTierForShop, celebrityProfileForTier } from './customers';
 import { GameState, Gist, Message, ReplyChoice, Rival, RivalPost } from './types';
 import { Topic, startConvo } from './convos';
 import { brandFromLegacy, brandPower, getBrandMetrics } from './business';
@@ -200,18 +200,18 @@ export function announceCelebrityVisit(s0: GameState, event: CelebrityVisitAnnou
     }
   } else {
     s = say(s, 'Gidigram', event.premiumOrder
-      ? `FASHION ALERT ✨ ${event.shopName} has reportedly secured a celebrity premium order worth ${moneyText}. Asanwa and the rest of Lagos are watching.`
+      ? `FASHION ALERT ✨ ${event.celebrityName} reportedly placed a premium order at ${event.shopName}: ${moneyText}. Asanwa and the rest of Lagos are watching.`
       : event.bought
-        ? `CELEBRITY SPOTTED ✨ A celebrity shopper made a purchase at ${event.shopName}.`
-        : `CELEBRITY SIGHTING: a guest visited ${event.shopName} but left without an order.`,
+        ? `CELEBRITY SPOTTED ✨ ${event.celebrityName} made a purchase at ${event.shopName}.`
+        : `CELEBRITY SIGHTING: ${event.celebrityName} visited ${event.shopName} but left without an order.`,
       { tone: event.premiumOrder ? 'good' : event.bought ? 'info' : 'warn' });
     const rival = rivalById(s, event.shopId);
     if (rival) s = rivalPost(s, rival,
       event.premiumOrder
-        ? `A celebrity guest chose a standout luxury look at ${event.shopName} ✨ Reported order: ${moneyText}. #CelebrityStyle #LagosFashion`
+        ? `${event.celebrityName} chose a standout luxury look at ${event.shopName} ✨ Reported order: ${moneyText}. #CelebrityStyle #LagosFashion`
         : event.bought
-          ? `A celebrity guest purchased a wardrobe at ${event.shopName} ✨ #LagosFashion`
-          : `A celebrity guest visited ${event.shopName} today, but no order was completed.`,
+          ? `${event.celebrityName} purchased a wardrobe at ${event.shopName} ✨ #LagosFashion`
+          : `${event.celebrityName} visited ${event.shopName} today, but no order was completed.`,
       !event.bought);
     if (rival?.main) s = inGroup(s, rival,
       event.premiumOrder
@@ -287,7 +287,7 @@ export function simulateRivals(s0: GameState): GameState {
   const rankById = new Map(currentOrder.map((id, index) => [id, index + 1] as const));
   const youRank = rankById.get('you') || 20;
   const rivals: Rival[] = [];
-  const news: { kind: 'up' | 'down' | 'viral' | 'scandal' | 'campaign' | 'celebrity'; r: Rival; spend?: number; bought?: boolean; premiumOrder?: boolean; celebrityTier?: number }[] = [];
+  const news: { kind: 'up' | 'down' | 'viral' | 'scandal' | 'campaign' | 'celebrity'; r: Rival; spend?: number; bought?: boolean; premiumOrder?: boolean; celebrityTier?: number; celebrityName?: string }[] = [];
   const growthNotes: { owner: string; shop: string; detail: string }[] = [];
   for (const r0 of s.rivals) {
     const r = { ...r0, week: [...r0.week], weekCosts: [...(r0.weekCosts || [])] };
@@ -386,6 +386,7 @@ export function simulateRivals(s0: GameState): GameState {
     const celebrityChance = celebrityVisitChance(r.tier, signatureProperty, celebrityProfile);
     if (celebrityScheduled && chance(celebrityChance)) {
       const celebrityTier = chooseCelebrityTierForShop(r.tier, signatureProperty, celebrityProfile);
+      const namedGuest = celebrityProfileForTier(celebrityTier);
       const { budget, spendFloor } = celebrityAmountsForTier(celebrityTier);
       const currentBrand = r.brand || brandFromLegacy(r.rep, r.followers || 0, r.tier);
       const purchaseChance = clamp(0.80 + (r.skill - 1) * 0.20 + (r.rep - 50) / 500, 0.55, 0.92);
@@ -419,7 +420,10 @@ export function simulateRivals(s0: GameState): GameState {
         prestige: clamp(currentBrand.prestige + (premiumOrder ? rand(0.4, 1.4) : bought ? rand(0.1, 0.5) : -rand(0.5, 1.1)), 5, 100),
         trendInfluence: clamp(currentBrand.trendInfluence + (premiumOrder ? rand(0.5, 1.7) : bought ? rand(0.1, 0.7) : -rand(0.3, 0.9)), 5, 100),
       };
-      news.push({ kind: 'celebrity', r, spend: celebrityRevenue, bought, premiumOrder, celebrityTier });
+      news.push({
+        kind: 'celebrity', r, spend: celebrityRevenue, bought, premiumOrder, celebrityTier,
+        celebrityName: `${namedGuest.name} · ${namedGuest.rank}`,
+      });
     }
     // Bad weeks still hurt: theft, a landlord's surprise charge or a dead generator.
     if (chance(0.025)) { const incidentCost = Math.round(takings * rand(2, 4)); r.cash -= incidentCost; r.weekCosts[r.weekCosts.length - 1] = (r.weekCosts[r.weekCosts.length - 1] || 0) + incidentCost; }
@@ -505,7 +509,7 @@ export function simulateRivals(s0: GameState): GameState {
         shopId: r.id,
         shopName: r.shop,
         ownerName: r.owner,
-        celebrityName: n.premiumOrder ? 'a celebrity client' : 'a celebrity guest',
+        celebrityName: n.celebrityName || (n.premiumOrder ? 'a celebrity client' : 'a celebrity guest'),
         spend: n.spend || 0,
         bought: !!n.bought,
         premiumOrder: !!n.premiumOrder,
