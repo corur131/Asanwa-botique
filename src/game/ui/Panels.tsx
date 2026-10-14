@@ -278,7 +278,7 @@ export const FurniturePanel: React.FC<{ s: GameState; a: FurnitureActions; selec
 // ---------------------------------------------------------------------------
 // Moving: four listings at the next size
 // ---------------------------------------------------------------------------
-export const MovePanel: React.FC<{ s: GameState; onMove: (l: Listing, plan: MoveEquipmentPlan) => void }> = ({ s, onMove }) => {
+export const MovePanel: React.FC<{ s: GameState; onMove: (l: Listing, plan: MoveEquipmentPlan, retainedStaffIds?: string[]) => void }> = ({ s, onMove }) => {
   const [pick, setPick] = useState<Listing | null>(null);
   const [movePlan, setMovePlan] = useState<MoveEquipmentPlan>('arrange');
   const resaleValue = s.furniture.filter((p) => furnitureById(p.id).mount !== 'finish').reduce((sum, p) => sum + Math.round(furnitureById(p.id).price * 0.4), 0);
