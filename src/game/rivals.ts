@@ -199,6 +199,12 @@ export function announceCelebrityVisit(s0: GameState, event: CelebrityVisitAnnou
       s = { ...s, today: { ...s.today, events: [...(s.today?.events || []), headline] } };
     }
   } else {
+    s = say(s, 'Gidigram', event.premiumOrder
+      ? `FASHION ALERT ✨ ${event.shopName} has reportedly secured a celebrity premium order worth ${moneyText}. Asanwa and the rest of Lagos are watching.`
+      : event.bought
+        ? `CELEBRITY SPOTTED ✨ A celebrity shopper made a purchase at ${event.shopName}.`
+        : `CELEBRITY SIGHTING: a guest visited ${event.shopName} but left without an order.`,
+      { tone: event.premiumOrder ? 'good' : event.bought ? 'info' : 'warn' });
     const rival = rivalById(s, event.shopId);
     if (rival) s = rivalPost(s, rival,
       event.premiumOrder
