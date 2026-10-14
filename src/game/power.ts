@@ -84,8 +84,8 @@ export const EQUIPMENT_WATTS: Readonly<Record<string, number>> = {
 };
 
 /** Sum active powered equipment only; clothing and non-powered inventory never enter this calculation. */
-export function equipmentLoadKw(items: readonly { id: string }[]): number {
-  return items.reduce((sum, item) => sum + (EQUIPMENT_WATTS[item.id] || 0) / 1000, 0);
+export function equipmentLoadKw(items: readonly { id: string; uid?: string }[], off: Record<string, boolean> = {}): number {
+  return items.reduce((sum, item) => sum + (item.uid && off[item.uid] ? 0 : (EQUIPMENT_WATTS[item.id] || 0) / 1000), 0);
 }
 export const kwhForLoad = (kw: number, minutes: number) => Math.max(0, kw) * Math.max(0, minutes) / 60;
 export const tariffFor = (s: GameState) => {
@@ -112,7 +112,8 @@ export const solarDrainMinutes = (minutes: number, demandKw: number, panels: num
   Math.max(0, minutes) * Math.max(acOn ? 2 : 1, Math.max(1, demandKw / Math.max(0.35, panels * 0.35)));
 export const solarChargeMinutes = (current: number, minutes: number, panels: number) =>
   Math.max(0, current) + Math.max(0, minutes) * POWER.chargePerPanelPerMinute * Math.max(0, panels);
-export const generatorOverloaded = (s: GameState) => !!s.power?.gen && loadKw(s) > generatorCapacityKw(s) + 0.001;
+export const loadExceedsCapacity = (demandKw: number, capacityKw: number) => demandKw > capacityKw + 0.001;
+export const generatorOverloaded = (s: GameState) => !!s.power?.gen && loadExceedsCapacity(loadKw(s), generatorCapacityKw(s));
 
 /** Electricity drawn right now, in kW. Baseline lighting scales with floor area and display capacity. */
 export function loadKw(s: GameState): number {
@@ -152,8 +153,8 @@ export const solarCap = (s: GameState) => liveStats(s).solarPanels * POWER.minut
 export function source(s: GameState, t = s.clock): Source {
   if (!nepaOff(s, t)) return 'grid';
   const st = liveStats(s);
-  if (s.power?.gen && st.gen && loadKw(s) <= generatorCapacityKw(s) + 0.001) return 'gen';
-  if (st.solarPanels && (s.power?.solar || 0) > 0 && loadKw(s) <= st.solarPanels * 0.35 + 0.001) return 'solar';
+  if (s.power?.gen && st.gen && !loadExceedsCapacity(loadKw(s), generatorCapacityKw(s))) return 'gen';
+  if (st.solarPanels && (s.power?.solar || 0) > 0 && !loadExceedsCapacity(loadKw(s), st.solarPanels * 0.35)) return 'solar';
   return 'none';
 }
 
