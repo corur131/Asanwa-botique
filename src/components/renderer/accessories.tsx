@@ -531,13 +531,34 @@ export const Necklace: React.FC<{ id: Id; kind: string; male: boolean }> = ({ id
 
 export const Glasses: React.FC<{ kind: string }> = ({ kind }) => {
   const clear = kind === 'clear';
-  const frame = kind === 'acetateStatementFrames' ? '#593824' : kind === 'titaniumDesignerFrames' ? '#8D949D' : kind === 'goldTempleSunglasses' || kind === 'heirloomGoldSunglasses' ? '#C6A34D' : clear ? '#2A2220' : kind === 'aviators' ? '#B8913E' : '#0A0808';
-  const lensFill = kind === 'titaniumDesignerFrames' || clear ? '#DCE8F0' : kind === 'aviators' || kind === 'goldTempleSunglasses' || kind === 'heirloomGoldSunglasses' ? '#3A2A1E' : '#1A1414';
-  const lensOp = clear || kind === 'titaniumDesignerFrames' ? 0.18 : 0.9;
+  const frame = kind === 'atelierCathedralCatEye' ? '#261E2D'
+    : kind === 'atelierPrismShield' ? '#A7B9C8'
+    : kind === 'atelierRimlessOrbit' ? '#C4A66A'
+    : kind === 'atelierButterflyArchitecture' ? '#13151E'
+    : kind === 'empireLiquidWrapSunglasses' ? '#263642'
+    : kind === 'atelierMonolithAviator' ? '#8E7A4C'
+    : kind === 'atelierDoubleBridgeSquare' ? '#3D444C'
+    : kind === 'empireArchitecturalSportFrame' ? '#33404F'
+    : kind === 'acetateStatementFrames' ? '#593824' : kind === 'titaniumDesignerFrames' ? '#8D949D' : kind === 'goldTempleSunglasses' || kind === 'heirloomGoldSunglasses' ? '#C6A34D' : clear ? '#2A2220' : kind === 'aviators' ? '#B8913E' : '#0A0808';
+  const lensFill = kind === 'atelierPrismShield' ? '#8FB6C9'
+    : kind === 'atelierRimlessOrbit' ? '#DCE8F0'
+    : kind === 'atelierButterflyArchitecture' ? '#1D2637'
+    : kind === 'empireLiquidWrapSunglasses' ? '#243C48'
+    : kind === 'atelierMonolithAviator' ? '#2B313B'
+    : kind === 'atelierDoubleBridgeSquare' ? '#4D5A66'
+    : kind === 'empireArchitecturalSportFrame' ? '#223544'
+    : kind === 'titaniumDesignerFrames' || clear ? '#DCE8F0' : kind === 'aviators' || kind === 'goldTempleSunglasses' || kind === 'heirloomGoldSunglasses' ? '#3A2A1E' : '#1A1414';
+  const lensOp = kind === 'atelierRimlessOrbit' || clear || kind === 'titaniumDesignerFrames' ? 0.2 : 0.9;
   const lens = (cx: number, flip: number) => {
     let d: string;
-    if (kind === 'catEye' || kind === 'runwaySculptedShades') d = `M ${cx - 38 * flip} 316 C ${cx - 10 * flip} 310 ${cx + 30 * flip} 312 ${cx + 40 * flip} 306 C ${cx + 38 * flip} 336 ${cx + 22 * flip} 358 ${cx} 358 C ${cx - 24 * flip} 358 ${cx - 38 * flip} 340 ${cx - 38 * flip} 316 Z`;
-    else if (kind === 'aviators' || kind === 'goldTempleSunglasses' || kind === 'heirloomGoldSunglasses') d = `M ${cx - 36 * flip} 316 C ${cx - 10 * flip} 312 ${cx + 20 * flip} 312 ${cx + 38 * flip} 316 C ${cx + 40 * flip} 344 ${cx + 22 * flip} 366 ${cx + 4 * flip} 366 C ${cx - 20 * flip} 366 ${cx - 38 * flip} 344 ${cx - 36 * flip} 316 Z`;
+    if (kind === 'atelierCathedralCatEye') d = `M ${cx - 40 * flip} 320 L ${cx - 46 * flip} 301 Q ${cx - 6 * flip} 306 ${cx + 38 * flip} 309 L ${cx + 34 * flip} 342 Q ${cx + 19 * flip} 365 ${cx} 357 Q ${cx - 28 * flip} 353 ${cx - 40 * flip} 320 Z`;
+    else if (kind === 'atelierPrismShield' || kind === 'empireArchitecturalSportFrame') d = `M ${cx - 41 * flip} 310 L ${cx + 35 * flip} 310 L ${cx + 42 * flip} 337 L ${cx + 16 * flip} 363 L ${cx - 15 * flip} 363 L ${cx - 42 * flip} 337 Z`;
+    else if (kind === 'atelierRimlessOrbit') d = `M ${cx - 35} 334 C ${cx - 33} 309 ${cx - 9} 306 ${cx} 316 C ${cx + 18} 303 ${cx + 36} 318 ${cx + 34} 339 C ${cx + 31} 360 ${cx + 9} 365 ${cx} 351 C ${cx - 16} 364 ${cx - 37} 354 ${cx - 35} 334 Z`;
+    else if (kind === 'atelierButterflyArchitecture') d = `M ${cx - 42 * flip} 317 Q ${cx - 10 * flip} 300 ${cx + 38 * flip} 309 L ${cx + 48 * flip} 302 L ${cx + 34 * flip} 342 Q ${cx + 18 * flip} 364 ${cx} 356 Q ${cx - 30 * flip} 356 ${cx - 42 * flip} 317 Z`;
+    else if (kind === 'empireLiquidWrapSunglasses') d = `M ${cx - 42 * flip} 312 C ${cx - 5 * flip} 301 ${cx + 26 * flip} 307 ${cx + 43 * flip} 315 Q ${cx + 33 * flip} 352 ${cx + 12 * flip} 360 Q ${cx - 22 * flip} 360 ${cx - 42 * flip} 312 Z`;
+    else if (kind === 'atelierMonolithAviator' || kind === 'aviators' || kind === 'goldTempleSunglasses' || kind === 'heirloomGoldSunglasses') d = `M ${cx - 36 * flip} 316 C ${cx - 10 * flip} 312 ${cx + 20 * flip} 312 ${cx + 38 * flip} 316 C ${cx + 40 * flip} 344 ${cx + 22 * flip} 366 ${cx + 4 * flip} 366 C ${cx - 20 * flip} 366 ${cx - 38 * flip} 344 ${cx - 36 * flip} 316 Z`;
+    else if (kind === 'atelierDoubleBridgeSquare') d = `M ${cx - 37} 313 L ${cx + 32} 313 L ${cx + 37} 323 L ${cx + 32} 350 L ${cx + 19} 360 L ${cx - 24} 360 L ${cx - 37} 350 Z`;
+    else if (kind === 'catEye' || kind === 'runwaySculptedShades') d = `M ${cx - 38 * flip} 316 C ${cx - 10 * flip} 310 ${cx + 30 * flip} 312 ${cx + 40 * flip} 306 C ${cx + 38 * flip} 336 ${cx + 22 * flip} 358 ${cx} 358 C ${cx - 24 * flip} 358 ${cx - 38 * flip} 340 ${cx - 38 * flip} 316 Z`;
     else if (kind === 'oversized') d = `M ${cx - 44} 306 L ${cx + 44} 306 C ${cx + 46} 340 ${cx + 40} 370 ${cx} 370 C ${cx - 40} 370 ${cx - 46} 340 ${cx - 44} 306 Z`;
     else d = `M ${cx - 36} 318 Q ${cx - 36} 314 ${cx - 18} 314 L ${cx + 18} 314 Q ${cx + 36} 314 ${cx + 36} 332 L ${cx + 36} 340 Q ${cx + 36} 358 ${cx + 18} 358 L ${cx - 18} 358 Q ${cx - 36} 358 ${cx - 36} 340 Z`;
     return (
@@ -553,7 +574,15 @@ export const Glasses: React.FC<{ kind: string }> = ({ kind }) => {
       {lens(251, -1)}
       {lens(349, 1)}
       <path d="M 287 328 Q 300 320 313 328" fill="none" stroke={frame} strokeWidth="3" />
-      {(kind === 'aviators' || kind === 'goldTempleSunglasses' || kind === 'heirloomGoldSunglasses') && <path d="M 290 316 L 310 316" stroke={frame} strokeWidth="2" />}
+      {(kind === 'aviators' || kind === 'goldTempleSunglasses' || kind === 'heirloomGoldSunglasses' || kind === 'atelierMonolithAviator') && <path d="M 290 316 L 310 316" stroke={frame} strokeWidth="2" />}
+      {kind === 'atelierCathedralCatEye' && <path d="M 215 310 L 232 308 M 385 310 L 368 308" stroke="#D8C5A1" strokeWidth="4.2" strokeLinecap="round" />}
+      {kind === 'atelierPrismShield' && <><path d="M 211 330 L 237 354 M 389 330 L 363 354" stroke="#E8F5FC" strokeWidth="2.1" /><path d="M 236 312 L 265 350 M 364 312 L 335 350" stroke="#E8F5FC" strokeWidth="1.4" opacity="0.65" /></>}
+      {kind === 'atelierRimlessOrbit' && <><path d="M 218 334 L 277 334 M 323 334 L 382 334" stroke="#C4A66A" strokeWidth="1.4" /><circle cx="251" cy="334" r="3" fill="#D6DCE5" /><circle cx="349" cy="334" r="3" fill="#D6DCE5" /></>}
+      {kind === 'atelierButterflyArchitecture' && <><path d="M 218 315 Q 250 296 279 316 M 382 315 Q 350 296 321 316" fill="none" stroke="#C9D6E8" strokeWidth="2" /><circle cx="234" cy="315" r="2.2" fill="#F4D69B" /><circle cx="366" cy="315" r="2.2" fill="#F4D69B" /></>}
+      {kind === 'empireLiquidWrapSunglasses' && <><path d="M 207 320 Q 235 342 257 340 M 393 320 Q 365 342 343 340" fill="none" stroke="#9EC2D1" strokeWidth="2.5" /><path d="M 216 349 Q 250 369 276 351 M 384 349 Q 350 369 324 351" fill="none" stroke="#E9F7FC" strokeWidth="1.4" /></>}
+      {kind === 'atelierMonolithAviator' && <path d="M 220 318 L 280 318 M 320 318 L 380 318" stroke="#E3D8BC" strokeWidth="1.6" />}
+      {kind === 'atelierDoubleBridgeSquare' && <><path d="M 290 321 L 310 321 M 288 327 L 312 327" stroke="#A6B4C0" strokeWidth="1.7" /><path d="M 220 313 L 220 351 M 380 313 L 380 351" stroke="#98A6B5" strokeWidth="1.1" /></>}
+      {kind === 'empireArchitecturalSportFrame' && <><path d="M 212 312 L 269 312 M 331 312 L 388 312" stroke="#9EC9D9" strokeWidth="2.4" /><path d="M 219 350 L 250 360 M 381 350 L 350 360" stroke="#A9C5D1" strokeWidth="2" /></>}
       <path d={`M ${kind === 'oversized' ? 207 : 215} 326 L 196 334 M ${kind === 'oversized' ? 393 : 385} 326 L 404 334`} stroke={frame} strokeWidth="3" />
       {kind === 'acetateStatementFrames' && <path d="M 215 309 L 240 306 M 385 309 L 360 306" stroke={frame} strokeWidth="5" strokeLinecap="round" />}
       {kind === 'titaniumDesignerFrames' && <path d="M 220 322 L 280 322 M 320 322 L 380 322" stroke="#C0C7CF" strokeWidth="1.2" />}
