@@ -209,7 +209,7 @@ export function celebrityVisitChance(shopTierIndex: number, signatureProperty: b
   if (maximumCelebrityTierForShop(shopTierIndex) < 0) return 0;
   const tier = Math.min(6, Math.floor(shopTierIndex));
   // Scheduled days are opportunities; higher tiers gain more dates, not a guaranteed visit.
-  const baseByTier = [0, 0, 0.10, 0.16, 0.22, 0.28, 0.34];
+  const baseByTier = [0, 0, 0.25, 0.28, 0.32, 0.36, 0.40];
   return Math.min(0.95, (baseByTier[tier] || 0) + (signatureProperty ? 0.15 : 0));
 }
 
