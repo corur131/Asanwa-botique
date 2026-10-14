@@ -750,13 +750,15 @@ export interface GameState {
   /** NEPA cuts today, in shop minutes (can start before opening and run past closing). */
   outages: { from: number; to: number }[];
   /** Generator on, solar battery minutes, litres in the generator's tank. */
-  power: { gen: boolean; solar: number; fuel?: number; /** Fuel by generator furniture UID; legacy saves use fuel for the primary generator. */ generatorFuel?: Record<string, number>; /** Rechargeable fan battery, in minutes. */ fanBattery?: number };
+  power: { gen: boolean; solar: number; /** User-selected grid tariff; omitted in older saves. */ tariff?: number; fuel?: number; /** Fuel by generator furniture UID; legacy saves use fuel for the primary generator. */ generatorFuel?: Record<string, number>; /** Rechargeable fan battery, in minutes. */ fanBattery?: number };
   /** Divine's energy, 0..100. Full after a night's sleep. */
   energy?: number;
   /** Appliances switched off (fans, AC, speaker, TV), by furniture uid. */
   off?: Record<string, boolean>;
   busy?: Busy | null;
   meter?: WeekMeter;
+  /** Day on which the recurring weekly utility/market bills were settled; guards duplicate close calls. */
+  utilityBillDay?: number;
   /** TV channel index, for fun. */
   channel?: number;
   /** WhatsApp conversations that go back and forth. */

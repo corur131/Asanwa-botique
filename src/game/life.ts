@@ -12,7 +12,7 @@
  *   she is busy. Before opening and after closing they take no time.
  */
 import { naira } from './economy';
-import { POWER, addShout, coolRunning, fuelOf, fuelPrice, liveStats, nepaOff, refuel, setGen, solarCap, tankSize } from './power';
+import { POWER, addShout, coolRunning, fuelOf, fuelPrice, liveStats, nepaOff, refuel, setGen, solarCap, tankSize, tariffFor } from './power';
 import { furnitureById, roomOf, SWITCHABLE } from './shop';
 import { CharacterConfig } from '../types/character';
 import { Busy, GameState, Pose } from './types';
@@ -288,13 +288,13 @@ const DATA = [3_500, 5_000, 10_000, 15_000, 22_000, 35_000, 50_000];
 export interface Bill { label: string; amount: number }
 
 export function weeklyBills(s: GameState): Bill[] {
-  const kwh = Math.round(s.meter?.kwh || 0);
+  const kwh = Math.round((s.meter?.kwh || 0) * 100) / 100;
   const t = Math.max(0, Math.min(LAWMA.length - 1, Math.floor(s.tier || 0)));
   const size = roomOf(s.listing);
   const lawma = Math.round((LAWMA[t] * (0.8 + (size.w * size.d) / 60)) / 100) * 100;
   const area = s.listing.area || 'Yaba';
   return [
-    { label: `NEPA electricity (${kwh} kWh)`, amount: Math.round(kwh * POWER.tariff) },
+    { label: `NEPA electricity (${kwh} kWh @ ₦${tariffFor(s)}/kWh)`, amount: Math.round(kwh * tariffFor(s)) },
     { label: 'LAWMA waste collection', amount: lawma },
     { label: `${area} market association and security`, amount: Math.round((DUES[t] * (AREA_DUES[area] ?? 1.1)) / 100) * 100 },
     { label: 'Data, internet and POS charges', amount: DATA[t] },
@@ -302,6 +302,7 @@ export function weeklyBills(s: GameState): Bill[] {
 }
 
 export function payBills(s0: GameState): GameState {
+  if (s0.utilityBillDay === s0.day) return s0;
   const bills = weeklyBills(s0);
   let s = s0;
   let total = 0;
@@ -311,6 +312,6 @@ export function payBills(s0: GameState): GameState {
     const line = { day: s.day, t: -1, label: b.label, amount: -b.amount };
     s = { ...s, cash: s.cash - b.amount, ledger: [line, ...(s.ledger || [])].slice(0, 500) };
   }
-  s = { ...s, meter: { kwh: 0 }, today: { ...s.today, costs: s.today.costs + total, events: [...s.today.events, `Paid ${naira(total)} in weekly bills.`] } };
+  s = { ...s, utilityBillDay: s.day, meter: { kwh: 0 }, today: { ...s.today, costs: s.today.costs + total, events: [...s.today.events, `Paid ${naira(total)} in weekly bills.`] } };
   return text(s, 'Bills', `This week's bills:\n${bills.map((b) => `• ${b.label}: ${naira(b.amount)}`).join('\n')}\nTotal: ${naira(total)}. Paid from your account.`);
 }
