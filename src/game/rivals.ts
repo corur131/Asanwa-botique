@@ -49,7 +49,71 @@ const DAILY = [120_000, 400_000, 1_000_000, 2_500_000, 15_000_000, 40_000_000, 1
 const STOCK_SHARE = [0.45, 0.5, 0.55, 0.6, 0.62, 0.66, 0.7];
 /** Weekly wages for their staff. */
 const WAGES = [0, 0, 60_000, 150_000, 300_000, 800_000, 1_800_000];
+const STAR_RENT_FACTOR = [0, 0.75, 1, 1.33, 1.75] as const;
 const hash = (id: string) => Array.from(id).reduce((a, c) => a + c.charCodeAt(0), 0);
+
+function median(values: number[]): number {
+  if (!values.length) return 0;
+  const ordered = values.map((value) => Math.max(0, Number.isFinite(value) ? value : 0)).sort((a, b) => a - b);
+  return ordered[Math.floor(ordered.length / 2)] || 0;
+}
+
+/**
+ * Conservative weekly profit estimate if this boutique operated at a target tier.
+ * Uses the median recent takings to avoid one celebrity windfall deciding an upgrade.
+ */
+export function projectedRivalWeeklyProfitAtTier(r: Rival, targetTier: number): number {
+  const currentTier = Math.max(0, Math.min(TIERS.length - 1, Math.floor(r.tier)));
+  if (!Number.isInteger(targetTier) || targetTier <= currentTier || targetTier >= TIERS.length) return Number.NEGATIVE_INFINITY;
+  const recentTakings = (r.week || []).slice(-7);
+  if (!recentTakings.length || DAILY[currentTier] <= 0) return Number.NEGATIVE_INFINITY;
+
+  const typicalDailyTakings = median(recentTakings);
+  const projectedDailyTakings = typicalDailyTakings * DAILY[targetTier] / DAILY[currentTier];
+  const stockShare = clamp(STOCK_SHARE[targetTier] + (r.wholesaleActive ? 0.05 : 0), 0.3, 0.78);
+  const branchCount = Math.max(0, r.branches || 0);
+  const departmentCount = (r.departments || []).length;
+  const dailyRunning = TIERS[targetTier].running +
+    branchCount * Math.max(5_000, TIERS[targetTier].running * 0.22) +
+    departmentCount * 2_500 + (r.wholesaleActive ? 7_000 : 0);
+  const projectedStars = r.skill > 1.05 ? 3 : 2;
+  const weeklyFixed = TIERS[targetTier].rent * STAR_RENT_FACTOR[projectedStars] +
+    WAGES[targetTier] + branchCount * TIERS[targetTier].rent * 0.55;
+  return projectedDailyTakings * (1 - stockShare) * 7 - dailyRunning * 7 - weeklyFixed;
+}
+
+/** A rival upgrades only with protected liquidity, a profitable recent week, and positive projected tier economics. */
+export function rivalCanAffordTierUpgrade(r: Rival, targetTier: number): boolean {
+  if (targetTier !== r.tier + 1 || targetTier < 1 || targetTier >= TIERS.length || r.cash < 0) return false;
+  const next = TIERS[targetTier];
+  const appetite = 1.1 + (hash(r.id) % 6) * 0.1;
+  const liquidAfterDebt = Math.max(0, r.cash) + Math.max(0, r.savings || 0) - Math.max(0, r.debt || 0);
+  if (liquidAfterDebt <= next.moveIn * appetite + next.rent * 3) return false;
+
+  const recentProfits = (r.profitHistory || []).slice(-7);
+  const recentProfit = recentProfits.length >= 5
+    ? recentProfits.reduce((sum, profit) => sum + profit, 0)
+    : (r.week || []).reduce((sum, value) => sum + value, 0) -
+      (r.weekCosts || []).reduce((sum, value) => sum + value, 0);
+  return recentProfit > 0 && projectedRivalWeeklyProfitAtTier(r, targetTier) > 0;
+}
+
+/** Keep tier-specific premises valued consistently without erasing branch/department assets. */
+function adjustRivalPropertyAssetValue(r: Rival, fromTier: number, toTier: number): void {
+  const oldBase = Math.round(TIERS[fromTier].moveIn * 0.8 + TIERS[fromTier].rent * 2);
+  const nextBase = Math.round(TIERS[toTier].moveIn * 0.8 + TIERS[toTier].rent * 2);
+  const existing = Number.isFinite(r.assetValue) ? Math.max(0, r.assetValue || 0) : oldBase;
+  r.assetValue = Math.max(0, existing - oldBase + nextBase);
+}
+
+/** Family bridge credit is a recorded liability, not a silent cash grant. */
+function rescueRivalCash(r: Rival, targetCash: number): number {
+  const borrowed = Math.max(0, Math.round(targetCash - r.cash));
+  if (!borrowed) return 0;
+  r.cash += borrowed;
+  r.debt = Math.max(0, r.debt || 0) + borrowed;
+  return borrowed;
+}
 
 function lookFor(male: boolean): CharacterConfig {
   for (let i = 0; i < 40; i++) {
@@ -287,7 +351,7 @@ export function simulateRivals(s0: GameState): GameState {
   const rankById = new Map(currentOrder.map((id, index) => [id, index + 1] as const));
   const youRank = rankById.get('you') || 20;
   const rivals: Rival[] = [];
-  const news: { kind: 'up' | 'down' | 'viral' | 'scandal' | 'campaign' | 'celebrity'; r: Rival; spend?: number; bought?: boolean; premiumOrder?: boolean; celebrityTier?: number; celebrityName?: string }[] = [];
+  const news: { kind: 'up' | 'down' | 'viral' | 'scandal' | 'campaign' | 'celebrity' | 'rescue'; r: Rival; spend?: number; bought?: boolean; premiumOrder?: boolean; celebrityTier?: number; celebrityName?: string; rescueAmount?: number }[] = [];
   const growthNotes: { owner: string; shop: string; detail: string }[] = [];
   for (const r0 of s.rivals) {
     const r = { ...r0, week: [...r0.week], weekCosts: [...(r0.weekCosts || [])] };
@@ -465,7 +529,7 @@ export function simulateRivals(s0: GameState): GameState {
         r.cash -= 7_500_000;
         r.branches = branchCount + 1;
         expansionInvestmentMade = true;
-        r.assetValue = Math.max(0, (r.assetValue || 0) + 2_500_000);
+        // Branch assets are already valued from r.branches in netWorthRival; do not double-count them in assetValue.
         growthNotes.push({ owner: r.owner, shop: r.shop, detail: 'opened branch ' + r.branches + ' and committed ₦7,500,000 to its setup' });
       } else if (canOpenWholesale && chance(0.55)) {
         r.cash -= 5_000_000;
@@ -479,30 +543,57 @@ export function simulateRivals(s0: GameState): GameState {
         growthNotes.push({ owner: r.owner, shop: r.shop, detail: 'opened its ' + preferredDepartment + ' department for ₦' + departmentCost?.toLocaleString('en-NG') });
       }
     }
-    // move up when they can afford it; get thrown down when broke too long
-    const next = TIERS[r.tier + 1];
-    const appetite = 1.1 + (hash(r.id) % 6) * 0.1;
-    if (next && !expansionInvestmentMade && r.cash > next.moveIn * appetite + next.rent * 3 && today - r.moved > 14) {
-      r.cash -= next.moveIn;
-      r.tier += 1;
-      r.stars = r.skill > 1.05 ? 3 : 2;
-      r.moved = today;
-      news.push({ kind: 'up', r });
-    }
+    // Record operating profit before making the next investment decision.
+    // Capex is an asset movement, not an operating expense, so it stays outside this history.
     r.profitHistory = [...(r.profitHistory || []), (r.week[r.week.length - 1] || 0) - (r.weekCosts[r.weekCosts.length - 1] || 0)].slice(-28);
+
+    // Service family bridge credit from cash above a three-rent reserve. Principal repayment reduces both cash and debt.
+    if (today % 7 === 0 && (r.debt || 0) > 0) {
+      const safeReserve = TIERS[r.tier].rent * 3;
+      const repayment = Math.min(Math.max(0, r.debt || 0), Math.round(Math.max(0, r.cash - safeReserve) * 0.15));
+      if (repayment > 0) {
+        r.cash -= repayment;
+        r.debt = Math.max(0, (r.debt || 0) - repayment);
+      }
+    }
+
+    // Move up only if the next tier is affordable from liquid assets and recent profits can sustain its bills.
+    const next = TIERS[r.tier + 1];
+    if (next && !expansionInvestmentMade && today - r.moved > 14 && rivalCanAffordTierUpgrade(r, r.tier + 1)) {
+      const cashNeeded = next.moveIn + next.rent * 3;
+      const savingsToCash = Math.min(Math.max(0, r.savings || 0), Math.max(0, cashNeeded - r.cash));
+      if (savingsToCash > 0) {
+        r.savings = Math.max(0, (r.savings || 0) - savingsToCash);
+        r.cash += savingsToCash;
+      }
+      if (r.cash >= cashNeeded) {
+        const previousTier = r.tier;
+        r.cash -= next.moveIn;
+        r.tier += 1;
+        r.stars = r.skill > 1.05 ? 3 : 2;
+        r.moved = today;
+        adjustRivalPropertyAssetValue(r, previousTier, r.tier);
+        news.push({ kind: 'up', r });
+      }
+    }
+
     r.broke = r.cash < 0 ? r.broke + 1 : 0;
     if (r.broke >= 10 && r.tier > 0) {
+      const previousTier = r.tier;
       r.tier -= 1;
       r.stars = 1;
-      r.cash = TIERS[r.tier].rent * 2;
+      adjustRivalPropertyAssetValue(r, previousTier, r.tier);
+      const rescueAmount = rescueRivalCash(r, TIERS[r.tier].rent * 2);
       r.broke = 0;
       r.moved = today;
       r.rep = clamp(r.rep - 6, 0, 99);
       news.push({ kind: 'down', r });
+      if (rescueAmount > 0) news.push({ kind: 'rescue', r, rescueAmount });
     } else if (r.broke >= 14) {
-      // even a kiosk owner borrows from family and keeps going
-      r.cash = TIERS[0].rent * 2;
+      // A kiosk can keep going through a recorded, interest-free family bridge loan.
+      const rescueAmount = rescueRivalCash(r, TIERS[0].rent * 2);
       r.broke = 0;
+      if (rescueAmount > 0) news.push({ kind: 'rescue', r, rescueAmount });
     }
     rivals.push(r);
   }
@@ -536,6 +627,10 @@ export function simulateRivals(s0: GameState): GameState {
       if (r.main) s = rivalPost(s, r, pick(LINES.brag[r.personality]));
     } else if (n.kind === 'campaign') {
       s = gist(s, `${r.shop} launches an aggressive campaign`, `${r.owner} is spending on promotions and discounts to pull customers from rival boutiques. It is working, but the marketing bill is not small.`, r.id);
+    } else if (n.kind === 'rescue') {
+      s = gist(s, `${r.shop} secures family bridge credit`,
+        `${r.owner} borrowed ${naira(n.rescueAmount || 0)} after a cash crisis to keep trading. The amount is recorded as a liability; future surplus cash will repay it before further expansion.`,
+        r.id, true);
     } else {
       s = gist(s, `Customer drags ${r.shop} online`, `"They spoilt my wedding look," says a bride. ${r.owner} has not responded.`, r.id, true);
     }
