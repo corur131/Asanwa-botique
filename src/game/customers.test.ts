@@ -125,8 +125,8 @@ test('Signature properties receive more celebrity opportunities than ordinary sh
       assert.ok(celebrityIsScheduled(tier, day + 1, true), `Signature Level ${tier + 1} must recognize cycle day ${day}`);
     }
   }
-  assert.ok(!celebrityIsScheduled(4, 2, false), 'ordinary Flagship should not inherit the Signature-only schedule');
-  assert.ok(celebrityIsScheduled(4, 2, true), 'Signature Flagship should have an extra eligible day');
+  assert.ok(!celebrityIsScheduled(4, 3, false), 'ordinary Flagship should not inherit the Signature-only schedule');
+  assert.ok(celebrityIsScheduled(4, 3, true), 'Signature Flagship should have an extra eligible day');
 });
 
 test('celebrity eligibility opens at Level 3 and lower celebrity ranks can visit higher shops', () => {
