@@ -3,7 +3,7 @@ import { HairStyle } from '../../types/character';
 import { darken, lighten } from './color';
 import { Pt, curveThrough } from './geometry';
 import { CAP, CAP_STRANDS } from './refPaths';
-import { Grain, HairProps, SLICK_CAP, coils, recolor, seeded } from './hair';
+import { Grain, HairProps, MALE_CAP, MALE_HAIRLINE, SLICK_CAP, coils, recolor, seeded } from './hair';
 import { ScalpCap, StyleLayers, backBraids, braidCap, curlCloud, frontBraids, hairMass, hang, scalpRows, shineOf, toD } from './hair2';
 
 /**
@@ -361,5 +361,75 @@ export const WIG_STYLES: Partial<Record<HairStyle, StyleLayers>> = {
   cornrows,
   passionTwists,
   goddessLocs,
+  atelierGlassSilkBob: wig({ len: 304, bottom: 502, extra: 7, bob: true, inX: 238, outX: 180, inSlope: 8, outSlope: 7 }),
+  atelierSculptedSWave: wig({ len: 650, bottom: 850, extra: 21, amp: 22, freq: 44, inX: 238, outX: 178, outSlope: 62, texture: 'wave' }),
+  atelierCurtainLayers: wig({ len: 590, bottom: 790, extra: 13, amp: 9, freq: 72, inX: 232, outX: 184, outSlope: 70, flicks: 36 }),
+  empireOrbitHaloCurls: {
+    back: (p) => <>
+      {curlCloud(p, 'orbit-halo-back', [[300, 208, 126], [211, 260, 70], [389, 260, 70], [204, 340, 48], [396, 340, 48]], 731)}
+      <path d="M 204 290 C 220 210 254 182 300 178 C 346 182 380 210 396 290" fill="none" stroke={p.pal.darkShadow} strokeWidth="12" opacity="0.7" />
+      <path d="M 208 280 C 232 218 265 196 300 193 C 335 196 368 218 392 280" fill="none" stroke={p.pal.specular} strokeWidth="2.6" opacity="0.7" />
+    </>,
+    front: (p) => <>
+      {curlCloud(p, 'orbit-halo-front', [[234, 216, 42], [267, 190, 39], [300, 180, 42], [333, 190, 39], [366, 216, 42], [213, 250, 28], [387, 250, 28]], 739)}
+      <path d="M 194 300 C 186 239 226 166 300 158 C 374 166 414 239 406 300" fill="none" stroke={p.pal.mid} strokeWidth="20" strokeLinecap="round" />
+      <path d="M 200 283 C 217 220 251 184 300 178 C 349 184 383 220 400 283" fill="none" stroke={p.pal.specular} strokeWidth="3.5" opacity={0.75 * shineOf(p)} />
+      {[0, 1, 2, 3, 4, 5].map((i) => <path key={i} d={`M ${228 + i * 29} 195 q 9 -12 18 0 q -9 13 -18 0`} fill="none" stroke={p.pal.strandHighlight} strokeWidth="2" opacity="0.85" />)}
+    </>,
+  },
+  empireLiquidSidePony: {
+    back: (p) => <>
+      <path d="M 194 245 C 167 310 177 430 188 548 C 200 570 219 566 229 546 L 235 340 C 262 299 255 250 236 226 Z" fill={`url(#${p.id('hairLong')})`} stroke={p.pal.darkShadow} strokeWidth="2" />
+      <path d="M 406 245 C 433 310 423 430 412 548 C 400 570 381 566 371 546 L 365 340 C 338 299 345 250 364 226 Z" fill={`url(#${p.id('hairLong')})`} stroke={p.pal.darkShadow} strokeWidth="2" />
+      <path d="M 218 290 C 224 370 222 470 210 538 M 382 290 C 376 370 378 470 390 538" fill="none" stroke={p.pal.specular} strokeWidth="2.2" opacity={0.7 * shineOf(p)} />
+    </>,
+    side: (p) => <>
+      <path d="M 234 207 C 196 236 191 310 205 355 C 216 388 240 397 260 371 C 272 350 266 293 258 259 C 253 235 247 218 234 207 Z" fill={`url(#${p.id('hairG')})`} stroke={p.pal.darkShadow} strokeWidth="2" />
+      <path d="M 366 207 C 404 236 409 310 395 355 C 384 388 360 397 340 371 C 328 350 334 293 342 259 C 347 235 353 218 366 207 Z" fill={`url(#${p.id('hairG')})`} stroke={p.pal.darkShadow} strokeWidth="2" />
+      <path d="M 246 247 C 236 318 251 340 252 369 M 354 247 C 364 318 349 340 348 369" fill="none" stroke={p.pal.strandHighlight} strokeWidth="2.3" opacity={0.75 * shineOf(p)} />
+      {/* One dramatic side-swept fall makes this a ponytail silhouette rather than generic long hair. */}
+      <path d="M 366 224 C 407 270 416 330 399 409 C 386 470 364 504 375 552 C 394 578 428 564 441 531 C 459 478 442 426 448 373 C 455 318 425 250 386 214 Z" fill={`url(#${p.id('hairLong')})`} stroke={p.pal.darkShadow} strokeWidth="2.2" />
+      {Array.from({ length: 12 }, (_, i) => <path key={i} d={`M ${386 + i * 4} 248 C ${414 + i * 3} 324 ${394 + i * 6} 415 ${402 + i * 3} 540`} fill="none" stroke={i % 3 === 0 ? p.pal.specular : p.pal.strandHighlight} strokeWidth={i % 3 === 0 ? 1.8 : 1.1} opacity={0.7 * shineOf(p)} />)}
+      <path d="M 374 225 Q 402 244 421 281" fill="none" stroke="#D9B25A" strokeWidth="5.4" strokeLinecap="round" />
+      <path d="M 374 225 Q 402 244 421 281" fill="none" stroke="#FFF0B8" strokeWidth="1.2" />
+    </>,
+    front: (p) => <>
+      <path d={SLICK_CAP} fill={`url(#${p.id('hairG')})`} />
+      <path d="M 194 338 C 197 280 234 220 300 212 C 362 210 400 252 406 338" fill="none" stroke={p.pal.strandHighlight} strokeWidth="2.2" opacity={0.8 * shineOf(p)} />
+      <path d="M 240 224 C 228 258 226 282 232 309 M 260 216 C 247 246 248 279 253 299 M 340 216 C 354 247 352 279 347 299" fill="none" stroke={p.pal.specular} strokeWidth="1.8" opacity={0.65 * shineOf(p)} />
+    </>,
+  },
+  atelierMonolithTaper: {
+    front: (p) => <>
+      <path d={MALE_CAP} fill={`url(#${p.id('hairG')})`} stroke={p.pal.darkShadow} strokeWidth="1.5" />
+      <path d="M 194 338 C 199 296 208 272 225 261 C 243 246 273 238 300 238 C 327 238 357 246 375 261 C 392 272 401 296 406 338" fill="none" stroke={p.pal.specular} strokeWidth="2" opacity={0.68 * shineOf(p)} />
+      <path d="M 214 281 Q 300 254 386 281" fill="none" stroke={p.pal.strandHighlight} strokeWidth="1.5" opacity={0.75 * shineOf(p)} />
+      {[0, 1, 2, 3, 4, 5].map((i) => <path key={i} d={`M ${236 + i * 25} 269 l 2 12`} stroke={p.pal.darkShadow} strokeWidth="1.1" opacity="0.55" />)}
+    </>,
+  },
+  atelierSculptedQuiff: {
+    front: (p) => <>
+      <path d={MALE_CAP} fill={`url(#${p.id('hairG')})`} stroke={p.pal.darkShadow} strokeWidth="1.4" />
+      <path d="M 198 328 C 185 274 215 218 250 205 C 271 171 316 164 346 187 C 378 200 402 252 402 328 Q 380 290 354 282 C 324 270 292 273 267 284 C 241 295 221 314 198 328 Z" fill={`url(#${p.id('hairG')})`} stroke={p.pal.darkShadow} strokeWidth="2" />
+      <path d="M 224 274 C 250 232 290 213 340 214 M 238 282 C 270 244 308 235 351 240 M 267 289 C 289 264 321 258 350 260" fill="none" stroke={p.pal.specular} strokeWidth="2.4" opacity={0.82 * shineOf(p)} />
+      <path d={MALE_HAIRLINE} fill="none" stroke={p.pal.darkShadow} strokeWidth="1.4" opacity="0.92" />
+    </>,
+  },
+  empireSilkCurtainWaves: {
+    back: (p) => <>
+      <path d="M 200 222 C 160 294 176 424 194 498 L 230 508 L 240 290 Z" fill={`url(#${p.id('hairLong')})`} stroke={p.pal.darkShadow} strokeWidth="2" />
+      <path d="M 400 222 C 440 294 424 424 406 498 L 370 508 L 360 290 Z" fill={`url(#${p.id('hairLong')})`} stroke={p.pal.darkShadow} strokeWidth="2" />
+    </>,
+    side: (p) => <>
+      <path d="M 222 202 C 196 244 204 321 223 365 Q 237 389 254 363 C 271 332 254 257 242 220 Z" fill={`url(#${p.id('hairG')})`} stroke={p.pal.darkShadow} strokeWidth="1.8" />
+      <path d="M 378 202 C 404 244 396 321 377 365 Q 363 389 346 363 C 329 332 346 257 358 220 Z" fill={`url(#${p.id('hairG')})`} stroke={p.pal.darkShadow} strokeWidth="1.8" />
+      <path d="M 231 238 C 226 272 238 323 243 358 M 369 238 C 374 272 362 323 357 358" fill="none" stroke={p.pal.specular} strokeWidth="2.2" opacity={0.75 * shineOf(p)} />
+    </>,
+    front: (p) => <>
+      <path d="M 188 342 C 180 250 219 169 300 163 C 381 169 420 250 412 342 C 392 300 371 260 340 243 C 327 236 315 236 300 240 C 285 236 273 236 260 243 C 229 260 208 300 188 342 Z" fill={`url(#${p.id('hairG')})`} stroke={p.pal.darkShadow} strokeWidth="1.8" />
+      <path d="M 300 177 C 276 208 255 236 256 275 M 300 177 C 324 208 345 236 344 275" fill="none" stroke={p.pal.specular} strokeWidth="2.4" opacity={0.85 * shineOf(p)} />
+      <path d="M 256 244 C 249 269 254 296 258 314 M 344 244 C 351 269 346 296 342 314" fill="none" stroke={p.pal.strandHighlight} strokeWidth="2.3" opacity={0.8 * shineOf(p)} />
+    </>,
+  },
 };
 
