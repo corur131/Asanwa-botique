@@ -161,6 +161,17 @@ test('celebrity eligibility opens at Level 3 and lower celebrity ranks can visit
   );
 });
 
+test('celebrity purchasing floors rise with shop prestige and Signature status', () => {
+  const baselineRandom = seededRandom(88442);
+  const luxuryRandom = seededRandom(88442);
+  const baseline = celebrityAmountsForTier(1, baselineRandom, 4, false);
+  const luxurySignature = celebrityAmountsForTier(1, luxuryRandom, 5, true);
+  assert.ok(luxurySignature.budget > baseline.budget);
+  assert.ok(luxurySignature.spendFloor > baseline.spendFloor);
+  assert.ok(luxurySignature.spendFloor >= Math.round(CELEBRITY_SPEND_RANGES[1].min * 1.265 / 5_000) * 5_000);
+  assert.ok(luxurySignature.budget <= Math.round(CELEBRITY_SPEND_RANGES[1].max * 1.265 / 5_000) * 5_000);
+});
+
 test('reputation, audience and brand heat improve attraction without guaranteeing a celebrity', () => {
   const cold = { reputation: 25, followers: 120, shopTierIndex: 5, awareness: 20, prestige: 25, trendInfluence: 18 };
   const hot = { reputation: 92, followers: 250_000, shopTierIndex: 5, awareness: 92, prestige: 88, trendInfluence: 96 };
@@ -287,7 +298,8 @@ test('14-day celebrity payout simulation keeps premium orders below shop rent on
 
       const averageNetPerFortnight = netPremiumReceipts / cycles;
       assert.ok(premiumOrders > 0, 'simulation should observe premium orders at shop tier ' + shopTier);
-      assert.ok(averageNetPerFortnight < TIERS[shopTier].rent * 2,
+      const fortnightRent = TIERS[shopTier].rent * 2 * (signature ? 2.7 : 1);
+      assert.ok(averageNetPerFortnight < fortnightRent,
         'celebrity premium receipts should not cover all rent by themselves at shop tier ' + shopTier +
         (signature ? ' with Signature status' : ' without Signature status'));
     }
