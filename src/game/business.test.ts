@@ -651,7 +651,7 @@ test('Tolani and other rivals do not receive celebrity clients on every day; off
   }
 });
 
-test('a rival cannot receive routine celebrity visits on consecutive days', () => {
+test('elite rivals can host multiple celebrities on busy days and receive them on consecutive candidate days', () => {
   const originalRandom = Math.random;
   try {
     Math.random = () => 0.001;
@@ -673,7 +673,8 @@ test('a rival cannot receive routine celebrity visits on consecutive days', () =
       rivals: [elite], messages: [], gist: [], rivalPosts: [],
     });
     const first = simulateRivals(day29);
-    assert.ok(first.gist.some((item) => item.day === 29 && /celebrity client/i.test(item.title)));
+    assert.ok(first.gist.filter((item) => item.day === 29 && /celebrity/i.test(item.title)).length >= 2,
+      'Signature Fashion Empire can bring more than one celebrity into a single day');
     assert.equal(first.rivals[0].lastCelebrityVisitDay, 29);
 
     const day30 = state({
@@ -681,8 +682,8 @@ test('a rival cannot receive routine celebrity visits on consecutive days', () =
       today: { day: 30, bestScore: 0, events: [] } as unknown as GameState['today'],
     });
     const second = simulateRivals(day30);
-    assert.ok(!second.gist.some((item) => item.day === 30 && /celebrity client/i.test(item.title)),
-      'Signature Level 7 has a scheduled candidate on day 30, but a day-29 visit triggers cooldown');
+    assert.ok(second.gist.some((item) => item.day === 30 && /celebrity/i.test(item.title)),
+      'Signature Level 7 has a scheduled candidate on day 30 and can receive another visit after day 29');
   } finally {
     Math.random = originalRandom;
   }
