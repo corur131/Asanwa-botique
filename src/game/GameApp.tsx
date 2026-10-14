@@ -1020,6 +1020,14 @@ const SecurityMenu: React.FC<{
 /** NEPA status and the generator switch. */
 const PowerChip: React.FC<{ s: GameState; up: (f: (g: GameState) => GameState) => void }> = ({ s, up }) => {
   const [open, setOpen] = useState(false);
+  useEffect(() => {
+    if (!open) return;
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setOpen(false);
+    };
+    window.addEventListener('keydown', closeOnEscape);
+    return () => window.removeEventListener('keydown', closeOnEscape);
+  }, [open]);
   const st = E.stats(s);
   const src = E.source(s);
   const off = E.inBlackout(s);
@@ -1043,14 +1051,14 @@ const PowerChip: React.FC<{ s: GameState; up: (f: (g: GameState) => GameState) =
       </button>
       {open && typeof document !== 'undefined' && createPortal(
         <div
-          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/55 p-3"
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-3"
           onClick={() => setOpen(false)}
         >
           <div
             role="dialog"
             aria-modal="true"
             aria-label="Power and utilities"
-            className="w-[min(92vw,420px)] max-w-[calc(100vw-1.5rem)] max-h-[min(84dvh,720px)] overflow-y-auto overscroll-contain space-y-2 rounded-xl border border-white/15 bg-[#11141d] p-3 shadow-2xl"
+            className="w-[min(92vw,420px)] max-h-[min(84dvh,720px)] overflow-y-auto overscroll-contain space-y-2 rounded-xl border border-white/15 bg-[#11141d] p-3 shadow-2xl"
             onClick={(event) => event.stopPropagation()}
           >
         <div className="flex items-center justify-between gap-2">
