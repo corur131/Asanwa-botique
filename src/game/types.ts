@@ -169,6 +169,8 @@ export interface Rival {
   speciality: Speciality;
   area: string;
   tier: number;
+  /** Signature-grade premium premises; optional in legacy saves. */
+  signature?: boolean;
   stars: number;
   cash: number;
   rep: number;
