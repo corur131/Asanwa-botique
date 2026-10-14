@@ -127,22 +127,70 @@ const unitSample = (random: () => number) => {
 const roundToFiveThousand = (value: number) => Math.round(value / 5_000) * 5_000;
 
 /**
- * Rich retail customers have a ₦100k–₦5m spending capacity, not a promise to spend it.
- * The distribution is deliberately weighted toward sub-₦1.25m budgets; very large budgets are rare.
+ * Rich clothing shoppers receive budget distributions based on the shop tier.
+ * These are spending capacities, not promises to spend the full amount.
+ * Tier indexes 0–6 represent in-game Levels 1–7; service-only visitors keep SERVICE_BUDGET.
  */
-export const RICH_RETAIL_BUDGET_BANDS = [
-  { weight: 0.65, min: 100_000, max: 500_000 },
-  { weight: 0.22, min: 500_000, max: 1_250_000 },
-  { weight: 0.09, min: 1_250_000, max: 2_500_000 },
-  { weight: 0.035, min: 2_500_000, max: 4_000_000 },
-  { weight: 0.005, min: 4_000_000, max: 5_000_000 },
-] as const;
+type RichRetailBudgetBand = { readonly weight: number; readonly min: number; readonly max: number };
+const BUDGET_BANDS = {
+  entry: { min: 100_000, max: 500_000 },
+  growing: { min: 500_000, max: 1_250_000 },
+  premium: { min: 1_250_000, max: 2_500_000 },
+  luxury: { min: 2_500_000, max: 4_000_000 },
+  elite: { min: 4_000_000, max: 5_000_000 },
+  maison: { min: 5_000_000, max: 7_500_000 },
+  empire: { min: 7_500_000, max: 10_000_000 },
+} as const;
 
-export function richRetailBudget(random: () => number = Math.random): number {
+const bands = (weights: readonly number[]): RichRetailBudgetBand[] => [
+  ...(weights[0] ? [{ weight: weights[0], ...BUDGET_BANDS.entry }] : []),
+  ...(weights[1] ? [{ weight: weights[1], ...BUDGET_BANDS.growing }] : []),
+  ...(weights[2] ? [{ weight: weights[2], ...BUDGET_BANDS.premium }] : []),
+  ...(weights[3] ? [{ weight: weights[3], ...BUDGET_BANDS.luxury }] : []),
+  ...(weights[4] ? [{ weight: weights[4], ...BUDGET_BANDS.elite }] : []),
+  ...(weights[5] ? [{ weight: weights[5], ...BUDGET_BANDS.maison }] : []),
+  ...(weights[6] ? [{ weight: weights[6], ...BUDGET_BANDS.empire }] : []),
+];
+
+/** Ordinary-shop chances, ordered from Level 1 through Level 7. Every row totals 100%. */
+export const RICH_RETAIL_BUDGET_BANDS_BY_TIER: readonly (readonly RichRetailBudgetBand[])[] = [
+  bands([0.95, 0.05, 0, 0, 0, 0, 0]),
+  bands([0.80, 0.18, 0.02, 0, 0, 0, 0]),
+  bands([0.65, 0.22, 0.09, 0.035, 0.005, 0, 0]),
+  bands([0.57, 0.22, 0.12, 0.07, 0.02, 0, 0]),
+  bands([0.39, 0.24, 0.18, 0.12, 0.05, 0.02, 0]),
+  bands([0.23, 0.23, 0.23, 0.18, 0.08, 0.03, 0.02]),
+  bands([0.12, 0.18, 0.23, 0.22, 0.12, 0.08, 0.05]),
+];
+
+/** Signature customers skew wealthier than customers at an ordinary shop of the same tier. */
+export const SIGNATURE_RICH_RETAIL_BUDGET_BANDS_BY_TIER: readonly (readonly RichRetailBudgetBand[])[] = [
+  bands([0.85, 0.13, 0.02, 0, 0, 0, 0]),
+  bands([0.68, 0.20, 0.10, 0.02, 0, 0, 0]),
+  bands([0.53, 0.22, 0.13, 0.08, 0.04, 0, 0]),
+  bands([0.45, 0.22, 0.16, 0.11, 0.06, 0, 0]),
+  bands([0.28, 0.23, 0.22, 0.15, 0.07, 0.04, 0.01]),
+  bands([0.15, 0.21, 0.25, 0.19, 0.09, 0.06, 0.05]),
+  bands([0.10, 0.15, 0.22, 0.23, 0.14, 0.10, 0.06]),
+];
+
+/** Backward-compatible export: the original Level 3 baseline mix. */
+export const RICH_RETAIL_BUDGET_BANDS = RICH_RETAIL_BUDGET_BANDS_BY_TIER[2];
+
+export function richRetailBudget(
+  random: () => number = Math.random,
+  shopTierIndex = 2,
+  signatureProperty = false,
+): number {
+  const tier = Math.max(0, Math.min(6, Math.floor(Number.isFinite(shopTierIndex) ? shopTierIndex : 2)));
+  const bandsByTier = signatureProperty
+    ? SIGNATURE_RICH_RETAIL_BUDGET_BANDS_BY_TIER
+    : RICH_RETAIL_BUDGET_BANDS_BY_TIER;
+  const selectedBands = bandsByTier[tier] || RICH_RETAIL_BUDGET_BANDS_BY_TIER[2];
   const roll = unitSample(random);
   let cumulative = 0;
-  let band = RICH_RETAIL_BUDGET_BANDS[RICH_RETAIL_BUDGET_BANDS.length - 1];
-  for (const candidate of RICH_RETAIL_BUDGET_BANDS) {
+  let band = selectedBands[selectedBands.length - 1];
+  for (const candidate of selectedBands) {
     cumulative += candidate.weight;
     if (roll < cumulative) {
       band = candidate;
@@ -150,7 +198,7 @@ export function richRetailBudget(random: () => number = Math.random): number {
     }
   }
   const value = band.min + unitSample(random) * (band.max - band.min);
-  return Math.max(100_000, Math.min(5_000_000, roundToFiveThousand(value)));
+  return Math.max(band.min, Math.min(band.max, roundToFiveThousand(value)));
 }
 
 /**
@@ -208,9 +256,9 @@ export function celebrityIsScheduled(shopTierIndex: number, day: number): boolea
 export function celebrityVisitChance(shopTierIndex: number, signatureProperty: boolean): number {
   if (maximumCelebrityTierForShop(shopTierIndex) < 0) return 0;
   const tier = Math.min(6, Math.floor(shopTierIndex));
-  // Scheduled days are opportunities; higher tiers gain more dates, not a guaranteed visit.
+  // Signature properties multiply the ordinary-shop chance by 1.5; they do not bypass the Level 3 gate.
   const baseByTier = [0, 0, 0.10, 0.16, 0.22, 0.28, 0.34];
-  return Math.min(0.95, (baseByTier[tier] || 0) + (signatureProperty ? 0.15 : 0));
+  return Math.min(0.95, (baseByTier[tier] || 0) * (signatureProperty ? 1.5 : 1));
 }
 
 const SERVICE_INTRO = {
@@ -358,7 +406,7 @@ export function makeCustomer(state: GameState, mix: [number, number, number]): C
   const budget = service
     ? roundBudget(lo + Math.random() * (hi - lo))
     : cls === 'rich'
-      ? richRetailBudget()
+      ? richRetailBudget(Math.random, state.tier, !!state.listing.signature)
       : roundBudget(lo + Math.random() * (hi - lo));
   const fav = regular ? { favColor: regular.favColor, favName: regular.favName } : (() => { const c = pick(WANTED_COLOURS); return { favColor: c.color, favName: c.name }; })();
   const base = {
