@@ -209,10 +209,10 @@ export function richRetailBudget(
 /** Rank-based baseline spending capacity at a Flagship shop; venue prestige scales it further. */
 export const CELEBRITY_SPEND_RANGES = [
   { min: 1_500_000, max: 12_000_000 },
-  { min: 6_000_000, max: 25_000_000 },
-  { min: 12_000_000, max: 45_000_000 },
-  { min: 25_000_000, max: 90_000_000 },
-  { min: 50_000_000, max: 250_000_000 },
+  { min: 7_000_000, max: 25_000_000 },
+  { min: 20_000_000, max: 45_000_000 },
+  { min: 40_000_000, max: 90_000_000 },
+  { min: 85_000_000, max: 250_000_000 },
 ] as const;
 
 function lowWeightedAmount(min: number, max: number, random: () => number): number {
