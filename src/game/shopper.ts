@@ -1,11 +1,12 @@
+import { FABRIC_COLORS } from '../constants/catalog';
 import { BUDGET, MARKUP, TIERS } from './economy';
 import { cartTotal } from './engine';
 import type { CartLine } from './engine';
-import { canBuy, entryFor, HAIR_SWATCHES, isClothing, MARKET, pieceCost } from './market';
+import { canBuy, entryFor, HAIR_SWATCHES, isClothing, MARKET, pieceCost, takesColour } from './market';
 import type { MarketEntry } from './market';
 import type {
   CustomerClass, GameState, ProductSalesRecord, ShopperBuyingPreference, ShopperDressRank,
-  ShopperJob, ShopperMission, ShopperOrderLine, ShopperPriceBand, ShopperProductCategory,
+  ShopperJob, ShopperMission, ShopperOrderLine, ShopperPriceBand, ShopperProductCategory, StockKind,
 } from './types';
 
 const CLASS_ORDER: CustomerClass[] = ['poor', 'middle', 'rich'];
@@ -24,6 +25,25 @@ export const SHOPPER_PREFERENCE_CATEGORIES: { id: ShopperProductCategory; label:
   { id: 'headwear', label: 'Headwear', kinds: ['headwear'] },
   { id: 'glasses', label: 'Eyewear', kinds: ['glasses'] },
 ];
+
+const SHOPPER_CATEGORY_BY_KIND: Record<StockKind, ShopperProductCategory> = {
+  top: 'top',
+  bottom: 'bottom',
+  dress: 'dress',
+  outer: 'outer',
+  shoes: 'shoes',
+  bag: 'bag',
+  necklace: 'jewellery',
+  wrist: 'jewellery',
+  earrings: 'jewellery',
+  hair: 'hair',
+  headwear: 'headwear',
+  glasses: 'glasses',
+} as Record<StockKind, ShopperProductCategory>;
+
+export function shopperCategoryForKind(kind: StockKind): ShopperProductCategory {
+  return SHOPPER_CATEGORY_BY_KIND[kind];
+}
 
 const CLASS_RANK: Record<'poor' | 'middle' | 'rich', number> = { poor: 0, middle: 1, rich: 2 };
 
@@ -201,6 +221,8 @@ interface Candidate {
   suggestedPieces: number;
   /** Contract requirements are sourced in their listed order, regardless of sales scoring. */
   contractOrder?: number;
+  /** Do not recolour a line when it intentionally replenishes a stocked variant. */
+  preserveVariant?: boolean;
 }
 
 function toLine(entry: MarketEntry, opts: { fabric?: string; color: string; color2: string; pattern: number; pieces: number }): ShopperOrderLine {
@@ -237,6 +259,41 @@ function candidateLine(
   const fabric = isClothing(entry.kind) ? existing?.fabric || entry.fabric || 'plain' : undefined;
   const colour2 = existing?.color2 || (isClothing(entry.kind) ? DEFAULT_TRIM : color);
   return toLine(entry, { fabric, color, color2: colour2, pattern, pieces: suggestedPieces });
+}
+
+/**
+ * Fresh products should make the shop's colour palette broader, not repeat whichever
+ * colours happened to sell most in the last few days. Existing variants are left alone
+ * for genuine restock lines. Historical sales influence this only gently; current stock
+ * and the products already chosen for this order drive the balance.
+ */
+function balancedShopperColour(
+  entry: MarketEntry,
+  s: GameState,
+  records: ProductSalesRecord[],
+  chosen: ShopperOrderLine[],
+): string {
+  const palette = entry.kind === 'hair'
+    ? HAIR_SWATCHES.map((swatch) => swatch.color)
+    : FABRIC_COLORS;
+  const options = palette.map((color) => {
+    const stockUnits = s.stock
+      .filter((row) => takesColour(row.kind) && row.color.toLowerCase() === color.toLowerCase())
+      .reduce((sum, row) => sum + Math.max(0, row.pieces), 0);
+    const orderUnits = chosen
+      .filter((row) => takesColour(row.kind) && row.color.toLowerCase() === color.toLowerCase())
+      .reduce((sum, row) => sum + Math.max(0, row.pieces), 0);
+    const historicUnits = records
+      .filter((row) => row.color.toLowerCase() === color.toLowerCase())
+      .reduce((sum, row) => sum + Math.max(0, row.units) * recency(row.day, s.day), 0);
+    return { color, score: stockUnits * 2 + orderUnits * 4 + Math.log1p(historicUnits) };
+  });
+  const lowestScore = Math.min(...options.map((option) => option.score));
+  const leastUsed = options.filter((option) => option.score === lowestScore);
+  let seed = `${entry.kind}|${entry.id}|${s.day}`;
+  let hash = 0;
+  for (let i = 0; i < seed.length; i++) hash = (hash * 31 + seed.charCodeAt(i)) >>> 0;
+  return leastUsed[hash % leastUsed.length].color;
 }
 
 function mergeIntoCart(cart: CartLine[], additions: ShopperOrderLine[]): CartLine[] {
@@ -285,6 +342,9 @@ export function prepareShopperOrder(
   for (const design of s.stock) {
     if (design.pieces > 0) representedKinds.set(design.kind, (representedKinds.get(design.kind) || 0) + design.pieces);
   }
+  const stockedCategories = new Set<ShopperProductCategory>(
+    s.stock.filter((design) => design.pieces > 0).map((design) => shopperCategoryForKind(design.kind)),
+  );
   const normalCeiling = shopperPriceCeiling(s, mission);
   const priceCeiling = normalCeiling;
   const maxLines = [6, 8, 10, 13, 16, 20, 24][Math.max(0, Math.min(6, Math.floor(s.tier || 0)))] || 6;
@@ -328,10 +388,11 @@ export function prepareShopperOrder(
         score: 1000 + productDemand + (inStock <= 0 ? 3 : 0),
         suggestedPieces: missing,
         contractOrder: requirementIndex,
+        preserveVariant: !!variants.length,
       });
       continue;
     }
-    if (mission === 'restock' && (variants.length || !hasBuyingPreferences)) {
+    if (mission === 'restock' && variants.length) {
       for (const variant of variants) {
         const matchingEntry = entryFor(variant.kind, variant.itemId);
         if (!matchingEntry || !canBuy(matchingEntry, s.tier)) continue;
@@ -349,6 +410,7 @@ export function prepareShopperOrder(
           entry, line, unitCost,
           score: 3 + productDemand * 2 + recentUnits * 2 + (variant.pieces <= 0 ? 6 : variant.pieces === 1 ? 3 : 0),
           suggestedPieces: line.pieces,
+          preserveVariant: true,
         });
       }
       continue;
@@ -368,7 +430,7 @@ export function prepareShopperOrder(
         const preferenceScore = shopperPreferenceScore(entry, shoppingExamples);
         const score = 90 + (entry.luxury ? 100 : 0) + productDemand * 2 +
           (shoppingExamples.trim() ? (preferenceScore > 0 ? 120 + preferenceScore * 120 : -80) : 0);
-        candidates.push({ entry, line, unitCost, score, suggestedPieces: richQuantityFor(unitCost) });
+        candidates.push({ entry, line, unitCost, score, suggestedPieces: richQuantityFor(unitCost), preserveVariant: true });
       }
       continue;
     }
@@ -404,6 +466,7 @@ export function prepareShopperOrder(
   const remainingCandidates = [...candidates];
   const chosen: ShopperOrderLine[] = [];
   const pickedProducts = new Set<string>();
+  const pickedCategories = new Set<ShopperProductCategory>();
   const pickedKinds = new Map<string, number>();
   const pickedGroups = new Map<string, number>();
   const coveredPriceBandKeys = new Set<string>();
@@ -416,31 +479,52 @@ export function prepareShopperOrder(
   // kinds and catalogue groups, so the shopper does not fill the cart with near-copies.
   while (chosen.length < lineLimit && remainingCandidates.length) {
     let bestIndex = -1;
+    let coveringCategory: ShopperProductCategory | null = null;
     if (mission === 'contract' && selectedContract) {
       bestIndex = remainingCandidates.findIndex((candidate) =>
         !pickedProducts.has([candidate.entry.kind, candidate.entry.id].join('|')),
       );
     } else {
-      let bestScore = Number.NEGATIVE_INFINITY;
-      for (let i = 0; i < remainingCandidates.length; i++) {
-        const candidate = remainingCandidates[i];
-        const key = [candidate.entry.kind, candidate.entry.id].join('|');
-        if (pickedProducts.has(key)) continue;
-        const kind = candidate.entry.kind;
-        const group = candidate.entry.group.toLowerCase();
-        const kindStock = representedKinds.get(kind) || 0;
-        const kindPicks = pickedKinds.get(kind) || 0;
-        const groupPicks = pickedGroups.get(group) || 0;
-        const diversityPenalty = mission === 'restock' ? 0
-          : Math.min(7, Math.log1p(kindStock) * 1.3) + kindPicks * 3 + groupPicks * 2.5;
-        const bandKeys = hasBuyingPreferences
-          ? matchingPriceBandPreferenceKeys(candidate.entry, activePreferences, candidate.line.fabric)
-          : [];
-        const uncoveredBandBonus = bandKeys.filter((key) => !coveredPriceBandKeys.has(key)).length * 1_000;
-        const adjustedScore = candidate.score - diversityPenalty + uncoveredBandBonus;
-        if (adjustedScore > bestScore) {
-          bestScore = adjustedScore;
-          bestIndex = i;
+      // Cover each available shopper category before spending the whole order on repeats.
+      // Restock only targets categories that currently have no pieces; Variety/premium
+      // missions spread their new assortment across the eligible categories in the catalogue.
+      const remainingBudget = budget - spent;
+      const coverageOptions = remainingCandidates
+        .map((candidate, index) => ({ candidate, index, category: shopperCategoryForKind(candidate.entry.kind) }))
+        .filter(({ candidate, index, category }) =>
+          !pickedProducts.has([candidate.entry.kind, candidate.entry.id].join('|')) &&
+          !pickedCategories.has(category) &&
+          (mission !== 'restock' || !stockedCategories.has(category)) &&
+          candidate.unitCost <= remainingBudget,
+        )
+        .sort((a, b) => a.candidate.unitCost - b.candidate.unitCost ||
+          b.candidate.score - a.candidate.score ||
+          a.index - b.index);
+      if (coverageOptions.length && chosen.length < lineLimit) {
+        bestIndex = coverageOptions[0].index;
+        coveringCategory = coverageOptions[0].category;
+      } else {
+        let bestScore = Number.NEGATIVE_INFINITY;
+        for (let i = 0; i < remainingCandidates.length; i++) {
+          const candidate = remainingCandidates[i];
+          const key = [candidate.entry.kind, candidate.entry.id].join('|');
+          if (pickedProducts.has(key)) continue;
+          const kind = candidate.entry.kind;
+          const group = candidate.entry.group.toLowerCase();
+          const kindStock = representedKinds.get(kind) || 0;
+          const kindPicks = pickedKinds.get(kind) || 0;
+          const groupPicks = pickedGroups.get(group) || 0;
+          const diversityPenalty = mission === 'restock' ? 0
+            : Math.min(7, Math.log1p(kindStock) * 1.3) + kindPicks * 3 + groupPicks * 2.5;
+          const bandKeys = hasBuyingPreferences
+            ? matchingPriceBandPreferenceKeys(candidate.entry, activePreferences, candidate.line.fabric)
+            : [];
+          const uncoveredBandBonus = bandKeys.filter((key) => !coveredPriceBandKeys.has(key)).length * 1_000;
+          const adjustedScore = candidate.score - diversityPenalty + uncoveredBandBonus;
+          if (adjustedScore > bestScore) {
+            bestScore = adjustedScore;
+            bestIndex = i;
+          }
         }
       }
     }
@@ -452,13 +536,26 @@ export function prepareShopperOrder(
       if (mission === 'contract' && selectedContract) break;
       continue;
     }
-    const quantity = Math.min(candidate.suggestedPieces, Math.floor(remaining / candidate.unitCost));
+    const affordableQuantity = Math.floor(remaining / candidate.unitCost);
+    const quantity = coveringCategory
+      ? Math.min(1, affordableQuantity)
+      : Math.min(candidate.suggestedPieces, affordableQuantity);
     if (quantity < 1) {
       if (mission === 'contract' && selectedContract) break;
       continue;
     }
-    const line = { ...candidate.line, pieces: quantity };
+    let line: ShopperOrderLine = { ...candidate.line, pieces: quantity };
+    if (!candidate.preserveVariant && takesColour(line.kind)) {
+      const color = balancedShopperColour(candidate.entry, s, records, chosen);
+      const pattern = line.kind === 'hair'
+        ? Math.max(0, HAIR_SWATCHES.findIndex((swatch) => swatch.color === color))
+        : line.pattern;
+      const color2 = isClothing(line.kind) ? line.color2 : color;
+      const colourAdjusted = { ...line, color, color2, pattern };
+      line = { ...colourAdjusted, key: cartKey(colourAdjusted) };
+    }
     chosen.push(line);
+    pickedCategories.add(shopperCategoryForKind(candidate.entry.kind));
     for (const key of matchingPriceBandPreferenceKeys(candidate.entry, activePreferences, line.fabric)) {
       coveredPriceBandKeys.add(key);
     }

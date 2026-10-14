@@ -6,7 +6,7 @@ import { buyCart, cartTotal, fromData, newGame, validateCart } from './engine';
 import { canBuy, MARKET, pieceCost } from './market';
 import {
   prepareShopperOrder, shopperDressRank, shopperEntryMatchesPreferences, shopperPriceBandMatches,
-  shopperPriceCeiling,
+  shopperPriceCeiling, SHOPPER_PREFERENCE_CATEGORIES, shopperCategoryForKind,
 } from './shopper';
 import type { ShopperBuyingPreference } from './types';
 import type { GameState, ShopperOrderLine } from './types';
@@ -332,4 +332,63 @@ test('when both exact price bands are selected, the shopper includes products fr
   assert.ok(entries.some((entry, index) =>
     shopperPriceBandMatches(entry, 'millionCouture', result.job!.items[index].fabric)),
   'the order must also include a ₦1m+ product rather than filling only from the lower band');
+});
+
+
+test('restock fills currently missing shopper categories before repeating existing categories', () => {
+  const s = game({ cash: 100_000_000, tier: 5, stock: [], marketCart: [], productSales: [] });
+  const budget = 50_000_000;
+  const ceiling = shopperPriceCeiling(s, 'restock');
+  const expectedCategories = new Set(
+    MARKET
+      .filter((entry) => canBuy(entry, s.tier) &&
+        pieceCost(entry, ['top', 'bottom', 'dress', 'outer'].includes(entry.kind) ? entry.fabric || 'plain' : undefined) * MARKUP <= ceiling)
+      .map((entry) => shopperCategoryForKind(entry.kind)),
+  );
+  const result = prepareShopperOrder(s, 'restock', budget);
+  assert.ok(result.job, result.error);
+  const sourcedCategories = new Set(result.job.items.map((line) => shopperCategoryForKind(line.kind)));
+  for (const category of expectedCategories) {
+    assert.ok(sourcedCategories.has(category), `restock should source the eligible missing category: ${category}`);
+  }
+  assert.ok(result.job.items.length >= expectedCategories.size,
+    'when the budget and tier allow it, category coverage should precede duplicate-category shopping');
+  assert.ok(result.job.estimatedTotal <= budget);
+});
+
+test('fresh shopper assortment uses a balanced colour palette even when red and black dominate historical sales', () => {
+  const s = game({ cash: 100_000_000, tier: 5, stock: [], marketCart: [], productSales: [] });
+  const sales = Array.from({ length: 40 }, (_, index) => ({
+    day: s.day - 1,
+    designKey: `historic-${index}`,
+    kind: index % 2 ? 'dress' as const : 'top' as const,
+    itemId: `historic-item-${index}`,
+    fabric: 'plain' as const,
+    color: index % 2 ? '#1E1E24' : '#C2262E',
+    color2: '#C9A163',
+    pattern: 0,
+    customerClass: 'rich' as const,
+    units: 500,
+    tier: s.tier,
+  }));
+  const result = prepareShopperOrder({ ...s, productSales: sales }, 'variety', 50_000_000);
+  assert.ok(result.job, result.error);
+  const colouredLines = result.job.items.filter((line) =>
+    ['top', 'bottom', 'dress', 'outer', 'shoes', 'bag', 'headwear', 'hair'].includes(line.kind),
+  );
+  const uniqueColours = new Set(colouredLines.map((line) => line.color.toUpperCase()));
+  assert.ok(uniqueColours.size >= 6,
+    `a broad fresh order should use at least six distinct colours, got ${[...uniqueColours].join(', ')}`);
+  assert.ok(colouredLines.some((line) => !['#1E1E24', '#C2262E'].includes(line.color.toUpperCase())),
+    'historical red/black sales must not force every fresh product to repeat those colours');
+  assert.ok(result.job.estimatedTotal <= 50_000_000);
+});
+
+test('shopper category mapping combines jewellery product kinds without losing other categories', () => {
+  assert.equal(shopperCategoryForKind('necklace'), 'jewellery');
+  assert.equal(shopperCategoryForKind('wrist'), 'jewellery');
+  assert.equal(shopperCategoryForKind('earrings'), 'jewellery');
+  assert.equal(shopperCategoryForKind('top'), 'top');
+  assert.equal(shopperCategoryForKind('glasses'), 'glasses');
+  assert.equal(SHOPPER_PREFERENCE_CATEGORIES.length, 10);
 });
