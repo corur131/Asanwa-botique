@@ -180,7 +180,7 @@ function makePoliticianContractOffer(s: GameState): PoliticianContract | null {
   const requirements: PoliticianContractRequirement[] = [];
   const seen = new Set<string>();
   for (let i = 0; i < eligible.length && requirements.length < lineCount; i++) {
-    const row = eligible[(start + i * 7) % eligible.length];
+    const row = eligible[(start + i) % eligible.length];
     const key = row.entry.kind + '|' + row.entry.id;
     if (seen.has(key)) continue;
     seen.add(key);
