@@ -496,9 +496,11 @@ export function openShop(s0: GameState): GameState {
   }
   const model = contestModel(s);
   if (model) arrivals.push(model);
-  if (s.celebDay === s.day) {
-    const c = makeCustomer(s, [0, 0, 1]);
-    arrivals.push({ at: 120 + Math.random() * 360, c: { ...c, influencer: true, budget: Math.round(c.budget * 1.5 / 10_000) * 10_000, request: `Hi! I'm ${c.name}. ${c.request} (A celebrity! Her followers will see this look.)` } });
+  // Deborah's separately scheduled celebrity tip uses the same five-tier system and Level 3 gate.
+  if (s.celebDay === s.day && highestEligibleCelebrityTier >= 0) {
+    const celebrityTier = Math.floor(Math.random() * (highestEligibleCelebrityTier + 1));
+    const c = makeCelebrityCustomer(s, celebrityTier);
+    arrivals.push({ at: 120 + Math.random() * 360, c });
   }
   arrivals.sort((a, b) => a.at - b.at);
   const outages = planOutages(s.day);
