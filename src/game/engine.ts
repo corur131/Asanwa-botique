@@ -128,14 +128,15 @@ const freshDay = { clock: 0, arrivals: [], inShop: [], serving: null, left: [], 
 const POLITICIAN_CONTRACT_COOLDOWN_DAYS = 45;
 
 const CONTRACT_TIER_RULES = [
-  { retailCeiling: 18_000, lines: 1, minQty: 2, maxQty: 3, deadlineDays: 5 },
-  { retailCeiling: 60_000, lines: 1, minQty: 3, maxQty: 5, deadlineDays: 6 },
-  { retailCeiling: 100_000, lines: 2, minQty: 4, maxQty: 6, deadlineDays: 7 },
-  { retailCeiling: 200_000, lines: 2, minQty: 6, maxQty: 9, deadlineDays: 8 },
-  { retailCeiling: 300_000, lines: 3, minQty: 8, maxQty: 12, deadlineDays: 10 },
-  // Major contracts are intentionally demanding: they belong to the two highest boutique levels.
-  { retailCeiling: 1_500_000, lines: 3, minQty: 40, maxQty: 55, deadlineDays: 12 },
-  { retailCeiling: 3_000_000, lines: 4, minQty: 45, maxQty: 65, deadlineDays: 14 },
+  { retailCeiling: 18_000, lines: 1, minQty: 2, maxQty: 3, deadlineDays: 5, minUnitCost: 0 },
+  { retailCeiling: 60_000, lines: 1, minQty: 3, maxQty: 5, deadlineDays: 6, minUnitCost: 0 },
+  { retailCeiling: 100_000, lines: 2, minQty: 4, maxQty: 6, deadlineDays: 7, minUnitCost: 0 },
+  { retailCeiling: 200_000, lines: 2, minQty: 6, maxQty: 9, deadlineDays: 8, minUnitCost: 0 },
+  { retailCeiling: 300_000, lines: 3, minQty: 8, maxQty: 12, deadlineDays: 10, minUnitCost: 0 },
+  // Major contracts require luxury catalogue items so the proposed rewards are backed by
+  // substantial sourcing costs, not hundreds of pieces of cheap everyday stock.
+  { retailCeiling: 1_500_000, lines: 3, minQty: 40, maxQty: 55, deadlineDays: 12, minUnitCost: 460_000 },
+  { retailCeiling: 3_000_000, lines: 4, minQty: 45, maxQty: 65, deadlineDays: 14, minUnitCost: 700_000 },
 ] as const;
 
 const CONTRACT_CLIENTS = [
@@ -165,7 +166,7 @@ function makePoliticianContractOffer(s: GameState): PoliticianContract | null {
       unitCost: pieceCost(entry, isClothing(entry.kind) ? entry.fabric || 'plain' : undefined),
     }))
     .filter((row) => {
-      if (row.unitCost <= 0 || row.unitCost * MARKUP > rule.retailCeiling) return false;
+      if (row.unitCost < rule.minUnitCost || row.unitCost * MARKUP > rule.retailCeiling) return false;
       const held = (s.stock || []).filter((design) => design.kind === row.entry.kind && design.itemId === row.entry.id)
         .reduce((sum, design) => sum + Math.max(0, design.pieces), 0);
       // Keep contracts meaningful even for a new kiosk: offers require at least a little new sourcing.
