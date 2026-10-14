@@ -978,7 +978,7 @@ const PowerChip: React.FC<{ s: GameState; up: (f: (g: GameState) => GameState) =
   const tariff = E.tariffFor(s);
   const tariffOptions = Object.values(E.POWER.tariffs);
   const nextTariff = tariffOptions[(Math.max(0, tariffOptions.indexOf(tariff)) + 1) % tariffOptions.length];
-  const powered = s.furniture.filter((p) => p.placed && E.EQUIPMENT_WATTS[p.id] && E.furnitureById(p.id)?.group !== 'Lighting' ? true : p.placed && !!E.EQUIPMENT_WATTS[p.id]);
+  const powered = s.furniture.filter((p) => p.placed && !!E.EQUIPMENT_WATTS[p.id]);
   const sourceLabel = src === 'grid' ? (off ? 'Grid unavailable' : 'Grid supply') : src === 'gen' ? 'Generator supply' : src === 'solar' ? 'Solar / battery' : 'Power shortage';
   return (
     <details className="relative text-xs text-slate-200">
@@ -1015,7 +1015,7 @@ const PowerChip: React.FC<{ s: GameState; up: (f: (g: GameState) => GameState) =
           <div className="max-h-36 space-y-1 overflow-auto">
             {powered.length === 0 ? <div className="text-slate-500">No powered equipment installed.</div> : powered.slice(0, 12).map((p) => (
               <div key={p.uid} className="flex items-center justify-between gap-2">
-                <span className="truncate">{E.furnitureById(p.id).name} · {E.EQUIPMENT_WATTS[p.id]} W</span>
+                <span className="truncate">{furnitureById(p.id).name} · {E.EQUIPMENT_WATTS[p.id]} W</span>
                 <Btn size="sm" tone={s.off?.[p.uid] ? 'muted' : 'green'} onClick={() => up((g) => ({ ...g, off: { ...(g.off || {}), [p.uid]: !g.off?.[p.uid] } }))}>{s.off?.[p.uid] ? 'Off · switch on' : 'On · switch off'}</Btn>
               </div>
             ))}
