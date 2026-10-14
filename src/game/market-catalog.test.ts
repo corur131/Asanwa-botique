@@ -5,37 +5,13 @@ import { GARMENTS } from '../components/renderer/garments';
 import { MARKUP } from './economy';
 import { canBuy, MARKET, pieceCost } from './market';
 
-const levelSixIds = [
-  'maisonSilkAtelierBlouse',
-  'maisonTailoredTrousers',
-  'maisonPrivateColumnGown',
-  'maisonAsoOkeCapeGown',
-  'maisonRoyalAgbada',
-  'maisonVelvetDinnerSuit',
-  'maisonDiamondRunwayPumps',
-  'maisonPearlEveningBag',
-  'maisonGoldWorkedGele',
-  'maisonVirginHairLaceFront',
-  'maisonHeirloomCoralNecklace',
-  'maisonDiamondChronograph',
-  'maisonGoldSunglasses',
-] as const;
+const levelSixIds = WARDROBE
+  .filter((item) => item.id.startsWith('couture26') && item.minTier === 5)
+  .map((item) => item.id);
 
-const levelSevenIds = [
-  'empireSilkAtelierBlouse',
-  'empireTailoredTrousers',
-  'empireRedCarpetColumnGown',
-  'empireImperialCapeGown',
-  'empireRoyalAgbada',
-  'empireVelvetTuxedoSet',
-  'empireDiamondRunwayPumps',
-  'empirePearlEveningBag',
-  'empireGoldWorkedGele',
-  'empireVirginHairLaceFront',
-  'empireHeirloomCoralNecklace',
-  'empireDiamondChronograph',
-  'empireGoldSunglasses',
-] as const;
+const levelSevenIds = WARDROBE
+  .filter((item) => item.id.startsWith('couture26') && item.minTier === 6)
+  .map((item) => item.id);
 
 function entryById(id: string) {
   const matches = MARKET.filter((entry) => entry.id === id);
@@ -59,21 +35,21 @@ function checkTierGroup(ids: readonly string[], unlockTier: 5 | 6, maxWholesale:
 }
 
 test('Level 6 Maison products unlock at Level 6 and retain sustainable margins', () => {
-  checkTierGroup(levelSixIds, 5, 1_300_000);
+  checkTierGroup(levelSixIds, 5, 1_350_000);
 });
 
 test('Level 7 Empire products unlock only at Level 7 and retain sustainable margins', () => {
-  checkTierGroup(levelSevenIds, 6, 2_200_000);
+  checkTierGroup(levelSevenIds, 6, 1_900_000);
 });
 
-test('each top-tier shop has an accessible two-piece designer capsule', () => {
-  const maisonEntry = entryById('maisonSilkAtelierBlouse');
-  const maisonTrousers = entryById('maisonTailoredTrousers');
-  const empireEntry = entryById('empireSilkAtelierBlouse');
-  const empireTrousers = entryById('empireTailoredTrousers');
+test('Maison and Empire each have a distinct new-design wholesale capsule', () => {
+  const maisonTop = entryById('couture26MaisonPrismFoldSilkBlouse');
+  const maisonTrousers = entryById('couture26MaisonDoublePleatColumnTrousers');
+  const empireTop = entryById('couture26EmpireLiquidMetalDrapeShell');
+  const empireTrousers = entryById('couture26EmpireLiquidFoldWideLeg');
 
-  assert.equal(pieceCost(maisonEntry, maisonEntry.fabric) + pieceCost(maisonTrousers, maisonTrousers.fabric), 175_000);
-  assert.equal(pieceCost(empireEntry, empireEntry.fabric) + pieceCost(empireTrousers, empireTrousers.fabric), 205_000);
+  assert.equal(pieceCost(maisonTop, maisonTop.fabric) + pieceCost(maisonTrousers, maisonTrousers.fabric), 305_000);
+  assert.equal(pieceCost(empireTop, empireTop.fabric) + pieceCost(empireTrousers, empireTrousers.fabric), 820_000);
 });
 
 test('40 original global couture designs have distinct, real renderer drawings', () => {
