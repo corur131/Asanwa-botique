@@ -269,13 +269,22 @@ def simulate(pl, days=200, seed=0, shock_day=None, shock=0.0, fixed_tier=None):
             cycle_day = (day - 1) % 14
             signature = bool(P.get('celebrity_signature', False))
             schedule = SIGNATURE_CELEBRITY_DAYS_BY_SHOP_TIER[tier] if signature else CELEBRITY_DAYS_BY_SHOP_TIER[tier]
-            if (cycle_day in schedule and last_celebrity_visit_day != day - 1
-                    and rnd.random() < celebrity_visit_probability(tier, signature)):
+            max_daily_visits = 3 if tier >= 6 and signature else 2 if tier >= 4 else 1
+            visits_today = 0
+            if cycle_day in schedule and rnd.random() < celebrity_visit_probability(tier, signature):
                 income += record_celebrity_visit(rnd, tier, log, signature)
+                visits_today += 1
                 last_celebrity_visit_day = day
-            # Deborah's confirmed lead is a special opportunity, but never stacks twice on the same day.
-            if celeb_day == day and last_celebrity_visit_day != day:
+                if visits_today < max_daily_visits and rnd.random() < additional_celebrity_visit_probability(tier, signature):
+                    income += record_celebrity_visit(rnd, tier, log, signature)
+                    visits_today += 1
+                if visits_today < max_daily_visits and rnd.random() < third_celebrity_visit_probability(tier, signature):
+                    income += record_celebrity_visit(rnd, tier, log, signature)
+                    visits_today += 1
+            # Deborah's confirmed lead can add a visit if that day's VIP capacity is not already full.
+            if celeb_day == day and visits_today < max_daily_visits:
                 income += record_celebrity_visit(rnd, tier, log, signature)
+                visits_today += 1
                 last_celebrity_visit_day = day
             extra_chance = CELEBRITY_EXTRA_CHANCE[tier] * (1.25 if signature else 1.0)
             if day >= 5 and (celeb_day is None or celeb_day < day) and rnd.random() < min(0.10, extra_chance):
@@ -357,13 +366,22 @@ def simulate_celebrity_forecast(days=200, runs=1000):
                     cycle_day = (day - 1) % 14
                     # Independent tier-scheduled opportunity, as in openShop.
                     signature_schedule = SIGNATURE_CELEBRITY_DAYS_BY_SHOP_TIER[shop_tier] if signature else CELEBRITY_DAYS_BY_SHOP_TIER[shop_tier]
-                    if (cycle_day in signature_schedule and last_celebrity_visit_day != day - 1
-                            and rnd.random() < celebrity_visit_probability(shop_tier, signature)):
+                    max_daily_visits = 3 if shop_tier >= 6 and signature else 2 if shop_tier >= 4 else 1
+                    visits_today = 0
+                    if cycle_day in signature_schedule and rnd.random() < celebrity_visit_probability(shop_tier, signature):
                         record_celebrity_visit(rnd, shop_tier, log, signature)
+                        visits_today += 1
                         last_celebrity_visit_day = day
-                    # Deborah tip arrival is a special lead and cannot stack with a same-day scheduled visit.
-                    if celeb_day == day and last_celebrity_visit_day != day:
+                        if visits_today < max_daily_visits and rnd.random() < additional_celebrity_visit_probability(shop_tier, signature):
+                            record_celebrity_visit(rnd, shop_tier, log, signature)
+                            visits_today += 1
+                        if visits_today < max_daily_visits and rnd.random() < third_celebrity_visit_probability(shop_tier, signature):
+                            record_celebrity_visit(rnd, shop_tier, log, signature)
+                            visits_today += 1
+                    # Deborah's tip is an extra guest only when there is still room on the daily VIP list.
+                    if celeb_day == day and visits_today < max_daily_visits:
                         record_celebrity_visit(rnd, shop_tier, log, signature)
+                        visits_today += 1
                         last_celebrity_visit_day = day
                     extra_chance = CELEBRITY_EXTRA_CHANCE[shop_tier] * (1.25 if signature else 1.0)
                     if day >= 5 and (celeb_day is None or celeb_day < day) and rnd.random() < min(0.10, extra_chance):
