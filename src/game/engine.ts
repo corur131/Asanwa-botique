@@ -482,8 +482,8 @@ export function openShop(s0: GameState): GameState {
     mix[2] = Math.max(0, mix[2] + shift);
   }
   const arrivals = Array.from({ length: n }, () => ({ at: arrivalMinute(), c: makeCustomer(s, mix) }));
-  // Celebrity eligibility starts at shop Level 3; signature properties improve odds without being a gate.
-  const celebrityScheduled = celebrityIsScheduled(s.tier, s.day);
+  // Celebrity eligibility starts at Level 3; Signature properties receive more candidate days and 1.5x odds.
+  const celebrityScheduled = celebrityIsScheduled(s.tier, s.day, !!s.listing.signature);
   const highestEligibleCelebrityTier = maximumCelebrityTierForShop(s.tier);
   if (
     highestEligibleCelebrityTier >= 0 &&
