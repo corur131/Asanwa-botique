@@ -50,10 +50,11 @@ export const SLOW_WEEK_CHANCE = 0.12;
 
 export const SERVICE_FEE: Record<CustomerClass, number> = { poor: 2_000, middle: 5_000, rich: 15_000 };
 export const SUPPLIES_SHARE = 0.35;
+/** Retail purchase capacity. Rich retail customers use a weighted sampler inside this wider band. */
 export const BUDGET: Record<CustomerClass, [number, number]> = {
   poor: [6_000, 18_000],
   middle: [20_000, 60_000],
-  rich: [100_000, 300_000],
+  rich: [100_000, 5_000_000],
 };
 
 /** Customers who only want hair or makeup done. */
