@@ -23,10 +23,13 @@ import {
   RICH_RETAIL_BUDGET_BANDS_BY_TIER,
   SIGNATURE_RICH_RETAIL_BUDGET_BANDS_BY_TIER,
   richRetailBudget,
+  isCelebrityRosterName,
+  sanitizeOrdinaryCustomerName,
+  sanitizeSavedCelebrityNameCollisions,
 } from './customers';
 import { BUDGET, SERVICE_BUDGET, CELEBRITY_FULFILMENT_RATE, TIERS } from './economy';
 import { settle } from './engine';
-import type { Customer, ScoreBreakdown } from './types';
+import type { Customer, GameState, ScoreBreakdown } from './types';
 
 function seededRandom(seed: number): () => number {
   let state = seed >>> 0;
@@ -356,4 +359,49 @@ test('follower growth and a live brand campaign gently shift customer mix toward
   assert.ok(affluentCustomerShareShift(1_000_000) > affluentCustomerShareShift(100));
   assert.ok(Math.abs(affluentCustomerShareShift(5_000_000) - 0.06625) < 1e-12);
   assert.ok(affluentCustomerShareShift(5_000_000, 'luxury') > affluentCustomerShareShift(5_000_000));
+});
+
+
+test('ordinary customers cannot keep names that collide with the celebrity roster', () => {
+  assert.equal(isCelebrityRosterName('Burna Boy'), true);
+  assert.equal(isCelebrityRosterName('burnaboy'), true);
+  assert.equal(isCelebrityRosterName('Burna-Boy'), true);
+  assert.equal(isCelebrityRosterName('Tunde'), false);
+
+  const ordinary = sanitizeOrdinaryCustomerName({
+    id: 'customer-saved-as-burnaboy',
+    name: 'burnaboy',
+    male: true,
+    budget: 76_000,
+  });
+  assert.notEqual(ordinary.name.toLowerCase().replace(/[^a-z0-9]/g, ''), 'burnaboy');
+  assert.equal(ordinary.budget, 76_000, 'identity repair must not change the ordinary shopper budget');
+  assert.equal(
+    sanitizeOrdinaryCustomerName({ id: 'customer-saved-as-burnaboy', name: 'Burna Boy', male: true }).name,
+    ordinary.name,
+    'the replacement name stays stable across visits and reloads',
+  );
+});
+
+test('saved regulars and waiting customers are repaired without renaming true celebrity guests', () => {
+  const ordinary = (id: string, name: string, budget = 76_000) => ({
+    id, name, male: true, budget, cls: 'poor', celebrity: undefined,
+  } as unknown as Customer);
+  const trueCelebrity = {
+    ...ordinary('vip-saved', 'Burna Boy', 120_000_000),
+    cls: 'rich',
+    celebrity: { tier: 4, rank: 'SSS global superstar', spendFloor: 85_000_000 },
+  } as Customer;
+  const saved = {
+    regulars: [{ id: 'regular-burna', name: 'Burna Boy', male: true }],
+    arrivals: [{ at: 25, c: ordinary('arrival-burnaboy', 'BurnaBoy') }, { at: 30, c: trueCelebrity }],
+    inShop: [{ c: ordinary('waiting-burna', 'burna-boy'), arrived: 5, patience: 9999 }],
+  } as unknown as GameState;
+
+  const fixed = sanitizeSavedCelebrityNameCollisions(saved);
+  assert.notEqual(fixed.regulars[0].name.toLowerCase().replace(/[^a-z0-9]/g, ''), 'burnaboy');
+  assert.notEqual(fixed.arrivals[0].c.name.toLowerCase().replace(/[^a-z0-9]/g, ''), 'burnaboy');
+  assert.equal(fixed.arrivals[0].c.budget, 76_000);
+  assert.equal(fixed.arrivals[1].c.name, 'Burna Boy', 'a genuine celebrity keeps their public identity');
+  assert.equal(fixed.inShop[0].c.name.toLowerCase().replace(/[^a-z0-9]/g, '') === 'burnaboy', false);
 });
