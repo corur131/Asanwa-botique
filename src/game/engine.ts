@@ -577,7 +577,7 @@ export function openShop(s0: GameState): GameState {
   if (arrivals.some((arrival) => !!arrival.c.celebrity)) {
     next = { ...next, lastCelebrityVisitDay: s.day };
   } else if (celebrityAttention) {
-    next = addShout(next, 'Deborah', 'Sis, word is reaching celebrity circles, but nobody confirmed a visit today. Keep the boutique ready; attention does not always turn into a visit.', 'info');
+    next = addShout(next, 'Deborah', 'Sis, word is reaching celebrity circles, but nobody confirmed a visit today. Keep the boutique ready; attention does not always turn into a visit.', 'good');
   }
   if (outageAt(next, 0)) {
     next = addShout(next, 'NEPA', 'No light this morning. NEPA took it before you opened.', 'nepa');
