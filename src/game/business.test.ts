@@ -577,12 +577,12 @@ test('v1 boosted saves receive only the extra capital needed for the save-scaled
   );
 });
 
-test('rivals announce celebrity visits in news, chat, and their social feed', () => {
+test('rivals announce celebrity visits in news, chat, and their social feed on a scheduled day', () => {
   const originalRandom = Math.random;
   const base = state({
-    day: 31, history: [], ranking: [], dailyRanking: [],
+    day: 29, history: [], ranking: [], dailyRanking: [],
     listing: { area: 'Yaba' } as GameState['listing'],
-    today: { day: 31, bestScore: 0, events: [] } as unknown as GameState['today'],
+    today: { day: 29, bestScore: 0, events: [] } as unknown as GameState['today'],
     rivals: initRivals(), messages: [], gist: [], rivalPosts: [],
   });
   try {
@@ -591,6 +591,38 @@ test('rivals announce celebrity visits in news, chat, and their social feed', ()
     assert.ok(updated.gist.some((item) => /celebrity client/i.test(item.title)));
     assert.ok(updated.messages.some((item) => item.from === 'GistLagos' && /CELEBRITY SIGHTING/i.test(item.text)));
     assert.ok(updated.rivalPosts.some((post) => /Celebrity client|special guest/i.test(post.caption)));
+  } finally {
+    Math.random = originalRandom;
+  }
+});
+
+
+test('Tolani and other rivals do not receive celebrity clients on every day; off-schedule days are quiet', () => {
+  const originalRandom = Math.random;
+  const tolani = initRivals().find((rival) => rival.id === 'tolani')!;
+  try {
+    Math.random = () => 0.001;
+    const offSchedule = state({
+      day: 32, // cycle day 3; ordinary Flagship celebrity days are 1, 6 and 11
+      history: [], ranking: [], dailyRanking: [],
+      listing: { area: 'Yaba' } as GameState['listing'],
+      today: { day: 32, bestScore: 0, events: [] } as unknown as GameState['today'],
+      rivals: [tolani], messages: [], gist: [], rivalPosts: [],
+    });
+    const quiet = simulateRivals(offSchedule);
+    assert.ok(!quiet.gist.some((item) => /celebrity client/i.test(item.title)),
+      'Tolani must not receive a scheduled celebrity on an off-day');
+
+    const scheduled = state({
+      day: 29, // cycle day 0 is an ordinary Flagship candidate day
+      history: [], ranking: [], dailyRanking: [],
+      listing: { area: 'Yaba' } as GameState['listing'],
+      today: { day: 29, bestScore: 0, events: [] } as unknown as GameState['today'],
+      rivals: [tolani], messages: [], gist: [], rivalPosts: [],
+    });
+    const visit = simulateRivals(scheduled);
+    assert.ok(visit.gist.some((item) => /celebrity client/i.test(item.title)),
+      'Tolani should still receive celebrity opportunities on scheduled days');
   } finally {
     Math.random = originalRandom;
   }
@@ -613,12 +645,12 @@ test('Level 6 and Level 7 rivals retain finite celebrity finances and publicize 
         weekCosts: Array.from({ length: 7 }, () => 2_000_000),
       };
       const base = state({
-        day: 31,
+        day: 29,
         history: [],
         ranking: [],
         dailyRanking: [],
         listing: { area: 'Yaba' } as GameState['listing'],
-        today: { day: 31, bestScore: 0, events: [] } as unknown as GameState['today'],
+        today: { day: 29, bestScore: 0, events: [] } as unknown as GameState['today'],
         rivals: [elite],
         messages: [],
         gist: [],
