@@ -36,6 +36,11 @@ SIGNATURE_CELEBRITY_DAYS_BY_SHOP_TIER = [
 ]
 CELEBRITY_VISIT_CHANCE = [0, 0, 0.10, 0.16, 0.22, 0.28, 0.34]
 CELEBRITY_EXTRA_CHANCE = [0, 0, 0.04, 0.045, 0.05, 0.055, 0.06]
+CELEBRITY_TIER_WEIGHTS_BY_SHOP_TIER = [
+    [], [], [0.55, 0.30, 0.15], [0.38, 0.30, 0.22, 0.10],
+    [0.26, 0.24, 0.21, 0.17, 0.12], [0.17, 0.20, 0.21, 0.22, 0.20],
+    [0.10, 0.14, 0.18, 0.25, 0.33],
+]
 CELEBRITY_SPEND_RANGES = [
     (750_000, 8_500_000),
     (3_500_000, 12_500_000),
@@ -107,14 +112,28 @@ def celebrity_visit_probability(shop_tier, signature=False):
     if shop_tier < 2:
         return 0.0
     base = CELEBRITY_VISIT_CHANCE[min(6, int(shop_tier))]
-    return min(0.95, base * (1.5 if signature else 1.0))
+    return min(0.65, base * (1.25 if signature else 1.0))
 
 
-def record_celebrity_visit(rnd, shop_tier, log):
+def choose_celebrity_tier(shop_tier, signature, rnd):
+    """Mirror the shared rank weights; Signature gently tilts the mix upward."""
+    tier = max(0, min(6, int(shop_tier)))
+    highest = min(4, tier)
+    weights = list(CELEBRITY_TIER_WEIGHTS_BY_SHOP_TIER[tier][:highest + 1])
+    tilt = 1.06 if signature else 1.0
+    weights = [weight * (tilt ** rank) for rank, weight in enumerate(weights)]
+    roll = rnd.random() * sum(weights)
+    for rank, weight in enumerate(weights):
+        roll -= weight
+        if roll < 0:
+            return rank
+    return highest
+
+
+def record_celebrity_visit(rnd, shop_tier, log, signature=False):
     """Return conservative net premium receipt; normal-price celebrity sales are omitted."""
     log['celebrity_visits'] += 1
-    highest = min(4, shop_tier)
-    celebrity_tier = rnd.randint(0, highest)
+    celebrity_tier = choose_celebrity_tier(shop_tier, signature, rnd)
     budget, spend_floor = celebrity_amounts(celebrity_tier, rnd)
     if rnd.random() >= CELEBRITY_PREMIUM_SCORE_SUCCESS_RATE:
         return 0
@@ -232,12 +251,12 @@ def simulate(pl, days=200, seed=0, shock_day=None, shock=0.0, fixed_tier=None):
             signature = bool(P.get('celebrity_signature', False))
             schedule = SIGNATURE_CELEBRITY_DAYS_BY_SHOP_TIER[tier] if signature else CELEBRITY_DAYS_BY_SHOP_TIER[tier]
             if cycle_day in schedule and rnd.random() < celebrity_visit_probability(tier, signature):
-                income += record_celebrity_visit(rnd, tier, log)
+                income += record_celebrity_visit(rnd, tier, log, signature)
             # Deborah's planTips path schedules for day+2 and refuses to plan another visit
             # while celeb_day is current/future. This cooldown is part of the game mechanics.
             if celeb_day == day:
-                income += record_celebrity_visit(rnd, tier, log)
-            extra_chance = CELEBRITY_EXTRA_CHANCE[tier] * (1.5 if signature else 1.0)
+                income += record_celebrity_visit(rnd, tier, log, signature)
+            extra_chance = CELEBRITY_EXTRA_CHANCE[tier] * (1.25 if signature else 1.0)
             if day >= 5 and (celeb_day is None or celeb_day < day) and rnd.random() < min(0.10, extra_chance):
                 celeb_day = day + 2
 
@@ -315,13 +334,14 @@ def simulate_celebrity_forecast(days=200, runs=1000):
                 for day in range(1, days + 1):
                     cycle_day = (day - 1) % 14
                     # Independent tier-scheduled opportunity, as in openShop.
-                    if cycle_day in CELEBRITY_DAYS_BY_SHOP_TIER[shop_tier] and rnd.random() < celebrity_visit_probability(shop_tier, signature):
-                        record_celebrity_visit(rnd, shop_tier, log)
+                    signature_schedule = SIGNATURE_CELEBRITY_DAYS_BY_SHOP_TIER[shop_tier] if signature else CELEBRITY_DAYS_BY_SHOP_TIER[shop_tier]
+                    if cycle_day in signature_schedule and rnd.random() < celebrity_visit_probability(shop_tier, signature):
+                        record_celebrity_visit(rnd, shop_tier, log, signature)
                     # Deborah tip arrival comes two days after it is planned. A pending tip blocks
                     # fresh tips until its visit day has passed, matching planTips in encounters.ts.
                     if celeb_day == day:
-                        record_celebrity_visit(rnd, shop_tier, log)
-                    extra_chance = CELEBRITY_EXTRA_CHANCE[shop_tier] + (0.02 if signature else 0.0)
+                        record_celebrity_visit(rnd, shop_tier, log, signature)
+                    extra_chance = CELEBRITY_EXTRA_CHANCE[shop_tier] * (1.25 if signature else 1.0)
                     if day >= 5 and (celeb_day is None or celeb_day < day) and rnd.random() < min(0.10, extra_chance):
                         celeb_day = day + 2
                 total_visits += log['celebrity_visits']
