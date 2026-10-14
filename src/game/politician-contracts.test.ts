@@ -95,12 +95,12 @@ test('200-day contract economy sample uses actual unlocked catalogue offers at L
     const meanReward = rewards.reduce((sum, amount) => sum + amount, 0) / rewards.length;
     console.log(
       '[Batch 6 economy sample] ' + scenario.label + ': 400 actual-catalogue offers; ' +
-      'goods cost min/median/max ₦' + Math.round(goodsCosts[0]).toLocaleString('en-NG') + '/' +
-      Math.round(medianGoodsCost).toLocaleString('en-NG') + '/' +
-      Math.round(goodsCosts[goodsCosts.length - 1]).toLocaleString('en-NG') +
-      '; median contribution ₦' + Math.round(medianContribution).toLocaleString('en-NG') +
-      '; mean reward ₦' + Math.round(meanReward).toLocaleString('en-NG') +
-      '; one contract's median contribution equals ' +
+      'goods cost min/median/max ₦' + Math.round(goodsCosts[0]) + '/' +
+      Math.round(medianGoodsCost) + '/' +
+      Math.round(goodsCosts[goodsCosts.length - 1]) +
+      '; median contribution ₦' + Math.round(medianContribution) +
+      '; mean reward ₦' + Math.round(meanReward) +
+      '; median contribution equals ' +
       (medianContribution / scenario.weeklyRent).toFixed(2) + ' weeks of standard tier rent.'
     );
     assert.ok(medianContribution > 0);
