@@ -973,20 +973,58 @@ const PowerChip: React.FC<{ s: GameState; up: (f: (g: GameState) => GameState) =
   const st = E.stats(s);
   const src = E.source(s);
   const off = E.inBlackout(s);
-  if (!off) return <span className="text-xs text-emerald-300 font-semibold">⚡ NEPA</span>;
+  const load = E.loadKw(s);
+  const dailyKwh = E.dailyEnergyKwh(s);
+  const tariff = E.tariffFor(s);
+  const tariffOptions = Object.values(E.POWER.tariffs);
+  const nextTariff = tariffOptions[(Math.max(0, tariffOptions.indexOf(tariff)) + 1) % tariffOptions.length];
+  const powered = s.furniture.filter((p) => p.placed && E.EQUIPMENT_WATTS[p.id] && E.furnitureById(p.id)?.group !== 'Lighting' ? true : p.placed && !!E.EQUIPMENT_WATTS[p.id]);
+  const sourceLabel = src === 'grid' ? (off ? 'Grid unavailable' : 'Grid supply') : src === 'gen' ? 'Generator supply' : src === 'solar' ? 'Solar / battery' : 'Power shortage';
   return (
-    <span className="flex items-center gap-1.5">
-      {src === 'solar' && <Pill tone="green">☀ Solar {Math.round(s.power.solar)}m</Pill>}
-      {src === 'gen' && <Pill tone="gold">⛽ Gen on</Pill>}
-      {src === 'none' && <Pill tone="red">No light</Pill>}
-      {st.gen && <span className={`text-[11px] font-semibold ${E.fuelOf(s) < 2 ? 'text-rose-300' : 'text-slate-300'}`}>⛽ {Math.round(E.fuelOf(s) * 10) / 10}/{E.tankSize(s)} L</span>}
-      {st.gen && !s.power.gen && E.fuelOf(s) > 0 && <Btn size="sm" tone="gold" onClick={() => up((g) => E.setGen(g, true))}>Start gen</Btn>}
-      {st.gen && E.fuelOf(s) < E.tankSize(s) - 0.5 && <Btn size="sm" onClick={() => up((g) => E.refuel(g, 'full'))}>Fill tank · {naira(Math.round((E.tankSize(s) - E.fuelOf(s)) * E.fuelPrice(s)))}</Btn>}
-      {st.gen && s.power.gen && <Btn size="sm" onClick={() => up((g) => E.setGen(g, false))}>Stop gen</Btn>}
-    </span>
+    <details className="relative text-xs text-slate-200">
+      <summary className="cursor-pointer list-none rounded-lg border border-white/15 bg-white/5 px-3 py-1.5 font-semibold hover:bg-white/10">
+        ⚡ Power &amp; Utilities · {src === 'grid' && !off ? 'NEPA' : src === 'none' ? 'Shortage' : src === 'solar' ? 'Solar' : 'Generator'}
+      </summary>
+      <div className="absolute right-0 top-full z-50 mt-2 w-[min(92vw,360px)] space-y-2 rounded-xl border border-white/15 bg-[#11141d] p-3 shadow-2xl">
+        <div className="flex items-center justify-between gap-2"><b className="text-sm text-white">Power &amp; Utilities</b><span className={src === 'none' ? 'text-rose-300' : 'text-emerald-300'}>{sourceLabel}</span></div>
+        <div className="grid grid-cols-2 gap-2">
+          <div className="rounded-lg bg-white/5 p-2"><div className="text-slate-400">Current load</div><b>{load.toFixed(2)} kW</b></div>
+          <div className="rounded-lg bg-white/5 p-2"><div className="text-slate-400">Daily energy estimate</div><b>{dailyKwh.toFixed(1)} kWh</b></div>
+          <div className="rounded-lg bg-white/5 p-2"><div className="text-slate-400">Daily grid cost estimate</div><b>{naira(E.dailyEnergyCost(s))}</b></div>
+          <div className="rounded-lg bg-white/5 p-2"><div className="text-slate-400">Grid tariff</div><b>₦{tariff}/kWh</b></div>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <Btn size="sm" onClick={() => up((g) => ({ ...g, power: { ...g.power, tariff: nextTariff } }))}>Change tariff → ₦{nextTariff}</Btn>
+          {st.gen && <span className={E.fuelOf(s) < 2 ? 'text-rose-300' : 'text-slate-300'}>Fuel {Math.round(E.fuelOf(s) * 10) / 10}/{E.tankSize(s)} L</span>}
+        </div>
+        {st.gen && <div className="rounded-lg bg-white/5 p-2">
+          <div className="flex items-center justify-between"><span>Generator load / capacity</span><b>{load.toFixed(2)} / {E.generatorCapacityKw(s).toFixed(1)} kW</b></div>
+          <div className="text-slate-400">Fuel burn at current demand: {E.fuelPerHour(s).toFixed(2)} L/hour</div>
+          {E.generatorOverloaded(s) && <div className="mt-1 text-rose-300">Warning: generator overload. Some equipment cannot run together.</div>}
+          {off && !s.power.gen && E.fuelOf(s) > 0 && <Btn size="sm" tone="gold" onClick={() => up((g) => E.setGen(g, true))}>Start generator</Btn>}
+          {s.power.gen && <Btn size="sm" onClick={() => up((g) => E.setGen(g, false))}>Stop generator</Btn>}
+          {E.fuelOf(s) < E.tankSize(s) - 0.5 && <Btn size="sm" onClick={() => up((g) => E.refuel(g, 'full'))}>Refill · {naira(Math.round((E.tankSize(s) - E.fuelOf(s)) * E.fuelPrice(s)))}</Btn>}
+        </div>}
+        <div className="rounded-lg bg-white/5 p-2">
+          <div>Solar generation capacity: {(st.solarPanels * 0.35).toFixed(2)} kW</div>
+          <div>Battery reserve: {Math.round(s.power?.solar || 0)} / {Math.round(E.solarCap(s))} minutes equivalent</div>
+          <div>Inverter status: {st.solarPanels ? (src === 'solar' ? 'Supplying power' : 'Installed · standby/charging') : 'Not installed'}</div>
+        </div>
+        <div>
+          <div className="mb-1 font-semibold text-slate-300">Powered equipment</div>
+          <div className="max-h-36 space-y-1 overflow-auto">
+            {powered.length === 0 ? <div className="text-slate-500">No powered equipment installed.</div> : powered.slice(0, 12).map((p) => (
+              <div key={p.uid} className="flex items-center justify-between gap-2">
+                <span className="truncate">{E.furnitureById(p.id).name} · {E.EQUIPMENT_WATTS[p.id]} W</span>
+                <Btn size="sm" tone={s.off?.[p.uid] ? 'muted' : 'green'} onClick={() => up((g) => ({ ...g, off: { ...(g.off || {}), [p.uid]: !g.off?.[p.uid] } }))}>{s.off?.[p.uid] ? 'Off · switch on' : 'On · switch off'}</Btn>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </details>
   );
 };
-
 const PhoneButton: React.FC<{ unread: number; onClick: () => void }> = ({ unread, onClick }) => (
   <button onClick={onClick} className="relative rounded-lg px-3 py-1.5 text-sm font-semibold bg-white/5 border border-white/15 text-white hover:bg-white/10">
     📱 Phone
