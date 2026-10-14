@@ -268,13 +268,86 @@ export function celebrityIsScheduled(shopTierIndex: number, day: number, signatu
   return days.includes(fortnightDay);
 }
 
-/** Probability on a candidate day. Signature status raises the odds but is never required. */
-export function celebrityVisitChance(shopTierIndex: number, signatureProperty: boolean): number {
+/**
+ * Shared brand profile used by the player, competitors and Deborah's advance tips.
+ * Missing fields are backfilled from the game's legacy reputation/audience estimates.
+ */
+export interface CelebrityAttractionProfile {
+  reputation?: number;
+  followers?: number;
+  shopTierIndex?: number;
+  awareness?: number;
+  prestige?: number;
+  trendInfluence?: number;
+}
+
+/** Bounded 0.78–1.25 attraction multiplier: strong brands gain visibility, but nothing guarantees a visit. */
+export function celebrityAttractionMultiplier(profile?: CelebrityAttractionProfile): number {
+  if (!profile) return 1;
+  const clampScore = (value: number | undefined, fallback: number) =>
+    typeof value === 'number' && Number.isFinite(value)
+      ? Math.max(0, Math.min(100, value))
+      : Math.max(0, Math.min(100, fallback));
+  const reputation = clampScore(profile.reputation, 50);
+  const followers = typeof profile.followers === 'number' && Number.isFinite(profile.followers)
+    ? Math.max(0, profile.followers) : 0;
+  const social = Math.log10(followers + 1);
+  const tier = typeof profile.shopTierIndex === 'number' && Number.isFinite(profile.shopTierIndex)
+    ? Math.max(0, Math.min(6, Math.floor(profile.shopTierIndex))) : 0;
+  const awareness = clampScore(profile.awareness, 18 + social * 10 + tier * 4);
+  const prestige = clampScore(profile.prestige, 15 + reputation * 0.52 + tier * 3);
+  const trendInfluence = clampScore(profile.trendInfluence, 12 + social * 5);
+  const audienceScore = Math.max(0, Math.min(100, social / 5 * 100));
+  const brandHeat = reputation * 0.35 + awareness * 0.25 + prestige * 0.20 +
+    trendInfluence * 0.15 + audienceScore * 0.05;
+  return Math.max(0.78, Math.min(1.25, 0.78 + (brandHeat / 100) * 0.47));
+}
+
+/** Higher shop tiers increasingly attract the strongest ranks; Signature and brand heat tilt the mix upward. */
+export const CELEBRITY_TIER_WEIGHTS_BY_SHOP_TIER: readonly (readonly number[])[] = [
+  [],
+  [],
+  [0.55, 0.30, 0.15],
+  [0.38, 0.30, 0.22, 0.10],
+  [0.26, 0.24, 0.21, 0.17, 0.12],
+  [0.17, 0.20, 0.21, 0.22, 0.20],
+  [0.10, 0.14, 0.18, 0.25, 0.33],
+];
+
+/** Select a celebrity rank using one distribution shared by player and rivals. */
+export function chooseCelebrityTierForShop(
+  shopTierIndex: number,
+  signatureProperty = false,
+  profile?: CelebrityAttractionProfile,
+  random: () => number = Math.random,
+): number {
+  const highest = maximumCelebrityTierForShop(shopTierIndex);
+  if (highest < 0) return -1;
+  const tier = Math.min(6, Math.floor(shopTierIndex));
+  const source = CELEBRITY_TIER_WEIGHTS_BY_SHOP_TIER[tier] || [1];
+  const tilt = Math.max(0.75, Math.min(1.30,
+    1 + (celebrityAttractionMultiplier(profile) - 1) * 0.8 + (signatureProperty ? 0.06 : 0)));
+  const weights = source.slice(0, highest + 1).map((weight, index) => weight * Math.pow(tilt, index));
+  const total = weights.reduce((sum, weight) => sum + weight, 0);
+  let roll = unitSample(random) * total;
+  for (let index = 0; index < weights.length; index++) {
+    roll -= weights[index];
+    if (roll < 0) return index;
+  }
+  return Math.max(0, weights.length - 1);
+}
+
+/** Probability on a candidate day. Brand heat matters; Signature adds a moderated 1.25x odds advantage. */
+export function celebrityVisitChance(
+  shopTierIndex: number,
+  signatureProperty: boolean,
+  profile?: CelebrityAttractionProfile,
+): number {
   if (maximumCelebrityTierForShop(shopTierIndex) < 0) return 0;
   const tier = Math.min(6, Math.floor(shopTierIndex));
-  // Signature properties multiply the ordinary-shop chance by 1.5; they do not bypass the Level 3 gate.
   const baseByTier = [0, 0, 0.10, 0.16, 0.22, 0.28, 0.34];
-  return Math.min(0.95, (baseByTier[tier] || 0) * (signatureProperty ? 1.5 : 1));
+  const signatureMultiplier = signatureProperty ? 1.25 : 1;
+  return Math.min(0.65, (baseByTier[tier] || 0) * signatureMultiplier * celebrityAttractionMultiplier(profile));
 }
 
 const SERVICE_INTRO = {
