@@ -52,11 +52,14 @@ test('accepting a contract sets a deadline but never charges the player', () => 
 });
 
 test('shopper sources only missing quantities for the accepted contract and delivery pays after stock is verified', () => {
-  const s = game({ cash: 500_000, tier: 6, marketCart: [] });
+  const s = game({ cash: 5_000_000, tier: 6, marketCart: [] });
   const offer = contractFor(s);
   const accepted = acceptPoliticianContract(s, offer.id);
   const contract = accepted.politicianContracts!.find((row) => row.id === offer.id)!;
-  const shopper = prepareShopperOrder(accepted, 'contract', 300_000, contract.brief, contract.id);
+  // Late-game bulk contracts must source the full required quantity, so give the
+  // shopper a budget that covers the contract's actual catalogue cost.
+  const sourcingBudget = contract.requirements.reduce((sum, row) => sum + row.unitCost * row.quantity, 0);
+  const shopper = prepareShopperOrder(accepted, 'contract', sourcingBudget, contract.brief, contract.id);
   assert.ok(shopper.job, shopper.error);
   assert.equal(shopper.job.contractId, contract.id);
   assert.ok(shopper.job.items.every((line) => contract.requirements.some((row) => row.kind === line.kind && row.itemId === line.itemId)));
