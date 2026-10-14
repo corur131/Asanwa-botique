@@ -590,6 +590,36 @@ const CELEBRITY_POOLS: { name: string; male: boolean; rank: string }[][] = [
   ],
 ];
 
+const celebrityNameKey = (name: string) => name.toLocaleLowerCase('en-NG').replace(/[^a-z0-9]/g, '');
+
+/** Match celebrity identities even when a save changes spacing, punctuation, or letter case. */
+export function isCelebrityRosterName(name: string): boolean {
+  const key = celebrityNameKey(name);
+  return !!key && CELEBRITY_POOLS.some((pool) => pool.some((profile) => celebrityNameKey(profile.name) === key));
+}
+
+/** Give a mislabelled ordinary customer a stable, ordinary name without changing their budget or identity. */
+export function sanitizeOrdinaryCustomerName<T extends { id?: string; name: string; male: boolean }>(person: T): T {
+  if (!isCelebrityRosterName(person.name)) return person;
+  const names = person.male ? MEN : WOMEN;
+  const identity = person.id || person.name;
+  let seed = 0;
+  for (let i = 0; i < identity.length; i++) seed = (seed * 31 + identity.charCodeAt(i)) >>> 0;
+  return { ...person, name: names[seed % names.length] };
+}
+
+/** Repair celebrity-name collisions in both the saved regular roster and anyone already on the shop floor. */
+export function sanitizeSavedCelebrityNameCollisions(state: GameState): GameState {
+  const safeCustomer = (customer: Customer): Customer =>
+    customer.celebrity ? customer : sanitizeOrdinaryCustomerName(customer);
+  return {
+    ...state,
+    regulars: (state.regulars || []).map((person) => sanitizeOrdinaryCustomerName(person)),
+    arrivals: (state.arrivals || []).map((arrival) => ({ ...arrival, c: safeCustomer(arrival.c) })),
+    inShop: (state.inShop || []).map((person) => ({ ...person, c: safeCustomer(person.c) })),
+  };
+}
+
 /** Return a named guest from the same rank pool used by player and rival celebrity visits. */
 export function celebrityProfileForTier(
   celebrityTier: number,
@@ -631,7 +661,8 @@ export function makeCelebrityCustomer(state: GameState, celebrityTier: number): 
 
 export function makeCustomer(state: GameState, mix: [number, number, number]): Customer {
   // regulars come back
-  const regular = state.regulars.length && chance(Math.min(0.35, 0.08 + state.regulars.length * 0.03)) ? pick(state.regulars) : undefined;
+  const chosenRegular = state.regulars.length && chance(Math.min(0.35, 0.08 + state.regulars.length * 0.03)) ? pick(state.regulars) : undefined;
+  const regular = chosenRegular ? sanitizeOrdinaryCustomerName(chosenRegular) : undefined;
   const cls = state.listing.signature ? (chance(0.08) ? 'middle' : 'rich') : regular ? regular.cls : classFor(state, mix);
   const rolled = regular ? { ...regular.look, state: 'plain' as const } : { ...generateRandomCustomer('plain'), state: 'plain' as const };
   const male = rolled.body === 'male';

@@ -8,13 +8,13 @@ import { answerInvite, contestFor, contestModel, dropStep, judge, planDrop, plan
 import { POWER as POWER_CFG, activeGeneratorUid, addShout, coolRunning, drainRate, fuelOf, fuelPrice, liveStats, nepaOff, outageAt, planOutages, pourFuel, powerStep, scarcity, source, tankSize } from './power';
 import { answerConvo, startGist } from './convos';
 import { ENERGY, busyNow, divineBonus, energyOf, energyStep, exhausted, payBills, spendEnergy } from './life';
-import { makeCustomer, makeCelebrityCustomer, celebrityIsScheduled, celebrityDiscoveryChance, celebrityVisitFollowThroughChance, affluentCustomerShareShift, visibilityDiscoveryChance, maximumCelebrityTierForShop, chooseCelebrityTierForShop, maximumCelebrityVisitsPerDay } from './customers';
+import { makeCustomer, makeCelebrityCustomer, celebrityIsScheduled, celebrityDiscoveryChance, celebrityVisitFollowThroughChance, affluentCustomerShareShift, visibilityDiscoveryChance, maximumCelebrityTierForShop, chooseCelebrityTierForShop, maximumCelebrityVisitsPerDay, sanitizeSavedCelebrityNameCollisions } from './customers';
 import { buildLook, hairGroup, lookCost, scoreLook } from './scoring';
 import { FABRIC_COLORS, FEMALE_HAIR, MAKEUP_LOOKS } from '../constants/catalog';
 import { colourName } from './colours';
 import { FURNITURE, KIOSK_LISTING, Listing, Placed, STARTER_FURNITURE, autoPlace, prepareFurnitureForMove,
   findSpot, canPlace, turn, Rot, ceilingCapacity, ceilingUsed, yardCapacity, yardUsed, cheapestListing, furnitureById, listingsFor, newUid, prestigeRichShift, prestigeTraffic, shopStats, usesFloor, wallCapacity, wallUsed, MoveEquipmentPlan } from './shop';
-import { CharacterMemory, CollaborationEvent, CollaborationReply, Customer, DayLog, Departure, Design, ReplyChoice, GameState, LedgerLine, Message, PoliticianContract, PoliticianContractRequirement, Regular, ScoreBreakdown, Settlement, SponsorshipOffer, StaffMember, StaffProfession, StyleChoice } from './types';
+import { CharacterMemory, CollaborationEvent, CollaborationReply, Customer, DayLog, Departure, Design, ReplyChoice, GameState, LedgerLine, Message, PoliticianContract, PoliticianContractRequirement, Regular, ScoreBreakdown, Settlement, SponsorshipOffer, StaffMember, StaffProfession, StyleChoice, Visitor } from './types';
 import { closeBrandDay, ensureBusinessState, getBrandMetrics, initialBankState, processBankWeekly, processFixedDepositMaturities, processPromotionAtClose, processExpansionAtClose, promotionTrafficBoost, recordWeeklyWealth, saveRentAtClose } from './business';
 
 export { brandPower, currentWealthRows, financialAssets, getBrandMetrics, creditProfile, creditRating, creditHistoryReport, premiumLoanEligible, takePremiumBusinessLoan, renegotiateBusinessLoan, loanRateForScore, maximumLoan, netWorthPlayer, netWorthRival, playerWeekTotals, totalLiabilities, unlocksForFollowers, availablePromotionLevels, promotionBudgetBounds, promotionTrafficBoost, startPromotion, stopPromotion, wholesaleUpgradeQuote, upgradeWholesaleInventory, transferBank, setRentSaving, setSavingsGoal, createFixedDeposit, takeBusinessLoan, repayBusinessLoan, arrangeBusinessLoanRepayment, expansionOptions, investInExpansion, financeExpansionPurchase } from './business';
@@ -610,10 +610,15 @@ export function staffCanServeCustomer(staff: Pick<StaffMember, 'level' | 'profes
   return customer.service !== 'makeup';
 }
 
+/** Celebrities are never auto-dispatched; an explicit player assignment is required. */
+export function staffMayAutoDispatch(v: Pick<Visitor, 'c' | 'forStaff'>): boolean {
+  return !v.c.celebrity || !!v.forStaff;
+}
+
 /** Whether at least one qualified employee can take this unassigned visitor. */
 export function canAssignToStaff(s: GameState, id: string): boolean {
   const v = visitor(s, id);
-  return !!v && !v.by && s.staff.some((m) => staffCanServeCustomer(m, v.c) && staffChoice(s, v.c) !== null);
+  return !!v && (!v.by || (v.by === 'divine' && s.serving === id)) && s.staff.some((m) => staffCanServeCustomer(m, v.c) && staffChoice(s, v.c) !== null);
 }
 export const shopClosing = (s: GameState) => s.phase === 'shop' && s.clock >= SHOP_MINUTES;
 
@@ -736,7 +741,7 @@ export function tick(s0: GameState, minutes: number): GameState {
     if (!s.inShop.some((v) => v.by === m.id)) {
       // Dispatch the oldest eligible customer as soon as an employee is free; explicit requests go first.
       const next = waiting(s)
-        .filter((v) => staffCanServeCustomer(m, v.c) && staffChoice(s, v.c) !== null)
+        .filter((v) => staffMayAutoDispatch(v) && staffCanServeCustomer(m, v.c) && staffChoice(s, v.c) !== null)
         .sort((a, b) => Number(!!b.forStaff) - Number(!!a.forStaff) || a.arrived - b.arrived)[0];
       if (next && end < SHOP_MINUTES) s = { ...s, inShop: s.inShop.map((v) => (v.c.id === next.c.id ? { ...v, by: m.id, until: end + staffMinutes(m.level) } : v)) };
     }
@@ -2101,7 +2106,7 @@ function migrate(raw: GameState): GameState | null {
   if (s.version === 5) {
     const current = s as GameState;
     return ensureBusinessState({
-      ...current,
+      ...sanitizeSavedCelebrityNameCollisions(current),
       characterMemories: normaliseCharacterMemories(current.characterMemories, current.day),
       collaborations: Array.isArray(current.collaborations) ? current.collaborations : [],
       version: 5,
@@ -2110,8 +2115,8 @@ function migrate(raw: GameState): GameState | null {
   if (s.version === 4) {
     const current = s as unknown as GameState;
     const base = current.rivals
-      ? { ...current, version: 5 as const, characterMemories: normaliseCharacterMemories(current.characterMemories, current.day), collaborations: Array.isArray(current.collaborations) ? current.collaborations : [] }
-      : { ...current, version: 5 as const, characterMemories: normaliseCharacterMemories(current.characterMemories, current.day), collaborations: Array.isArray(current.collaborations) ? current.collaborations : [], ...rivalDefaults() };
+      ? { ...sanitizeSavedCelebrityNameCollisions(current), version: 5 as const, characterMemories: normaliseCharacterMemories(current.characterMemories, current.day), collaborations: Array.isArray(current.collaborations) ? current.collaborations : [] }
+      : { ...sanitizeSavedCelebrityNameCollisions(current), version: 5 as const, characterMemories: normaliseCharacterMemories(current.characterMemories, current.day), collaborations: Array.isArray(current.collaborations) ? current.collaborations : [], ...rivalDefaults() };
     return ensureBusinessState(base as GameState);
   }
   if (s.version === 3) {
@@ -2123,7 +2128,7 @@ function migrate(raw: GameState): GameState | null {
       power: { gen: false, solar: 0 }, shouts: [], shoutSeq: 0, ...rivalDefaults(),
       ...(midDay ? { ...freshDay, phase: 'morning' as const, today: emptyLog(o.day) } : {}),
     } as unknown as GameState;
-    return ensureBusinessState(upgraded);
+    return ensureBusinessState(sanitizeSavedCelebrityNameCollisions(upgraded));
   }
   if (s.version === 1) {
     const listing = s.tier === 0 ? KIOSK_LISTING : { ...cheapestListing(s.tier, week(s.day)), rent: TIERS[s.tier].rent, stars: 2 };
@@ -2154,7 +2159,7 @@ function migrate(raw: GameState): GameState | null {
     msgSeq: messages.length,
     read: Object.fromEntries(messages.map((m) => [m.from, messages.length])),
   } as GameState;
-  return ensureBusinessState(upgraded);
+  return ensureBusinessState(sanitizeSavedCelebrityNameCollisions(upgraded));
 }
 /** The save on this device from before accounts existed. */
 export const LEGACY_KEY = KEY;

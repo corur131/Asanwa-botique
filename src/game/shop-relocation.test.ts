@@ -18,7 +18,7 @@ import {
 } from './shop';
 import { TIERS } from './economy';
 import { DIVINE_CONFIG } from '../constants/presets';
-import { fromData, newGame, moveTo, openShop } from './engine';
+import { fromData, newGame, moveTo, openShop, staffMayAutoDispatch } from './engine';
 
 function ownedStarterEquipment(): Placed[] {
   return STARTER_FURNITURE.map((item) => ({ ...item, uid: newUid() }));
@@ -275,4 +275,17 @@ test('normal Level 6 and 7 properties can receive celebrities on candidate visit
   } finally {
     Math.random = originalRandom;
   }
+});
+
+
+test('celebrity visitors wait for an explicit player handoff instead of auto-dispatching to staff', () => {
+  const celebrity = { celebrity: { tier: 4, rank: 'SSS global superstar', spendFloor: 85_000_000 } };
+  const ordinary = { celebrity: undefined };
+
+  assert.equal(staffMayAutoDispatch({ c: celebrity } as any), false,
+    'an unassigned celebrity must remain available for the player to choose');
+  assert.equal(staffMayAutoDispatch({ c: { ...celebrity }, forStaff: true } as any), true,
+    'a celebrity explicitly sent to staff may be dispatched');
+  assert.equal(staffMayAutoDispatch({ c: ordinary } as any), true,
+    'ordinary customer staffing behaviour remains automatic');
 });
