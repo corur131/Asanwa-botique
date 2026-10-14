@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
   CELEBRITY_DAYS_BY_SHOP_TIER,
+  SIGNATURE_CELEBRITY_DAYS_BY_SHOP_TIER,
   CELEBRITY_SPEND_RANGES,
   celebrityAmountsForTier,
   celebrityIsScheduled,
@@ -102,6 +103,30 @@ test('celebrity spend bands are tiered and every lower-tier maximum obeys the â‚
     assert.ok(meanBudget < range.min + (range.max - range.min) * 0.55, 'weighted amounts should favour the lower end');
     if (tier === 4) assert.ok(amounts.some((value) => value.budget > 35_000_000), 'SSS must exceed the old â‚¦35m ceiling sometimes');
   }
+});
+
+
+test('Signature properties receive more celebrity opportunities than ordinary shops', () => {
+  assert.deepEqual(
+    CELEBRITY_DAYS_BY_SHOP_TIER.slice(2).map((days) => days.length),
+    [1, 2, 3, 4, 6],
+  );
+  assert.deepEqual(
+    SIGNATURE_CELEBRITY_DAYS_BY_SHOP_TIER.slice(2).map((days) => days.length),
+    [2, 4, 6, 8, 10],
+  );
+
+  for (let tier = 2; tier <= 6; tier++) {
+    assert.ok(
+      SIGNATURE_CELEBRITY_DAYS_BY_SHOP_TIER[tier].length > CELEBRITY_DAYS_BY_SHOP_TIER[tier].length,
+      `Signature Level ${tier + 1} should have more candidate days`,
+    );
+    for (const day of SIGNATURE_CELEBRITY_DAYS_BY_SHOP_TIER[tier]) {
+      assert.ok(celebrityIsScheduled(tier, day + 1, true), `Signature Level ${tier + 1} must recognize cycle day ${day}`);
+    }
+  }
+  assert.ok(!celebrityIsScheduled(4, 2, false), 'ordinary Flagship should not inherit the Signature-only schedule');
+  assert.ok(celebrityIsScheduled(4, 2, true), 'Signature Flagship should have an extra eligible day');
 });
 
 test('celebrity eligibility opens at Level 3 and lower celebrity ranks can visit higher shops', () => {
