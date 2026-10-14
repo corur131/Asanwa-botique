@@ -54,7 +54,7 @@ export function scarcity(s: Pick<GameState, 'seed' | 'day'>): boolean {
 /** UID of the generator used by the shop's existing on/off switch: the largest installed generator. */
 export const activeGeneratorUid = (s: GameState) => s.furniture
   .filter((p) => p.placed && !!furnitureById(p.id).gen)
-  .sort((a, b) => Number(furnitureById(b.id).gen === 'big') - Number(furnitureById(a.id).gen === 'big'))[0]?.uid;
+  .sort((a, b) => Number(furnitureById(b.id).gen === 'big') + Number(b.id === 'industrialGen') * 2 - Number(furnitureById(a.id).gen === 'big') - Number(a.id === 'industrialGen') * 2)[0]?.uid;
 
 /** Tank size can be queried for one generator, or for the active generator. */
 export const tankSize = (s: GameState, uid?: string) => {
