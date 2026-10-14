@@ -233,7 +233,7 @@ export function maximumCelebrityTierForShop(shopTierIndex: number): number {
   return Math.min(4, Math.floor(shopTierIndex));
 }
 
-/** Candidate days per 14-day cycle; actual visits are still randomized on these days. */
+/** Ordinary-shop candidate days per 14-day cycle; each is still a probability roll. */
 export const CELEBRITY_DAYS_BY_SHOP_TIER: readonly (readonly number[])[] = [
   [],
   [],
@@ -244,10 +244,26 @@ export const CELEBRITY_DAYS_BY_SHOP_TIER: readonly (readonly number[])[] = [
   [0, 2, 4, 7, 9, 12],
 ];
 
-export function celebrityIsScheduled(shopTierIndex: number, day: number): boolean {
+/**
+ * Signature properties earn extra celebrity opportunities per 14-day cycle:
+ * 2 at Level 3, 4 at Level 4, 6 at Flagship, 8 at Luxury Maison, and 10 at Level 7.
+ * The separate 1.5x visit probability still applies on each opportunity.
+ */
+export const SIGNATURE_CELEBRITY_DAYS_BY_SHOP_TIER: readonly (readonly number[])[] = [
+  [],
+  [],
+  [2, 9],
+  [1, 5, 9, 12],
+  [0, 2, 5, 7, 9, 12],
+  [0, 2, 4, 6, 8, 10, 12, 13],
+  [0, 1, 3, 4, 6, 7, 9, 10, 12, 13],
+];
+
+export function celebrityIsScheduled(shopTierIndex: number, day: number, signatureProperty = false): boolean {
   if (!Number.isFinite(shopTierIndex) || shopTierIndex < 2) return false;
   const tier = Math.min(6, Math.floor(shopTierIndex));
-  const days = CELEBRITY_DAYS_BY_SHOP_TIER[tier] || [];
+  const daysByTier = signatureProperty ? SIGNATURE_CELEBRITY_DAYS_BY_SHOP_TIER : CELEBRITY_DAYS_BY_SHOP_TIER;
+  const days = daysByTier[tier] || [];
   const fortnightDay = (Math.max(1, Math.floor(day)) - 1) % 14;
   return days.includes(fortnightDay);
 }
