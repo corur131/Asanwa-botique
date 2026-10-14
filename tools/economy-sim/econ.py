@@ -30,6 +30,10 @@ RICH_RETAIL_BUDGET_BANDS = [
 CELEBRITY_DAYS_BY_SHOP_TIER = [
     [], [], [2], [1, 9], [0, 5, 10], [0, 4, 8, 12], [0, 2, 4, 7, 9, 12],
 ]
+SIGNATURE_CELEBRITY_DAYS_BY_SHOP_TIER = [
+    [], [], [2, 9], [1, 5, 9, 12], [0, 2, 5, 7, 9, 12],
+    [0, 2, 4, 6, 8, 10, 12, 13], [0, 1, 3, 4, 6, 7, 9, 10, 12, 13],
+]
 CELEBRITY_VISIT_CHANCE = [0, 0, 0.10, 0.16, 0.22, 0.28, 0.34]
 CELEBRITY_EXTRA_CHANCE = [0, 0, 0.04, 0.045, 0.05, 0.055, 0.06]
 CELEBRITY_SPEND_RANGES = [
@@ -103,7 +107,7 @@ def celebrity_visit_probability(shop_tier, signature=False):
     if shop_tier < 2:
         return 0.0
     base = CELEBRITY_VISIT_CHANCE[min(6, int(shop_tier))]
-    return min(0.95, base + (0.15 if signature else 0.0))
+    return min(0.95, base * (1.5 if signature else 1.0))
 
 
 def record_celebrity_visit(rnd, shop_tier, log):
@@ -226,14 +230,14 @@ def simulate(pl, days=200, seed=0, shock_day=None, shock=0.0, fixed_tier=None):
         if P.get('celebrity_enabled', False) and tier >= 2:
             cycle_day = (day - 1) % 14
             signature = bool(P.get('celebrity_signature', False))
-            schedule = CELEBRITY_DAYS_BY_SHOP_TIER[tier]
+            schedule = SIGNATURE_CELEBRITY_DAYS_BY_SHOP_TIER[tier] if signature else CELEBRITY_DAYS_BY_SHOP_TIER[tier]
             if cycle_day in schedule and rnd.random() < celebrity_visit_probability(tier, signature):
                 income += record_celebrity_visit(rnd, tier, log)
             # Deborah's planTips path schedules for day+2 and refuses to plan another visit
             # while celeb_day is current/future. This cooldown is part of the game mechanics.
             if celeb_day == day:
                 income += record_celebrity_visit(rnd, tier, log)
-            extra_chance = CELEBRITY_EXTRA_CHANCE[tier] + (0.02 if signature else 0.0)
+            extra_chance = CELEBRITY_EXTRA_CHANCE[tier] * (1.5 if signature else 1.0)
             if day >= 5 and (celeb_day is None or celeb_day < day) and rnd.random() < min(0.10, extra_chance):
                 celeb_day = day + 2
 
