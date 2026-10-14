@@ -289,3 +289,22 @@ test('celebrity visitors wait for an explicit player handoff instead of auto-dis
   assert.equal(staffMayAutoDispatch({ c: ordinary } as any), true,
     'ordinary customer staffing behaviour remains automatic');
 });
+
+
+test('relocation can move directly down tiers only after excess staff retention is explicit', () => {
+  const fresh = newGame(DIVINE_CONFIG);
+  const source = listingsFor(3, 0).find((listing) => !listing.signature)!;
+  const destination = listingsFor(1, 0).find((listing) => !listing.signature)!;
+  const staff = [
+    { id: 'staff-a', name: 'A', level: 1, wage: 1000, loyalty: 50, trained: false, weeks: 1, look: DIVINE_CONFIG },
+    { id: 'staff-b', name: 'B', level: 1, wage: 1000, loyalty: 50, trained: false, weeks: 1, look: DIVINE_CONFIG },
+    { id: 'staff-c', name: 'C', level: 1, wage: 1000, loyalty: 50, trained: false, weeks: 1, look: DIVINE_CONFIG },
+  ];
+  const state = { ...fresh, tier: 3, listing: source, staff, cash: 100_000_000 };
+  assert.equal(moveTo(state, destination, 'store'), state,
+    'a move that exceeds the destination staffing limit must not silently dismiss employees');
+  const moved = moveTo(state, destination, 'store', ['staff-b', 'staff-c']);
+  assert.equal(moved.tier, 1, 'moving down two tiers should be allowed');
+  assert.deepEqual(moved.staff.map((member) => member.id), ['staff-b', 'staff-c'],
+    'only the staff selected by the player should be retained');
+});
