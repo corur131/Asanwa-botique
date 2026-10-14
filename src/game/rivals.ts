@@ -7,7 +7,7 @@
 import { CharacterConfig } from '../types/character';
 import { generateRandomCustomer } from '../utils/randomizer';
 import { CELEBRITY_FULFILMENT_RATE, TIERS } from './economy';
-import { celebrityAmountsForTier, celebrityAttractionMultiplier, celebrityIsScheduled, celebrityVisitChance, chooseCelebrityTierForShop } from './customers';
+import { celebrityAmountsForTier, celebrityIsScheduled, celebrityVisitChance, chooseCelebrityTierForShop } from './customers';
 import { GameState, Gist, Message, ReplyChoice, Rival, RivalPost } from './types';
 import { Topic, startConvo } from './convos';
 import { brandFromLegacy, brandPower, getBrandMetrics } from './business';
