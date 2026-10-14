@@ -9,7 +9,7 @@ import {
   maximumCelebrityTierForShop,
   richRetailBudget,
 } from './customers';
-import { BUDGET, SERVICE_BUDGET } from './economy';
+import { BUDGET, SERVICE_BUDGET, CELEBRITY_FULFILMENT_RATE } from './economy';
 import { settle } from './engine';
 import type { Customer, ScoreBreakdown } from './types';
 
@@ -123,10 +123,13 @@ test('rich and celebrity checkout payments respect budget and high-value orders 
   const premiumSale = settle(celebrity, excellent, 1_000_000, 10_000, { hasPOS: true });
   assert.ok(premiumSale.paid >= celebrity.celebrity!.spendFloor);
   assert.ok(premiumSale.paid <= celebrity.budget);
+  assert.equal(premiumSale.cost, Math.round(premiumSale.paid * CELEBRITY_FULFILMENT_RATE), 'premium payout must book sourcing and tailoring costs');
+  assert.ok(premiumSale.paid - premiumSale.cost < premiumSale.paid, 'gross celebrity receipt must not be treated as net profit');
 
   const average = settle(celebrity, { total: 72 } as ScoreBreakdown, 1_000_000, 10_000);
   assert.ok(average.paid > 0, 'a passable look can still sell at its normal price');
   assert.ok(average.paid < celebrity.celebrity!.spendFloor, 'passable styling must not trigger the guaranteed premium order');
+  assert.equal(average.cost, 10_000, 'ordinary celebrity purchases should not be charged premium-order costs');
 
   const rejected = settle(celebrity, { total: 48 } as ScoreBreakdown, 1_000_000, 10_000);
   assert.equal(rejected.outcome, 'refused');
