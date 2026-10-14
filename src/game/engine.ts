@@ -782,6 +782,14 @@ export function settle(c: Customer, score: ScoreBreakdown, price: number, suppli
       line = `${line} Transfer alert received. Thank goodness.`;
     }
   }
+  // A celebrity can refuse a poor look. High-value orders are only unlocked by a strong result.
+  if (c.celebrity && s < 60) {
+    return {
+      price, paid: 0, tip: 0, cost: 0, outcome: 'refused',
+      line: 'I needed a standout look for my event. This is not right for me, so I will not buy it today.',
+      reaction: 'frown', repDelta: -3, becameRegular: false,
+    };
+  }
   // Budget is a spending ceiling, not a guarantee that every rich customer spends it all.
   if (c.cls === 'rich') paid = Math.min(paid, c.budget);
   let tip = 0;
@@ -789,12 +797,17 @@ export function settle(c: Customer, score: ScoreBreakdown, price: number, suppli
   else if (s >= 75) tip = { poor: 0.01, middle: 0.04, rich: 0.07 }[c.cls] * paid;
   if (c.male) tip *= 1.5; // men tip big
   if (c.celebrity) {
-    // The premium visit is a valuable completed sale, but the payout can never exceed this guest's budget.
-    paid = Math.min(c.budget, Math.max(paid, c.celebrity.spendFloor));
-    outcome = 'paid';
-    const celebrityTipRate = 0.05 + c.celebrity.tier * 0.02;
-    tip = Math.max(tip, Math.round(paid * celebrityTipRate / 100) * 100);
-    line = `${c.name} loved the luxury look and paid lavishly, with a generous celebrity tip.`;
+    if (s >= 80) {
+      // The premium order is earned by a strong look; mediocre styling sells only at its normal price.
+      paid = Math.min(c.budget, Math.max(paid, c.celebrity.spendFloor));
+      outcome = 'paid';
+      const celebrityTipRate = 0.05 + c.celebrity.tier * 0.02;
+      tip = Math.max(tip, Math.round(paid * celebrityTipRate / 100) * 100);
+      line = `${c.name} loved the luxury look and placed a premium celebrity order, with a generous tip.`;
+    } else {
+      paid = Math.min(paid, c.budget);
+      line = `${c.name} liked parts of the look and bought it at the regular price, but did not place a premium order.`;
+    }
   }
   const repDelta = ((s - 65) / 18) * (c.influencer ? 3 : 1);
   return { price, paid: Math.round(paid), tip: Math.round(tip / 100) * 100, cost: supplies, outcome, line, reaction, repDelta, becameRegular: s >= 80 && !c.regularId };
@@ -873,7 +886,7 @@ export function applyLook(s0: GameState, c: Customer, choice: StyleChoice, st0: 
     next = money(next, -st.cost, 'Hair and makeup supplies');
   }
   if (c.influencer && score.total >= 80) next = { ...next, followers: (next.followers || 0) + Math.round(60 + Math.random() * 120) };
-  if (c.celebrity && sold) {
+  if (c.celebrity && sold && score.total >= 80) {
     const gained = Math.round((8_000 + Math.random() * 10_000) * (1 + c.celebrity.tier * 0.85));
     const rivals = next.rivals.map((r) => r.id === 'you' ? r : { ...r, feeling: clamp(r.feeling - (8 + c.celebrity!.tier * 3), -100, 100) });
     next = { ...next, followers: (next.followers || 0) + gained, rep: clamp(next.rep + 3 + c.celebrity.tier * 2, 0, 100), rivals,
