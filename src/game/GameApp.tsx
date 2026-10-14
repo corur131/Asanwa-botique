@@ -976,7 +976,7 @@ const PowerChip: React.FC<{ s: GameState; up: (f: (g: GameState) => GameState) =
   const load = E.loadKw(s);
   const dailyKwh = E.dailyEnergyKwh(s);
   const tariff = E.tariffFor(s);
-  const tariffOptions = Object.values(E.POWER.tariffs);
+  const tariffOptions: number[] = Object.values(E.POWER.tariffs);
   const nextTariff = tariffOptions[(Math.max(0, tariffOptions.indexOf(tariff)) + 1) % tariffOptions.length];
   const powered = s.furniture.filter((p) => p.placed && !!E.EQUIPMENT_WATTS[p.id]);
   const sourceLabel = src === 'grid' ? (off ? 'Grid unavailable' : 'Grid supply') : src === 'gen' ? 'Generator supply' : src === 'solar' ? 'Solar / battery' : 'Power shortage';
