@@ -89,7 +89,7 @@ test('rich clothing budgets progress by shop tier and Signature properties skew 
 
 test('celebrity spend bands are tiered and every lower-tier maximum obeys the ₦5m overlap rule', () => {
   assert.equal(CELEBRITY_SPEND_RANGES.length, 5);
-  assert.deepEqual(CELEBRITY_SPEND_RANGES[4], { min: 30_000_000, max: 210_000_000 });
+  assert.deepEqual(CELEBRITY_SPEND_RANGES[4], { min: 85_000_000, max: 250_000_000 });
   for (let tier = 0; tier < CELEBRITY_SPEND_RANGES.length; tier++) {
     const range = CELEBRITY_SPEND_RANGES[tier];
     assert.ok(range.min < range.max);
@@ -157,7 +157,7 @@ test('celebrity eligibility opens at Level 3 and lower celebrity ranks can visit
   assert.equal(celebrityVisitChance(1, true), 0, 'Signature status cannot bypass the Level 3 gate');
   assert.deepEqual(
     [2, 3, 4, 5, 6].map((tier) => Number(celebrityVisitChance(tier, true).toFixed(2))),
-    [0.23, 0.35, 0.50, 0.60, 0.70],
+    [0.22, 0.35, 0.50, 0.60, 0.70],
   );
 });
 
