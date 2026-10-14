@@ -130,8 +130,9 @@ const CONTRACT_TIER_RULES = [
   { retailCeiling: 100_000, lines: 2, minQty: 4, maxQty: 6, deadlineDays: 7 },
   { retailCeiling: 200_000, lines: 2, minQty: 6, maxQty: 9, deadlineDays: 8 },
   { retailCeiling: 300_000, lines: 3, minQty: 8, maxQty: 12, deadlineDays: 10 },
-  { retailCeiling: 1_000_000, lines: 3, minQty: 10, maxQty: 16, deadlineDays: 12 },
-  { retailCeiling: 3_000_000, lines: 4, minQty: 12, maxQty: 20, deadlineDays: 14 },
+  // Major contracts are intentionally demanding: they belong to the two highest boutique levels.
+  { retailCeiling: 1_500_000, lines: 3, minQty: 40, maxQty: 55, deadlineDays: 12 },
+  { retailCeiling: 3_000_000, lines: 4, minQty: 45, maxQty: 65, deadlineDays: 14 },
 ] as const;
 
 const CONTRACT_CLIENTS = [
@@ -241,6 +242,10 @@ export function ensurePoliticianContractOffer(s0: GameState, force = false): Gam
   if (hasLive || (!force && contracts.length > 0 && s.day < lastActivityDay + 3)) {
     return contracts.length ? { ...s, politicianContracts: contracts.slice(-20) } : s;
   }
+  // Politician contracts are rare late-game opportunities, not day-one walk-in orders.
+  // Tier indexes 5 and 6 correspond to boutique Levels 6 and 7.
+  if (Math.floor(s.tier || 0) < 5) return contracts.length ? { ...s, politicianContracts: contracts.slice(-20) } : s;
+
   const offer = makePoliticianContractOffer(s);
   if (!offer) return s;
   s = { ...s, politicianContracts: [...contracts, offer].slice(-20) };
