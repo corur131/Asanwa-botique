@@ -8,7 +8,7 @@ import { CharacterConfig } from '../types/character';
 import { generateRandomCustomer } from '../utils/randomizer';
 import { CELEBRITY_FULFILMENT_RATE, TIERS, naira } from './economy';
 import { celebrityAmountsForTier, celebrityIsScheduled, celebrityVisitChance, chooseCelebrityTierForShop, celebrityProfileForTier, additionalCelebrityVisitChance, thirdCelebrityVisitChance, maximumCelebrityVisitsPerDay } from './customers';
-import { GameState, Gist, Message, ReplyChoice, Rival, RivalPost } from './types';
+import { BrandMetrics, GameState, Gist, Message, ReplyChoice, Rival, RivalPost } from './types';
 import { Topic, startConvo } from './convos';
 import { brandFromLegacy, brandPower, getBrandMetrics } from './business';
 
@@ -399,7 +399,7 @@ export function simulateRivals(s0: GameState): GameState {
         const celebrityTier = chooseCelebrityTierForShop(r.tier, signatureProperty, celebrityProfile);
         const namedGuest = celebrityProfileForTier(celebrityTier);
         const { budget, spendFloor } = celebrityAmountsForTier(celebrityTier, Math.random, r.tier, signatureProperty);
-        const currentBrand = r.brand || brandFromLegacy(r.rep, r.followers || 0, r.tier);
+        const currentBrand: BrandMetrics = r.brand || brandFromLegacy(r.rep, r.followers || 0, r.tier);
         const purchaseChance = clamp(0.80 + (r.skill - 1) * 0.20 + (r.rep - 50) / 500, 0.55, 0.92);
         const premiumOrderChance = clamp(0.48 + (r.skill - 1) * 0.60 + (r.rep - 50) * 0.002 +
           (currentBrand.reliability - 50) * 0.0015, 0.15, 0.90);
