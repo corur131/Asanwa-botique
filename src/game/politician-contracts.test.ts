@@ -54,8 +54,8 @@ test('Level 6 and Level 7 major contracts use the proposed late-game payout scal
 
 test('200-day contract economy sample uses actual unlocked catalogue offers at Levels 6 and 7', () => {
   const scenarios = [
-    { tier: 5, label: 'Level 6', lines: 3, minQty: 40, maxQty: 55, retailCeiling: 1_500_000, minReward: 220_000_000, maxReward: 500_000_000, weeklyRent: 30_000_000 },
-    { tier: 6, label: 'Level 7', lines: 4, minQty: 45, maxQty: 65, retailCeiling: 3_000_000, minReward: 500_000_000, maxReward: 1_000_000_000, weeklyRent: 75_000_000 },
+    { tier: 5, label: 'Level 6', lines: 3, minQty: 40, maxQty: 55, retailCeiling: 1_500_000, minUnitCost: 460_000, minReward: 220_000_000, maxReward: 500_000_000, weeklyRent: 30_000_000 },
+    { tier: 6, label: 'Level 7', lines: 4, minQty: 45, maxQty: 65, retailCeiling: 3_000_000, minUnitCost: 700_000, minReward: 500_000_000, maxReward: 1_000_000_000, weeklyRent: 75_000_000 },
   ] as const;
 
   for (const scenario of scenarios) {
@@ -80,8 +80,11 @@ test('200-day contract economy sample uses actual unlocked catalogue offers at L
         Number.isInteger(row.quantity) &&
         row.quantity >= scenario.minQty &&
         row.quantity <= scenario.maxQty &&
+        row.unitCost >= scenario.minUnitCost &&
         row.unitCost * MARKUP <= scenario.retailCeiling));
       const goodsCost = offer.requirements.reduce((sum, row) => sum + row.unitCost * row.quantity, 0);
+      assert.ok(goodsCost >= scenario.minUnitCost * scenario.minQty * scenario.lines,
+        'major order must carry meaningful minimum wholesale sourcing exposure');
       assert.ok(offer.reward > goodsCost, 'the contract payout must cover the actual catalogue goods cost');
       goodsCosts.push(goodsCost);
       rewards.push(offer.reward);
