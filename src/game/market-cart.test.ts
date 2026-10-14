@@ -64,3 +64,47 @@ test('cart rejects more than 500 pieces on one line before deducting money', () 
   assert.equal(after, state);
   assert.equal(after.cash, state.cash);
 });
+
+
+test('Royal Handwoven Wrapper and Sokoto checkout normalises official palette colours', () => {
+  for (const itemId of ['royalLoomWrapper', 'royalHandwovenSokoto']) {
+    const entry = MARKET.find((item) => item.id === itemId);
+    assert.ok(entry, `${itemId} exists in Yaba Mart`);
+    const color = FABRIC_COLORS[5].toLowerCase();
+    const color2 = FABRIC_COLORS[3].toLowerCase();
+    const lineWithoutKey = {
+      kind: entry.kind,
+      itemId: entry.id,
+      fabric: isClothing(entry.kind) ? entry.fabric || 'plain' : undefined,
+      color,
+      color2,
+      pattern: 0,
+      pieces: 1,
+    };
+    const line: CartLine = {
+      ...lineWithoutKey,
+      key: [lineWithoutKey.kind, lineWithoutKey.itemId, lineWithoutKey.fabric || '', lineWithoutKey.color, lineWithoutKey.color2, lineWithoutKey.pattern].join('|'),
+    };
+    const state = { ...newGame(DIVINE_CONFIG), tier: 6, cash: 20_000_000 };
+    const validation = validateCart(state, [line]);
+    assert.equal(validation.ok, true, `${entry.label} should accept official colours regardless of hex-letter casing`);
+    assert.deepEqual(validation.errors, []);
+
+    const after = buyCart(state, [line]);
+    assert.equal(after.cash, state.cash - validation.total);
+    const purchased = after.stock.find((stock) => stock.itemId === entry.id);
+    assert.ok(purchased, `${entry.label} was added to stock`);
+    assert.equal(purchased.color, FABRIC_COLORS[5], 'stored main colour uses canonical palette value');
+    assert.equal(purchased.color2, FABRIC_COLORS[3], 'stored trim colour uses canonical palette value');
+  }
+});
+
+test('Yaba Mart still rejects a genuinely unsupported colour with a precise message', () => {
+  const { state, line } = levelSevenCart(10_000_000);
+  const invalid = { ...line, color2: '#D4AF37' };
+  const validation = validateCart(state, [invalid]);
+  assert.equal(validation.ok, false);
+  assert.ok(validation.errors.some((error) => error.includes('second/trim colour')));
+  const after = buyCart(state, [invalid]);
+  assert.equal(after, state, 'unsupported colours must not deduct cash or add stock');
+});
