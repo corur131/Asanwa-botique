@@ -386,6 +386,18 @@ export function FloorPiece({ id, colors, selected }: { id: string; colors: strin
           <StandingFanHead />
         </group>
       );
+    case 'industrialGen':
+      return (
+        <group>
+          {glow}
+          <B p={[0, 0.38, 0]} s={[1.15, 0.72, 0.78]} c="#38434B" />
+          <B p={[0, 0.78, 0]} s={[1.2, 0.08, 0.82]} c="#20262C" />
+          <B p={[0, 0.42, 0.405]} s={[0.72, 0.38, 0.025]} c="#D6A52D" />
+          {[-0.42, 0.42].map((x) => <Cyl key={x} p={[x, 0.08, 0.34]} r1={0.1} h={0.08} c="#171A1D" rot={[Math.PI / 2, 0, 0]} />)}
+          {[-0.2, 0, 0.2].map((x) => <B key={x} p={[x, 0.42, 0.423]} s={[0.025, 0.28, 0.01]} c="#20262C" />)}
+          <B p={[0.43, 0.48, 0.42]} s={[0.12, 0.1, 0.03]} c="#3D7654" />
+        </group>
+      );
     case 'generator':
       return (
         <group>
