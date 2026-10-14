@@ -34,7 +34,8 @@ SIGNATURE_CELEBRITY_DAYS_BY_SHOP_TIER = [
     [], [], [2, 9], [1, 5, 9, 12], [0, 2, 5, 7, 9, 12],
     [0, 2, 4, 6, 8, 10, 12, 13], [0, 1, 3, 4, 6, 7, 9, 10, 12, 13],
 ]
-CELEBRITY_VISIT_CHANCE = [0, 0, 0.10, 0.16, 0.22, 0.28, 0.34]
+CELEBRITY_VISIT_CHANCE = [0, 0, 0.18, 0.28, 0.40, 0.48, 0.56]
+CELEBRITY_SECOND_VISIT_CHANCE = [0, 0, 0.0, 0.04, 0.08, 0.18, 0.25]
 CELEBRITY_EXTRA_CHANCE = [0, 0, 0.04, 0.045, 0.05, 0.055, 0.06]
 CELEBRITY_TIER_WEIGHTS_BY_SHOP_TIER = [
     [], [], [0.55, 0.30, 0.15], [0.38, 0.30, 0.22, 0.10],
@@ -42,11 +43,11 @@ CELEBRITY_TIER_WEIGHTS_BY_SHOP_TIER = [
     [0.10, 0.14, 0.18, 0.25, 0.33],
 ]
 CELEBRITY_SPEND_RANGES = [
-    (750_000, 8_500_000),
-    (3_500_000, 12_500_000),
-    (7_500_000, 20_000_000),
-    (15_000_000, 35_000_000),
-    (30_000_000, 210_000_000),
+    (1_500_000, 12_000_000),
+    (6_000_000, 25_000_000),
+    (12_000_000, 45_000_000),
+    (25_000_000, 90_000_000),
+    (50_000_000, 250_000_000),
 ]
 CELEBRITY_FULFILMENT_RATE = 0.45
 CELEBRITY_PREMIUM_SCORE_SUCCESS_RATE = 0.60  # scenario assumption, not guaranteed gameplay success
@@ -101,8 +102,12 @@ def low_weighted_amount(lo, hi, rnd):
     return max(lo, min(hi, _nearest_5000(value)))
 
 
-def celebrity_amounts(tier, rnd):
+def celebrity_amounts(tier, rnd, shop_tier=4, signature=False):
     lo, hi = CELEBRITY_SPEND_RANGES[max(0, min(4, int(tier)))]
+    venue = [0.65, 0.72, 0.78, 0.90, 1.00, 1.15, 1.30][max(0, min(6, int(shop_tier)))]
+    venue *= 1.10 if signature else 1.0
+    lo = max(5_000, _nearest_5000(lo * venue))
+    hi = max(lo, _nearest_5000(hi * venue))
     budget = low_weighted_amount(lo, hi, rnd)
     spend_floor = low_weighted_amount(lo, budget, rnd)
     return budget, spend_floor
@@ -112,7 +117,20 @@ def celebrity_visit_probability(shop_tier, signature=False):
     if shop_tier < 2:
         return 0.0
     base = CELEBRITY_VISIT_CHANCE[min(6, int(shop_tier))]
-    return min(0.65, base * (1.25 if signature else 1.0))
+    return min(0.80, base * (1.25 if signature else 1.0))
+
+
+def additional_celebrity_visit_probability(shop_tier, signature=False):
+    if shop_tier < 4:
+        return 0.0
+    base = CELEBRITY_SECOND_VISIT_CHANCE[min(6, int(shop_tier))]
+    return min(0.35, base * (1.25 if signature else 1.0))
+
+
+def third_celebrity_visit_probability(shop_tier, signature=False):
+    if shop_tier < 6 or not signature:
+        return 0.0
+    return 0.12
 
 
 def choose_celebrity_tier(shop_tier, signature, rnd):
@@ -134,7 +152,7 @@ def record_celebrity_visit(rnd, shop_tier, log, signature=False):
     """Return conservative net premium receipt; normal-price celebrity sales are omitted."""
     log['celebrity_visits'] += 1
     celebrity_tier = choose_celebrity_tier(shop_tier, signature, rnd)
-    budget, spend_floor = celebrity_amounts(celebrity_tier, rnd)
+    budget, spend_floor = celebrity_amounts(celebrity_tier, rnd, shop_tier, signature)
     if rnd.random() >= CELEBRITY_PREMIUM_SCORE_SUCCESS_RATE:
         return 0
     gross = min(budget, spend_floor)
