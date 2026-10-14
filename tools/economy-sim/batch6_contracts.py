@@ -3,9 +3,9 @@
 
 This is an envelope/scenario simulation, not a claim about the catalogue's exact
 average product prices. It mirrors the late-game contract tier rules and payout
-formula in src/game/engine.ts, then tests low-to-high wholesale costs against the
-weekly rents used by the economy model. Unit-cost shares are deliberate stress
-scenarios, not measured probabilities.
+formula in src/game/engine.ts, then tests premium wholesale-cost floors and ceilings
+against the weekly rents used by the economy model. Unit-cost shares are deliberate
+stress scenarios, not measured probabilities.
 """
 from math import ceil, floor
 
@@ -18,12 +18,12 @@ COST_SHARES = (0.10, 0.25, 0.50, 0.75, 1.00)
 TIERS = (
     {
         "level": 6, "name": "Luxury Maison", "lines": 3, "min_qty": 40,
-        "max_qty": 55, "retail_ceiling": 1_500_000, "min_reward": 220_000_000,
+        "max_qty": 55, "retail_ceiling": 1_500_000, "min_unit_cost": 460_000, "min_reward": 220_000_000,
         "max_reward": 500_000_000, "weekly_rent": 30_000_000,
     },
     {
         "level": 7, "name": "Fashion Empire House", "lines": 4, "min_qty": 45,
-        "max_qty": 65, "retail_ceiling": 3_000_000, "min_reward": 500_000_000,
+        "max_qty": 65, "retail_ceiling": 3_000_000, "min_unit_cost": 700_000, "min_reward": 500_000_000,
         "max_reward": 1_000_000_000, "weekly_rent": 75_000_000,
     },
 )
@@ -58,12 +58,12 @@ def offer_days(days, cooldown, expire=False):
     return count
 
 
-def margins_over_reachable_cost_envelope(tier, max_cost):
-    """Find minimum/maximum gross contribution at formula breakpoints and the cost ceiling."""
-    candidates = {0, max_cost, tier["min_reward"] // 4, tier["max_reward"] // 4}
+def margins_over_reachable_cost_envelope(tier, min_cost, max_cost):
+    """Find minimum/maximum gross contribution within the permitted sourcing-cost envelope."""
+    candidates = {min_cost, max_cost, tier["min_reward"] // 4, tier["max_reward"] // 4}
     for point in tuple(candidates):
         for delta in (-1_000, -100, 0, 100, 1_000):
-            candidates.add(max(0, min(max_cost, point + delta)))
+            candidates.add(max(min_cost, min(max_cost, point + delta)))
     rows = [(contract_reward(cost, tier) - cost, cost) for cost in candidates]
     min_margin, min_at_cost = min(rows)
     max_margin, max_at_cost = max(rows)
@@ -81,9 +81,11 @@ def main():
 
     for tier in TIERS:
         max_unit_cost = max_eligible_unit_cost(tier["retail_ceiling"])
+        min_qty = tier["lines"] * tier["min_qty"]
         max_qty = tier["lines"] * tier["max_qty"]
+        min_cost = tier["min_unit_cost"] * min_qty
         max_cost = max_unit_cost * max_qty
-        min_margin, min_at_cost, max_margin, max_at_cost = margins_over_reachable_cost_envelope(tier, max_cost)
+        min_margin, min_at_cost, max_margin, max_at_cost = margins_over_reachable_cost_envelope(tier, min_cost, max_cost)
         calendar_rent = tier["weekly_rent"] * SIMULATION_DAYS / 7
         min_rent_cover = min_margin / tier["weekly_rent"]
         max_rent_cover = max_margin / tier["weekly_rent"]
@@ -92,6 +94,7 @@ def main():
 
         print()
         print(f"Level {tier['level']} — {tier['name']}")
+        print(f"  Minimum modelled sourcing spend for one full order: {money(min_cost)}")
         print(f"  Maximum modelled sourcing spend for one full order: {money(max_cost)}")
         print(f"  Gross contribution range after wholesale goods, before rent/wages/power: {money(min_margin)} to {money(max_margin)}")
         print(f"  Minimum contribution occurs at goods cost {money(min_at_cost)}; maximum at {money(max_at_cost)}.")
@@ -101,7 +104,7 @@ def main():
         midpoint_qty = (tier["min_qty"] + tier["max_qty"]) // 2
         print("  Mid-quantity cost sensitivity (per-piece sourcing cost as share of permitted ceiling):")
         for share in COST_SHARES:
-            unit_cost = floor((max_unit_cost * share) / 100) * 100
+            unit_cost = max(tier["min_unit_cost"], floor((max_unit_cost * share) / 100) * 100)
             goods_cost = contract_cost(unit_cost, midpoint_qty, tier)
             reward = contract_reward(goods_cost, tier)
             contribution = reward - goods_cost
@@ -114,6 +117,7 @@ def main():
         # The payout floor/cap and four-times goods-cost rule should protect these
         # minimum contributions even at the formula transition points.
         assert min_margin >= (165_000_000 if tier["level"] == 6 else 375_000_000)
+        assert min_cost == tier["min_unit_cost"] * tier["lines"] * tier["min_qty"]
 
     print()
     print("PASS: all tested scenarios stay inside the approved reward bands, cover wholesale sourcing cost,")
