@@ -4,7 +4,10 @@ import {
   CELEBRITY_DAYS_BY_SHOP_TIER,
   SIGNATURE_CELEBRITY_DAYS_BY_SHOP_TIER,
   CELEBRITY_SPEND_RANGES,
+  CELEBRITY_TIER_WEIGHTS_BY_SHOP_TIER,
   celebrityAmountsForTier,
+  celebrityAttractionMultiplier,
+  chooseCelebrityTierForShop,
   celebrityIsScheduled,
   celebrityVisitChance,
   maximumCelebrityTierForShop,
@@ -145,14 +148,38 @@ test('celebrity eligibility opens at Level 3 and lower celebrity ranks can visit
     const signature = celebrityVisitChance(shopTier, true);
     assert.ok(ordinary > 0 && ordinary < 1);
     assert.ok(signature > ordinary && signature <= 0.95);
-    assert.ok(Math.abs(signature - ordinary * 1.5) < 1e-12,
-      `Signature Level ${shopTier + 1} should have exactly 1.5x the ordinary celebrity chance`);
+    assert.ok(Math.abs(signature - ordinary * 1.25) < 1e-12,
+      `Signature Level ${shopTier + 1} should have exactly 1.25x the ordinary celebrity chance before brand heat`);
   }
   assert.equal(celebrityVisitChance(1, true), 0, 'Signature status cannot bypass the Level 3 gate');
   assert.deepEqual(
     [2, 3, 4, 5, 6].map((tier) => Number(celebrityVisitChance(tier, true).toFixed(2))),
-    [0.15, 0.24, 0.33, 0.42, 0.51],
+    [0.13, 0.20, 0.28, 0.35, 0.43],
   );
+});
+
+test('reputation, audience and brand heat improve attraction without guaranteeing a celebrity', () => {
+  const cold = { reputation: 25, followers: 120, shopTierIndex: 5, awareness: 20, prestige: 25, trendInfluence: 18 };
+  const hot = { reputation: 92, followers: 250_000, shopTierIndex: 5, awareness: 92, prestige: 88, trendInfluence: 96 };
+  assert.ok(celebrityAttractionMultiplier(cold) < 1);
+  assert.ok(celebrityAttractionMultiplier(hot) > celebrityAttractionMultiplier(cold));
+  assert.ok(celebrityAttractionMultiplier(hot) <= 1.25);
+  assert.ok(celebrityVisitChance(5, true, hot) > celebrityVisitChance(5, true, cold));
+  assert.ok(celebrityVisitChance(5, true, hot) < 1, 'brand heat must never guarantee a visit');
+
+  assert.equal(CELEBRITY_TIER_WEIGHTS_BY_SHOP_TIER.length, 7);
+  const flagshipRandom = seededRandom(20261013);
+  const empireRandom = seededRandom(20261014);
+  const signatureRandom = seededRandom(20261015);
+  const samples = 12_000;
+  let flagshipTop = 0, empireTop = 0, signatureEmpireTop = 0;
+  for (let i = 0; i < samples; i++) {
+    if (chooseCelebrityTierForShop(4, false, undefined, flagshipRandom) === 4) flagshipTop++;
+    if (chooseCelebrityTierForShop(6, false, undefined, empireRandom) === 4) empireTop++;
+    if (chooseCelebrityTierForShop(6, true, undefined, signatureRandom) === 4) signatureEmpireTop++;
+  }
+  assert.ok(empireTop > flagshipTop, 'Fashion Empire should attract more top-tier celebrities than Flagship');
+  assert.ok(signatureEmpireTop > empireTop, 'Signature should modestly improve the top-rank celebrity mix');
 });
 
 test('visit-frequency simulation scales gradually with shop tier and Signature improves odds', () => {
