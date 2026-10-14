@@ -60,7 +60,10 @@ def offer_days(days, cooldown, expire=False):
 
 def margins_over_reachable_cost_envelope(tier, min_cost, max_cost):
     """Find minimum/maximum gross contribution within the permitted sourcing-cost envelope."""
-    candidates = {min_cost, max_cost, tier["min_reward"] // 4, tier["max_reward"] // 4}
+    candidates = {
+        max(min_cost, min(max_cost, point))
+        for point in (min_cost, max_cost, tier["min_reward"] // 4, tier["max_reward"] // 4)
+    }
     for point in tuple(candidates):
         for delta in (-1_000, -100, 0, 100, 1_000):
             candidates.add(max(min_cost, min(max_cost, point + delta)))
@@ -102,13 +105,14 @@ def main():
         print(f"  200-day rent estimate: {money(calendar_rent)}; {delivered_offer_count} successful contracts at the minimum contribution would cover {rent_cover_horizon:.2f}x that rent.")
 
         midpoint_qty = (tier["min_qty"] + tier["max_qty"]) // 2
-        print("  Mid-quantity cost sensitivity (per-piece sourcing cost as share of permitted ceiling):")
+        print("  Mid-quantity cost sensitivity (position within the eligible wholesale-cost range):")
         for share in COST_SHARES:
-            unit_cost = max(tier["min_unit_cost"], floor((max_unit_cost * share) / 100) * 100)
+            unit_cost = tier["min_unit_cost"] + floor(((max_unit_cost - tier["min_unit_cost"]) * share / 100) / 100) * 100
+            unit_cost = min(max_unit_cost, max(tier["min_unit_cost"], unit_cost))
             goods_cost = contract_cost(unit_cost, midpoint_qty, tier)
             reward = contract_reward(goods_cost, tier)
             contribution = reward - goods_cost
-            print(f"    {share:>4.0%} cost share: goods {money(goods_cost)}, reward {money(reward)}, contribution {money(contribution)}")
+            print(f"    {share:>4.0%} through cost range: goods {money(goods_cost)}, reward {money(reward)}, contribution {money(contribution)}")
             assert tier["min_reward"] <= reward <= tier["max_reward"]
             assert contribution > 0
 
