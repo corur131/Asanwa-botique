@@ -98,6 +98,21 @@ test('shopper sources only missing quantities for the accepted contract and deli
   assert.ok(delivered.today.events.some((event) => event.includes('Contract delivered')));
 });
 
+test('fulfilled major contracts keep a 45-day cooldown before another offer', () => {
+  const s = game({ tier: 6, politicianContracts: [] });
+  const offer = contractFor(s);
+  const completed = {
+    ...s,
+    politicianContracts: s.politicianContracts!.map((row) =>
+      row.id === offer.id ? { ...row, status: 'fulfilled' as const, completedDay: s.day } : row),
+  };
+  const stillCoolingDown = ensurePoliticianContractOffer({ ...completed, day: s.day + 44 });
+  assert.equal(stillCoolingDown.politicianContracts?.some((row) => row.status === 'offered'), false);
+
+  const readyForNext = ensurePoliticianContractOffer({ ...completed, day: s.day + 45 });
+  assert.equal(readyForNext.politicianContracts?.some((row) => row.status === 'offered'), true);
+});
+
 test('an accepted contract that passes its deadline fails and applies a fee and reputation consequence', () => {
   const s = game({ cash: 200_000 });
   const offer = contractFor(s);
@@ -130,6 +145,9 @@ test('expired offers do not incur a penalty and a fresh offer arrives after the 
   assert.equal(expired.politicianContracts!.find((row) => row.id === offer.id)!.status, 'expired');
   assert.equal(expired.cash, s.cash);
   assert.equal(expired.today.costs, s.today.costs);
-  const nextDay = ensurePoliticianContractOffer({ ...expired, day: (offer.completedDay || offer.offerExpiresDay + 1) + 3 });
+  const expirationDay = expired.politicianContracts!.find((row) => row.id === offer.id)!.completedDay!;
+  const beforeCooldownEnds = ensurePoliticianContractOffer({ ...expired, day: expirationDay + 44 });
+  assert.equal(beforeCooldownEnds.politicianContracts!.some((row) => row.status === 'offered'), false);
+  const nextDay = ensurePoliticianContractOffer({ ...expired, day: expirationDay + 45 });
   assert.ok(nextDay.politicianContracts!.some((row) => row.status === 'offered'));
 });
