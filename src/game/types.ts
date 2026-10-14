@@ -757,6 +757,8 @@ export interface GameState {
   off?: Record<string, boolean>;
   busy?: Busy | null;
   meter?: WeekMeter;
+  /** Day on which the recurring weekly utility/market bills were settled; guards duplicate close calls. */
+  utilityBillDay?: number;
   /** TV channel index, for fun. */
   channel?: number;
   /** WhatsApp conversations that go back and forth. */
