@@ -906,14 +906,27 @@ export function applyLook(s0: GameState, c: Customer, choice: StyleChoice, st0: 
       today: { ...next.today, events: [...next.today.events, `TRENDING IN LAGOS: ${c.name} paid ${naira(st.paid + st.tip)} including a ${naira(st.tip)} tip, then posted your look. +${gained?.toLocaleString('en-NG')} followers. Rivals are watching.`] } };
   }
   if (c.celebrity) {
+    const currentBrand = getBrandMetrics(next);
+    const bought = sold && st.paid > 0;
+    const premiumOrder = bought && score.total >= 80;
+    const rank = c.celebrity.tier;
+    next = {
+      ...next,
+      brand: {
+        ...currentBrand,
+        awareness: clamp(currentBrand.awareness + (premiumOrder ? 1.0 + rank * 0.25 : bought ? 0.25 : -0.15), 5, 100),
+        prestige: clamp(currentBrand.prestige + (premiumOrder ? 0.45 + rank * 0.15 : bought ? 0.10 : -0.25), 5, 100),
+        trendInfluence: clamp(currentBrand.trendInfluence + (premiumOrder ? 0.7 + rank * 0.25 : bought ? 0.25 : -0.30), 5, 100),
+      },
+    };
     next = announceCelebrityVisit(next, {
       shopId: 'you',
       shopName: 'Asanwa Boutique',
       ownerName: 'Divine',
       celebrityName: c.name,
       spend: st.paid + st.tip,
-      bought: sold && st.paid > 0,
-      premiumOrder: sold && score.total >= 80,
+      bought,
+      premiumOrder,
       followerGain: celebrityFollowerGain,
     });
   }
