@@ -8,7 +8,8 @@ import type { GameState, PoliticianContract } from './types';
 
 function game(overrides: Partial<GameState> = {}): GameState {
   // Most contract workflow tests exercise the late-game eligible tier.
-  return { ...newGame(DIVINE_CONFIG), tier: 6, ...overrides } as GameState;
+  const state = { ...newGame(DIVINE_CONFIG), tier: 6, ...overrides } as GameState;
+  return ensurePoliticianContractOffer(state, true);
 }
 
 function contractFor(s: GameState): PoliticianContract {
