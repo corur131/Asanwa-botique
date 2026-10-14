@@ -72,6 +72,7 @@ json.dump({
         'celebrityFulfilmentRate': econ.CELEBRITY_FULFILMENT_RATE,
         'celebrityPremiumScoreSuccessAssumption': econ.CELEBRITY_PREMIUM_SCORE_SUCCESS_RATE,
         'celebrityForecastIncludesSecondaryCelebrityOpportunityPath': True,
+        'secondaryCelebrityTipSchedulesTwoDaysAheadWithPendingVisitCooldown': True,
         'days': 200,
         'runsPerPlayerType': 300,
         'cashShock': {'day': 60, 'fraction': 0.6},
