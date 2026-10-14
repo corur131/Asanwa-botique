@@ -125,6 +125,8 @@ export default function GameApp({ onLab, initial, storageKey, cloud, notice }: {
   const [touring, setTouring] = useState<string | null>(null);
   const [paused, setPaused] = useState(false);
   const [timeSpeed, setTimeSpeed] = useState<2 | 5 | 10>(2);
+  // Keep the clock, electricity status, and speed controls collapsible so they don't crowd the shop view.
+  const [clockControlsHidden, setClockControlsHidden] = useState(false);
   const [hidden, setHidden] = useState(false);
   const [confirmClose, setConfirmClose] = useState(false);
   const [lookEdit, setLookEdit] = useState<CharacterConfig | null>(null);
@@ -445,20 +447,43 @@ export default function GameApp({ onLab, initial, storageKey, cloud, notice }: {
           </div>
         </div>
 
-        {/* the clock */}
+        {/* clock, electricity, and speed controls can be collapsed to free up shop-floor space */}
         {s.phase === 'shop' && (
-          <div className="absolute top-3 right-3 left-3 sm:left-1/2 sm:right-auto sm:-translate-x-1/2 z-10 rounded-2xl border border-white/15 bg-[#12141c]/92 backdrop-blur px-3 py-2 flex flex-wrap items-center gap-x-3 gap-y-1.5 sm:w-max">
-            <div className="leading-tight">
-              <div className={`text-xl font-bold tabular-nums ${closing ? 'text-rose-300' : 'text-white'}`}>{E.clockText(s.clock)}</div>
-              <div className="w-24 h-1 rounded-full bg-white/10 mt-1 overflow-hidden"><div className="h-full bg-amber-400" style={{ width: `${(s.clock / SHOP_MINUTES) * 100}%` }} /></div>
+          clockControlsHidden ? (
+            <button
+              type="button"
+              aria-label="Show clock, electricity, and speed controls"
+              aria-expanded={false}
+              title="Show clock, electricity, and speed controls"
+              onClick={() => setClockControlsHidden(false)}
+              className="absolute top-3 right-3 z-10 flex items-center gap-1.5 rounded-xl border border-white/15 bg-[#12141c]/95 px-3 py-2 text-xs font-semibold text-white shadow-lg backdrop-blur hover:bg-[#232631]"
+            >
+              ⚡ Controls <span aria-hidden="true">⌄</span>
+            </button>
+          ) : (
+            <div className="absolute top-3 right-3 left-3 sm:left-1/2 sm:right-auto sm:-translate-x-1/2 z-10 rounded-2xl border border-white/15 bg-[#12141c]/92 backdrop-blur px-3 py-2 flex flex-wrap items-center gap-x-3 gap-y-1.5 sm:w-max">
+              <div className="leading-tight">
+                <div className={`text-xl font-bold tabular-nums ${closing ? 'text-rose-300' : 'text-white'}`}>{E.clockText(s.clock)}</div>
+                <div className="w-24 h-1 rounded-full bg-white/10 mt-1 overflow-hidden"><div className="h-full bg-amber-400" style={{ width: `${(s.clock / SHOP_MINUTES) * 100}%` }} /></div>
+              </div>
+              <PowerChip s={s} up={up} />
+              <div className="flex items-center gap-1 rounded-xl border border-white/10 bg-black/25 p-1" aria-label="Game speed">
+                {([2, 5, 10] as const).map((speed) => <button key={speed} type="button" aria-pressed={timeSpeed === speed} onClick={() => setTimeSpeed(speed)} className={`min-h-9 min-w-10 rounded-lg px-2 text-xs font-bold transition-colors ${timeSpeed === speed ? 'bg-amber-400 text-slate-950' : 'text-slate-200 hover:bg-white/10'}`}>{speed}×</button>)}
+              </div>
+              <Btn size="sm" onClick={() => setPaused((p) => !p)}>{paused ? '▶ Play' : '❚❚ Pause'}</Btn>
+              {!s.inShop.length && !s.serving && !closing && s.arrivals.length > 0 && <Btn size="sm" tone="ghost" onClick={() => up(E.skipAhead)}>Skip ⏩</Btn>}
+              <button
+                type="button"
+                aria-label="Hide clock, electricity, and speed controls"
+                aria-expanded={true}
+                title="Hide controls to free up space"
+                onClick={() => setClockControlsHidden(true)}
+                className="flex min-h-9 min-w-9 items-center justify-center rounded-lg border border-white/10 px-2 text-sm font-bold text-slate-300 hover:bg-white/10 hover:text-white"
+              >
+                ⌃
+              </button>
             </div>
-            <PowerChip s={s} up={up} />
-            <div className="flex items-center gap-1 rounded-xl border border-white/10 bg-black/25 p-1" aria-label="Game speed">
-              {([2, 5, 10] as const).map((speed) => <button key={speed} type="button" aria-pressed={timeSpeed === speed} onClick={() => setTimeSpeed(speed)} className={`min-h-9 min-w-10 rounded-lg px-2 text-xs font-bold transition-colors ${timeSpeed === speed ? 'bg-amber-400 text-slate-950' : 'text-slate-200 hover:bg-white/10'}`}>{speed}×</button>)}
-            </div>
-            <Btn size="sm" onClick={() => setPaused((p) => !p)}>{paused ? '▶ Play' : '❚❚ Pause'}</Btn>
-            {!s.inShop.length && !s.serving && !closing && s.arrivals.length > 0 && <Btn size="sm" tone="ghost" onClick={() => up(E.skipAhead)}>Skip ⏩</Btn>}
-          </div>
+          )
         )}
         {paused && s.phase === 'shop' && !styling && (
           <button onClick={() => setPaused(false)} className="absolute inset-0 z-[5] bg-black/40 flex items-center justify-center">
