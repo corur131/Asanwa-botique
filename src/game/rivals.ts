@@ -22,7 +22,7 @@ type Seed = Omit<Rival, 'cash' | 'rep' | 'followers' | 'week' | 'feeling' | 'loo
 
 const ROSTER: Seed[] = [
   // the five
-  { id: 'tolani', owner: 'Tolani Adebayo', shop: 'House of Tolani', handle: 'houseoftolani', main: true, personality: 'queen', speciality: 'bridal', area: 'Victoria Island', tier: 4, signature: true, skill: 1.28, aggression: 0.45, rep: 88, followers: 48_000 },
+  { id: 'tolani', owner: 'Tolani Adebayo', shop: 'House of Tolani', handle: 'houseoftolani', main: true, personality: 'queen', speciality: 'bridal', area: 'Victoria Island', tier: 4, signature: true, skill: 1.12, aggression: 0.45, rep: 84, followers: 32_000 },
   { id: 'amaka', owner: 'Amaka Obi', shop: "Amaka's Closet", handle: 'amakascloset_', main: true, personality: 'loud', speciality: 'genz', area: 'Yaba', tier: 1, skill: 1.02, aggression: 0.8, rep: 55, followers: 3_200 },
   { id: 'bisi', owner: 'Iya Bisi', shop: 'Bisi Aso-Oke & Lace', handle: 'bisi_asooke', main: true, personality: 'oldschool', speciality: 'native', area: 'Surulere', tier: 1, skill: 0.98, aggression: 0.4, rep: 60, followers: 1_400 },
   { id: 'chioma', owner: 'Chioma Eze', shop: 'Chi Cheap & Chic', handle: 'chicheapchic', main: true, personality: 'shady', speciality: 'cheap', area: 'Yaba', tier: 0, skill: 0.95, aggression: 0.9, rep: 38, followers: 900 },
@@ -348,8 +348,13 @@ export function simulateRivals(s0: GameState): GameState {
   const currentOrder = ladder(s).map((row) => row.id);
   const rankById = new Map(currentOrder.map((id, index) => [id, index + 1] as const));
   const youRank = rankById.get('you') || 20;
+  // Rival-only race: who is on top, and by how much. Being number one costs something.
+  const rivalOrder = currentOrder.filter((id) => id !== 'you');
+  const rivalPos = new Map(rivalOrder.map((id, index) => [id, index + 1] as const));
+  const scoreOf = new Map(s.rivals.map((r) => [r.id, rivalScore(r)] as const));
+  const leadGap = clamp((scoreOf.get(rivalOrder[0]) || 1) / Math.max(1, scoreOf.get(rivalOrder[1]) || 1), 1, 16);
   const rivals: Rival[] = [];
-  const news: { kind: 'up' | 'down' | 'viral' | 'scandal' | 'campaign' | 'celebrity' | 'rescue'; r: Rival; spend?: number; bought?: boolean; premiumOrder?: boolean; celebrityTier?: number; celebrityName?: string; rescueAmount?: number }[] = [];
+  const news: { kind: 'up' | 'down' | 'viral' | 'scandal' | 'campaign' | 'celebrity' | 'rescue' | 'poach' | 'investor'; r: Rival; from?: Rival; amount?: number; spend?: number; bought?: boolean; premiumOrder?: boolean; celebrityTier?: number; celebrityName?: string; rescueAmount?: number }[] = [];
   const growthNotes: { owner: string; shop: string; detail: string }[] = [];
   for (const r0 of s.rivals) {
     const r = { ...r0, week: [...r0.week], weekCosts: [...(r0.weekCosts || [])] };
@@ -358,6 +363,10 @@ export function simulateRivals(s0: GameState): GameState {
     const followK = 1 + 0.3 * (r.followers / (r.followers + 8000));
     const ramp = Math.min(1, 0.55 + (today - r.moved) / 20);
     const rivalRank = rankById.get(r.id) || 20;
+    const pos = rivalPos.get(r.id) || 20;
+    const isLeader = pos === 1;
+    // Big audiences grow more slowly: the next 100k followers are harder than the first.
+    const followerScale = 1 / (1 + r.followers / 120_000);
     const chasingDivine = Math.abs(rivalRank - youRank) <= (r.main ? 5 : 2);
     const guardingTopFive = rivalRank <= 5;
     const campaignChance = clamp(
@@ -368,9 +377,9 @@ export function simulateRivals(s0: GameState): GameState {
     // Each boutique can have one defining event today: a push for customers, a viral win or a setback.
     const dayEvent: 'campaign' | 'viral' | 'scandal' | null = chance(campaignChance)
       ? 'campaign'
-      : chance(0.038 * (r.main ? 1.25 : 1))
+      : chance(0.038 * (r.main ? 1.25 : 1) * (pos > 3 ? 1.4 : 1))
         ? 'viral'
-        : chance(0.01)
+        : chance(isLeader ? 0.03 : pos <= 3 ? 0.018 : 0.01)
           ? 'scandal'
           : null;
     const eventMultiplier = dayEvent === 'campaign'
@@ -385,15 +394,21 @@ export function simulateRivals(s0: GameState): GameState {
     const branchCount = Math.max(0, r.branches || 0);
     const departmentCount = (r.departments || []).length;
     const expansionLift = 1 + branchCount * 0.28 + departmentCount * 0.075 + (r.wholesaleActive ? 0.16 : 0);
-    const takings = DAILY[r.tier] * expansionLift * r.skill * form * repK * followK * ramp * rand(0.58, 1.48) * eventMultiplier * (r.stars === 1 ? 0.9 : r.stars >= 3 ? 1.1 : 1);
+    // A runaway leader saturates: customers start trying the shops everyone else is talking about.
+    const saturation = isLeader ? 1 / (1 + 0.3 * Math.log2(leadGap)) : 1;
+    const takings = saturation * DAILY[r.tier] * expansionLift * r.skill * form * repK * followK * ramp * rand(0.58, 1.48) * eventMultiplier * (r.stars === 1 ? 0.9 : r.stars >= 3 ? 1.1 : 1);
     r.week.push(takings);
     r.week = r.week.slice(-7);
     const stockShare = clamp(STOCK_SHARE[r.tier] + (r.wholesaleActive ? 0.05 : 0), 0.3, 0.78);
     const branchRunning = branchCount * Math.max(5_000, t.running * 0.22);
     const departmentRunning = departmentCount * 2_500;
     const wholesaleRunning = r.wholesaleActive ? 7_000 : 0;
-    let dailyCosts = takings * stockShare + t.running + branchRunning + departmentRunning + wholesaleRunning;
-    r.cash += takings * (1 - stockShare) - t.running - branchRunning - departmentRunning - wholesaleRunning;
+    // The top shops carry heavier overheads: bigger teams, PR, security and the cost of staying on top.
+    // The further ahead the leader runs, the heavier it gets.
+    const topShare = isLeader ? clamp(0.08 + 0.07 * Math.log2(leadGap), 0.08, 0.3) : pos <= 3 ? 0.04 : 0;
+    const topCost = takings * topShare;
+    let dailyCosts = takings * stockShare + t.running + branchRunning + departmentRunning + wholesaleRunning + topCost;
+    r.cash += takings * (1 - stockShare) - t.running - branchRunning - departmentRunning - wholesaleRunning - topCost;
     if (today % 7 === 0) {
       const weeklyCosts = t.rent * [0, 0.75, 1, 1.33, 1.75][r.stars] + WAGES[r.tier] + branchCount * t.rent * 0.55;
       r.cash -= weeklyCosts;
@@ -404,7 +419,7 @@ export function simulateRivals(s0: GameState): GameState {
     const target = 30 + r.skill * 45;
     r.rep = clamp(r.rep + (target - r.rep) * 0.04 + rand(-1.5, 1.5), 5, 99);
     const priorFollowers = r.followers;
-    r.followers = Math.max(0, Math.round(r.followers * (1 + (r.rep - 45) / 9000) + rand(0, 6) * (r.tier + 1)));
+    r.followers = Math.max(0, Math.round(r.followers * (1 + ((r.rep - 45) / 9000) * followerScale) + rand(0, 6) * (r.tier + 1)));
     const baseBrand = r.brand || brandFromLegacy(r.rep, priorFollowers, r.tier);
     r.brand = {
       awareness: clamp(baseBrand.awareness + (r.followers > priorFollowers ? 0.12 : -0.04) + (dayEvent === 'campaign' ? 1.15 : 0), 5, 100),
@@ -429,13 +444,13 @@ export function simulateRivals(s0: GameState): GameState {
       const campaignCost = Math.round(takings * rand(0.07, 0.13));
       r.cash -= campaignCost;
       r.weekCosts[r.weekCosts.length - 1] = (r.weekCosts[r.weekCosts.length - 1] || 0) + campaignCost;
-      r.followers += Math.round(rand(90, 260) * (r.tier + 1) + takings / 10_000 * rand(1, 3));
+      r.followers += Math.round((rand(90, 260) * (r.tier + 1) + takings / 10_000 * rand(1, 3)) * followerScale);
       r.rep = clamp(r.rep + rand(0.2, 0.8), 5, 99);
       if (r.main) news.push({ kind: 'campaign', r });
     }
     // Player and rivals share the same follower/promotion discovery and visit-follow-through model.
-    // Tolani retains premium positioning on existing saves as well as new games.
-    const signatureProperty = !!r.signature || (r.id === 'tolani' && r.tier >= 4 && r.stars >= 3);
+    // A signature address is earned: any established flagship with a strong name qualifies.
+    const signatureProperty = r.tier >= 4 && r.rep >= 75 && r.stars >= 2;
     const celebrityProfile = {
       reputation: r.rep,
       followers: r.followers || 0,
@@ -490,9 +505,9 @@ export function simulateRivals(s0: GameState): GameState {
         dailyCosts += celebrityCosts;
         r.rep = clamp(r.rep + (premiumOrder ? rand(0.8, 2.2) : bought ? rand(0.1, 0.5) : -rand(0.3, 1.1)), 5, 99);
         if (bought) {
-          r.followers += premiumOrder
-            ? Math.round(rand(250, 1_800) * (r.tier + 1) + celebritySpend / 100_000 * rand(2, 8))
-            : Math.round(rand(20, 100) * (r.tier + 1));
+          r.followers += Math.round(followerScale * (premiumOrder
+            ? rand(250, 1_800) * (r.tier + 1) + celebritySpend / 100_000 * rand(2, 8)
+            : rand(20, 100) * (r.tier + 1)));
         }
         r.brand = {
           ...currentBrand,
@@ -509,11 +524,13 @@ export function simulateRivals(s0: GameState): GameState {
     // Bad weeks still hurt: theft, a landlord's surprise charge or a dead generator.
     if (chance(0.025)) { const incidentCost = Math.round(takings * rand(2, 4)); r.cash -= incidentCost; r.weekCosts[r.weekCosts.length - 1] = (r.weekCosts[r.weekCosts.length - 1] || 0) + incidentCost; }
     if (dayEvent === 'viral') {
-      r.followers += Math.round(rand(1_200, 4_800) * (r.tier + 1));
+      r.followers += Math.round(rand(1_200, 4_800) * (r.tier + 1) * followerScale);
       r.rep = clamp(r.rep + rand(3, 7), 0, 99);
       news.push({ kind: 'viral', r });
     } else if (dayEvent === 'scandal') {
       r.rep = clamp(r.rep - rand(6, 12), 0, 99);
+      // Bad press costs followers too, and the bigger the shop the louder the unfollows.
+      r.followers = Math.round(r.followers * (1 - rand(0.02, 0.06) * (isLeader ? 1.5 : 1)));
       const scandalCost = Math.round(DAILY[r.tier] * rand(0.9, 1.8));
       r.cash -= scandalCost;
       r.weekCosts[r.weekCosts.length - 1] = (r.weekCosts[r.weekCosts.length - 1] || 0) + scandalCost;
@@ -568,7 +585,10 @@ export function simulateRivals(s0: GameState): GameState {
 
     // Move up only if the next tier is affordable from liquid assets and recent profits can sustain its bills.
     const next = TIERS[r.tier + 1];
-    if (next && !expansionInvestmentMade && today - r.moved > 14 && rivalCanAffordTierUpgrade(r, r.tier + 1)) {
+    // The shop on top is careful about the next big move: it wants a much fatter cushion first.
+    const leaderCaution = isLeader ? 2 : 1;
+    if (next && !expansionInvestmentMade && today - r.moved > (isLeader ? 28 : 14) && rivalCanAffordTierUpgrade(r, r.tier + 1)
+      && Math.max(0, r.cash) + Math.max(0, r.savings || 0) >= (next.moveIn + next.rent * 3) * leaderCaution) {
       const cashNeeded = next.moveIn + next.rent * 3;
       const savingsToCash = Math.min(Math.max(0, r.savings || 0), Math.max(0, cashNeeded - r.cash));
       if (savingsToCash > 0) {
@@ -606,6 +626,7 @@ export function simulateRivals(s0: GameState): GameState {
     }
     rivals.push(r);
   }
+  if (today % 7 === 0) weeklyShakeUp(rivals, news);
   s = { ...s, rivals };
   for (const note of growthNotes) s = gist(s, note.shop + ' expands its fashion empire', note.owner + ' ' + note.detail + '. The investment raises future sales potential but adds real operating costs.', note.shop);
 
@@ -637,6 +658,14 @@ export function simulateRivals(s0: GameState): GameState {
       if (r.main) s = rivalPost(s, r, pick(LINES.brag[r.personality]));
     } else if (n.kind === 'campaign') {
       s = gist(s, `${r.shop} launches an aggressive campaign`, `${r.owner} is spending on promotions and discounts to pull customers from rival boutiques. It is working, but the marketing bill is not small.`, r.id);
+    } else if (n.kind === 'poach' && n.from) {
+      const from = n.from;
+      s = gist(s, `${r.shop} poaches ${from.owner.split(' ')[0]}'s head stylist 👀`, `The stylist behind some of ${from.shop}'s biggest looks has moved to ${r.owner}. Insiders say the offer was "too sweet to refuse".`, r.id, true);
+      if (r.main && chance(0.6)) s = inGroup(s, r, pick(['New hire alert 😌 Some people did not know what they had.', 'My team just got stronger 💪🏾 No names, no stress.', 'When you treat staff well, talent finds you 😌']));
+      if (from.main && chance(0.5)) s = inGroup(s, from, pick(['Staff come, staff go. The brand remains 💅🏾', 'Let them go. I trained one, I will train ten.', 'Some people cannot build, they can only poach 🙄']));
+    } else if (n.kind === 'investor') {
+      s = gist(s, `${r.shop} lands an investor 💰`, `${r.owner} has secured ${naira(n.amount || 0)} from a private investor to grow the business. Bigger premises may be next.`, r.id);
+      if (r.main) s = rivalPost(s, r, pick(['New partners, new chapter 🤝✨ Big things loading…', 'God has sent helpers 🙏🏾 Watch this space 👀']), false, 'brag');
     } else if (n.kind === 'rescue') {
       s = gist(s, `${r.shop} secures family bridge credit`,
         `${r.owner} borrowed ${naira(n.rescueAmount || 0)} after a cash crisis to keep trading. The amount is recorded as a liability; future surplus cash will repay it before further expansion.`,
@@ -675,6 +704,48 @@ export function simulateRivals(s0: GameState): GameState {
     dailyRanking: [...(s.dailyRanking || []), { day: today, order: dailyOrder }].slice(-30),
   };
   return s;
+}
+
+/**
+ * Weekly shake-up so no shop runs away forever. Skill drifts with results: the shop on top
+ * gets comfortable while hungry shops below improve. The leader loses talent to rivals,
+ * and shops that fall behind can attract investors. Mutates the rivals passed in.
+ */
+function weeklyShakeUp(rivals: Rival[], news: { kind: 'poach' | 'investor' | string; r: Rival; from?: Rival; amount?: number }[]): void {
+  const order = [...rivals].sort((a, b) => rivalScore(b) - rivalScore(a));
+  order.forEach((r, i) => {
+    // Main rivals settle around a competitive 1.05; background shops around their own natural level.
+    const home = r.main ? 1.05 : Math.min(1.05, ROSTER.find((x) => x.id === r.id)?.skill ?? 1);
+    let drift = rand(-0.008, 0.008) + (home - r.skill) * 0.1;
+    if (i === 0 && r.skill > 1) drift -= 0.015;
+    else if (i < 3 && r.skill > 1) drift -= 0.005;
+    else if (i >= 5 && r.main && r.skill < 1.12) drift += 0.01;
+    r.skill = Math.round(clamp(r.skill + drift, 0.85, 1.22) * 1000) / 1000;
+  });
+  // Top talent gets tempted away from the leader by a hungrier shop.
+  const leader = order[0];
+  if (leader && chance(0.35)) {
+    const hunters = order.slice(1, 9).filter((r) => r.tier >= 1);
+    const hunter = hunters.find((r) => r.main && chance(0.5)) || (hunters.length ? pick(hunters) : undefined);
+    if (hunter) {
+      const swing = rand(0.02, 0.04);
+      leader.skill = Math.round(clamp(leader.skill - swing, 0.85, 1.22) * 1000) / 1000;
+      hunter.skill = Math.round(clamp(hunter.skill + swing, 0.85, 1.22) * 1000) / 1000;
+      leader.rep = clamp(leader.rep - rand(1, 3), 5, 99);
+      news.push({ kind: 'poach', r: hunter, from: leader });
+    }
+  }
+  // Investors back shops that are behind but trading well enough to grow.
+  order.slice(3).forEach((r) => {
+    // Main rivals can be backed all the way to the top; background shops only up to a mid-size shop,
+    // so the Top 20 doesn't fill up with empires.
+    const ceiling = r.main ? Math.min(TIERS.length - 1, order[0].tier) : 3;
+    if (r.tier >= ceiling || r.cash < 0 || (r.debt || 0) > 0) return;
+    if (!chance(r.main ? 0.13 : 0.035)) return;
+    const amount = Math.round((TIERS[r.tier + 1].moveIn * 1.6 + TIERS[r.tier + 1].rent * 3) * rand(0.9, 1.2) / 100_000) * 100_000;
+    r.cash += amount;
+    news.push({ kind: 'investor', r, amount });
+  });
 }
 
 export function publishLadder(s0: GameState): GameState {
