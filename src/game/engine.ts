@@ -1069,17 +1069,47 @@ export function staffChoice(s: GameState, c: Customer): StyleChoice | null {
   return choice;
 }
 
-function staffFinish(s: GameState, c: Customer, m: StaffMember): GameState {
+export function staffFinish(s: GameState, c: Customer, m: StaffMember): GameState {
   const choice = staffChoice(s, c);
   if (!choice) return depart({ ...s, today: { ...s.today, lost: s.today.lost + 1 } }, c, c.look, false);
   const cost = lookCost(c, choice, s.stock);
   const base = scoreInShop(s, c, choice);
-  const total = Math.round(clamp(base.total * (0.62 + 0.035 * m.level), 0, 100));
+  const raw = base.total * (0.62 + 0.035 * m.level);
+  // Experts know their craft: level 7 never sends a client out unhappy (70+), and level 8+
+  // styles every client beautifully (80-100).
+  const total = Math.round(m.level >= EXPERT_STYLE_LEVEL ? clamp(raw + (m.level - 7) * 5, 80, 100)
+    : m.level >= EXPERT_PRICE_LEVEL ? clamp(raw, 70, 100) : clamp(raw, 0, 100));
   const score = { ...base, total };
-  const price = Math.min(cost.fair, c.budget);
-  const st = settle(c, score, price, cost.consumables);
-  const next = applyLook(s, c, choice, st, score);
+  let st: Settlement;
+  if (m.level >= EXPERT_PRICE_LEVEL) {
+    // Experienced staff charge from the client's budget, never below 95% of it, and see the
+    // payment through (they wait for the transfer alert), celebrities included.
+    const price = expertStaffPrice(c.budget, m.level);
+    const settled = settle(c, score, price, cost.consumables, { hasPOS: true });
+    st = settled.outcome === 'walked' || settled.outcome === 'refused'
+      ? { ...settled, paid: price, outcome: 'paid', reaction: 'smile', repDelta: Math.max(0, settled.repDelta), line: `${c.name} paid ${naira(price)} for ${m.name}'s look.` }
+      : { ...settled, paid: Math.max(settled.paid, price) };
+  } else {
+    st = settle(c, score, Math.min(cost.fair, c.budget), cost.consumables);
+  }
+  let next = applyLook(s, c, choice, st, score);
+  // Top stylists show off their best work on Gidigram.
+  if (m.level >= EXPERT_STYLE_LEVEL && total >= 95 && st.outcome !== 'walked' && st.outcome !== 'refused') {
+    next = postLook(next, c, buildLook(c, choice, s.stock), total, m.name);
+  }
   return { ...next, today: { ...next.today, staffServed: next.today.staffServed + (st.outcome === 'walked' || st.outcome === 'refused' ? 0 : 1) } };
+}
+
+/** Staff at this level and above price from the client's budget (at least 95% of it). */
+export const EXPERT_PRICE_LEVEL = 7;
+/** Staff at this level and above style every client to 80-100 and post their 95+ looks. */
+export const EXPERT_STYLE_LEVEL = 8;
+
+/** What an experienced stylist charges: 95-97% of the budget at level 7, up to 98-100% at level 10. */
+export function expertStaffPrice(budget: number, level: number): number {
+  const [lo, hi] = level >= 10 ? [0.98, 1] : level >= 8 ? [0.96, 0.99] : [0.95, 0.97];
+  const pct = lo + Math.random() * (hi - lo);
+  return Math.max(Math.ceil(budget * 0.95 / 500) * 500, Math.min(budget, Math.round((budget * pct) / 500) * 500));
 }
 
 // ---------------------------------------------------------------------------
@@ -2130,21 +2160,23 @@ export function clearDesign(s: GameState, uid: string): GameState {
 // ---------------------------------------------------------------------------
 // Gidigram
 // ---------------------------------------------------------------------------
-export const postsToday = (s: GameState) => (s.posts || []).filter((p) => p.day === s.day).length;
+export const postsToday = (s: GameState) => (s.posts || []).filter((p) => p.day === s.day && !p.by).length;
 export const canPost = (s: GameState, score: number) => score >= 70 && postsToday(s) < 3;
 
 const CAPTIONS = [
   'Styled by @divine.styles 🔥', 'Another happy client! Book your slot 💅🏾', 'Owambe ready ✨', 'From walk-in to wow.', 'Who did it better? Us. 😌', 'Fresh out of the chair 💇🏾‍♀️', "Clean look for a clean guy.", 'Na so we dey do am for Yaba 💯',
 ];
 
-export function postLook(s: GameState, c: Customer, look: CharacterConfig, score: number): GameState {
-  if (!canPost(s, score)) return s;
+export function postLook(s: GameState, c: Customer, look: CharacterConfig, score: number, by?: string): GameState {
+  // Divine's own posts are limited per day; a staff member posting their work isn't.
+  if (!by && !canPost(s, score)) return s;
   const clsMult = { poor: 0.6, middle: 1, rich: 2 }[c.cls];
   const fatigue = 1 / (1 + postsToday(s));
   const flowerWall = s.furniture.some((p) => p.placed && p.id === 'flowerWall');
   const gained = Math.max(5, Math.round((score - 60) * clsMult * (4 + Math.random() * 4) * fatigue * (1 + (s.followers || 0) / 6000) * (flowerWall ? 1.12 : 1)));
   const likes = Math.round(((s.followers || 0) + gained) * (0.08 + (score - 70) / 300) * (0.8 + Math.random() * 0.4) * (flowerWall ? 1.5 : 1));
-  const post = { id: `p${s.day}-${Math.random().toString(36).slice(2, 7)}`, day: s.day, look, name: c.name, caption: pick(CAPTIONS), score, likes, gained };
+  const caption = by ? pick([`Styled by ${by} at Asanwa Boutique ✨`, `${by} did that 🔥 Book ${by.split(' ')[0]} at Asanwa`, `Another masterpiece from ${by} 💅🏾`]) : pick(CAPTIONS);
+  const post = { id: `p${s.day}-${Math.random().toString(36).slice(2, 7)}`, day: s.day, look, name: c.name, caption, score, likes, gained, ...(by ? { by } : {}) };
   return { ...s, followers: (s.followers || 0) + gained, posts: [post, ...(s.posts || [])].slice(0, 24) };
 }
 

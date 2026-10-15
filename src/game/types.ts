@@ -330,6 +330,8 @@ export interface Post {
   /** Brag posts share news (celebrity, contract, upgrade...) rather than a styled look. */
   kind?: 'look' | 'brag';
   title?: string;
+  /** A staff member's own post of a client they styled (doesn't use up Divine's daily posts). */
+  by?: string;
 }
 
 /** Something worth bragging about on Gidigram. */
