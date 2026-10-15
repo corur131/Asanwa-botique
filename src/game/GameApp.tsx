@@ -19,6 +19,7 @@ import { furnitureById, turn, Rot, room, wallFits, wallLayout } from './shop';
 import type { CloudSession } from '../cloud/AuthGate';
 import { AdminPanel } from '../cloud/AdminPanel';
 import { armSound, playNepaReturn, pop, setGenSound, useSound } from './sound';
+import { WEATHER_INFO, outdoorNow, seasonOf } from './climate';
 import { ActionMenu, CameraPad, Catalogue, EnergyBar, SoundSettings, ViewPicker } from './ui/Build';
 import type { CamCmd, DragMode, View } from './scene/ShopScene';
 import type { Pose } from './types';
@@ -394,8 +395,8 @@ export default function GameApp({ onLab, initial, storageKey, cloud, notice }: {
             </div>
           </div>
         </div>
-        {s.weather && <div className="text-xs text-sky-200" title="Lagos weather affects walk-ins, comfort and energy">
-          {s.weather === 'sunny' ? '☀️ Sunny · hot' : s.weather === 'rainy' ? '🌧️ Rainy · fewer walk-ins' : s.weather === 'harmattan' ? '🌫️ Harmattan · dusty' : '☁️ Cloudy · mild'}
+        {s.weather && <div className="text-xs text-sky-200" title={`${seasonOf(s.day).name}: ${seasonOf(s.day).blurb}`}>
+          {WEATHER_INFO[s.weather].icon} {WEATHER_INFO[s.weather].title} · {Math.round(outdoorNow(s))}°C · {seasonOf(s.day).name}
         </div>}
         <div className={`text-lg font-bold ${s.cash < 0 ? 'text-rose-300' : 'text-emerald-300'}`}>{naira(s.cash)}</div>
         <div className="rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-xs"><div className="text-[10px] text-slate-400">Brand Power</div><div className="font-bold text-fuchsia-200">{brandPower(getBrandMetrics(s), s.followers || 0, s.tier)?.toLocaleString("en-NG")}</div></div>

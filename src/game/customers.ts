@@ -1,3 +1,4 @@
+import { SeasonId, festive, seasonOf } from './climate';
 import { Occasion } from '../constants/catalog';
 import { generateRandomCustomer } from '../utils/randomizer';
 import { BUDGET, SERVICE_BUDGET, SERVICE_SHARE } from './economy';
@@ -79,7 +80,7 @@ function wantLine(w: Want, male: boolean): string {
   }
 }
 
-function wantsFor(occasion: Occasion, male: boolean, cls: CustomerClass, wigs: boolean, trendColor?: string): Want[] {
+function wantsFor(occasion: Occasion, male: boolean, cls: CustomerClass, wigs: boolean, trendColor?: string, season?: SeasonId): Want[] {
   const pool: Want[] = [];
   // Gidigram's colour of the week shows up in what customers ask for.
   const trending = trendColor ? WANTED_COLOURS.find((c) => c.color === trendColor) : undefined;
@@ -99,6 +100,9 @@ function wantsFor(occasion: Occasion, male: boolean, cls: CustomerClass, wigs: b
     pool.push({ kind: 'hair', group: pick(wigs ? ['wig', 'braids', 'natural', 'updo'] : ['braids', 'natural', 'updo', 'twists']) });
   }
   if (['office', 'dateNight', 'casual'].includes(occasion)) pool.push({ kind: 'jacket' });
+  // The season shows up in requests: layers for harmattan mornings, flats for wet roads.
+  if (season === 'harmattan' && occasion !== 'redCarpet') pool.push({ kind: 'jacket' }, { kind: 'jacket' }, ...(male ? [] : [{ kind: 'covered' } as Want]));
+  if ((season === 'rains' || season === 'lateRains') && !male) pool.push({ kind: 'noHeels' }, { kind: 'noHeels' });
   const n = cls === 'poor' ? (chance(0.5) ? 1 : 0) : chance(0.6) ? 2 : 1;
   const out: Want[] = [];
   while (out.length < n && pool.length) {
@@ -669,7 +673,9 @@ export function makeCustomer(state: GameState, mix: [number, number, number]): C
   const rolled = regular ? { ...regular.look, state: 'plain' as const } : { ...generateRandomCustomer('plain'), state: 'plain' as const };
   const male = rolled.body === 'male';
   const look = regular ? rolled : { ...rolled, wardrobe: everydayWardrobe(male), outfit: undefined, accessories: { ...(rolled.accessories || {}), headwear: 'none', shoes: male ? 'slides' : 'flats' } as typeof rolled.accessories };
-  const occasion = pick(OCCASIONS[cls]);
+  // December is owambe season: parties and weddings everywhere.
+  const partyTime = festive(state.day) && chance(0.35) ? OCCASIONS[cls].filter((o) => o === 'owambe' || o === 'wedding') : [];
+  const occasion = partyTime.length ? pick(partyTime) : pick(OCCASIONS[cls]);
   // nobody asks for a wig install before there's a hair station
   const wigs = shopStats(state.furniture, state.tier, state.listing.stars).wigs;
   const service: Customer['service'] = chance(male ? SERVICE_SHARE.male : SERVICE_SHARE.female) ? (male ? 'hair' : pick(['hair', 'hair', 'makeup', 'both'] as const)) : undefined;
@@ -686,7 +692,7 @@ export function makeCustomer(state: GameState, mix: [number, number, number]): C
     cls,
     occasion,
     budget,
-    wants: service ? serviceWants(service, occasion, male, cls, wigs) : wantsFor(occasion, male, cls, wigs, state.trend?.color),
+    wants: service ? serviceWants(service, occasion, male, cls, wigs) : wantsFor(occasion, male, cls, wigs, state.trend?.color, seasonOf(state.day || 1).id),
     service,
     taste: fav,
     look,

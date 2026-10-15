@@ -3,6 +3,7 @@ import { CharacterSvg } from '../../components/renderer/renderCharacter';
 import { getDeborahConfig, MALE_CONFIG } from '../../constants/presets';
 import { naira } from '../economy';
 import * as E from '../engine';
+import { WEATHER_INFO, dateLabel, dayRange, festive, outdoorTemp, seasonOf } from '../climate';
 import { Listing, MoveEquipmentPlan } from '../shop';
 import { CharacterMemory, CollaborationReply, GameState, Message, Post, Rival } from '../types';
 import { MarketApp } from './MarketApp';
@@ -937,34 +938,50 @@ const Top20: React.FC<{ s: GameState; open: (id: string) => void }> = ({ s, open
   );
 };
 
-const WEATHER: Record<NonNullable<GameState['weather']>, { icon: string; title: string; detail: string }> = {
-  sunny: { icon: '☀️', title: 'Sunny and hot', detail: 'Fans and AC matter more; Divine loses energy faster without cooling.' },
-  rainy: { icon: '🌧️', title: 'Rainy season', detail: 'Fewer walk-ins, customers wait a little longer, and NEPA faults are more likely. A street canopy protects the queue.' },
-  harmattan: { icon: '🌫️', title: 'Harmattan', detail: 'Cool, dusty mornings. Keep clothes covered and expect milder heat.' },
-  cloudy: { icon: '☁️', title: 'Cloudy', detail: 'Mild weather with normal customer traffic.' },
-};
 const WeatherApp: React.FC<{ s: GameState }> = ({ s }) => {
   const today = s.weather || E.weatherForDay(s.day, s.seed);
+  const season = seasonOf(s.day);
+  const range = dayRange(s.day, s.seed, today);
+  const now = s.phase === 'shop' ? outdoorTemp(s.day, s.seed, s.clock, today) : null;
+  // The next season, and how many days until it starts.
+  let nextIn = 1;
+  while (nextIn < 400 && seasonOf(s.day + nextIn).id === season.id) nextIn++;
+  const next = seasonOf(s.day + nextIn);
   return (
     <AppFrame title="Lagos Weather" sub="Forecast for your boutique" tone="bg-gradient-to-r from-sky-600 to-blue-800">
       <div className="p-4">
         <div className="rounded-2xl border border-sky-400/20 bg-sky-500/10 p-4 mb-3">
-          <div className="text-xs uppercase tracking-wider text-sky-200">Today · Day {s.day}</div>
-          <div className="text-2xl font-bold text-white mt-1">{WEATHER[today].icon} {WEATHER[today].title}</div>
-          <p className="text-sm text-slate-300 mt-2">{WEATHER[today].detail}</p>
+          <div className="text-xs uppercase tracking-wider text-sky-200">Today · {dateLabel(s.day)} · Day {s.day}</div>
+          <div className="flex items-end justify-between gap-2 mt-1">
+            <div className="text-2xl font-bold text-white">{WEATHER_INFO[today].icon} {WEATHER_INFO[today].title}</div>
+            <div className="text-right">
+              {now !== null && <div className="text-2xl font-bold text-white tabular-nums">{Math.round(now)}°C</div>}
+              <div className="text-xs text-slate-300 tabular-nums">H {Math.round(range.high)}° · L {Math.round(range.low)}°</div>
+            </div>
+          </div>
+          <p className="text-sm text-slate-300 mt-2">{WEATHER_INFO[today].detail}</p>
+        </div>
+        <div className="rounded-2xl border border-white/10 bg-white/5 p-3 mb-3">
+          <div className="text-xs uppercase tracking-wider text-slate-400">Season</div>
+          <div className="text-lg font-semibold text-white mt-0.5">{season.icon} {season.name}{festive(s.day) ? ' · Owambe December 🎉' : ''}</div>
+          <p className="text-xs text-slate-300 mt-1">{season.blurb}</p>
+          <p className="text-[11px] text-slate-400 mt-1.5">{next.icon} {next.name} starts in {nextIn} day{nextIn === 1 ? '' : 's'}.</p>
         </div>
         <div className="text-xs uppercase tracking-wider text-slate-400 mb-2">Next 5 days</div>
         <div className="space-y-2">
           {Array.from({ length: 5 }, (_, i) => {
-            const weather = E.weatherForDay(s.day + i + 1, s.seed);
+            const day = s.day + i + 1;
+            const weather = E.weatherForDay(day, s.seed);
+            const r = dayRange(day, s.seed, weather);
             return <div key={i} className="flex items-center gap-3 rounded-xl bg-white/5 border border-white/5 px-3 py-2">
-              <div className="text-xs text-slate-400 w-14">Day {s.day + i + 1}</div>
-              <div className="text-xl">{WEATHER[weather].icon}</div>
-              <div className="text-sm text-white">{WEATHER[weather].title}</div>
+              <div className="text-xs text-slate-400 w-14">{dateLabel(day)}</div>
+              <div className="text-xl">{WEATHER_INFO[weather].icon}</div>
+              <div className="text-sm text-white flex-1">{WEATHER_INFO[weather].title}</div>
+              <div className="text-xs text-slate-300 tabular-nums">{Math.round(r.high)}° / {Math.round(r.low)}°</div>
             </div>;
           })}
         </div>
-        <p className="text-[11px] text-slate-500 mt-3">This is the game's seasonal forecast, based on Lagos weather patterns.</p>
+        <p className="text-[11px] text-slate-500 mt-3">The game's year follows Lagos seasons: harmattan in Dec–Feb, the hot season in Mar–Apr, the rains in May–Oct with the August break, and dry season in November.</p>
       </div>
     </AppFrame>
   );
