@@ -4,7 +4,7 @@ import * as E from '../engine';
 import { entryFor } from '../market';
 import type { GameState, ShopperAudience, ShopperBuyingPreference, ShopperDressRank, ShopperMission, ShopperPriceBand } from '../types';
 import {
-  prepareShopperOrder, SHOPPER_MISSIONS, SHOPPER_PREFERENCE_CATEGORIES,
+  SHOPPER_NAME, prepareShopperOrder, SHOPPER_MISSIONS, SHOPPER_PREFERENCE_CATEGORIES,
   shopperAvailableBudget, shopperPriceCeiling,
 } from '../shopper';
 import type { CartLine } from '../engine';
@@ -101,8 +101,8 @@ export const ShopperApp: React.FC<{
   return (
     <div className="flex-1 min-h-0 flex flex-col bg-[#111] text-white">
       <div className="bg-gradient-to-r from-violet-700 to-indigo-700 px-3 py-3 shrink-0">
-        <div className="text-lg font-bold">Yaba Mart Shopper</div>
-        <div className="text-xs text-white/75 mt-0.5">A business-minded buyer for your boutique</div>
+        <div className="text-lg font-bold">{SHOPPER_NAME} · Yaba Mart Shopper</div>
+        <div className="text-xs text-white/75 mt-0.5">Buys for the customers who actually walk in: everyday, middle-class and big spenders, women and men, in the colours they ask for.</div>
         <div className="grid grid-cols-2 gap-2 mt-3">
           <div className="rounded-xl bg-black/15 border border-white/10 p-2">
             <div className="text-[10px] uppercase tracking-wide text-white/60">Your boutique</div>
