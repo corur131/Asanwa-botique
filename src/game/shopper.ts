@@ -339,6 +339,16 @@ const WOMEN_ROLES: [ShopperProductCategory, number][] = [
 const MEN_ROLES: [ShopperProductCategory, number][] = [
   ['top', 24], ['bottom', 18], ['dress', 12], ['shoes', 14], ['headwear', 6], ['outer', 6], ['jewellery', 3], ['glasses', 2],
 ];
+/** Celebrity and VIP shopping: the outfit is the look, so clothes lead (about 70% of styles). */
+const CELEB_WOMEN_ROLES: [ShopperProductCategory, number][] = [
+  ['dress', 30], ['top', 10], ['bottom', 8], ['outer', 8], ['shoes', 10], ['bag', 6],
+  ['hair', 8], ['headwear', 5], ['jewellery', 7], ['glasses', 1],
+];
+const CELEB_MEN_ROLES: [ShopperProductCategory, number][] = [
+  ['top', 26], ['dress', 18], ['bottom', 16], ['outer', 14], ['shoes', 12], ['jewellery', 4], ['headwear', 4],
+];
+/** Many of the game's celebrities are men, so they get a bigger share than walk-ins. */
+const CELEB_MEN_SHARE = 0.4;
 /** Matches generateRandomCustomer(): roughly a quarter of walk-ins are men. */
 const MEN_SHARE = 0.26;
 /** Rough spending power per segment, used to split the budget between them. */
@@ -396,17 +406,22 @@ function planFreshStyles(
   const mix = TIERS[tierIndex].mix;
   const rawShares = CLASS_ORDER.map((cls, i) => mix[i] * SEGMENT_SPEND[cls]);
   const totalShare = rawShares.reduce((a, b) => a + b, 0) || 1;
-  const segments = CLASS_ORDER
-    .map((cls, i) => ({ segment: cls as Segment, share: rawShares[i] / totalShare }))
-    .filter((row) => row.share >= 0.04);
+  const celebrity = mission === 'richCustomers';
+  const segments = celebrity
+    ? [{ segment: 'rich' as Segment, share: 1 }]
+    : CLASS_ORDER
+      .map((cls, i) => ({ segment: cls as Segment, share: rawShares[i] / totalShare }))
+      .filter((row) => row.share >= 0.04);
 
-  const stockedProducts = new Set(s.stock.map((d) => `${d.kind}|${d.itemId}`));
+  // Celebrity shopping may bring back a luxury style once every piece of it has sold.
+  const stockedProducts = new Set(s.stock.filter((d) => !celebrity || d.pieces > 0).map((d) => `${d.kind}|${d.itemId}`));
   const takenProducts = new Set(alreadyChosen.map((l) => `${l.kind}|${l.itemId}`));
   const tripSeed = `${s.day}|${(s.shopperJobs || []).length}|${s.msgSeq || 0}`;
   const examplesGiven = !!shoppingExamples.trim();
 
   const eligible = MARKET.filter((entry) => {
     if (!canBuy(entry, s.tier)) return false;
+    if (celebrity && shopperDressRank(entry) !== 2) return false;
     const cost = pieceCost(entry, isClothing(entry.kind) ? entry.fabric || 'plain' : undefined);
     return Number.isFinite(cost) && cost > 0 && cost * MARKUP <= retailCeiling;
   });
@@ -440,7 +455,7 @@ function planFreshStyles(
       let score = -Math.abs(Math.log(cost / Math.max(1, window.target))) * 1.6;
       score += rank === goal ? 2.5 : rank > goal ? (segment === 'poor' ? -3 : 0.8) : -1.5;
       score += Math.min(6, demandScore(records, entry, s, mission) * 0.8);
-      if (examplesGiven) score += shopperPreferenceScore(entry, shoppingExamples) * 5;
+      if (examplesGiven) score += shopperPreferenceScore(entry, shoppingExamples) * 8;
       if (['dress', 'top', 'bottom'].includes(entry.kind)) {
         if (entry.native && nativeCount < englishCount) score += 1.5;
         if (!entry.native && englishCount < nativeCount) score += 1.5;
@@ -455,14 +470,14 @@ function planFreshStyles(
     if (!best) return null;
     const entry = best;
     const unitCost = pieceCost(entry, isClothing(entry.kind) ? entry.fabric || 'plain' : undefined);
-    const cap = SEGMENT_PIECE_CAP[segment];
+    const cap = celebrity ? 3 : SEGMENT_PIECE_CAP[segment];
     const affordable = Math.floor((budget - spent) / unitCost);
     let units = Math.max(1, Math.min(affordable, Math.floor(segBudgetPerPick / unitCost), cap * 3));
     if (units < 1) return null;
     // Clothes come in two or three colourways that share one rack slot; customers ask
     // for colours by name, so this is what lets her actually say "yes, I have it in blue".
     const colourways = isClothing(entry.kind)
-      ? Math.max(1, Math.min(segment === 'rich' ? 2 : 3, Math.ceil(units / 2)))
+      ? Math.max(1, Math.min(segment === 'rich' && !celebrity ? 2 : 3, Math.ceil(units / 2)))
       : 1;
     units = Math.min(units, colourways * cap);
     const base = candidateLine(entry, s, mission, records, undefined, 1);
@@ -503,11 +518,28 @@ function planFreshStyles(
     if (!choose({ audience: 'women', category }, segment, perPick)) choose({ category }, segment, perPick);
   }
 
+  // 1b. Anything she named in the examples box comes next.
+  if (examplesGiven) {
+    const wanted = eligible
+      .map((entry) => ({ entry, score: shopperPreferenceScore(entry, shoppingExamples) }))
+      .filter((row) => row.score > 0)
+      .sort((a, b) => b.score - a.score)
+      .slice(0, Math.max(1, Math.floor(styleLimit / 3)));
+    for (const { entry } of wanted) {
+      if (picks.length >= styleLimit) break;
+      if (takenProducts.has(`${entry.kind}|${entry.id}`)) continue;
+      choose({ category: shopperCategoryForKind(entry.kind) }, segments[segments.length - 1]?.segment || 'middle', budget / Math.max(1, styleLimit));
+    }
+  }
+
   // 2. Split the rest of the styles between customer segments and women/men roles.
   const remainingStyles = Math.max(0, styleLimit - picks.length);
+  const womenRoles = celebrity ? CELEB_WOMEN_ROLES : WOMEN_ROLES;
+  const menRoles = celebrity ? CELEB_MEN_ROLES : MEN_ROLES;
+  const menShare = celebrity ? CELEB_MEN_SHARE : MEN_SHARE;
   const roles: Role[] = [
-    ...WOMEN_ROLES.map(([category, weight]) => ({ audience: 'women' as const, category, weight: weight * (1 - MEN_SHARE) })),
-    ...MEN_ROLES.map(([category, weight]) => ({ audience: 'men' as const, category, weight: weight * MEN_SHARE })),
+    ...womenRoles.map(([category, weight]) => ({ audience: 'women' as const, category, weight: weight * (1 - menShare) })),
+    ...menRoles.map(([category, weight]) => ({ audience: 'men' as const, category, weight: weight * menShare })),
   ];
   const roleWeight = roles.reduce((a, r) => a + r.weight, 0);
   const startSpent = spent;
@@ -584,6 +616,21 @@ function kunleReport(
     parts.push(`I topped up ${restockLines.length} of your bestsellers (${restockLines.reduce((a, l) => a + l.pieces, 0)} pieces) so you don't run out.`);
   } else if (mission === 'restock') {
     parts.push('Nothing has been selling fast enough to need a top-up yet, so I filled the gaps on your racks instead.');
+  }
+  if (mission === 'richCustomers') {
+    const outfits = picks.filter((p) => isClothing(p.entry.kind));
+    const finishing = picks.filter((p) => !isClothing(p.entry.kind));
+    const men = picks.filter((p) => p.entry.for === 'm').length;
+    parts.push(`I went to the big luxury suppliers for your celebrity and VIP clients. ${outfits.length} outfit style${outfits.length === 1 ? '' : 's'}: ${outfits.slice(0, 4).map((p) => p.entry.label).join(', ')}${outfits.length > 4 ? ` and ${outfits.length - 4} more` : ''}.`);
+    if (finishing.length) parts.push(`Plus ${finishing.length} finishing piece${finishing.length === 1 ? '' : 's'} to complete the look: ${finishing.slice(0, 3).map((p) => p.entry.label).join(', ')}${finishing.length > 3 ? ' and others' : ''}.`);
+    if (men) parts.push(`${men} of the styles are for male stars.`);
+    const colours = [...new Set(outfits.flatMap((p) => p.lines.map((l) => colourName(l.color))).filter(Boolean))];
+    if (colours.length >= 3) parts.push(`The outfits come in different colours (${colours.slice(0, 5).join(', ')}), never more than 3 of the same one. No celebrity wants to see her dress on another person.`);
+    if (shoppingExamples.trim()) parts.push(`You asked for “${shoppingExamples.trim().slice(0, 120)}”, so I looked for that first.`);
+    parts.push(`Total: ${pieces} pieces for ${naira(spent)} out of ${naira(budget)}.`);
+    if (budget - spent > budget * 0.15) parts.push(`I kept ${naira(budget - spent)} back. Buying more would mean piles of the same luxury piece.`);
+    parts.push('Check the cart in Yaba Mart before you pay.');
+    return parts.join(' ');
   }
   const bySegment = (segment: Segment) => picks.filter((p) => p.segment === segment);
   const describe = (list: AutoPick[]) => list.slice(0, 3).map((p) => p.entry.label).join(', ');
@@ -691,12 +738,15 @@ function prepareAutoOrder(
     .map((entry) => shopperCategoryForKind(entry.kind)));
   const stockedCategories = new Set(s.stock.filter((d) => d.pieces > 0).map((d) => shopperCategoryForKind(d.kind)));
   for (const line of restockLines) stockedCategories.add(shopperCategoryForKind(line.kind));
-  const mustCover = new Set([...eligibleCategories].filter((c) => !stockedCategories.has(c)));
+  const mustCover = mission === 'richCustomers'
+    ? new Set<ShopperProductCategory>()
+    : new Set([...eligibleCategories].filter((c) => !stockedCategories.has(c)));
   const freeSlots = Math.max(0, displayCap(s) - displayedCount(s));
   const tierStyles = [8, 12, 16, 22, 28, 34, 40][tierIndex] || 8;
   // Full racks don't stop him: new styles wait in the store room and she swaps them in.
   let styleLimit = tierStyles;
   if (mission === 'restock') styleLimit = restockLines.length ? Math.max(mustCover.size, Math.ceil(styleLimit / 2)) : styleLimit;
+  if (mission === 'richCustomers') styleLimit = [6, 10, 16, 24, 34, 46, 60][tierIndex] || 6;
   styleLimit = Math.max(styleLimit, mustCover.size);
   const freshBudget = Math.max(0, budget - spent);
   const { picks, spent: freshSpent } = planFreshStyles(
@@ -704,12 +754,17 @@ function prepareAutoOrder(
   );
   spent += freshSpent;
   const chosen = [...restockLines, ...picks.flatMap((p) => p.lines)].filter((l) => l.pieces > 0);
+  if (!chosen.length && mission === 'richCustomers') {
+    return { state: s, error: MARKET.some((entry) => canBuy(entry, s.tier) && shopperDressRank(entry) === 2)
+      ? 'Kunle could not find new luxury pieces within this budget. You may already stock most of them, or the budget is too small for one piece.'
+      : 'Luxury suppliers only sell to bigger shops. Move up to a Boutique to shop for celebrities.' };
+  }
   if (!chosen.length) {
     return { state: s, error: 'Kunle could not find anything worth buying within this budget and your shop level. Try a bigger budget.' };
   }
   let summary = kunleReport(s, mission, picks, restockLines, spent, budget, shoppingExamples);
   if (picks.length > freeSlots) {
-    summary = summary.replace('Check the cart', `Your racks only have space for ${freeSlots} new style${freeSlots === 1 ? '' : 's'}, so the rest go to the store room. Swap them in at the start of the day, or buy another rail. Check the cart`);
+    summary = summary.replace('Check the cart', `${freeSlots ? `Your racks only have space for ${freeSlots} new style${freeSlots === 1 ? '' : 's'}` : 'Your racks are full'}, so the rest go to the store room. Swap them in at the start of the day, or buy another rail. Check the cart`);
   }
   return finishOrder(s, mission, budget, chosen, spent, summary, []);
 }
@@ -735,7 +790,7 @@ export function prepareShopperOrder(
     : undefined;
   if (contractId && !selectedContract) return { state: s, error: 'That politician contract is no longer active. Open Contracts and select an accepted contract.' };
   if (mission === 'contract' && !selectedContract && !contractBrief.trim()) return { state: s, error: 'Accept a politician contract first, or enter a sourcing brief.' };
-  if ((mission === 'variety' || mission === 'restock') && !hasBuyingPreferences) {
+  if ((mission === 'variety' || mission === 'restock' || mission === 'richCustomers') && !hasBuyingPreferences) {
     return prepareAutoOrder(s, mission, budget, shoppingExamples);
   }
 

@@ -109,7 +109,11 @@ test('rich-customer mission prioritises unlocked luxury items and scales order q
   });
   assert.ok(luxuryLines.length > 0, 'rich-customer sourcing should include unlocked luxury products where the tier has them');
   assert.ok(large.job.items.some((line) => line.pieces > 1), 'premium shopping should buy more than one piece when the budget supports it');
-  assert.ok(large.job.estimatedTotal > small.job.estimatedTotal * 2, 'a much larger budget should materially increase the proposed order, not return almost the same tiny cart');
+  // Celebrity shopping caps each colourway at 3 pieces (no piles of one luxury item), so a
+  // small Boutique runs out of new luxury styles before ₦50m. It must still grow clearly.
+  assert.ok(large.job.estimatedTotal > small.job.estimatedTotal * 1.5, 'a much larger budget should materially increase the proposed order, not return almost the same tiny cart');
+  assert.ok(large.job.items.length > small.job.items.length, 'a larger budget should bring more styles or colourways');
+  assert.ok(large.job.items.every((line) => line.pieces <= 3), 'celebrity orders never pile up one luxury colourway');
   assert.ok(small.job.estimatedTotal <= 5_000_000);
   assert.ok(large.job.estimatedTotal <= 50_000_000);
 
