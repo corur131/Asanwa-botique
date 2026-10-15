@@ -9,6 +9,7 @@ import { generateRandomCustomer } from '../utils/randomizer';
 import { MARKET, canBuy, isClothing, makeDesign, pieceCost } from './market';
 import { NAMED_COLOURS } from './colours';
 import { FURNITURE, Listing, Placed, autoPlace, newUid, shopStats } from './shop';
+import { addBrag } from './gram';
 import { startConvo } from './convos';
 import { GROUP, REPLIES, ladder, mainRivals, playerRank, rivalById } from './rivals';
 import { Customer, Design, Drop, GameState, Message, ReplyChoice, Rival, ShowEvent } from './types';
@@ -169,6 +170,7 @@ export function judge(s0: GameState, c: Customer, score: number): GameState {
       s = feel(s, r.id, -12);
     }
     s = say(s, 'Deborah', `SISSSS YOU WON!!! ₦${k.prize?.toLocaleString('en-NG')}! 🎉🎉 I'm screaming!`, { tone: 'good' });
+    s = addBrag(s, 'styleOff', `We won the ${k.title}`, `Asanwa Boutique beat ${r?.shop || 'a rival'} at the ${k.title}, scoring ${score} to ${k.rivalScore}.`, 3);
   } else {
     s = { ...s, rep: clamp(s.rep - 1, 0, 100) };
     s = gist(s, `${r?.shop || 'Rival'} wins the ${k.title}`, `${r?.owner} scored ${k.rivalScore}; Divine scored ${score}. Close one!`, r?.id);

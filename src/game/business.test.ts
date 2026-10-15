@@ -601,8 +601,8 @@ test('rivals announce celebrity visits in news, chat, and their social feed on a
     Math.random = () => 0.001;
     const updated = simulateRivals(base);
     assert.ok(updated.gist.some((item) => /celebrity client/i.test(item.title)));
-    assert.ok(updated.messages.some((item) => item.from === 'GistLagos' && /CELEBRITY SIGHTING/i.test(item.text)));
-    assert.ok(updated.messages.some((item) => item.from === 'Gidigram' && /FASHION ALERT|CELEBRITY SPOTTED/i.test(item.text)));
+    assert.ok((updated.gramNotes || []).some((item) => /CELEBRITY SIGHTING/i.test(item.text)));
+    assert.ok((updated.gramNotes || []).some((item) => /FASHION ALERT|CELEBRITY SPOTTED/i.test(item.text)));
     assert.ok(updated.rivalPosts.some((post) => /celebrity|special guest/i.test(post.caption)));
   } finally {
     Math.random = originalRandom;
@@ -627,8 +627,8 @@ test('player celebrity visits are announced across gist, group chat and Gidigram
     bought: true, premiumOrder: true, followerGain: 15_000,
   });
   assert.ok(updated.gist.some((item) => /celebrity client/i.test(item.title)));
-  assert.ok(updated.messages.some((item) => item.from === 'GistLagos' && /CELEBRITY SIGHTING/i.test(item.text)));
-  assert.ok(updated.messages.some((item) => item.from === 'Gidigram' && /TRENDING NOW/i.test(item.text)));
+  assert.ok((updated.gramNotes || []).some((item) => /CELEBRITY SIGHTING/i.test(item.text)));
+  assert.ok((updated.gramNotes || []).some((item) => /TRENDING NOW/i.test(item.text)));
   assert.ok(updated.messages.some((item) => item.from === 'Asanwa Boutique' && item.chat === 'Lagos Fashion Babes'));
 });
 
@@ -734,7 +734,7 @@ test('Level 6 and Level 7 rivals retain finite celebrity finances and publicize 
       assert.ok(Number.isFinite(result.cash), 'Level ' + (tier + 1) + ' rival cash must remain finite');
       assert.ok(result.week.every(Number.isFinite), 'Level ' + (tier + 1) + ' rival revenue history must remain finite');
       assert.ok(updated.gist.some((item) => /celebrity client/i.test(item.title)), 'Level ' + (tier + 1) + ' celebrity visit should appear in the news feed');
-      assert.ok(updated.messages.some((item) => item.from === 'GistLagos' && /CELEBRITY SIGHTING/i.test(item.text)), 'Level ' + (tier + 1) + ' celebrity visit should be announced');
+      assert.ok((updated.gramNotes || []).some((item) => /CELEBRITY SIGHTING/i.test(item.text)), 'Level ' + (tier + 1) + ' celebrity visit should be announced');
       assert.ok(updated.rivalPosts.some((post) => /celebrity|special guest/i.test(post.caption)), 'Level ' + (tier + 1) + ' celebrity visit should appear on social media');
     }
   } finally {

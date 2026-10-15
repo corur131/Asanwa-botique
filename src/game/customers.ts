@@ -79,9 +79,11 @@ function wantLine(w: Want, male: boolean): string {
   }
 }
 
-function wantsFor(occasion: Occasion, male: boolean, cls: CustomerClass, wigs: boolean): Want[] {
+function wantsFor(occasion: Occasion, male: boolean, cls: CustomerClass, wigs: boolean, trendColor?: string): Want[] {
   const pool: Want[] = [];
-  const colour = pick(WANTED_COLOURS);
+  // Gidigram's colour of the week shows up in what customers ask for.
+  const trending = trendColor ? WANTED_COLOURS.find((c) => c.color === trendColor) : undefined;
+  const colour = trending && chance(0.3) ? trending : pick(WANTED_COLOURS);
   pool.push({ kind: 'color', color: colour.color, name: colour.name });
   if (occasion === 'owambe' || occasion === 'wedding') {
     pool.push({ kind: 'native' }, { kind: 'native' });
@@ -684,7 +686,7 @@ export function makeCustomer(state: GameState, mix: [number, number, number]): C
     cls,
     occasion,
     budget,
-    wants: service ? serviceWants(service, occasion, male, cls, wigs) : wantsFor(occasion, male, cls, wigs),
+    wants: service ? serviceWants(service, occasion, male, cls, wigs) : wantsFor(occasion, male, cls, wigs, state.trend?.color),
     service,
     taste: fav,
     look,

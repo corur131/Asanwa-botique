@@ -288,7 +288,7 @@ const ON_READ = ['Seen it, no reply? 😂 Coward', 'Blue tick and silence. I kne
 
 /** Others jumping into the group chat. */
 const CHIME: Record<'hot' | 'divine' | 'them' | 'calm', string[]> = {
-  hot: ['🍿🍿🍿 I\'m just here', 'Una should take this to DM abeg 😂', 'Screenshot don already go GistLagos o', 'Ah. This group is hot today 🔥', 'Somebody should call the admin 😂'],
+  hot: ['🍿🍿🍿 I\'m just here', 'Una should take this to DM abeg 😂', 'Screenshot don already reach Lagos Fashion Daily o', 'Ah. This group is hot today 🔥', 'Somebody should call the admin 😂'],
   divine: ['Divine no dey carry last o 😂😂', 'Ehen! Divine finish am 😂', 'This one na knockout 🥊😂', 'Divine wins this round, no cap 😂'],
   them: ['Divine you sef 😂 you didn\'t think this one through', 'Ah, she got you there o 😬', 'This one pain me for you Divine 😂'],
   calm: ['Thank God una don settle 🙏🏾', 'Peace at last 😂', 'See, this is how it should be ❤️'],
@@ -697,7 +697,8 @@ function wrapUp(s0: GameState, c: Convo): GameState {
   const name = r ? r.owner : c.with;
   if (c.last === 'soft') {
     s = feel(s, c.rivalId, 12);
-    if (c.chat === GROUP && chance(0.5)) s = post(s, 'GistLagos', CHIME.calm[Math.floor(Math.random() * CHIME.calm.length)], { chat: GROUP });
+    const witness = (s.rivals || []).find((x) => x.main && x.id !== c.rivalId);
+    if (c.chat === GROUP && witness && chance(0.5)) s = post(s, witness.owner, CHIME.calm[Math.floor(Math.random() * CHIME.calm.length)], { chat: GROUP });
     return s;
   }
   const big = c.chat === GROUP && c.peak >= 4;
