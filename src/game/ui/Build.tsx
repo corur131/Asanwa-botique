@@ -7,6 +7,7 @@ import { useThumb } from '../scene/Thumbs';
 import type { CamCmd, DragMode, View } from '../scene/ShopScene';
 import { Btn } from './kit';
 import { useSound } from '../sound';
+import { setPeopleQuality, usePeopleQuality } from '../scene/people/quality';
 
 const Thumb: React.FC<{ id: string }> = ({ id }) => {
   const url = useThumb(id);
@@ -176,6 +177,7 @@ export const ActionMenu: React.FC<{ s: GameState; uid: string; onPick: (id: E.Ac
 /** On/off and volume for music, the generator and pops; mirror reflections. */
 export const SoundSettings: React.FC = () => {
   const snd = useSound();
+  const people = usePeopleQuality();
   const row = (label: string, on: boolean, vol: number, k: 'music' | 'gen' | 'sfx', vk: 'musicVol' | 'genVol' | 'sfxVol') => (
     <div className="flex items-center gap-2">
       <button onClick={() => snd.set({ [k]: !on })} className={`w-28 shrink-0 rounded-lg px-2 py-1.5 text-xs font-semibold text-left ${on ? 'bg-emerald-600/80 text-white' : 'bg-white/5 text-slate-400 border border-white/10'}`}>
@@ -194,6 +196,14 @@ export const SoundSettings: React.FC = () => {
       <button onClick={() => snd.set({ reflections: !snd.reflections })} className={`w-full rounded-lg px-2 py-1.5 text-xs font-semibold text-left ${snd.reflections ? 'bg-emerald-600/80 text-white' : 'bg-white/5 text-slate-400 border border-white/10'}`}>
         Mirror reflections: {snd.reflections ? 'on' : 'off (faster on old phones)'}
       </button>
+      <div className="flex items-center gap-1.5">
+        <span className="w-28 shrink-0 text-xs text-slate-300">People detail</span>
+        {(['high', 'medium', 'simple'] as const).map((q) => (
+          <button key={q} onClick={() => setPeopleQuality(q)} className={`flex-1 rounded-lg px-1.5 py-1.5 text-[11px] font-semibold ${people === q ? 'bg-amber-500 text-black' : 'bg-white/5 text-slate-300 border border-white/10'}`}>
+            {q === 'high' ? 'High' : q === 'medium' ? 'Medium' : 'Simple'}
+          </button>
+        ))}
+      </div>
     </div>
   );
 };

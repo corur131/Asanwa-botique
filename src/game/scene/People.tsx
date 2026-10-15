@@ -1,11 +1,15 @@
 import React, { useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
+import { Html } from '@react-three/drei';
 import * as THREE from 'three';
 import { CharacterConfig, Garment } from '../../types/character';
 import { SKIN_TONES } from '../../constants/skinTones';
 import { HAIR_PALETTES } from '../../components/renderer/hair';
 import { itemById } from '../../constants/catalog';
 import type { Pose } from '../types';
+import { bodiesReady, loadBodies, onBodiesReady } from './people/assets';
+import { Character } from './people/Character';
+import { usePeopleQuality } from './people/quality';
 
 /**
  * Low-poly people for the shop floor. Each one wears the colours of their real outfit
@@ -28,6 +32,22 @@ export interface FigureLook {
   width: number;
   headwear: string | null;
   bag: string | null;
+  // --- for the smooth, rigged people (people/Character.tsx)
+  body: 'woman' | 'womanCurvy' | 'man';
+  /** Extra width for plus-size bodies. */
+  bulk: number;
+  torso: string;
+  sleeves: 'none' | 'short' | 'long';
+  sleeveColor: string;
+  neckline: 'high' | 'open' | 'strapless';
+  legs: 'bare' | 'trousers' | 'shorts';
+  legColor: string;
+  /** Skirt, gown or robe hanging from the waist: length below the waist in metres. */
+  skirt: { color: string; len: number; flare: number } | null;
+  /** A long coat over everything. */
+  coat: { color: string; len: number } | null;
+  lips: string;
+  beard: boolean;
 }
 
 const LONG = new Set(['longBraids', 'boneStraight', 'bodyWave', 'sidePartFrontal', 'kinkyStraight', 'waterWave', 'butterflyLayers', 'deepCurly']);
@@ -51,6 +71,30 @@ export function lookToFigure(cfg: CharacterConfig): FigureLook {
   const dressLength = w.dress ? (SHORT_BOTTOM.has(w.dress.style) ? 0.35 : /maxi|Maxi|Gown|bubu|laceGown|corset|ball|slit|mermaid|offShoulderGown|adire|cape/i.test(w.dress.style) ? 1 : 0.62) : 0;
   const bottomStyle = w.bottom?.style || '';
   const acc = cfg.accessories;
+  // --- details for the rigged people
+  const topStyle = w.top?.style || '';
+  const dressStyle = w.dress?.style || '';
+  const outer = w.outer;
+  const outerStyle = outer?.style || '';
+  const suit = /Suit|Tuxedo|Pantsuit|jumpsuit|Jumpsuit/.test(dressStyle);
+  const robe = /kaftan|Kaftan|agbada|Agbada|senator|Senator/.test(dressStyle) && !suit;
+  const skirtLen = (style: string) => /mini|Mini|shorts|playsuit/i.test(style) ? 0.3
+    : /pencil|aLine|ALine|shirtDress|ShirtDress|slip|Slip|wrap|Wrap|tubeMidi|fitFlare|bodycon/i.test(style) && !/Gown|Maxi|maxi/.test(style) ? (/Midi|midi|Pleat/.test(style) ? 0.68 : 0.52)
+      : /Midi|midi/.test(style) ? 0.68 : 0.94;
+  const skirtFlare = (style: string) => /ball|Ball|bubu|Bubu|ruffle|fitFlare|FitFlare|aLine|Petal|Cape|cape|agbada|Agbada/.test(style) ? 0.16 : /mermaid|Mermaid|pencil|Column|column|bodycon|tube/.test(style) ? 0.02 : 0.07;
+  let skirt: FigureLook['skirt'] = null;
+  if (w.dress && !suit) {
+    if (robe) skirt = { color: w.dress.color, len: /senator|Senator/.test(dressStyle) ? 0.55 : 0.92, flare: /agbada|Agbada/.test(dressStyle) ? 0.2 : 0.05 };
+    else if (!/playsuit/.test(dressStyle)) skirt = { color: w.dress.color, len: skirtLen(dressStyle), flare: skirtFlare(dressStyle) };
+  } else if (w.bottom && !TROUSERS.has(bottomStyle) && !/Trouser|trouser|Palazzo|palazzo|WideLeg|Jeans|jeans|shorts|Shorts|Sokoto|sokoto/.test(bottomStyle)) {
+    skirt = { color: w.bottom.color, len: skirtLen(bottomStyle), flare: skirtFlare(bottomStyle) };
+  }
+  const shorts = /shorts|Shorts|playsuit/.test(bottomStyle + dressStyle);
+  const legsCovered = !skirt || robe ? (shorts ? 'shorts' : male || suit || robe || !!w.bottom ? 'trousers' : 'bare') : 'bare';
+  const torso = w.dress?.color || w.top?.color || '#9A9A9A';
+  const longSleeve = male ? !/tee|polo|Tee/.test(topStyle) : /buba|Buba|SheerSleeve|puff|Puff|kaba|Kaba|hoodie|Kaftan|kaftan|bubu|Bubu/.test(topStyle + dressStyle);
+  const sleeveless = !male && /camisole|tube|Tube|corset|Corset|halter|offShoulder|Bodice|bodice|Shell|slip|Slip|bodycon|Gown|gown|Column|strapless|cropTop/.test(topStyle + dressStyle) && !longSleeve;
+  const coatLong = !!outer && /trench|Trench|Coat|coat|kimono|Cape|cape/.test(outerStyle);
   return {
     skin,
     hair: pal.mid,
@@ -66,13 +110,46 @@ export function lookToFigure(cfg: CharacterConfig): FigureLook {
     width: cfg.body === 'femalePlus' ? 1.25 : cfg.body === 'femaleRegular' ? 1.08 : male ? 1.12 : 1,
     headwear: acc && acc.headwear && acc.headwear !== 'none' ? acc.headwearColor || '#C9A163' : null,
     bag: acc && acc.bag && acc.bag !== 'none' ? acc.bagColor || '#7A2A2A' : null,
+    body: male ? 'man' : cfg.body === 'femaleSlim' ? 'woman' : 'womanCurvy',
+    bulk: cfg.body === 'femalePlus' ? 1.07 : 1,
+    torso: outer?.color || torso,
+    sleeves: outer ? 'long' : longSleeve || suit || robe ? 'long' : sleeveless ? 'none' : 'short',
+    sleeveColor: outer?.color || torso,
+    neckline: male || outer || suit || robe ? 'high' : /tube|Tube|corset|Corset|offShoulder|strapless|Bodice|bodice/.test(topStyle + dressStyle) ? 'strapless' : 'open',
+    legs: legsCovered,
+    legColor: (suit || robe ? w.dress?.color : w.bottom?.color) || '#3A3A44',
+    skirt,
+    coat: outer && coatLong ? { color: outer.color, len: 0.72 } : null,
+    lips: cfg.lips?.color || '#8A4A44',
+    beard: male && !!cfg.maleOnly?.facialHair && cfg.maleOnly.facialHair !== 'none',
   };
 }
 
 const M: React.FC<{ c: string; r?: number }> = ({ c, r = 0.85 }) => <meshStandardMaterial color={c} roughness={r} />;
 
+type FigureProps = { look: FigureLook; walking: boolean; carryBag?: boolean; highlight?: boolean; pose?: Pose };
+
+/**
+ * One person. Uses the smooth rigged bodies once they have loaded, and the simple block
+ * figure before that (or if they can't load).
+ */
+export const Figure: React.FC<FigureProps> = (props) => {
+  const quality = usePeopleQuality();
+  const detail = quality === 'high' ? 'hi' : 'lo';
+  const [, bump] = React.useState(0);
+  const assets = bodiesReady(detail);
+  React.useEffect(() => {
+    if (quality === 'simple' || assets) return;
+    void loadBodies(detail);
+    return onBodiesReady(() => bump((n) => n + 1));
+  }, [assets, detail, quality]);
+  const asset = assets?.[props.look.body];
+  if (!asset || quality === 'simple') return <BlockFigure {...props} />;
+  return <Character asset={asset} shadows={quality === 'high'} {...props} />;
+};
+
 /** One person, about 1.7 m tall, built from boxes, cylinders and spheres. `walk` swings the limbs. */
-export const Figure: React.FC<{ look: FigureLook; walking: boolean; carryBag?: boolean; highlight?: boolean; pose?: Pose }> = ({ look: l, walking, carryBag, highlight, pose = 'stand' }) => {
+const BlockFigure: React.FC<{ look: FigureLook; walking: boolean; carryBag?: boolean; highlight?: boolean; pose?: Pose }> = ({ look: l, walking, carryBag, highlight, pose = 'stand' }) => {
   const legL = useRef<THREE.Group>(null);
   const legR = useRef<THREE.Group>(null);
   const armL = useRef<THREE.Group>(null);
@@ -371,6 +448,10 @@ export function findPath(blocked: boolean[][], from: Cell, to: Cell, w: number, 
   return [from, to];
 }
 
+/** People are drawn a touch larger than life so they read clearly in the shop. */
+export const PEOPLE_SCALE = 1.08;
+const TAG_TONE = { green: 'bg-emerald-400', amber: 'bg-amber-400', red: 'bg-rose-500', gold: 'bg-yellow-300' } as const;
+
 /**
  * A person who walks to `target` (a cell) along the grid. Starts at `spawn`.
  * Calls onArrive once when they get there.
@@ -397,7 +478,9 @@ export const Walker: React.FC<{
   seatFace?: number;
   onArrive?: () => void;
   onClick?: () => void;
-}> = ({ look, spawn, target, blocked, w, d, delay = 0, speed = 1.4, carryBag, highlight, pose, face, seatPosition, seatFace, onArrive, onClick }) => {
+  /** A floating name tag (waiting customers), with a dot showing how patient they still are. */
+  tag?: { text: string; tone: 'green' | 'amber' | 'red' | 'gold' } | null;
+}> = ({ look, spawn, target, blocked, w, d, delay = 0, speed = 1.4, carryBag, highlight, pose, face, seatPosition, seatFace, onArrive, onClick, tag }) => {
   const group = useRef<THREE.Group>(null);
   const state = useRef({ path: [] as Cell[], i: 0, pos: new THREE.Vector3(spawn[0] + 0.5, 0, spawn[1] + 0.5), wait: delay, arrived: false, key: '', walking: false });
   const [walking, setWalking] = React.useState(false);
@@ -486,7 +569,21 @@ export const Walker: React.FC<{
       onPointerOver={() => onClick && (document.body.style.cursor = 'pointer')}
       onPointerOut={() => (document.body.style.cursor = '')}
     >
-      <Figure look={look} walking={walking} carryBag={carryBag} highlight={highlight} pose={pose} />
+      <group scale={PEOPLE_SCALE}>
+        <Figure look={look} walking={walking} carryBag={carryBag} highlight={highlight} pose={pose} />
+      </group>
+      {tag && (
+        <Html position={[0, pose === 'sit' ? 1.65 : 2.12, 0]} center zIndexRange={[4, 0]} style={{ pointerEvents: onClick ? 'auto' : 'none' }}>
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); onClick?.(); }}
+            className="whitespace-nowrap rounded-full border border-white/20 bg-[#12141c]/85 px-1.5 py-0.5 text-[10px] font-semibold text-white shadow"
+          >
+            <span className={`mr-1 inline-block h-1.5 w-1.5 rounded-full align-middle ${TAG_TONE[tag.tone]}`} />
+            {tag.text}
+          </button>
+        </Html>
+      )}
     </group>
   );
 };
