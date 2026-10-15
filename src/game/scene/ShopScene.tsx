@@ -40,7 +40,16 @@ export interface SceneProps {
   night?: boolean;
   /** NEPA took light. */
   dark?: boolean;
+  /** One-finger / left-button drag: turn the camera, or slide it sideways. */
+  dragMode?: DragMode;
+  /** A one-off camera command from the on-screen pad; `n` changes on every press. */
+  camCmd?: CamCmd | null;
+  /** Bumped to snap the camera back to the current view's starting position. */
+  camReset?: number;
 }
+
+export type DragMode = 'rotate' | 'move';
+export type CamCmd = { n: number; kind: 'zoomIn' | 'zoomOut' | 'left' | 'right' | 'up' | 'down' };
 
 /** Cells where people stand: the styling spot, Divine's spot, waiting spots, staff spots. */
 export function spots(s: GameState) {
@@ -1215,8 +1224,60 @@ function BuildGrid({ r }: { r: RoomStyle }) {
 
 export type View = 'angle' | 'top' | 'front' | 'free';
 
+type Controls = { target: THREE.Vector3; update: () => void; minDistance: number; maxDistance: number };
+
+/**
+ * Keeps sideways moves inside the shop (you can't lose it off screen) and carries out the
+ * zoom / slide / re-centre buttons.
+ */
+function CameraPad({ r, cmd, view }: { r: RoomStyle; cmd?: CamCmd | null; view: View }) {
+  const { camera } = useThree();
+  const controls = useThree((st) => st.controls) as unknown as Controls | null;
+  const shift = useCallback((dx: number, dz: number) => {
+    if (!controls) return;
+    controls.target.x += dx; controls.target.z += dz;
+    camera.position.x += dx; camera.position.z += dz;
+    controls.update();
+  }, [camera, controls]);
+  useFrame(() => {
+    if (!controls) return;
+    const t = controls.target;
+    const x = Math.max(-1, Math.min(r.w + 1, t.x));
+    const z = Math.max(-1, Math.min(r.d + 3, t.z));
+    const y = Math.max(0, Math.min(3, t.y));
+    if (x !== t.x || z !== t.z || y !== t.y) {
+      camera.position.x += x - t.x; camera.position.y += y - t.y; camera.position.z += z - t.z;
+      t.set(x, y, z);
+      controls.update();
+    }
+  });
+  const last = useRef(0);
+  useEffect(() => {
+    if (!cmd || !controls || cmd.n === last.current) return;
+    last.current = cmd.n;
+    if (cmd.kind === 'zoomIn' || cmd.kind === 'zoomOut') {
+      const off = camera.position.clone().sub(controls.target);
+      const len = off.length() * (cmd.kind === 'zoomIn' ? 0.8 : 1.25);
+      off.setLength(Math.max(controls.minDistance, Math.min(controls.maxDistance, len)));
+      camera.position.copy(controls.target).add(off);
+      controls.update();
+      return;
+    }
+    // Slide relative to where the camera is looking, flattened onto the floor.
+    const step = Math.max(1, Math.max(r.w, r.d) * 0.12);
+    const fwd = controls.target.clone().sub(camera.position);
+    fwd.y = 0;
+    if (fwd.lengthSq() < 1e-6 || view === 'top') fwd.set(0, 0, -1);
+    fwd.normalize();
+    const right = new THREE.Vector3(-fwd.z, 0, fwd.x);
+    const v = cmd.kind === 'left' ? right.multiplyScalar(-step) : cmd.kind === 'right' ? right.multiplyScalar(step) : cmd.kind === 'up' ? fwd.multiplyScalar(step) : fwd.multiplyScalar(-step);
+    shift(v.x, v.z);
+  }, [cmd, controls, camera, r.w, r.d, shift, view]);
+  return null;
+}
+
 /** Moves the camera when the view changes. */
-function CameraRig({ view, r }: { view: View; r: RoomStyle }) {
+function CameraRig({ view, r, reset }: { view: View; r: RoomStyle; reset?: number }) {
   const { camera } = useThree();
   const controls = useThree((st) => st.controls) as unknown as { target: THREE.Vector3; update: () => void } | null;
   const cx = r.w / 2;
@@ -1234,12 +1295,38 @@ function CameraRig({ view, r }: { view: View; r: RoomStyle }) {
       controls.target.set(cx, view === 'front' ? 1.1 : 0.6, cz);
       controls.update();
     } else camera.lookAt(cx, 0.6, cz);
-  }, [view, cx, cz, dist, camera, controls]);
+  }, [view, cx, cz, dist, camera, controls, reset]);
   return null;
+}
+
+/**
+ * A drag that moves or turns the camera must not also count as a tap on whatever is under the
+ * finger when it lifts. Swallow the click in the capture phase, before the 3D scene sees it.
+ */
+function useDragGuard() {
+  const cleanup = useRef<(() => void) | null>(null);
+  return useCallback((el: HTMLDivElement | null) => {
+    cleanup.current?.();
+    cleanup.current = null;
+    if (!el) return;
+    let x = 0, y = 0, moved = false;
+    const down = (e: PointerEvent) => { if (e.isPrimary) { x = e.clientX; y = e.clientY; moved = false; } };
+    const move = (e: PointerEvent) => { if (e.isPrimary && Math.hypot(e.clientX - x, e.clientY - y) > 8) moved = true; };
+    const click = (e: MouseEvent) => { if (moved) { e.stopPropagation(); e.preventDefault(); moved = false; } };
+    el.addEventListener('pointerdown', down, true);
+    el.addEventListener('pointermove', move, true);
+    el.addEventListener('click', click, true);
+    cleanup.current = () => {
+      el.removeEventListener('pointerdown', down, true);
+      el.removeEventListener('pointermove', move, true);
+      el.removeEventListener('click', click, true);
+    };
+  }, []);
 }
 
 export default function ShopScene(p: SceneProps) {
   const { s } = p;
+  const dragGuard = useDragGuard();
   const [graphicsLost, setGraphicsLost] = useState(false);
   const handleCanvasCreated = useCallback(({ gl }: { gl: THREE.WebGLRenderer }) => {
     const canvas = gl.domElement;
@@ -1373,6 +1460,8 @@ export default function ShopScene(p: SceneProps) {
 
   const free = view === 'free';
   const top = view === 'top';
+  // Top view always slides; otherwise the player's Move/Turn choice decides.
+  const slide = top || p.dragMode === 'move';
   const cellAt = (e: { point: THREE.Vector3 }): Cell => {
     if (p.placing) {
       const fp = s.furniture.find((x) => x.uid === p.placing!.uid);
@@ -1396,13 +1485,29 @@ export default function ShopScene(p: SceneProps) {
     if (side !== p.wallPlacing.side || at !== p.wallPlacing.at) p.onWallHover?.(side, at);
   };
   return (
-    <div style={{ position: 'relative', width: '100%', height: '100%', touchAction: 'none' }}>
+    <div ref={dragGuard} style={{ position: 'relative', width: '100%', height: '100%', touchAction: 'none' }}>
       <Canvas onCreated={handleCanvasCreated} shadows={r.w * r.d <= 220} dpr={[1, 1.25]} camera={{ fov: 32, position: [cx + dist * 0.72, dist * 1.35, cz + dist], near: 0.1, far: 200 }} style={{ background: r.signatureTheme === 'botanical-atrium' ? 'linear-gradient(#9DCDBF,#263D35)' : r.signatureTheme === 'cobalt-gallery' ? 'linear-gradient(#C9D6ED,#37496D)' : p.night ? 'linear-gradient(#0b0d1a,#1a1630)' : 'linear-gradient(#24305a,#3a4a7a)' }}>
         <ambientLight color={r.signatureTheme === 'botanical-atrium' ? '#D5F1E0' : r.signatureTheme === 'cobalt-gallery' ? '#DEE8FF' : '#FFFFFF'} intensity={p.night ? 0.35 : p.dark ? 0.14 : r.signatureTheme ? 0.68 : 0.6} />
         <hemisphereLight args={[r.signatureTheme === 'botanical-atrium' ? '#E0F3DD' : r.signatureTheme === 'cobalt-gallery' ? '#E5EBFF' : '#FFF4E0', r.signatureTheme === 'botanical-atrium' ? '#23483A' : r.signatureTheme === 'cobalt-gallery' ? '#354668' : '#3A3A50', p.night ? 0.3 : p.dark ? 0.12 : r.signatureTheme ? 0.6 : 0.55]} />
         <directionalLight position={[cx + 6, 12, cz + 8]} intensity={p.night ? 0.4 : p.dark ? 0.35 : 1.2} castShadow={r.w * r.d <= 220} shadow-mapSize={[512, 512]} shadow-camera-left={-12} shadow-camera-right={12} shadow-camera-top={12} shadow-camera-bottom={-12} />
-        <OrbitControls makeDefault target={[cx, 0.6, cz]} enablePan={free} enableRotate={!top} minPolarAngle={top ? 0 : free ? 0.05 : 0.45} maxPolarAngle={top ? 0.02 : free ? 1.52 : view === 'front' ? 1.45 : 1.2} minDistance={dist * 0.35} maxDistance={dist * 2} />
-        <CameraRig view={view} r={r} />
+        <OrbitControls
+          makeDefault
+          target={[cx, 0.6, cz]}
+          enablePan
+          enableZoom
+          enableRotate={!top}
+          // Top view slides in the screen plane (which is the floor); other views slide along the floor.
+          screenSpacePanning={top}
+          panSpeed={1.1}
+          mouseButtons={{ LEFT: slide ? THREE.MOUSE.PAN : THREE.MOUSE.ROTATE, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: slide ? THREE.MOUSE.ROTATE : THREE.MOUSE.PAN }}
+          touches={{ ONE: slide ? THREE.TOUCH.PAN : THREE.TOUCH.ROTATE, TWO: THREE.TOUCH.DOLLY_PAN }}
+          minPolarAngle={top ? 0 : free ? 0.05 : 0.45}
+          maxPolarAngle={top ? 0.02 : free ? 1.52 : view === 'front' ? 1.45 : 1.2}
+          minDistance={dist * (top ? 0.2 : 0.3)}
+          maxDistance={dist * 2.2}
+        />
+        <CameraRig view={view} r={r} reset={p.camReset || 0} />
+        <CameraPad r={r} cmd={p.camCmd} view={view} />
         <Room r={dressed} tier={s.tier} painted={!!fin.paint} />
         <Furniture s={s} selected={p.selected} placing={p.placing} wallPlacing={p.wallPlacing} onTap={tap} dark={p.dark} reflections={p.reflections} />
         {p.build && <BuildGrid r={r} />}

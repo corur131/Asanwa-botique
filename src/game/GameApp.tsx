@@ -19,8 +19,8 @@ import { furnitureById, turn, Rot, room, wallFits, wallLayout } from './shop';
 import type { CloudSession } from '../cloud/AuthGate';
 import { AdminPanel } from '../cloud/AdminPanel';
 import { armSound, playNepaReturn, pop, setGenSound, useSound } from './sound';
-import { ActionMenu, Catalogue, EnergyBar, SoundSettings, ViewPicker } from './ui/Build';
-import type { View } from './scene/ShopScene';
+import { ActionMenu, CameraPad, Catalogue, EnergyBar, SoundSettings, ViewPicker } from './ui/Build';
+import type { CamCmd, DragMode, View } from './scene/ShopScene';
 import type { Pose } from './types';
 
 const ShopScene = lazy(() => import('./scene/ShopScene'));
@@ -114,6 +114,9 @@ export default function GameApp({ onLab, initial, storageKey, cloud, notice }: {
   /** A catalogue piece you're trying before you buy it. */
   const [trying, setTrying] = useState<{ id: string; x: number; z: number; rot: Rot; yardSide?: 'left' | 'right' } | null>(null);
   const [view, setView] = useState<View>('angle');
+  const [dragMode, setDragMode] = useState<DragMode>('rotate');
+  const [camCmd, setCamCmd] = useState<CamCmd | null>(null);
+  const [camReset, setCamReset] = useState(0);
   const [menuFor, setMenuFor] = useState<string | null>(null);
   /** Last floor tile chosen by the player; the scene keeps Divine there until another destination is chosen. */
   const [manualTarget, setManualTarget] = useState<[number, number] | null>(null);
@@ -428,6 +431,9 @@ export default function GameApp({ onLab, initial, storageKey, cloud, notice }: {
             dark={dark}
             build={build}
             view={view}
+            dragMode={dragMode}
+            camCmd={camCmd}
+            camReset={camReset}
             act={build ? null : act}
             manualTarget={manualTarget}
             onMoveTo={(x, z) => { setManualTarget([x, z]); setSitting(null); setLocalAct(null); setMenuFor(null); }}
@@ -440,6 +446,11 @@ export default function GameApp({ onLab, initial, storageKey, cloud, notice }: {
             onCustomer={styleCustomer}
           />
         </Suspense>
+
+        {/* camera pad: slide sideways, zoom, snap back */}
+        <div className="absolute right-2 top-1/2 -translate-y-1/2 z-[15]">
+          <CameraPad mode={dragMode} setMode={setDragMode} top={view === 'top'} send={(kind) => setCamCmd((c) => ({ n: (c?.n || 0) + 1, kind }))} reset={() => setCamReset((n) => n + 1)} />
+        </div>
 
         {/* top-left: where we are */}
         <div className={`absolute top-3 left-3 w-48 sm:w-60 space-y-2 pointer-events-none ${s.phase === 'shop' ? 'max-sm:hidden' : ''} ${build ? 'hidden' : ''}`}>
