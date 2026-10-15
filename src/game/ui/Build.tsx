@@ -176,7 +176,7 @@ export const ActionMenu: React.FC<{ s: GameState; uid: string; onPick: (id: E.Ac
 /** On/off and volume for music, the generator and pops; mirror reflections. */
 export const SoundSettings: React.FC = () => {
   const snd = useSound();
-  const row = (label: string, on: boolean, vol: number, k: 'music' | 'gen' | 'sfx', vk: 'musicVol' | 'genVol' | 'sfxVol') => (
+  const row = (label: string, on: boolean, vol: number, k: 'music' | 'gen' | 'sfx' | 'rain', vk: 'musicVol' | 'genVol' | 'sfxVol' | 'rainVol') => (
     <div className="flex items-center gap-2">
       <button onClick={() => snd.set({ [k]: !on })} className={`w-28 shrink-0 rounded-lg px-2 py-1.5 text-xs font-semibold text-left ${on ? 'bg-emerald-600/80 text-white' : 'bg-white/5 text-slate-400 border border-white/10'}`}>
         {label}: {on ? 'on' : 'off'}
@@ -189,7 +189,8 @@ export const SoundSettings: React.FC = () => {
       <div className="text-[11px] uppercase tracking-wider text-amber-300/90 font-bold">Sound</div>
       {row('Music', snd.music, snd.musicVol, 'music', 'musicVol')}
       {row('Generator', snd.gen, snd.genVol, 'gen', 'genVol')}
-      {row('Pops', snd.sfx, snd.sfxVol, 'sfx', 'sfxVol')}
+      {row('Pops & NEPA', snd.sfx, snd.sfxVol, 'sfx', 'sfxVol')}
+      {row('Rain', snd.rain, snd.rainVol, 'rain', 'rainVol')}
       <div className="text-[11px] uppercase tracking-wider text-amber-300/90 font-bold pt-1">Graphics</div>
       <button onClick={() => snd.set({ reflections: !snd.reflections })} className={`w-full rounded-lg px-2 py-1.5 text-xs font-semibold text-left ${snd.reflections ? 'bg-emerald-600/80 text-white' : 'bg-white/5 text-slate-400 border border-white/10'}`}>
         Mirror reflections: {snd.reflections ? 'on' : 'off (faster on old phones)'}
