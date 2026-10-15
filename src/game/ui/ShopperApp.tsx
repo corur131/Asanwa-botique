@@ -284,7 +284,7 @@ export const ShopperApp: React.FC<{
                 className="w-full rounded-lg bg-black/25 border border-white/15 pl-7 pr-3 py-2 text-sm outline-none focus:border-violet-400"
               />
             </div>
-            <div className="text-[10px] text-slate-500">The shopper cannot reserve more than your available cash after the existing cart is accounted for. Nothing is charged until you check out.</div>
+            <div className="text-[10px] text-slate-500">Kunle takes 5% of the goods he picks (at least ₦1,500), paid at checkout and only on items you keep. His fee is already set aside from the spendable amount. Shopping yourself in Yaba Mart is free.</div>
           </label>
 
           <div className="rounded-lg bg-black/20 border border-white/5 px-3 py-2">

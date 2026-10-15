@@ -1,6 +1,7 @@
 import { FABRIC_COLORS } from '../constants/catalog';
-import { BUDGET, MARKUP, TIERS } from './economy';
-import { cartTotal, displayCap, displayedCount } from './engine';
+import { BUDGET, MARKUP, SHOPPER_COMMISSION_MIN, SHOPPER_COMMISSION_RATE, TIERS } from './economy';
+import { cartTotal, displayCap, displayedCount, shopperCommission } from './engine';
+import { sameColour } from './colours';
 import { WANTED_COLOURS } from './colours';
 import type { CartLine } from './engine';
 import { canBuy, entryFor, HAIR_SWATCHES, isClothing, MARKET, pieceCost, takesColour } from './market';
@@ -111,8 +112,13 @@ export const SHOPPER_MISSIONS: { id: ShopperMission; label: string; description:
   { id: 'contract', label: 'Source for a contract', description: 'Match a short sourcing brief to eligible products in the official catalogue.' },
 ];
 
-export const shopperAvailableBudget = (s: GameState, cart: CartLine[] = s.marketCart || []) =>
-  Math.max(0, Math.floor((s.cash - cartTotal(cart)) / 100) * 100);
+/** Money Kunle may spend on goods, after the existing cart, its commission, and his own
+ * commission on this new order (5%, at least ₦1,500) are set aside. */
+export const shopperAvailableBudget = (s: GameState, cart: CartLine[] = s.marketCart || []) => {
+  const free = s.cash - cartTotal(cart) - shopperCommission(s, cart).total;
+  const afterFee = Math.min(free / (1 + SHOPPER_COMMISSION_RATE), free - SHOPPER_COMMISSION_MIN);
+  return Math.max(0, Math.floor(afterFee / 100) * 100);
+};
 
 /** A normal shopping mission has a price ceiling derived from the actual customer mix
  * and spending bands. Explicit premium/contract missions may use a different ceiling,
@@ -385,7 +391,13 @@ interface AutoPick {
   lines: ShopperOrderLine[];
   unitCost: number;
   cap: number;
+  perColour: number;
 }
+
+const NEUTRALS = ['#F6F1E8', '#E9D8B8', '#5A3A28', '#1E1E24'];
+/** Which rack a clothing colour competes on: who it is for and what kind of garment. */
+const rackGroup = (e: { kind: StockKind; for?: string }) =>
+  `${e.for === 'm' ? 'm' : e.for === 'f' ? 'f' : 'both'}|${e.kind === 'dress' ? 'dress' : e.kind === 'outer' ? 'outer' : 'separates'}`;
 
 /**
  * Plan fresh styles for the shop. `mustCover` lists categories the shop has nothing
@@ -418,6 +430,42 @@ function planFreshStyles(
   const takenProducts = new Set(alreadyChosen.map((l) => `${l.kind}|${l.itemId}`));
   const tripSeed = `${s.day}|${(s.shopperJobs || []).length}|${s.msgSeq || 0}`;
   const examplesGiven = !!shoppingExamples.trim();
+  // The cart holds at most 250 lines; leave room for what is already in it.
+  const lineBudget = Math.max(10, Math.min(220, 250 - (s.marketCart || []).length - alreadyChosen.length));
+
+  // How often each colour was asked for and missing from the racks in the last 30 days.
+  const recentMisses = (s.colourMisses || []).filter((row) => row.day >= s.day - 30);
+  const missCount = (color: string) => recentMisses.filter((row) => sameColour(row.color, color)).length;
+  /** Styles on the racks (and in this order) per colour, for one rack group. */
+  const rackCoverage = (entry: MarketEntry, chosen: ShopperOrderLine[]) => {
+    const group = rackGroup(entry);
+    const rows = [
+      ...s.stock.filter((d) => d.pieces > 0 && isClothing(d.kind)).map((d) => ({ kind: d.kind, itemId: d.itemId, color: d.color })),
+      ...chosen.filter((l) => isClothing(l.kind)).map((l) => ({ kind: l.kind, itemId: l.itemId, color: l.color })),
+    ].filter((row) => {
+      const e = entryFor(row.kind, row.itemId);
+      if (!e) return false;
+      const g = rackGroup(e);
+      return g === group || g.split('|')[1] === group.split('|')[1] && (g.startsWith('both') || group.startsWith('both'));
+    });
+    const palette = [...new Set([...WANTED_COLOURS.map((c) => c.color), ...NEUTRALS])];
+    return palette.map((color) => ({
+      color,
+      styles: rows.filter((row) => sameColour(row.color, color)).length,
+      // Requested colours matter most; neutrals are basics, wanted far less often.
+      demand: NEUTRALS.includes(color) ? 0.3 : 1 + missCount(color) * 0.5,
+    }));
+  };
+  /** Requested colours this rack group has no style in at all. */
+  const rackColourGaps = (entry: MarketEntry, chosen: ShopperOrderLine[]) =>
+    rackCoverage(entry, chosen).filter((row) => row.styles === 0 && !NEUTRALS.includes(row.color));
+  /** The colours a new clothing style should come in: thinnest coverage for its demand first. */
+  const pickRackColours = (entry: MarketEntry, count: number, chosen: ShopperOrderLine[]) => {
+    const ranked = rackCoverage(entry, chosen)
+      .map((row) => ({ ...row, need: (row.styles + (NEUTRALS.includes(row.color) ? 1 : 0)) / row.demand + (hashOf(`${tripSeed}|${entry.id}|${row.color}`) % 100) / 400 }))
+      .sort((a, b) => a.need - b.need);
+    return ranked.slice(0, Math.max(1, count)).map((row) => row.color);
+  };
 
   const eligible = MARKET.filter((entry) => {
     if (!canBuy(entry, s.tier)) return false;
@@ -470,41 +518,52 @@ function planFreshStyles(
     if (!best) return null;
     const entry = best;
     const unitCost = pieceCost(entry, isClothing(entry.kind) ? entry.fabric || 'plain' : undefined);
-    const cap = celebrity ? 3 : SEGMENT_PIECE_CAP[segment];
+    const isCloth = isClothing(entry.kind);
+    // Pieces per colourway: celebrity clothes are one-offs, everyday stock can go deeper.
+    const perColour = celebrity ? (isCloth ? 1 : 2) : segment === 'poor' ? 2 : segment === 'middle' ? 2 : 1;
+    const cap = celebrity ? (isCloth ? 1 : 2) : SEGMENT_PIECE_CAP[segment];
     const affordable = Math.floor((budget - spent) / unitCost);
-    let units = Math.max(1, Math.min(affordable, Math.floor(segBudgetPerPick / unitCost), cap * 3));
-    if (units < 1) return null;
-    // Clothes come in two or three colourways that share one rack slot; customers ask
-    // for colours by name, so this is what lets her actually say "yes, I have it in blue".
-    const colourways = isClothing(entry.kind)
-      ? Math.max(1, Math.min(segment === 'rich' && !celebrity ? 2 : 3, Math.ceil(units / 2)))
-      : 1;
-    units = Math.min(units, colourways * cap);
-    const base = candidateLine(entry, s, mission, records, undefined, 1);
+    const wantedUnits = Math.min(affordable, Math.max(1, Math.floor(segBudgetPerPick / unitCost)));
+    if (wantedUnits < 1) return null;
+    const lineRoom = lineBudget - chosenLines.length + alreadyChosen.length;
+    if (lineRoom < 1) return null;
+    // Colours: every style gets a few, more only when the racks are missing colours
+    // customers ask for in this kind of clothing. Never the whole palette by default.
+    let colourCount = 1;
+    if (isCloth) {
+      const base = celebrity ? 4 : segment === 'rich' ? 2 : 3;
+      const most = celebrity ? 6 : segment === 'rich' ? 3 : 5;
+      const gaps = rackColourGaps(entry, chosenLines).length;
+      const bestseller = demandScore(records, entry, s, mission) > 0 ? 1 : 0;
+      colourCount = Math.min(most, base + Math.min(2, gaps > 3 ? 2 : gaps > 0 ? 1 : 0) + bestseller);
+      colourCount = Math.max(1, Math.min(colourCount, Math.floor(wantedUnits / perColour) || 1, lineRoom));
+    }
+    const units = Math.min(wantedUnits, colourCount * perColour);
+    const baseLine = candidateLine(entry, s, mission, records, undefined, 1);
+    const colours = isCloth
+      ? pickRackColours(entry, colourCount, chosenLines)
+      : takesColour(entry.kind)
+        ? [balancedShopperColour(entry, s, records, chosenLines)]
+        : [baseLine.color];
     const lines: ShopperOrderLine[] = [];
     let left = units;
-    for (let c = 0; c < colourways && left > 0; c++) {
-      const pieces = Math.ceil(left / (colourways - c));
+    colours.forEach((color, c) => {
+      if (left <= 0) return;
+      const pieces = Math.ceil(left / (colours.length - c));
       left -= pieces;
-      let color = base.color;
-      let pattern = base.pattern;
-      let color2 = base.color2;
-      if (takesColour(entry.kind)) {
-        color = isClothing(entry.kind) || entry.kind === 'hair'
-          ? balancedShopperColour(entry, s, records, chosenLines, c)
-          : balancedShopperColour(entry, s, records, chosenLines);
-        if (entry.kind === 'hair') pattern = Math.max(0, HAIR_SWATCHES.findIndex((sw) => sw.color === color));
-        color2 = isClothing(entry.kind) ? base.color2 : color;
-      }
-      const line = toLine(entry, { fabric: base.fabric, color, color2, pattern, pieces });
-      if (lines.some((l) => l.key === line.key)) { lines[lines.findIndex((l) => l.key === line.key)].pieces += pieces; continue; }
+      const pattern = entry.kind === 'hair' ? Math.max(0, HAIR_SWATCHES.findIndex((sw) => sw.color === color)) : baseLine.pattern;
+      const color2 = isCloth ? baseLine.color2 : takesColour(entry.kind) ? color : baseLine.color2;
+      const line = toLine(entry, { fabric: baseLine.fabric, color, color2, pattern, pieces });
+      const at = lines.findIndex((l) => l.key === line.key);
+      if (at >= 0) { lines[at].pieces += pieces; return; }
       lines.push(line);
       chosenLines.push(line);
-    }
+    });
+    const bought = lines.reduce((a, l) => a + l.pieces, 0);
     takenProducts.add(`${entry.kind}|${entry.id}`);
     if (['dress', 'top', 'bottom'].includes(entry.kind)) entry.native ? nativeCount++ : englishCount++;
-    spent += unitCost * units;
-    const pick: AutoPick = { entry, segment, lines, unitCost, cap };
+    spent += unitCost * bought;
+    const pick: AutoPick = { entry, segment, lines, unitCost, cap, perColour };
     picks.push(pick);
     return pick;
   };
@@ -566,8 +625,23 @@ function planFreshStyles(
     }
   }
 
-  // 3. Money left over goes into more pieces of what he already picked, everyday
-  // segments first, up to each colourway's cap.
+  // 3. Money left over: first more colours where a rack still has requested colours
+  // missing, then a little more depth, never piles of one colourway.
+  for (const pick of picks) {
+    if (!isClothing(pick.entry.kind)) continue;
+    const most = celebrity ? 6 : pick.segment === 'rich' ? 3 : 5;
+    while (pick.lines.length < most && chosenLines.length - alreadyChosen.length < lineBudget &&
+      spent + pick.unitCost * pick.perColour <= budget) {
+      const gaps = rackColourGaps(pick.entry, chosenLines).map((row) => row.color)
+        .filter((color) => !pick.lines.some((l) => l.color === color));
+      if (!gaps.length) break;
+      const first = pick.lines[0];
+      const line = toLine(pick.entry, { fabric: first.fabric, color: gaps[0], color2: first.color2, pattern: first.pattern, pieces: pick.perColour });
+      pick.lines.push(line);
+      chosenLines.push(line);
+      spent += pick.unitCost * pick.perColour;
+    }
+  }
   const order: Segment[] = ['middle', 'poor', 'rich'];
   let grew = true;
   while (grew && spent < budget * 0.92) {
@@ -612,6 +686,12 @@ function kunleReport(
   ];
   const opener = openers[hashOf(`${s.day}|${(s.shopperJobs || []).length}`) % openers.length];
   const parts = [opener];
+  const misses = new Map<string, number>();
+  for (const row of (s.colourMisses || []).filter((r) => r.day >= s.day - 30)) misses.set(row.name, (misses.get(row.name) || 0) + 1);
+  const topMisses = [...misses.entries()].sort((a, b) => b[1] - a[1]).slice(0, 3);
+  const boughtColours = new Set(picks.flatMap((p) => p.lines.map((l) => colourName(l.color))));
+  const answered = topMisses.filter(([name]) => boughtColours.has(name));
+  if (answered.length) parts.push(`Customers asked for ${answered.map(([name, n]) => `${name} ${n} time${n === 1 ? '' : 's'}`).join(', ')} this month and your racks had none, so I made sure to bring those.`);
   if (restockLines.length) {
     parts.push(`I topped up ${restockLines.length} of your bestsellers (${restockLines.reduce((a, l) => a + l.pieces, 0)} pieces) so you don't run out.`);
   } else if (mission === 'restock') {
@@ -625,10 +705,10 @@ function kunleReport(
     if (finishing.length) parts.push(`Plus ${finishing.length} finishing piece${finishing.length === 1 ? '' : 's'} to complete the look: ${finishing.slice(0, 3).map((p) => p.entry.label).join(', ')}${finishing.length > 3 ? ' and others' : ''}.`);
     if (men) parts.push(`${men} of the styles are for male stars.`);
     const colours = [...new Set(outfits.flatMap((p) => p.lines.map((l) => colourName(l.color))).filter(Boolean))];
-    if (colours.length >= 3) parts.push(`The outfits come in different colours (${colours.slice(0, 5).join(', ')}), never more than 3 of the same one. No celebrity wants to see her dress on another person.`);
+    if (colours.length >= 3) parts.push(`The outfits come in different colours (${colours.slice(0, 5).join(', ')}${colours.length > 5 ? ' and more' : ''}), one piece per colour. No celebrity wants to see her dress on another person.`);
     if (shoppingExamples.trim()) parts.push(`You asked for “${shoppingExamples.trim().slice(0, 120)}”, so I looked for that first.`);
     parts.push(`Total: ${pieces} pieces for ${naira(spent)} out of ${naira(budget)}.`);
-    if (budget - spent > budget * 0.15) parts.push(`I kept ${naira(budget - spent)} back. Buying more would mean piles of the same luxury piece.`);
+    if (budget - spent > budget * 0.15) parts.push(`I kept ${naira(budget - spent)} back. Buying more would mean repeating the same luxury pieces.`);
     parts.push('Check the cart in Yaba Mart before you pay.');
     return parts.join(' ');
   }
@@ -645,7 +725,7 @@ function kunleReport(
   const native = picks.filter((p) => p.entry.native).length;
   if (native) parts.push(`${native} native piece${native === 1 ? '' : 's'} for owambe and church people.`);
   const colours = [...new Set(picks.filter((p) => isClothing(p.entry.kind)).flatMap((p) => p.lines.map((l) => colourName(l.color))).filter(Boolean))];
-  if (colours.length >= 3) parts.push(`I bought the clothes in different colours customers dey ask for (${colours.slice(0, 5).join(', ')}), and the extra colours share one rack space.`);
+  if (colours.length >= 3) parts.push(`I spread the clothes across the colours customers dey ask for (${colours.slice(0, 5).join(', ')}${colours.length > 5 ? ' and more' : ''}), filling the colours your racks were missing. Extra colours of a style share one rack space.`);
   if (shoppingExamples.trim()) parts.push(`You asked for “${shoppingExamples.trim().slice(0, 120)}”, so I looked for that first.`);
   parts.push(`Total: ${pieces} pieces for ${naira(spent)} out of ${naira(budget)}.`);
   if (budget - spent > budget * 0.15) parts.push(`I kept ${naira(budget - spent)} back. I no see anything else worth the money, and I no wan flood your store room.`);
@@ -659,12 +739,16 @@ function finishOrder(
   budget: number,
   chosen: ShopperOrderLine[],
   spent: number,
-  summary: string,
+  summaryText: string,
   activePreferences: ShopperBuyingPreference[],
   selectedContract?: NonNullable<GameState['politicianContracts']>[number],
   contractBrief = '',
 ): { state: GameState; job: ShopperJob } {
+  let summary = summaryText;
   const hasBuyingPreferences = activePreferences.length > 0;
+  const fee = Math.max(SHOPPER_COMMISSION_MIN, Math.round((spent * SHOPPER_COMMISSION_RATE) / 100) * 100);
+  const feeNote = `My commission na ₦${fee?.toLocaleString('en-NG')} (5% of what I picked). You go pay am when you check out, only on the items you keep.`;
+  summary = summary.includes('Check the cart') ? summary.replace('Check the cart', `${feeNote} Check the cart`) : `${summary} ${feeNote}`;
   const id = 'shopper-' + s.day + '-' + (s.msgSeq || 0) + '-' + ((s.shopperJobs || []).length + 1);
   const job: ShopperJob = {
     id, mission, budget, estimatedTotal: spent, status: 'ready',

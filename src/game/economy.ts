@@ -48,6 +48,9 @@ export const START_CASH = 200_000;
  */
 export const CELEBRITY_FULFILMENT_RATE = 0.45;
 export const MARKUP = 1.35;
+/** Kunle the shopper's cut of the goods he picked, paid at checkout. Manual Yaba Mart shopping is free. */
+export const SHOPPER_COMMISSION_RATE = 0.05;
+export const SHOPPER_COMMISSION_MIN = 1_500;
 export const PIECES_PER_DESIGN = 1;
 export const DIVINE_CAPACITY = 8;
 export const STAFF_CAPACITY = 5;
