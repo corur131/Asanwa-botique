@@ -570,7 +570,7 @@ function kunleReport(
   budget: number,
   shoppingExamples: string,
 ): string {
-  const naira = (n: number) => `₦${Math.round(n).toLocaleString('en-NG')}`;
+  const naira = (n: number) => `₦${Math.round(n)?.toLocaleString('en-NG')}`;
   const pieces = [...restockLines, ...picks.flatMap((p) => p.lines)].reduce((a, l) => a + l.pieces, 0);
   const openers = [
     'Madam Divine! I don land from Yaba market.',
