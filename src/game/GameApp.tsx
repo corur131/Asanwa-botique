@@ -14,7 +14,7 @@ import { Styling } from './ui/Styling';
 import { PriceModal, Reveal } from './ui/Checkout';
 import { FurniturePanel, RailPanel, Stars, StaffActions } from './ui/Panels';
 import { AppId, Phone } from './ui/Phone';
-import { furnitureById, turn, Rot } from './shop';
+import { furnitureById, turn, Rot, room, wallFits, wallLayout } from './shop';
 import type { CloudSession } from '../cloud/AuthGate';
 import { AdminPanel } from '../cloud/AdminPanel';
 import { armSound, playNepaReturn, pop, setGenSound, useSound } from './sound';
@@ -108,6 +108,7 @@ export default function GameApp({ onLab, initial, storageKey, cloud, notice }: {
   const [selected, setSelected] = useState<string | null>(null);
   /** A floor piece in Divine's hands (build mode); `fresh` when just bought or taken out of storage. */
   const [placing, setPlacing] = useState<{ uid: string; rot: Rot; x: number; z: number; fresh?: boolean } | null>(null);
+  const [wallPlacing, setWallPlacing] = useState<{ uid: string; side: 'back' | 'left'; at: number } | null>(null);
   const [build, setBuild] = useState(false);
   /** A catalogue piece you're trying before you buy it. */
   const [trying, setTrying] = useState<{ id: string; x: number; z: number; rot: Rot; yardSide?: 'left' | 'right' } | null>(null);
@@ -431,7 +432,9 @@ export default function GameApp({ onLab, initial, storageKey, cloud, notice }: {
             onMoveTo={(x, z) => { setManualTarget([x, z]); setSitting(null); setLocalAct(null); setMenuFor(null); }}
             reflections={sound.reflections}
             onHover={(x, z) => (trying ? setTrying({ ...trying, x, z }) : placing && setPlacing({ ...placing, x, z }))}
-            onSelect={(uid) => { if (!placing && !trying) setSelected(uid); }}
+            onSelect={(uid) => { if (!placing && !trying && !wallPlacing) setSelected(uid); }}
+            wallPlacing={build ? wallPlacing : null}
+            onWallHover={(side, at) => wallPlacing && setWallPlacing({ ...wallPlacing, side, at })}
             onItem={(uid) => { if (!styling) { setSitting(null); setLocalAct(null); setMenuFor(uid); } }}
             onCustomer={styleCustomer}
           />
@@ -529,10 +532,28 @@ export default function GameApp({ onLab, initial, storageKey, cloud, notice }: {
                 </div>
               );
             })()}
-            {selectedPiece && !placing && !trying && (
+            {wallPlacing && (() => {
+              const piece = s.furniture.find((x) => x.uid === wallPlacing.uid);
+              const ok = wallFits(s.furniture, s.listing, wallPlacing.uid, wallPlacing.side, wallPlacing.at);
+              const len = wallPlacing.side === 'back' ? room(s.listing).w : room(s.listing).d - 1;
+              const w = piece ? furnitureById(piece.id).w : 1;
+              const nudge = (d: number) => setWallPlacing({ ...wallPlacing, at: Math.max(0, Math.min(len - w, wallPlacing.at + d)) });
+              return (
+                <div className="absolute top-14 left-1/2 -translate-x-1/2 z-20 rounded-xl border border-amber-500/50 bg-[#12141c]/95 p-2 flex flex-wrap items-center justify-center gap-2 text-sm max-w-[94vw]">
+                  <span className={`px-1 text-xs font-semibold ${ok ? 'text-emerald-300' : 'text-rose-300'}`}>{piece ? furnitureById(piece.id).name : ''}: {ok ? 'fits here' : 'something is already there'} · tap near a wall</span>
+                  <Btn size="sm" onClick={() => setWallPlacing({ ...wallPlacing, side: wallPlacing.side === 'back' ? 'left' : 'back', at: 0 })}>{wallPlacing.side === 'back' ? 'Back wall → Left wall' : 'Left wall → Back wall'}</Btn>
+                  <Btn size="sm" onClick={() => nudge(-1)}>◀</Btn>
+                  <Btn size="sm" onClick={() => nudge(1)}>▶</Btn>
+                  <Btn size="sm" tone="green" disabled={!ok} onClick={() => { up((g) => E.placeWallItem(g, wallPlacing.uid, wallPlacing.side, wallPlacing.at)); setWallPlacing(null); setSelected(null); }}>Place</Btn>
+                  <Btn size="sm" onClick={() => setWallPlacing(null)}>Cancel</Btn>
+                </div>
+              );
+            })()}
+            {selectedPiece && !placing && !trying && !wallPlacing && (
               <div className="absolute top-14 left-1/2 -translate-x-1/2 z-20 rounded-xl border border-amber-500/50 bg-[#12141c]/95 p-2 flex flex-wrap items-center justify-center gap-2 text-sm max-w-[94vw]">
                 <span className="text-white font-semibold px-1">{selectedPiece.name}</span>
                 {selectedPiece.mount === 'floor' && <Btn size="sm" onClick={() => pickUp(s, selected!, false)}>Move</Btn>}
+                {selectedPiece.mount === 'wall' && <Btn size="sm" onClick={() => { const at = wallLayout(s.furniture, s.listing)[selected!]; setWallPlacing({ uid: selected!, side: at?.side || 'back', at: at?.at || 0 }); }}>Move on wall</Btn>}
                 {selectedPiece.mount === 'floor' && <Btn size="sm" onClick={() => up((g) => E.rotateFurniture(g, selected!))}>↻ Rotate</Btn>}
                 {selectedPiece.mount === 'yard' && <><Btn size="sm" tone={s.furniture.find((p) => p.uid === selected)?.yardSide === 'left' ? 'gold' : 'ghost'} onClick={() => up((g) => ({ ...g, furniture: g.furniture.map((p) => p.uid === selected ? { ...p, yardSide: 'left' } : p) }))}>← Left side</Btn><Btn size="sm" tone={s.furniture.find((p) => p.uid === selected)?.yardSide !== 'left' ? 'gold' : 'ghost'} onClick={() => up((g) => ({ ...g, furniture: g.furniture.map((p) => p.uid === selected ? { ...p, yardSide: 'right' } : p) }))}>Right side →</Btn></>}
                 <Btn size="sm" onClick={() => { up((g) => E.storeFurniture(g, selected!)); setSelected(null); }}>Store</Btn>
@@ -1018,6 +1039,7 @@ const SecurityMenu: React.FC<{
 
 /** NEPA status and the generator switch. */
 const PowerChip: React.FC<{ s: GameState; up: (f: (g: GameState) => GameState) => void }> = ({ s, up }) => {
+  const [open, setOpen] = useState(false);
   const st = E.stats(s);
   const src = E.source(s);
   const off = E.inBlackout(s);
@@ -1029,12 +1051,14 @@ const PowerChip: React.FC<{ s: GameState; up: (f: (g: GameState) => GameState) =
   const powered = s.furniture.filter((p) => p.placed && !!E.EQUIPMENT_WATTS[p.id]);
   const sourceLabel = src === 'grid' ? (off ? 'Grid unavailable' : 'Grid supply') : src === 'gen' ? 'Generator supply' : src === 'solar' ? 'Solar / battery' : 'Power shortage';
   return (
-    <details className="relative text-xs text-slate-200">
-      <summary className="cursor-pointer list-none rounded-lg border border-white/15 bg-white/5 px-3 py-1.5 font-semibold hover:bg-white/10">
+    <div className="text-xs text-slate-200">
+      <button type="button" onClick={() => setOpen(true)} className="cursor-pointer rounded-lg border border-white/15 bg-white/5 px-3 py-1.5 font-semibold hover:bg-white/10">
         ⚡ Power &amp; Utilities · {src === 'grid' && !off ? 'NEPA' : src === 'none' ? 'Shortage' : src === 'solar' ? 'Solar' : 'Generator'}
-      </summary>
-      <div className="absolute right-0 top-full z-50 mt-2 w-[min(92vw,360px)] space-y-2 rounded-xl border border-white/15 bg-[#11141d] p-3 shadow-2xl">
-        <div className="flex items-center justify-between gap-2"><b className="text-sm text-white">Power &amp; Utilities</b><span className={src === 'none' ? 'text-rose-300' : 'text-emerald-300'}>{sourceLabel}</span></div>
+      </button>
+      {open && <div className="fixed inset-0 z-[80] flex items-end justify-center bg-black/55 sm:items-center" onClick={() => setOpen(false)}>
+      <div onClick={(e) => e.stopPropagation()} className="max-h-[85vh] w-full max-w-md space-y-2 overflow-y-auto rounded-t-2xl border border-white/15 bg-[#11141d] p-4 pb-6 shadow-2xl sm:rounded-2xl">
+        <div className="mx-auto mb-1 h-1 w-10 rounded-full bg-white/20 sm:hidden" />
+        <div className="flex items-center justify-between gap-2"><b className="text-sm text-white">Power &amp; Utilities</b><span className="flex items-center gap-2"><span className={src === 'none' ? 'text-rose-300' : 'text-emerald-300'}>{sourceLabel}</span><button type="button" aria-label="Close" onClick={() => setOpen(false)} className="h-7 w-7 rounded-full bg-white/10 text-slate-300">✕</button></span></div>
         <div className="grid grid-cols-2 gap-2">
           <div className="rounded-lg bg-white/5 p-2"><div className="text-slate-400">Current load</div><b>{load.toFixed(2)} kW</b></div>
           <div className="rounded-lg bg-white/5 p-2"><div className="text-slate-400">Daily energy estimate</div><b>{dailyKwh.toFixed(1)} kWh</b></div>
@@ -1060,8 +1084,8 @@ const PowerChip: React.FC<{ s: GameState; up: (f: (g: GameState) => GameState) =
         </div>
         <div>
           <div className="mb-1 font-semibold text-slate-300">Powered equipment</div>
-          <div className="max-h-36 space-y-1 overflow-auto">
-            {powered.length === 0 ? <div className="text-slate-500">No powered equipment installed.</div> : powered.slice(0, 12).map((p) => (
+          <div className="space-y-1">
+            {powered.length === 0 ? <div className="text-slate-500">No powered equipment installed.</div> : powered.map((p) => (
               <div key={p.uid} className="flex items-center justify-between gap-2">
                 <span className="truncate">{furnitureById(p.id).name} · {E.EQUIPMENT_WATTS[p.id]} W</span>
                 <Btn size="sm" tone={s.off?.[p.uid] ? 'ghost' : 'green'} onClick={() => up((g) => ({ ...g, off: { ...(g.off || {}), [p.uid]: !g.off?.[p.uid] } }))}>{s.off?.[p.uid] ? 'Off · switch on' : 'On · switch off'}</Btn>
@@ -1070,7 +1094,8 @@ const PowerChip: React.FC<{ s: GameState; up: (f: (g: GameState) => GameState) =
           </div>
         </div>
       </div>
-    </details>
+      </div>}
+    </div>
   );
 };
 const PhoneButton: React.FC<{ unread: number; onClick: () => void }> = ({ unread, onClick }) => (

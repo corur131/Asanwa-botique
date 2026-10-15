@@ -3,7 +3,7 @@ import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { OrbitControls } from '@react-three/drei';
 import * as THREE from 'three';
 import { GameState, Pose } from '../types';
-import { RoomStyle, finishes, room, cellsBlocked, footprint, furnitureById, wallLayout, Placed, canPlace, yardCapacity, Rot, rotAngle } from '../shop';
+import { RoomStyle, finishes, room, cellsBlocked, footprint, furnitureById, wallLayout, wallFits, Placed, canPlace, yardCapacity, solarRackCapacity, Rot, rotAngle } from '../shop';
 import { solarCap, source } from '../power';
 import { stats } from '../engine';
 import { ApplianceOn, CeilingPiece, FloorPiece, WallPiece, B, MirrorLive } from './Furniture3D';
@@ -18,6 +18,10 @@ export interface SceneProps {
   build?: boolean;
   view?: View;
   selected: string | null;
+  /** Build mode: a wall piece being moved, and where it would hang. */
+  wallPlacing?: { uid: string; side: 'back' | 'left'; at: number } | null;
+  /** The wall-placing cursor moved: nearest tall wall and position along it. */
+  onWallHover?: (side: 'back' | 'left', at: number) => void;
   /** The placing cursor moved to a cell. */
   onHover?: (x: number, z: number) => void;
   /** Build mode: a piece was tapped (null: the floor). */
@@ -734,7 +738,7 @@ export function Room({ r, tier, painted }: { r: RoomStyle; tier: number; painted
 }
 
 /** Yard pieces in the order they stand: solar at the back, generators nearest the street. */
-const yardOrder = (s: GameState) => s.furniture.filter((p) => p.placed && furnitureById(p.id).mount === 'yard').sort((a, b) => Number(!!furnitureById(a.id).gen) - Number(!!furnitureById(b.id).gen));
+const yardOrder = (s: GameState) => s.furniture.filter((p) => p.placed && furnitureById(p.id).mount === 'yard' && !furnitureById(p.id).solar).sort((a, b) => Number(!!furnitureById(a.id).gen) - Number(!!furnitureById(b.id).gen));
 
 /** Which mirrors get a live reflection: the one or two biggest. */
 function liveMirrorUids(s: GameState, on: boolean): Set<string> {
@@ -754,6 +758,12 @@ export function actionSpot(s: GameState, uid: string): { cell: Cell; face: numbe
   const blocked = cellsBlocked(s.furniture, s.listing);
   const free = (x: number, z: number) => x >= 0 && x < r.w && z >= 0 && z < r.d && !blocked[z][x];
   const faceTo = (c: Cell, tx: number, tz: number) => Math.atan2(tx - (c[0] + 0.5), tz - (c[1] + 0.5));
+  if (f.mount === 'yard' && f.solar) {
+    const panels = s.furniture.filter((x) => x.placed && !!furnitureById(x.id).solar);
+    const perRow = Math.max(1, Math.ceil(solarRackCapacity(s.listing) / 2));
+    const i = Math.max(0, panels.findIndex((x) => x.uid === uid));
+    return { cell: [Math.min(r.w - 1, Math.floor((r.w / perRow) * ((i % perRow) + 0.5))), -1], face: Math.PI };
+  }
   if (f.mount === 'yard') {
     const side = p.yardSide || 'right';
     const sideItems = yardOrder(s).filter((x) => (x.yardSide || 'right') === side);
@@ -886,6 +896,78 @@ function Smoke({ at, dense }: { at: [number, number, number]; dense: boolean }) 
   );
 }
 
+/** One solar panel on its frame, with the charge controller and its status light. */
+function SolarPanelModel({ led, ledI, bare }: { led: string; ledI: number; bare?: boolean }) {
+  return (
+  <group>
+    {/* Tilted photovoltaic panel with cell grid, legs, and the charge controller below. */}
+    {!bare && <B p={[-0.35, 0.55, -0.2]} s={[0.05, 1.1, 0.05]} c="#888" m={0.6} />}
+    {!bare && <B p={[0.35, 0.75, -0.2]} s={[0.05, 1.5, 0.05]} c="#888" m={0.6} />}
+    <B p={[0, 1.2, -0.2]} s={[0.98, 0.05, 0.78]} c="#303A50" m={0.65} r={0.25} rot={[0.5, 0, 0]} />
+    <B p={[0, 1.225, -0.18]} s={[0.91, 0.012, 0.69]} c="#173B69" m={0.55} r={0.18} rot={[0.5, 0, 0]} />
+    {[-0.3, -0.1, 0.1, 0.3].map((x) => <B key={x} p={[x, 1.24, -0.17]} s={[0.012, 0.012, 0.67]} c="#8DB9E7" rot={[0.5, 0, 0]} />)}
+    {[-0.18, 0, 0.18].map((z) => <B key={z} p={[0, 1.24, -0.18 + z]} s={[0.9, 0.012, 0.012]} c="#8DB9E7" rot={[0.5, 0, 0]} />)}
+    {!bare && <>
+    <B p={[0, 0.22, 0.25]} s={[0.42, 0.44, 0.26]} c="#E9EEF2" r={0.45} />
+    <B p={[0, 0.25, 0.385]} s={[0.26, 0.16, 0.012]} c="#202B45" />
+    <B p={[-0.07, 0.34, 0.392]} s={[0.14, 0.045, 0.01]} c="#123" e="#3AA0D0" ei={0.4} />
+    <mesh position={[0.1, 0.34, 0.395]}>
+      <sphereGeometry args={[0.03, 10, 8]} />
+      <meshStandardMaterial color={led} emissive={led} emissiveIntensity={ledI} />
+    </mesh>
+    <mesh position={[0, 0.45, 0.25]}>
+      <sphereGeometry args={[0.035, 10, 8]} />
+      <meshStandardMaterial color={led} emissive={led} emissiveIntensity={ledI} />
+    </mesh>
+    </>}
+  </group>
+  );
+}
+
+/** Solar panels on their rack behind the back wall, in rows across the shop's width. */
+function SolarRack({ s, selected, onTap, led, ledI }: { s: GameState; selected: string | null; onTap: (uid: string) => void; led: string; ledI: number }) {
+  const r = room(s.listing);
+  const panels = s.furniture.filter((p) => p.placed && !!furnitureById(p.id).solar);
+  if (!panels.length) return null;
+  const perRow = Math.max(1, Math.ceil(solarRackCapacity(s.listing) / 2));
+  const spacing = r.w / perRow;
+  const lift = r.height + 0.2; // raised frame so the panels show above the back wall
+  return (
+    <group>
+      <mesh position={[r.w / 2, -0.045, -1.9]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
+        <planeGeometry args={[r.w + 0.4, 2.6]} />
+        <meshStandardMaterial color="#8E8A80" roughness={1} />
+      </mesh>
+      {/* steel frame: posts and rails carrying the panel rows */}
+      {Array.from({ length: Math.ceil(r.w / 3) + 1 }, (_, i) => Math.min(r.w, i * 3)).map((x) => [-0.7, -2.0].map((z) => (
+        <B key={`${x}-${z}`} p={[x, lift / 2, z]} s={[0.08, lift, 0.08]} c="#7A7F86" m={0.6} />
+      )))}
+      {[-0.7, -2.0].map((z) => <B key={z} p={[r.w / 2, lift, z]} s={[r.w, 0.08, 0.08]} c="#7A7F86" m={0.6} />)}
+      {panels.map((p, i) => {
+        const row = Math.floor(i / perRow);
+        const x = spacing * ((i % perRow) + 0.5);
+        const z = -0.9 - row * 1.25;
+        const tap = (e: { stopPropagation: () => void }) => { e.stopPropagation(); onTap(p.uid); };
+        return (
+          <group key={p.uid} position={[x, lift - 0.75, z]} rotation={[0, 0, 0]} scale={[Math.min(1, spacing * 0.95), 1, 1]} onClick={tap} onPointerOver={() => (document.body.style.cursor = 'pointer')} onPointerOut={() => (document.body.style.cursor = '')}>
+            <SolarPanelModel led={led} ledI={ledI} bare />
+            {selected === p.uid && <B p={[0, 1.3, -0.2]} s={[0.96, 0.04, 0.8]} c="#F59E0B" e="#F59E0B" ei={0.6} o={0.5} />}
+          </group>
+        );
+      })}
+      {/* one battery and charge-controller box for the whole rack, with its status light */}
+      <group position={[0.8, 0, -0.75]} rotation={[0, Math.PI, 0]}>
+        <B p={[0, 0.35, 0]} s={[0.7, 0.7, 0.4]} c="#E9EEF2" r={0.45} />
+        <B p={[0, 0.45, 0.205]} s={[0.4, 0.22, 0.012]} c="#202B45" />
+        <mesh position={[0.15, 0.45, 0.215]}>
+          <sphereGeometry args={[0.045, 10, 8]} />
+          <meshStandardMaterial color={led} emissive={led} emissiveIntensity={ledI} />
+        </mesh>
+      </group>
+    </group>
+  );
+}
+
 /** The yard outside the right wall: generators and solar panels. */
 function Yard({ s, selected, onTap }: { s: GameState; selected: string | null; onTap: (uid: string) => void }) {
   const r = room(s.listing);
@@ -988,31 +1070,13 @@ function Yard({ s, selected, onTap }: { s: GameState; selected: string | null; o
                 </mesh>
               </group>
             ) : (
-              <group>
-                {/* Tilted photovoltaic panel with cell grid, legs, and the charge controller below. */}
-                <B p={[-0.35, 0.55, -0.2]} s={[0.05, 1.1, 0.05]} c="#888" m={0.6} />
-                <B p={[0.35, 0.75, -0.2]} s={[0.05, 1.5, 0.05]} c="#888" m={0.6} />
-                <B p={[0, 1.2, -0.2]} s={[0.98, 0.05, 0.78]} c="#303A50" m={0.65} r={0.25} rot={[0.5, 0, 0]} />
-                <B p={[0, 1.225, -0.18]} s={[0.91, 0.012, 0.69]} c="#173B69" m={0.55} r={0.18} rot={[0.5, 0, 0]} />
-                {[-0.3, -0.1, 0.1, 0.3].map((x) => <B key={x} p={[x, 1.24, -0.17]} s={[0.012, 0.012, 0.67]} c="#8DB9E7" rot={[0.5, 0, 0]} />)}
-                {[-0.18, 0, 0.18].map((z) => <B key={z} p={[0, 1.24, -0.18 + z]} s={[0.9, 0.012, 0.012]} c="#8DB9E7" rot={[0.5, 0, 0]} />)}
-                <B p={[0, 0.22, 0.25]} s={[0.42, 0.44, 0.26]} c="#E9EEF2" r={0.45} />
-                <B p={[0, 0.25, 0.385]} s={[0.26, 0.16, 0.012]} c="#202B45" />
-                <B p={[-0.07, 0.34, 0.392]} s={[0.14, 0.045, 0.01]} c="#123" e="#3AA0D0" ei={0.4} />
-                <mesh position={[0.1, 0.34, 0.395]}>
-                  <sphereGeometry args={[0.03, 10, 8]} />
-                  <meshStandardMaterial color={led} emissive={led} emissiveIntensity={ledI} />
-                </mesh>
-                <mesh position={[0, 0.45, 0.25]}>
-                  <sphereGeometry args={[0.035, 10, 8]} />
-                  <meshStandardMaterial color={led} emissive={led} emissiveIntensity={ledI} />
-                </mesh>
-              </group>
+              <SolarPanelModel led={led} ledI={ledI} />
             )}
             {selected === p.uid && <B p={[0, 0.012, 0]} s={[0.96, 0.02, 0.96]} c="#F59E0B" e="#F59E0B" ei={0.6} o={0.5} />}
           </group>
         );
       })}
+      <SolarRack s={s} selected={selected} onTap={onTap} led={led} ledI={ledI} />
       {/* Fuel gallons are physical objects: click one to choose a generator to refill. */}
       {(s.security?.gallons || []).map((g, i) => (
         <group key={g.id} position={[X + 0.42, 0, 0.5 + items.filter((p) => (p.yardSide || 'right') === 'right').length + i]} onClick={(e) => { e.stopPropagation(); onTap(`fuel-gallon:${g.id}`); }} onPointerOver={() => (document.body.style.cursor = 'pointer')} onPointerOut={() => (document.body.style.cursor = '')}>
@@ -1044,9 +1108,10 @@ function Yard({ s, selected, onTap }: { s: GameState; selected: string | null; o
   );
 }
 
-function Furniture({ s, selected, placing, onTap, dark, reflections }: Pick<SceneProps, 's' | 'selected' | 'placing' | 'dark' | 'reflections'> & { onTap: (uid: string) => void }) {
+function Furniture({ s, selected, placing, wallPlacing, onTap, dark, reflections }: Pick<SceneProps, 's' | 'selected' | 'placing' | 'wallPlacing' | 'dark' | 'reflections'> & { onTap: (uid: string) => void }) {
   const r = room(s.listing);
-  const wl = wallLayout(s.furniture, s.listing);
+  const wl = { ...wallLayout(s.furniture.filter((x) => x.uid !== wallPlacing?.uid), s.listing), ...(wallPlacing ? { [wallPlacing.uid]: { side: wallPlacing.side, at: wallPlacing.at } } : {}) };
+  const wallOk = wallPlacing ? wallFits(s.furniture, s.listing, wallPlacing.uid, wallPlacing.side, wallPlacing.at) : true;
   const live = useMemo(() => liveMirrorUids(s, reflections !== false), [s.furniture, reflections]); // eslint-disable-line react-hooks/exhaustive-deps
   // One rack/drawer slot represents one style. Individual colourways stay in stock,
   // but only the first in-stock colour paints a representative garment on the rack.
@@ -1087,9 +1152,12 @@ function Furniture({ s, selected, placing, onTap, dark, reflections }: Pick<Scen
           return (
             <group key={p.uid} position={pos} rotation={[0, at.side === 'back' ? 0 : Math.PI / 2, 0]} onClick={click} {...hover}>
               <MirrorLive.Provider value={live.has(p.uid)}>
-                <WallPiece id={p.id} colors={colors} />
+                <ApplianceOn.Provider value={powered && !s.off?.[p.uid]}>
+                  <WallPiece id={p.id} colors={colors} />
+                </ApplianceOn.Provider>
               </MirrorLive.Provider>
-              {selected === p.uid && <B p={[0, 0.05, 0.3]} s={[f.w, 0.03, 0.5]} c="#F59E0B" e="#F59E0B" ei={0.6} o={0.6} />}
+              {selected === p.uid && !wallPlacing && <B p={[0, 0.05, 0.3]} s={[f.w, 0.03, 0.5]} c="#F59E0B" e="#F59E0B" ei={0.6} o={0.6} />}
+              {wallPlacing?.uid === p.uid && <B p={[0, 1.4, 0.06]} s={[f.w - 0.04, 2.6, 0.04]} c={wallOk ? '#22C55E' : '#EF4444'} e={wallOk ? '#22C55E' : '#EF4444'} ei={0.5} o={0.35} />}
             </group>
           );
         }
@@ -1316,6 +1384,17 @@ export default function ShopScene(p: SceneProps) {
       Math.max(0, Math.min(r.d + 5, Math.floor(e.point.z))),
     ];
   };
+  /** Map a floor point to the nearer tall wall (back or left) and a position along it. */
+  const wallHover = (e: { point: THREE.Vector3 }) => {
+    if (!p.wallPlacing) return;
+    const piece = s.furniture.find((x) => x.uid === p.wallPlacing!.uid);
+    const w = piece ? furnitureById(piece.id).w : 1;
+    const side: 'back' | 'left' = e.point.z <= e.point.x * (r.d / Math.max(1, r.w)) ? 'back' : 'left';
+    const along = side === 'back' ? e.point.x : e.point.z;
+    const max = (side === 'back' ? r.w : r.d - 1) - w;
+    const at = Math.max(0, Math.min(max, Math.floor(along - w / 2 + 0.5)));
+    if (side !== p.wallPlacing.side || at !== p.wallPlacing.at) p.onWallHover?.(side, at);
+  };
   return (
     <div style={{ position: 'relative', width: '100%', height: '100%', touchAction: 'none' }}>
       <Canvas onCreated={handleCanvasCreated} shadows={r.w * r.d <= 220} dpr={[1, 1.25]} camera={{ fov: 32, position: [cx + dist * 0.72, dist * 1.35, cz + dist], near: 0.1, far: 200 }} style={{ background: r.signatureTheme === 'botanical-atrium' ? 'linear-gradient(#9DCDBF,#263D35)' : r.signatureTheme === 'cobalt-gallery' ? 'linear-gradient(#C9D6ED,#37496D)' : p.night ? 'linear-gradient(#0b0d1a,#1a1630)' : 'linear-gradient(#24305a,#3a4a7a)' }}>
@@ -1325,7 +1404,7 @@ export default function ShopScene(p: SceneProps) {
         <OrbitControls makeDefault target={[cx, 0.6, cz]} enablePan={free} enableRotate={!top} minPolarAngle={top ? 0 : free ? 0.05 : 0.45} maxPolarAngle={top ? 0.02 : free ? 1.52 : view === 'front' ? 1.45 : 1.2} minDistance={dist * 0.35} maxDistance={dist * 2} />
         <CameraRig view={view} r={r} />
         <Room r={dressed} tier={s.tier} painted={!!fin.paint} />
-        <Furniture s={s} selected={p.selected} placing={p.placing} onTap={tap} dark={p.dark} reflections={p.reflections} />
+        <Furniture s={s} selected={p.selected} placing={p.placing} wallPlacing={p.wallPlacing} onTap={tap} dark={p.dark} reflections={p.reflections} />
         {p.build && <BuildGrid r={r} />}
         {people}
         {p.placing && <PlacingGhost s={s} placing={p.placing} />}
@@ -1334,6 +1413,7 @@ export default function ShopScene(p: SceneProps) {
           position={[cx, 0.001, (r.d + 5) / 2]}
           rotation={[-Math.PI / 2, 0, 0]}
           onPointerMove={(e) => {
+            if (p.wallPlacing) { wallHover(e); return; }
             if (!p.placing) return;
             const c = cellAt(e);
             if (e.pointerType === 'mouse' && (c[0] !== p.placing.x || c[1] !== p.placing.z)) p.onHover?.(c[0], c[1]);
@@ -1341,6 +1421,7 @@ export default function ShopScene(p: SceneProps) {
           onClick={(e) => {
             e.stopPropagation();
             const c = cellAt(e);
+            if (p.wallPlacing) { wallHover(e); return; }
             if (p.placing) {
               p.onHover?.(c[0], c[1]);
               return;

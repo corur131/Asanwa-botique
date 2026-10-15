@@ -55,6 +55,53 @@ function Spin({ axis, speed, on, sway, children }: { axis: 'y' | 'z'; speed: num
   );
 }
 
+
+/** A small status light: green and glowing when on, dark when off. */
+function PowerLed({ p, on, c = '#22E06A', r = 0.025 }: { p: V3; on: boolean; c?: string; r?: number }) {
+  return <Ball p={p} r={r} c={on ? c : '#2A2D30'} e={on ? c : undefined} ei={on ? 2.2 : 0} />;
+}
+
+/** Seven-segment digit for appliance displays. */
+const SEGMENTS: Record<string, string> = { '0': 'abcdef', '1': 'bc', '2': 'abdeg', '3': 'abcdg', '4': 'bcfg', '5': 'acdfg', '6': 'acdefg', '7': 'abc', '8': 'abcdefg', '9': 'abcdfg' };
+function Digit({ ch, at, h = 0.09, c = '#3BFF8A' }: { ch: string; at: V3; h?: number; c?: string }) {
+  const w = h * 0.55;
+  const t = h * 0.14;
+  const on = SEGMENTS[ch] || '';
+  const segs: Record<string, [number, number, number, number]> = {
+    a: [0, h, w, t], d: [0, 0, w, t], g: [0, h / 2, w, t],
+    f: [-w / 2, h * 0.75, t, h / 2], b: [w / 2, h * 0.75, t, h / 2],
+    e: [-w / 2, h * 0.25, t, h / 2], c: [w / 2, h * 0.25, t, h / 2],
+  };
+  return (
+    <group position={at}>
+      {[...on].map((k) => { const [x, y, sw, sh] = segs[k]; return <B key={k} p={[x, y, 0]} s={[sw, sh, 0.004]} c={c} e={c} ei={1.8} />; })}
+    </group>
+  );
+}
+
+/** Puffs of steam or cool air drifting from an appliance while it runs. */
+function Puffs({ at, on, c = '#FFFFFF', n = 3, spread = 0.15 }: { at: V3; on: boolean; c?: string; n?: number; spread?: number }) {
+  const ref = useRef<THREE.Group>(null);
+  useFrame(({ clock }) => {
+    if (!ref.current) return;
+    ref.current.children.forEach((child, i) => {
+      const t = (clock.elapsedTime * 0.6 + i / n) % 1;
+      child.position.y = t * 0.35;
+      child.position.z = t * spread;
+      const m = (child as THREE.Mesh).material as THREE.MeshStandardMaterial;
+      if (m) m.opacity = 0.35 * (1 - t);
+    });
+  });
+  if (!on) return null;
+  return (
+    <group ref={ref} position={at}>
+      {Array.from({ length: n }, (_, i) => (
+        <mesh key={i}><sphereGeometry args={[0.05 + i * 0.01, 8, 6]} /><meshStandardMaterial color={c} transparent opacity={0.3} depthWrite={false} /></mesh>
+      ))}
+    </group>
+  );
+}
+
 function StandingFanHead() {
   const on = useContext(ApplianceOn);
   return (
@@ -217,6 +264,7 @@ function FoldedPile({ colors, n, w, y, d = 0.35 }: { colors: string[]; n: number
 }
 
 export function FloorPiece({ id, colors, selected }: { id: string; colors: string[]; selected?: boolean }) {
+  const on = useContext(ApplianceOn);
   const glow = selected ? <B p={[0, 0.01, 0]} s={[0.98, 0.02, 0.98]} c="#F59E0B" e="#F59E0B" ei={0.6} o={0.5} /> : null;
   switch (id) {
     case 'rustyRail':
@@ -304,6 +352,7 @@ export function FloorPiece({ id, colors, selected }: { id: string; colors: strin
           <Cyl p={[0, 0.25, 0.1]} r1={0.05} h={0.35} c={CHROME} m={0.8} />
           <B p={[0, 0.48, 0.1]} s={[0.5, 0.12, 0.5]} c={lux ? '#8E1F3A' : '#1E1E24'} />
           <B p={[0, 0.8, -0.12]} s={[0.5, 0.6, 0.1]} c={lux ? '#8E1F3A' : '#1E1E24'} />
+          <PowerLed p={[0.22, 0.48, 0.36]} on={on} r={0.016} />
           {lux ? (
             <>
               <Cyl p={[0, 1.15, -0.35]} r1={0.03} h={1.2} c={CHROME} m={0.8} rot={[0.3, 0, 0]} />
@@ -336,7 +385,7 @@ export function FloorPiece({ id, colors, selected }: { id: string; colors: strin
           <Cyl p={[0, 1.1, 0]} r1={0.015} h={0.6} c="#222" />
           <mesh position={[0, 1.5, 0]} castShadow>
             <torusGeometry args={[0.2, 0.025, 8, 24]} />
-            <meshStandardMaterial color="#FFF" emissive="#FFF6E0" emissiveIntensity={1.2} />
+            <meshStandardMaterial color={on ? '#FFF' : '#CFCFCF'} emissive="#FFF6E0" emissiveIntensity={on ? 1.2 : 0} />
           </mesh>
         </group>
       );
@@ -569,6 +618,7 @@ export function FloorPiece({ id, colors, selected }: { id: string; colors: strin
           {[-0.22, 0.22].map((x) => <B key={x} p={[x, 0.2, 0.05]} s={[0.04, 0.4, 0.45]} c={CHROME} m={0.8} />)}
           <Cyl p={[0, 1.1, -0.25]} r1={0.025} h={0.9} c={CHROME} m={0.8} />
           <Ball p={[0, 1.28, -0.05]} r={0.24} c="#F2EDE6" />
+          <PowerLed p={[0.2, 0.75, -0.1]} on={on} r={0.018} />
         </group>
       );
     case 'vanity':
@@ -581,7 +631,7 @@ export function FloorPiece({ id, colors, selected }: { id: string; colors: strin
           <Glass p={[0, 1.4, -0.3]} s={[1.25, 0.95, 0.01]} />
           {Array.from({ length: 14 }, (_, i) => {
             const side = i < 4 ? [-0.66, 1.0 + i * 0.27] : i < 8 ? [0.66, 1.0 + (i - 4) * 0.27] : [-0.55 + (i - 8) * 0.22, 1.93];
-            return <Ball key={i} p={[side[0], side[1], -0.28]} r={0.04} c="#FFF" e="#FFF3C8" ei={1.6} />;
+            return <Ball key={i} p={[side[0], side[1], -0.28]} r={0.04} c={on ? '#FFF' : '#D9D4CC'} e="#FFF3C8" ei={on ? 1.6 : 0} />;
           })}
           <Cyl p={[0, 0.25, 0.35]} r1={0.2} h={0.45} c="#F2CACC" />
         </group>
@@ -594,6 +644,8 @@ export function FloorPiece({ id, colors, selected }: { id: string; colors: strin
           <Cyl p={[0, 0.85, -0.05]} r1={0.015} h={1.3} c={CHROME} m={0.8} />
           <Cyl p={[0.12, 0.7, 0.05]} r1={0.02} h={0.9} c="#2A2A30" rot={[0, 0, 0.25]} />
           <B p={[0.22, 1.15, 0.08]} s={[0.08, 0.16, 0.06]} c="#E46A9A" />
+          <PowerLed p={[0.12, 0.22, 0.16]} on={on} r={0.018} />
+          <Puffs at={[0.24, 1.25, 0.1]} on={on} n={4} spread={0.05} />
         </group>
       );
     case 'stool':
@@ -619,7 +671,11 @@ export function FloorPiece({ id, colors, selected }: { id: string; colors: strin
           {glow}
           <B p={[0, 0.9, 0]} s={[0.45, 1.8, 0.35]} c="#F6F6F2" />
           <B p={[0, 1.35, 0.18]} s={[0.35, 0.5, 0.02]} c="#CCD3D8" />
-          <B p={[0, 0.7, 0.18]} s={[0.1, 0.05, 0.01]} c="#2A8A5A" e="#3AD08A" ei={1} />
+          {/* control screen: green temperature when running, black when off */}
+          <B p={[0, 0.98, 0.178]} s={[0.34, 0.2, 0.012]} c="#050607" />
+          {on && <><Digit ch="2" at={[-0.085, 0.91, 0.186]} h={0.13} /><Digit ch="2" at={[0.015, 0.91, 0.186]} h={0.13} /><Ball p={[0.1, 1.03, 0.186]} r={0.016} c="#3BFF8A" e="#3BFF8A" ei={1.8} /></>}
+          <PowerLed p={[0.13, 0.74, 0.18]} on={on} r={0.018} />
+          <Puffs at={[0, 1.35, 0.22]} on={on} c="#E8F6FF" />
         </group>
       );
     case 'smallGen':
@@ -640,6 +696,8 @@ export function FloorPiece({ id, colors, selected }: { id: string; colors: strin
           <Cyl p={[0, 1.22, 0]} r1={0.16} r2={0.14} h={0.42} c="#9FD3EE" />
           <B p={[-0.07, 0.75, 0.18]} s={[0.04, 0.05, 0.03]} c="#3A7BD5" />
           <B p={[0.07, 0.75, 0.18]} s={[0.04, 0.05, 0.03]} c="#C2262E" />
+          <PowerLed p={[-0.07, 0.85, 0.18]} on={on} c="#3A9BFF" r={0.018} />
+          <PowerLed p={[0.07, 0.85, 0.18]} on={on} c="#FF3A3A" r={0.018} />
         </group>
       );
     case 'speaker':
@@ -649,7 +707,8 @@ export function FloorPiece({ id, colors, selected }: { id: string; colors: strin
           <B p={[0, 0.35, 0]} s={[0.3, 0.7, 0.28]} c="#1E1E24" />
           <Cyl p={[0, 0.5, 0.145]} r1={0.09} h={0.02} c="#333" rot={[Math.PI / 2, 0, 0]} />
           <Cyl p={[0, 0.25, 0.145]} r1={0.06} h={0.02} c="#333" rot={[Math.PI / 2, 0, 0]} />
-          <B p={[0, 0.66, 0.145]} s={[0.2, 0.02, 0.01]} c="#3AD0FF" e="#3AD0FF" ei={1.2} />
+          <B p={[0, 0.66, 0.145]} s={[0.2, 0.02, 0.01]} c={on ? '#3AD0FF' : '#20262C'} e={on ? '#3AD0FF' : undefined} ei={on ? 1.2 : 0} />
+          <PowerLed p={[0.11, 0.08, 0.145]} on={on} r={0.015} />
         </group>
       );
     case 'diffuser':
@@ -847,6 +906,7 @@ export function FloorPiece({ id, colors, selected }: { id: string; colors: strin
 }
 
 export function WallPiece({ id, colors }: { id: string; colors: string[] }) {
+  const on = useContext(ApplianceOn);
   switch (id) {
     case 'hangerWall':
       return <group position={[0,0,0.16]}><B p={[0,1.4,0]} s={[1.9,1.8,0.08]} c="#6B452E"/>{[0.85,1.35,1.85].map(y=><group key={y}><B p={[0,y,0.13]} s={[1.8,0.04,0.24]} c={GOLD}/><B p={[0,y+0.12,0.1]} s={[1.7,0.12,0.05]} c="#8A6440"/>{Array.from({length:6},(_,i)=><group key={i} position={[-0.72+i*0.29,y+0.12,0.18]}><Cyl p={[0,0.08,0]} r1={0.012} h={0.16} c={CHROME}/><B p={[0,0.02,0]} s={[0.16,0.12,0.035]} c={pal(colors,i,'#C2262E')}/></group>)}</group>)}</group>;
@@ -924,7 +984,7 @@ export function WallPiece({ id, colors }: { id: string; colors: string[] }) {
     case 'displayWall':
       return (
         <group position={[0, 0, 0.1]}>
-          <B p={[0, 1.4, -0.04]} s={[2.9, 2.2, 0.06]} c="#F4EFE6" e="#FFF4DD" ei={0.35} />
+          <B p={[0, 1.4, -0.04]} s={[2.9, 2.2, 0.06]} c="#F4EFE6" e="#FFF4DD" ei={on ? 0.35 : 0} />
           {[0.75, 1.25, 1.75, 2.25].map((y, k) => (
             <group key={y}>
               <B p={[0, y, 0.12]} s={[2.7, 0.03, 0.3]} c={GOLD} m={0.8} r={0.3} />
@@ -945,6 +1005,10 @@ export function WallPiece({ id, colors }: { id: string; colors: string[] }) {
         <group position={[0, 2.1, 0.12]}>
           <B p={[0, 0, 0]} s={[0.9, 0.3, 0.22]} c="#F6F6F2" />
           <B p={[0, -0.1, 0.11]} s={[0.8, 0.04, 0.02]} c="#BBB" />
+          {/* status light: glowing green while cooling, dark when off */}
+          <PowerLed p={[0.36, 0.05, 0.12]} on={on} r={0.04} />
+          <B p={[0, 0.05, 0.113]} s={[0.5, 0.05, 0.008]} c={on ? '#22E06A' : '#BFC4C8'} e={on ? '#22E06A' : undefined} ei={on ? 1.6 : 0} />
+          <Puffs at={[0, -0.16, 0.12]} on={on} c="#E8F6FF" />
         </group>
       );
     case 'cardboardSign':
@@ -967,7 +1031,7 @@ export function WallPiece({ id, colors }: { id: string; colors: string[] }) {
       return (
         <group position={[0, 2.15, 0.06]}>
           <B p={[0, 0, 0]} s={[1.7, 0.42, 0.1]} c="#1E1E24" />
-          <B p={[0, 0, 0.055]} s={[1.5, 0.22, 0.01]} c={GOLD} e={GOLD} ei={0.7} m={0.6} />
+          <B p={[0, 0, 0.055]} s={[1.5, 0.22, 0.01]} c={GOLD} e={GOLD} ei={on ? 0.7 : 0} m={0.6} />
         </group>
       );
     case 'neon':
@@ -976,7 +1040,7 @@ export function WallPiece({ id, colors }: { id: string; colors: string[] }) {
           {Array.from({ length: 6 }, (_, i) => (
             <mesh key={i} position={[-0.7 + i * 0.28, 0, 0]}>
               <torusGeometry args={[0.1, 0.018, 6, 16, i % 2 ? Math.PI * 1.4 : Math.PI * 2]} />
-              <meshStandardMaterial color="#FF6AB8" emissive="#FF4AA8" emissiveIntensity={2.2} />
+              <meshStandardMaterial color={on ? '#FF6AB8' : '#7A5A6A'} emissive="#FF4AA8" emissiveIntensity={on ? 2.2 : 0} />
             </mesh>
           ))}
         </group>
@@ -1029,16 +1093,17 @@ export function WallPiece({ id, colors }: { id: string; colors: string[] }) {
       return (
         <group position={[0, 1.75, 0.05]}>
           <B p={[0, 0, 0]} s={[1.5, 0.85, 0.06]} c="#111" />
-          <B p={[0, 0, 0.032]} s={[1.4, 0.76, 0.01]} c="#2A1E3A" e="#C86AB8" ei={0.5} />
-          <B p={[-0.2, -0.1, 0.04]} s={[0.12, 0.45, 0.005]} c="#F2EDE6" e="#FFFFFF" ei={0.3} />
-          <B p={[0.25, -0.1, 0.04]} s={[0.12, 0.45, 0.005]} c="#E3B23C" e="#E3B23C" ei={0.3} />
+          <B p={[0, 0, 0.032]} s={[1.4, 0.76, 0.01]} c={on ? '#2A1E3A' : '#050506'} e="#C86AB8" ei={on ? 0.5 : 0} />
+          {on && <><B p={[-0.2, -0.1, 0.04]} s={[0.12, 0.45, 0.005]} c="#F2EDE6" e="#FFFFFF" ei={0.3} />
+          <B p={[0.25, -0.1, 0.04]} s={[0.12, 0.45, 0.005]} c="#E3B23C" e="#E3B23C" ei={0.3} /></>}
+          <PowerLed p={[0.68, -0.4, 0.035]} on={on} c={on ? '#22E06A' : '#C2262E'} r={0.012} />
         </group>
       );
     case 'ledStrip':
       return (
         <group position={[0, 0, 0.03]}>
-          <B p={[0, 2.25, 0]} s={[1.9, 0.03, 0.03]} c="#FFE7F2" e="#FF8AC8" ei={1.6} />
-          <B p={[0, 0.25, 0]} s={[1.9, 0.03, 0.03]} c="#FFE7F2" e="#FF8AC8" ei={1.2} />
+          <B p={[0, 2.25, 0]} s={[1.9, 0.03, 0.03]} c={on ? '#FFE7F2' : '#9A9094'} e="#FF8AC8" ei={on ? 1.6 : 0} />
+          <B p={[0, 0.25, 0]} s={[1.9, 0.03, 0.03]} c={on ? '#FFE7F2' : '#9A9094'} e="#FF8AC8" ei={on ? 1.2 : 0} />
         </group>
       );
     case 'paintedSign':

@@ -464,6 +464,8 @@ export interface Placed {
   placed: boolean;
   /** Outdoor items can be assigned to either side of the building. Older saves default to right. */
   yardSide?: 'left' | 'right';
+  /** Wall pieces the player has positioned: which tall wall, with x = position along it. */
+  wallSide?: 'back' | 'left';
 }
 
 export type Rot = 0 | 1 | 2 | 3;
@@ -486,7 +488,14 @@ export const liveItems = (items: Placed[], off?: Record<string, boolean>) => (of
 
 /** Spots in the yard outside for generators and solar panels. */
 export const yardCapacity = (k: RoomKey) => Math.max(3, room(k).d + 1);
-export const yardUsed = (items: Placed[]) => items.filter((p) => p.placed && furnitureById(p.id).mount === 'yard').length;
+/** Generators, security post and canopy share the yard; solar panels have their own rack. */
+export const yardUsed = (items: Placed[]) => items.filter((p) => p.placed && furnitureById(p.id).mount === 'yard' && !furnitureById(p.id).solar).length;
+/** Solar panels stand on a rack along the back of the building, sized by the shop's width. */
+export const solarRackCapacity = (k: RoomKey) => Math.max(6, Math.floor(room(k).w * 1.5));
+export const solarUsed = (items: Placed[]) => items.filter((p) => p.placed && !!furnitureById(p.id).solar).length;
+/** Is there outdoor space for this yard or solar piece? */
+export const outdoorRoomFor = (items: Placed[], id: string, k: RoomKey) =>
+  furnitureById(id).solar ? solarUsed(items) < solarRackCapacity(k) : yardUsed(items) < yardCapacity(k);
 
 /** How many lights and fans the ceiling can take. */
 export const ceilingCapacity = (k: RoomKey) => Math.max(2, Math.floor(room(k).w / 2.4));
@@ -505,16 +514,46 @@ export const wallCapacity = (k: RoomKey) => room(k).w + room(k).d - 1;
 export function wallLayout(items: Placed[], tier: RoomKey): Record<string, { side: 'back' | 'left'; at: number }> {
   const r = room(tier);
   const out: Record<string, { side: 'back' | 'left'; at: number }> = {};
-  let back = 0;
-  let left = 0;
-  const wall = items.filter((p) => p.placed && furnitureById(p.id).mount === 'wall').sort((a, b) => a.x - b.x);
-  for (const p of wall) {
+  const len = { back: r.w, left: r.d - 1 };
+  const taken = { back: [] as [number, number][], left: [] as [number, number][] };
+  const free = (side: 'back' | 'left', at: number, w: number) =>
+    at >= 0 && at + w <= len[side] && taken[side].every(([a, b]) => at + w <= a || at >= b);
+  const wall = items.filter((p) => p.placed && furnitureById(p.id).mount === 'wall');
+  // Pieces the player positioned keep their exact spot.
+  for (const p of wall.filter((x) => x.wallSide)) {
     const w = furnitureById(p.id).w;
-    if (back + w <= r.w) { out[p.uid] = { side: 'back', at: back }; back += w; }
-    else if (left + w <= r.d - 1) { out[p.uid] = { side: 'left', at: left }; left += w; }
+    const side = p.wallSide!;
+    if (free(side, p.x, w)) { out[p.uid] = { side, at: p.x }; taken[side].push([p.x, p.x + w]); }
+  }
+  // Everything else fills the first free gap: back wall first, then the left wall.
+  for (const p of wall.filter((x) => !x.wallSide || !out[x.uid]).sort((a, b) => a.x - b.x)) {
+    const w = furnitureById(p.id).w;
+    let placed = false;
+    for (const side of ['back', 'left'] as const) {
+      for (let at = 0; at + w <= len[side] && !placed; at++) {
+        if (free(side, at, w)) { out[p.uid] = { side, at }; taken[side].push([at, at + w]); placed = true; }
+      }
+      if (placed) break;
+    }
   }
   return out;
 }
+
+/** Could this wall piece hang here (in bounds, not overlapping another piece)? */
+export function wallFits(items: Placed[], tier: RoomKey, uid: string, side: 'back' | 'left', at: number): boolean {
+  const r = room(tier);
+  const p = items.find((x) => x.uid === uid);
+  if (!p) return false;
+  const w = furnitureById(p.id).w;
+  if (at < 0 || at + w > (side === 'back' ? r.w : r.d - 1)) return false;
+  const layout = wallLayout(items.filter((x) => x.uid !== uid), tier);
+  return Object.entries(layout).every(([id, spot]) => {
+    if (spot.side !== side) return true;
+    const ow = furnitureById(items.find((x) => x.uid === id)!.id).w;
+    return at + w <= spot.at || at >= spot.at + ow;
+  });
+}
+
 export const wallUsed = (items: Placed[]) => items.filter((p) => p.placed && furnitureById(p.id).mount === 'wall').reduce((a, p) => a + furnitureById(p.id).w, 0);
 
 /** The front row is the walkway from the door; nothing can stand there. */
