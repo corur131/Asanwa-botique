@@ -3,6 +3,7 @@ import { MARKUP, STAFF, TIERS, naira, staffMinutes } from '../economy';
 import { POWER, RICH_CUSTOMER_STAFF_LEVEL, contestFor, fuelOf, fuelPerHour, tankSize, Candidate, RaiseAnswer, candidates, canHire, daysToRent, displayCap, displayedCount, listingsNow, marketWage, restockAllCost, stats, waitingRoom } from '../engine';
 import { FURNITURE_GROUPS, FurnitureDef, FurnitureGroup, Listing, MoveEquipmentPlan, ceilingCapacity, ceilingUsed, finishes, furnitureById, furnitureForGroup, listingsFor, readyFurnishedCost, roomOf, wallCapacity, wallUsed } from '../shop';
 import { productKey } from '../market';
+import { colourName } from '../colours';
 
 const FurniturePreview = lazy(() => import('../scene/Previews').then((m) => ({ default: m.FurniturePreview })));
 const RoomPreview = lazy(() => import('../scene/Previews').then((m) => ({ default: m.RoomPreview })));
@@ -59,6 +60,8 @@ export const Messages: React.FC<{ s: GameState; n?: number }> = ({ s, n = 14 }) 
 // ---------------------------------------------------------------------------
 export const RailPanel: React.FC<{ s: GameState; display: (uid: string, on: boolean) => void; restock: (uid: string, n: number) => void; restockAll: () => void; clear: (uid: string) => void }> = ({ s, display, restock, restockAll, clear }) => {
   const [tab, setTab] = useState<'display' | 'storage'>('display');
+  // Colourways stay folded away; open one style at a time.
+  const [openKey, setOpenKey] = useState<string | null>(null);
   const cap = displayCap(s);
   const allGroups = useMemo(() => {
     const groups = new Map<string, typeof s.stock>();
@@ -110,19 +113,34 @@ export const RailPanel: React.FC<{ s: GameState; display: (uid: string, on: bool
                       : <Btn size="sm" tone="gold" disabled={used >= cap} onClick={() => display(d.uid, true)}>Display style</Btn>}
                   </div>
                 </div>
-                <div className="mt-2 space-y-1.5">
+                {(() => {
+                  const open = openKey === key;
+                  const out = variants.filter((v) => v.pieces === 0).length;
+                  return (
+                    <button type="button" aria-expanded={open} onClick={() => setOpenKey(open ? null : key)} className="mt-2 w-full flex items-center gap-2 rounded-lg bg-black/20 px-2 py-1.5 text-left hover:bg-black/30">
+                      <span className="flex -space-x-1.5 shrink-0">
+                        {variants.slice(0, 6).map((v) => <span key={v.uid} className="inline-block w-4 h-4 rounded-full border border-black/40" style={{ background: v.color }} />)}
+                      </span>
+                      <span className="min-w-0 flex-1 text-[11px] text-slate-300 truncate">
+                        {variants.length > 6 ? `+${variants.length - 6} more · ` : ''}{open ? 'Hide colours' : 'Show colours'}{out ? <span className="text-rose-300"> · {out} sold out</span> : null}
+                      </span>
+                      <span className="text-slate-400 text-xs">{open ? '⌃' : '⌄'}</span>
+                    </button>
+                  );
+                })()}
+                {openKey === key && <div className="mt-1.5 space-y-1.5">
                   {variants.map((v) => (
                     <div key={v.uid} className="flex flex-wrap items-center gap-2 rounded-lg bg-black/15 px-2 py-1.5">
                       <span title={v.color} className="inline-block w-5 h-5 rounded-full border border-white/25 shrink-0" style={{ background: v.color }} />
                       <div className="min-w-0 flex-1 text-[11px] text-slate-300">
-                        <span className="font-semibold text-white">{v.color}</span>
+                        <span className="font-semibold text-white">{colourName(v.color)}</span>
                         <span> · {v.pieces === 0 ? 'sold out' : `${v.pieces} in stock`}</span>
                       </div>
                       <Btn size="sm" disabled={s.cash < v.cost} onClick={() => restock(v.uid, 1)}>+1 · {naira(v.cost)}</Btn>
                       <Btn size="sm" onClick={() => clear(v.uid)} title="Sell this colourway at half price">Sell colour</Btn>
                     </div>
                   ))}
-                </div>
+                </div>}
               </div>
             );
           })}
