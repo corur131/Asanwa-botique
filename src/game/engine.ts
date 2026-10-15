@@ -12,12 +12,12 @@ import { makeCustomer, makeCelebrityCustomer, celebrityIsScheduled, celebrityDis
 import { buildLook, hairGroup, lookCost, scoreLook } from './scoring';
 import { FABRIC_COLORS, FEMALE_HAIR, MAKEUP_LOOKS } from '../constants/catalog';
 import { colourName, sameColour } from './colours';
-import { FURNITURE, KIOSK_LISTING, Listing, Placed, STARTER_FURNITURE, autoPlace, prepareFurnitureForMove,
+import { FURNITURE, KIOSK_LISTING, Listing, Placed, STARTER_FURNITURE, arrangeShop, autoPlace, prepareFurnitureForMove,
   findSpot, canPlace, turn, Rot, ceilingCapacity, ceilingUsed, yardCapacity, yardUsed, cheapestListing, furnitureById, listingsFor, newUid, prestigeRichShift, prestigeTraffic, shopStats, usesFloor, wallCapacity, wallUsed, MoveEquipmentPlan } from './shop';
 import { CharacterMemory, CollaborationEvent, CollaborationReply, Customer, DayLog, Departure, Design, ReplyChoice, GameState, LedgerLine, Message, PoliticianContract, PoliticianContractRequirement, Regular, ScoreBreakdown, Settlement, SponsorshipOffer, StaffMember, StaffProfession, StyleChoice, Visitor } from './types';
-import { closeBrandDay, ensureBusinessState, getBrandMetrics, initialBankState, processBankWeekly, processFixedDepositMaturities, processPromotionAtClose, processExpansionAtClose, promotionTrafficBoost, recordWeeklyWealth, saveRentAtClose } from './business';
+import { autoSaveAtClose, closeBrandDay, ensureBusinessState, getBrandMetrics, initialBankState, investmentValue, processBankWeekly, processFixedDepositMaturities, processInvestments, processPromotionAtClose, processExpansionAtClose, promotionTrafficBoost, recordWeeklyWealth, saveRentAtClose } from './business';
 
-export { brandPower, currentWealthRows, financialAssets, getBrandMetrics, creditProfile, creditRating, creditHistoryReport, premiumLoanEligible, takePremiumBusinessLoan, renegotiateBusinessLoan, loanRateForScore, maximumLoan, netWorthPlayer, netWorthRival, playerWeekTotals, totalLiabilities, unlocksForFollowers, availablePromotionLevels, promotionBudgetBounds, promotionTrafficBoost, startPromotion, stopPromotion, wholesaleUpgradeQuote, upgradeWholesaleInventory, transferBank, setRentSaving, setSavingsGoal, createFixedDeposit, takeBusinessLoan, repayBusinessLoan, arrangeBusinessLoanRepayment, expansionOptions, investInExpansion, financeExpansionPurchase } from './business';
+export { brandPower, currentWealthRows, financialAssets, getBrandMetrics, creditProfile, creditRating, creditHistoryReport, premiumLoanEligible, takePremiumBusinessLoan, renegotiateBusinessLoan, loanRateForScore, maximumLoan, netWorthPlayer, netWorthRival, playerWeekTotals, totalLiabilities, unlocksForFollowers, availablePromotionLevels, promotionBudgetBounds, promotionTrafficBoost, startPromotion, stopPromotion, wholesaleUpgradeQuote, upgradeWholesaleInventory, transferBank, setRentSaving, setSavingsGoal, createFixedDeposit, breakFixedDeposit, fixedDepositRate, FIXED_DEPOSIT_TERMS, buyTreasuryBill, treasuryBillYield, TBILL_TENORS, buyBond, sellBond, bondCoupon, BOND_TERMS, MIN_INVESTMENT, bankMarket, investmentValue, setAutoSave, loanPayoffQuote, loanInterestToDate, LOAN_PROCESSING_FEE_RATE, takeBusinessLoan, repayBusinessLoan, arrangeBusinessLoanRepayment, expansionOptions, investInExpansion, financeExpansionPurchase } from './business';
 
 const pick = <T,>(a: readonly T[]): T => a[Math.floor(Math.random() * a.length)];
 const chance = (p: number) => Math.random() < p;
@@ -41,6 +41,7 @@ export function cashFlowSummary(s: GameState) {
     openingCash, cash, operatingResult, cashChange, otherMovement,
     savings: Math.round(bank.savings || 0), rentVault: Math.round(bank.rentVault || 0),
     fixedDeposits: Math.round(fixedDeposits),
+    investments: investmentValue(s),
     recentMovements,
   };
 }
@@ -1106,11 +1107,14 @@ export function closeShop(s0: GameState): GameState {
 
   // Fixed deposits mature on their exact due day, not only on weekly banking days.
   s = processFixedDepositMaturities(s);
+  // Treasury bills mature daily; bonds pay weekly coupons and repay at maturity.
+  s = processInvestments(s);
 
   // Clear any old rent arrears from the Rent Vault and available cash before
   // saving for the next bill or creating a new rent liability.
   s = settleLateRent(s);
   s = saveRentAtClose(s);
+  s = autoSaveAtClose(s);
 
   if (s.day % 7 === 0) {
     s = payRent(s);
@@ -1510,7 +1514,7 @@ export function demote(s: GameState): GameState {
   const tier = s.tier - 1;
   const t = TIERS[tier];
   const listing = cheapestListing(tier, week(s.day));
-  const furniture = autoPlace(s.furniture.filter((f) => furnitureById(f.id).mount !== 'finish').map((f) => ({ ...f, placed: true })), listing);
+  const furniture = arrangeShop(s.furniture.filter((f) => furnitureById(f.id).mount !== 'finish').map((f) => ({ ...f, placed: true })), listing);
   const staff = s.staff.slice(0, t.staff);
   const left = s.staff.slice(t.staff);
   const remainingRentDebt = Math.max(0, Math.ceil((s.lateRent?.amount || 0) * 0.5));
@@ -1579,7 +1583,11 @@ export function moveTo(s0: GameState, l0: Listing, equipmentPlan: MoveEquipmentP
       ? ` I sold your reusable shop equipment for ${naira(move.saleProceeds)} at the usual 40% resale value. Your clothing stock and business records are still yours.`
       : equipmentPlan === 'furnished'
         ? ` The ready-furnished package cost ${naira(move.packageCost)} and has been arranged for this shop. Your previously owned reusable equipment is safely in storage.`
-        : ' I arranged your equipment around the new floor plan. You can still drag pieces to different areas in Build mode.';
+        : (() => {
+          const storedNames = move.furniture.filter((f) => !f.placed && furnitureById(f.id).mount !== 'finish').map((f) => furnitureById(f.id).name);
+          const storedNote = storedNames.length ? ` ${storedNames.length} piece${storedNames.length === 1 ? '' : 's'} did not fit and went to storage: ${[...new Set(storedNames)].slice(0, 5).join(', ')}${storedNames.length > 5 ? ' and more' : ''}.` : '';
+          return ` I set the shop up properly: till and window display by the door, rails along the walls, styling and fitting rooms at the back, and a seating area for waiting customers.${storedNote} You can still move anything in Build mode.`;
+        })();
   next = msg(next, 'Deborah', `We moved! Welcome to your ${t.name} on ${l.street}, ${l.area}. Rent is ${naira(l.rent)} a week and the landlord is ${l.landlord}. The shop holds up to ${t.slots} designs.${equipmentMessage} It will be quiet for two weeks while people find us.`, 'good');
   next = reactToMove(next, !fight);
   if (t.staff && !s.staff.length) next = msg(next, 'Deborah', `You can hire staff now! Trainees are cheap and loyal; experts are good from day one but they leave for money.`, 'info');

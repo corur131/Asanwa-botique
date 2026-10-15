@@ -567,14 +567,46 @@ export interface BusinessLoan {
   loanType?: 'standard' | 'premium';
   /** Formal collections notice has been issued. */
   collectionsNoticeIssued?: boolean;
+  /** Day the loan was paid out; interest builds up daily from here. */
+  startDay?: number;
+  /** Interest already paid early within the current weekly period. */
+  periodInterestPaid?: number;
+  /** True once a full week of interest has been paid (the minimum interest on any loan). */
+  minimumInterestMet?: boolean;
 }
 
 export interface FixedDeposit {
   id: string;
   amount: number;
+  /** Total return over the whole term, in percent. */
   ratePct: number;
   openedDay: number;
   maturityDay: number;
+}
+
+/** A treasury bill: bought below face value, pays the full face value at maturity. */
+export interface TreasuryBill {
+  id: string;
+  face: number;
+  cost: number;
+  /** Total yield over the tenor, in percent. */
+  yieldPct: number;
+  tenorDays: number;
+  boughtDay: number;
+  maturityDay: number;
+}
+
+/** A government bond: weekly coupon into the current account, principal back at maturity. */
+export interface Bond {
+  id: string;
+  principal: number;
+  /** Coupon per week, in percent of principal. */
+  couponPct: number;
+  termWeeks: number;
+  boughtDay: number;
+  maturityDay: number;
+  /** Market price index when bought (1 = par). */
+  boughtPrice: number;
 }
 
 export interface BusinessBranch {
@@ -675,6 +707,13 @@ export interface BankState {
   creditProfile?: CreditProfile;
   savingsGoalName: string;
   savingsGoalAmount: number;
+  /** Automatic savings: a share of each day's profit swept into Savings. */
+  autoSaveMode?: 'manual' | 'automatic';
+  autoSavePercent?: number;
+  treasuryBills?: TreasuryBill[];
+  bonds?: Bond[];
+  /** Weekly market: T-bill yield multiplier and bond price index (1 = par). */
+  market?: { day: number; tbillFactor: number; bondPrice: number };
 }
 
 /** Weekly public wealth snapshot; figures are game estimates, not real-world valuations. */

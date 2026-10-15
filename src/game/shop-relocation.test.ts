@@ -308,3 +308,34 @@ test('relocation can move directly down tiers only after excess staff retention 
   assert.deepEqual(moved.staff.map((member) => member.id), ['staff-b', 'staff-c'],
     'only the staff selected by the player should be retained');
 });
+
+
+test('moves arrange shops in zones: till by the door, aisle clear, styling and fitting deeper in, rails on walls', async () => {
+  const { furnitureById, footprint, room, cellsBlocked } = await import('./shop');
+  for (const tier of [2, 3, 4, 5, 6]) {
+    const listing = listingsFor(tier, 0)[0];
+    const fit = prepareFurnitureForMove([], listing, 'furnished').furniture.filter((p) => p.placed);
+    const r = room(listing);
+    const door = Math.floor(r.w / 2);
+    const floor = fit.filter((p) => furnitureById(p.id).mount === 'floor' && !furnitureById(p.id).walkable);
+    const centre = (p: typeof fit[number]) => { const f = footprint(p); return { x: p.x + f.w / 2, z: p.z + f.d / 2 }; };
+    const till = floor.filter((p) => ['jewelCounter', 'boutiqueDesk', 'posTerminal'].includes(p.id));
+    const styling = floor.filter((p) => ['Hair & makeup', 'Mirrors'].includes(furnitureById(p.id).group));
+    if (till.length) assert.ok(till.some((p) => centre(p).z >= r.d - 4), `tier ${tier}: the till stands near the entrance`);
+    if (till.length && styling.length) {
+      const avg = (list: typeof fit) => list.reduce((a, p) => a + centre(p).z, 0) / list.length;
+      assert.ok(avg(styling) < avg(till), `tier ${tier}: styling sits further back than the till`);
+    }
+    const aisleBlocked = floor.some((p) => { const f = footprint(p); return p.x <= door && door < p.x + f.w && p.z + f.d >= r.d - 2; });
+    assert.equal(aisleBlocked, false, `tier ${tier}: the walkway from the door is clear`);
+    const walls = cellsBlocked([], listing);
+    const rails = floor.filter((p) => /Rail|Shelving|glassCabinet/.test(p.id));
+    for (const p of rails) {
+      const f = footprint(p);
+      const touches = p.x === 0 || p.z === 0 || p.x + f.w === r.w ||
+        Array.from({ length: f.d }, (_, i) => walls[p.z + i]?.[p.x - 1] || walls[p.z + i]?.[p.x + f.w]).some(Boolean) ||
+        Array.from({ length: f.w }, (_, i) => walls[p.z - 1]?.[p.x + i]).some(Boolean);
+      assert.ok(touches, `tier ${tier}: ${p.id} stands against a wall`);
+    }
+  }
+});
