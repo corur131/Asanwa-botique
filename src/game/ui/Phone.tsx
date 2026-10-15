@@ -8,6 +8,7 @@ import { CharacterMemory, CollaborationReply, GameState, Message, Post, Rival } 
 import { MarketApp } from './MarketApp';
 import { ShopperApp } from './ShopperApp';
 import { BankApp } from './BankApp';
+import { generatedFace, isBusinessName, knownFace } from '../faces';
 import { ContractsApp } from './ContractsApp';
 import { MovePanel, StaffActions, StaffPanel } from './Panels';
 import type { CartLine } from '../engine';
@@ -230,6 +231,27 @@ const FashionGroupAvatar: React.FC<{ sizeClass: string }> = ({ sizeClass }) => (
   </span>
 );
 
+const BUSINESS_MARKS: Record<string, { glyph: string; bg: string }> = {
+  'Yaba Mart': { glyph: '🛍', bg: 'from-orange-400 to-rose-500' },
+  KoboBank: { glyph: '₦', bg: 'from-emerald-600 to-teal-800' },
+  'Asanwa HQ': { glyph: 'A', bg: 'from-amber-400 to-amber-700' },
+  Bills: { glyph: '⚡', bg: 'from-yellow-400 to-orange-600' },
+  Gidigram: { glyph: '◎', bg: 'from-yellow-400 via-pink-500 to-purple-600' },
+  'Lagos Fashion Week': { glyph: 'LFW', bg: 'from-slate-900 to-slate-700' },
+};
+/** Logo-style avatar for companies, banks and brands. */
+const BusinessAvatar: React.FC<{ name: string; sizeClass: string }> = ({ name, sizeClass }) => {
+  const known = BUSINESS_MARKS[name];
+  const palette = ['from-indigo-500 to-violet-700', 'from-sky-500 to-blue-700', 'from-fuchsia-500 to-pink-700', 'from-emerald-500 to-green-700', 'from-amber-500 to-orange-700', 'from-slate-600 to-slate-800'];
+  let h = 0;
+  for (const ch of name) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
+  const initials = name.split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]).join('').toUpperCase();
+  const glyph = known?.glyph || initials;
+  return (
+    <span role="img" aria-label={`${name} logo`} title={name} className={`${sizeClass} rounded-full shrink-0 flex items-center justify-center bg-gradient-to-br ${known?.bg || palette[h % palette.length]} text-white font-extrabold ring-1 ring-white/20 ${glyph.length > 2 ? 'text-[9px]' : 'text-sm'}`}>{glyph}</span>
+  );
+};
+
 const GistAvatar: React.FC<{ sizeClass: string }> = ({ sizeClass }) => (
   <span role="img" aria-label="GistLagos profile picture" className={`relative ${sizeClass} rounded-full overflow-hidden shrink-0 flex items-center justify-center bg-gradient-to-br from-[#8f2639] to-[#391522] ring-1 ring-rose-300/50`}>
     <svg viewBox="0 0 48 48" className="w-full h-full p-2" aria-hidden="true">
@@ -246,9 +268,10 @@ const ContactAvatar: React.FC<{ name: string; s: GameState; size?: AvatarSize }>
   if (name === GROUP) return <FashionGroupAvatar sizeClass={sizeClass} />;
   if (name === 'GistLagos') return <GistAvatar sizeClass={sizeClass} />;
 
-  const staff = (s.staff || []).find((m) => m.name === name);
-  const rival = (s.rivals || []).find((r) => r.owner === name);
-  const look = staff?.look || rival?.look || (name === 'Landlord' ? MALE_CONFIG : getDeborahConfig(s.divine));
+  if (name !== 'Landlord' && name !== 'Deborah' && isBusinessName(name)) return <BusinessAvatar name={name} sizeClass={sizeClass} />;
+  const look = name === 'Deborah' ? getDeborahConfig(s.divine)
+    : name === 'Landlord' ? MALE_CONFIG
+      : knownFace(name, s) || generatedFace(name);
   const safeName = name.replace(/[^a-zA-Z0-9_-]/g, '-');
   return (
     <span role="img" aria-label={`${name} profile picture`} title={name} className={`${sizeClass} rounded-full overflow-hidden shrink-0 ring-1 ring-white/15 bg-gradient-to-br from-[#32263d] to-[#162d30]`}>

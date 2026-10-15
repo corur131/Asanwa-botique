@@ -8,8 +8,8 @@ import { shopStats } from './shop';
 const pick = <T,>(a: readonly T[]): T => a[Math.floor(Math.random() * a.length)];
 const chance = (p: number) => Math.random() < p;
 
-const WOMEN = ['Adaeze', 'Funmilayo', 'Chiamaka', 'Aisha', 'Temitope', 'Ngozi', 'Bisola', 'Kemi', 'Halima', 'Ifeoma', 'Yetunde', 'Zainab', 'Omotola', 'Chioma', 'Damilola', 'Uche', 'Bukola', 'Amaka', 'Fatima', 'Toyin', 'Ebere', 'Simi', 'Ronke', 'Nkechi', 'Hauwa', 'Folake', 'Sade', 'Ijeoma', 'Mercy', 'Blessing', 'Precious', 'Joy', 'Esther', 'Ruth', 'Tolu', 'Adunni', 'Oluchi', 'Aminat', 'Ese', 'Ivie'];
-const MEN = ['Tunde', 'Chinedu', 'Emeka', 'Segun', 'Ibrahim', 'Femi', 'Obinna', 'Kunle', 'Musa', 'Dayo', 'Ikenna', 'Babatunde', 'Uchenna', 'Tobi', 'Yusuf', 'Kelechi', 'Wale', 'Ebuka', 'Gbenga', 'Osas'];
+export const WOMEN = ['Adaeze', 'Funmilayo', 'Chiamaka', 'Aisha', 'Temitope', 'Ngozi', 'Bisola', 'Kemi', 'Halima', 'Ifeoma', 'Yetunde', 'Zainab', 'Omotola', 'Chioma', 'Damilola', 'Uche', 'Bukola', 'Amaka', 'Fatima', 'Toyin', 'Ebere', 'Simi', 'Ronke', 'Nkechi', 'Hauwa', 'Folake', 'Sade', 'Ijeoma', 'Mercy', 'Blessing', 'Precious', 'Joy', 'Esther', 'Ruth', 'Tolu', 'Adunni', 'Oluchi', 'Aminat', 'Ese', 'Ivie'];
+export const MEN = ['Tunde', 'Chinedu', 'Emeka', 'Segun', 'Ibrahim', 'Femi', 'Obinna', 'Kunle', 'Musa', 'Dayo', 'Ikenna', 'Babatunde', 'Uchenna', 'Tobi', 'Yusuf', 'Kelechi', 'Wale', 'Ebuka', 'Gbenga', 'Osas'];
 
 export const OCCASION_LABEL: Record<Occasion, string> = {
   owambe: 'Owambe party',

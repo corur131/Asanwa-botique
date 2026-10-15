@@ -19,7 +19,7 @@ export interface ShopTier {
 
 export const TIERS: ShopTier[] = [
   { name: 'Kiosk', slots: 20, rent: 30_000, moveIn: 0, customers: 9, mix: [0.7, 0.27, 0.03], staff: 0, running: 1_500, luxury: false, blurb: 'A container kiosk on Herbert Macaulay Way, Yaba.' },
-  { name: 'Small shop', slots: 30, rent: 120_000, moveIn: 100_000, customers: 12, mix: [0.55, 0.38, 0.07], staff: 0, running: 3_000, luxury: false, blurb: 'A proper shop in a Yaba plaza, with a fitting room.' },
+  { name: 'Small shop', slots: 30, rent: 120_000, moveIn: 100_000, customers: 12, mix: [0.55, 0.38, 0.07], staff: 1, running: 3_000, luxury: false, blurb: 'A proper shop in a Yaba plaza, with a fitting room.' },
   { name: 'Boutique', slots: 50, rent: 1_000_000, moveIn: 3_000_000, customers: 16, mix: [0.42, 0.46, 0.12], staff: 2, running: 12_000, luxury: true, blurb: 'A larger boutique with a dedicated styling area and luxury suppliers.' },
   { name: 'Big boutique', slots: 75, rent: 4_000_000, moveIn: 12_000_000, customers: 21, mix: [0.32, 0.5, 0.18], staff: 4, running: 35_000, luxury: true, blurb: 'A substantial multi-zone boutique on the Lagos Island fashion circuit.' },
   { name: 'Flagship', slots: 105, rent: 12_000_000, moveIn: 35_000_000, customers: 27, mix: [0.25, 0.5, 0.25], staff: 6, running: 80_000, luxury: true, blurb: 'A major flagship with premium shopping areas and celebrity clientele.' },

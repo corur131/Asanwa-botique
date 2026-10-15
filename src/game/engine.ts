@@ -13,7 +13,7 @@ import { buildLook, hairGroup, lookCost, scoreLook } from './scoring';
 import { FABRIC_COLORS, FEMALE_HAIR, MAKEUP_LOOKS } from '../constants/catalog';
 import { colourName, sameColour } from './colours';
 import { FURNITURE, KIOSK_LISTING, Listing, Placed, STARTER_FURNITURE, arrangeShop, autoPlace, prepareFurnitureForMove,
-  findSpot, canPlace, turn, Rot, ceilingCapacity, ceilingUsed, yardCapacity, yardUsed, cheapestListing, furnitureById, listingsFor, newUid, prestigeRichShift, prestigeTraffic, shopStats, usesFloor, wallCapacity, wallUsed, MoveEquipmentPlan } from './shop';
+  findSpot, canPlace, turn, Rot, ceilingCapacity, ceilingUsed, yardCapacity, yardUsed, wallFits, solarRackCapacity, solarUsed, outdoorRoomFor, cheapestListing, furnitureById, listingsFor, newUid, prestigeRichShift, prestigeTraffic, shopStats, usesFloor, wallCapacity, wallUsed, MoveEquipmentPlan } from './shop';
 import { CharacterMemory, CollaborationEvent, CollaborationReply, Customer, DayLog, Departure, Design, ReplyChoice, GameState, LedgerLine, Message, PoliticianContract, PoliticianContractRequirement, Regular, ScoreBreakdown, Settlement, SponsorshipOffer, StaffMember, StaffProfession, StyleChoice, Visitor } from './types';
 import { autoSaveAtClose, closeBrandDay, ensureBusinessState, getBrandMetrics, initialBankState, investmentValue, processBankWeekly, processFixedDepositMaturities, processInvestments, processPromotionAtClose, processExpansionAtClose, promotionTrafficBoost, recordWeeklyWealth, saveRentAtClose } from './business';
 
@@ -1604,12 +1604,11 @@ export function buyFurniture(s: GameState, id: string): GameState {
   let furniture = s.furniture;
   let placedItem: Placed = item;
   if (f.mount === 'yard') {
-    if (yardUsed(furniture) >= yardCapacity(s.listing)) return s;
-    if (f.solar && furniture.filter((p) => furnitureById(p.id).solar).length >= POWER_CFG.maxPanels) return s;
+    if (!outdoorRoomFor(furniture, id, s.listing)) return s;
     const previousActive = activeGeneratorUid(s);
     const knownFuel = { ...(s.power?.generatorFuel || {}) };
     if (previousActive && knownFuel[previousActive] === undefined) knownFuel[previousActive] = fuelOf(s, previousActive);
-    const next = money({ ...s, power: { ...s.power, generatorFuel: knownFuel }, furniture: [...furniture, { ...item, placed: true, x: yardUsed(furniture) }] }, -f.price, f.name);
+    const next = money({ ...s, power: { ...s.power, generatorFuel: knownFuel }, furniture: [...furniture, { ...item, placed: true, x: f.solar ? solarUsed(furniture) : yardUsed(furniture) }] }, -f.price, f.name);
     if (f.solar) return { ...next, power: { ...next.power, solar: (next.power?.solar || 0) + POWER_CFG.minutesPerPanel } };
     if (!f.gen) return next;
     // Every generator starts with its own 5-litre reserve.
@@ -1710,6 +1709,13 @@ export function placeFurniture(s: GameState, uid: string, x: number, z: number, 
   return { ...s, furniture: s.furniture.map((f) => (f.uid === uid ? cand : f)) };
 }
 
+/** Hang a wall piece exactly where the player chose, if that part of the wall is free. */
+export function placeWallItem(s: GameState, uid: string, side: 'back' | 'left', at: number): GameState {
+  const p = s.furniture.find((f) => f.uid === uid);
+  if (!p || furnitureById(p.id).mount !== 'wall' || !wallFits(s.furniture, s.listing, uid, side, at)) return s;
+  return { ...s, furniture: s.furniture.map((f) => (f.uid === uid ? { ...f, placed: true, wallSide: side, x: at, z: 0 } : f)) };
+}
+
 /** Put a stored item back in the room wherever it fits. */
 export function installFurniture(s: GameState, uid: string): GameState {
   const p = s.furniture.find((f) => f.uid === uid);
@@ -1724,7 +1730,7 @@ export function installFurniture(s: GameState, uid: string): GameState {
     return { ...s, furniture: s.furniture.map((x) => (x.uid === uid ? { ...x, placed: true } : x)) };
   }
   if (f.mount === 'yard') {
-    if (yardUsed(s.furniture.filter((x) => x.placed)) >= yardCapacity(s.listing)) return s;
+    if (!outdoorRoomFor(s.furniture.filter((x) => x.placed), p.id, s.listing)) return s;
     return { ...s, furniture: s.furniture.map((x) => (x.uid === uid ? { ...x, placed: true } : x)) };
   }
   const spot = autoPlace([...s.furniture.filter((x) => x.placed), { ...p }], s.listing).find((x) => x.uid === uid)!;
@@ -2365,9 +2371,9 @@ export function withPreview(s: GameState, id: string, at?: { x: number; z: numbe
     item = { ...base, placed: ok };
     if (!ok) why = 'No ceiling space left';
   } else if (f.mount === 'yard') {
-    ok = yardUsed(furniture) < yardCapacity(s.listing) && !(f.solar && furniture.filter((p) => furnitureById(p.id).solar).length >= POWER_CFG.maxPanels);
-    item = { ...base, placed: ok, x: yardUsed(furniture), yardSide: at?.yardSide || 'right' };
-    if (!ok) why = 'The yard is full';
+    ok = outdoorRoomFor(furniture, id, s.listing);
+    item = { ...base, placed: ok, x: f.solar ? solarUsed(furniture) : yardUsed(furniture), yardSide: at?.yardSide || 'right' };
+    if (!ok) why = f.solar ? `The solar rack is full (${solarRackCapacity(s.listing)} panels for this shop)` : 'The yard is full';
   }
   if (s.cash < f.price) { ok = false; why = `You need ${naira(f.price)}`; }
   if ((f.minTier || 0) > s.tier) { ok = false; why = `Needs a ${TIERS[f.minTier || 0].name}`; }

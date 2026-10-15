@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { TIERS, naira } from '../economy';
 import * as E from '../engine';
-import { FURNITURE, FURNITURE_GROUPS, FurnitureGroup, furnitureById, furnitureForGroup, yardCapacity, yardUsed } from '../shop';
+import { FURNITURE, FURNITURE_GROUPS, FurnitureGroup, furnitureById, furnitureForGroup, outdoorRoomFor } from '../shop';
 import { GameState } from '../types';
 import { useThumb } from '../scene/Thumbs';
 import type { View } from '../scene/ShopScene';
@@ -20,7 +20,6 @@ export const Catalogue: React.FC<{ s: GameState; onBuy: (id: string, yardSide?: 
   const stored = s.furniture.filter((p) => !p.placed && furnitureById(p.id).mount !== 'finish');
   const items = tab === 'Stored' ? [] : furnitureForGroup(tab);
   const fin = s.furniture.filter((p) => furnitureById(p.id).mount === 'finish').map((p) => p.id);
-  const yardFull = yardUsed(s.furniture) >= yardCapacity(s.listing);
   return (
     <div className="rounded-2xl border border-white/15 bg-[#12141c]/95 backdrop-blur p-2 w-full">
       <div className="flex gap-1 overflow-x-auto pb-1.5">
@@ -59,7 +58,7 @@ export const Catalogue: React.FC<{ s: GameState; onBuy: (id: string, yardSide?: 
           const locked = (f.minTier || 0) > s.tier;
           const poor = s.cash < f.price;
           const have = f.mount === 'finish' && fin.includes(f.id);
-          const full = f.mount === 'yard' && yardFull;
+          const full = f.mount === 'yard' && !outdoorRoomFor(s.furniture, f.id, s.listing);
           const off = locked || poor || have || full;
           return (
             <button key={f.id} disabled={off} onClick={() => onBuy(f.id, f.mount === 'yard' ? yardSide : undefined)} title={f.note} className={`shrink-0 w-24 rounded-xl border overflow-hidden text-left ${off ? 'border-white/5 opacity-50' : 'border-white/15 hover:border-amber-400/60'} bg-white/5`}>

@@ -339,3 +339,33 @@ test('moves arrange shops in zones: till by the door, aisle clear, styling and f
     }
   }
 });
+
+test('solar panels use their own rack (not the yard), sized by shop width', async () => {
+  const { solarRackCapacity, outdoorRoomFor, yardCapacity } = await import('./shop');
+  const listing = listingsFor(1, 0)[0];
+  assert.ok(solarRackCapacity(listing) >= 12, 'a Small shop rack holds at least 12 panels');
+  const gens = Array.from({ length: yardCapacity(listing) }, (_, i) => ({ uid: 'g' + i, id: 'smallGen', x: i, z: 0, rot: 0 as const, placed: true }));
+  assert.equal(outdoorRoomFor(gens, 'smallGen', listing), false, 'a full yard blocks another generator');
+  assert.equal(outdoorRoomFor(gens, 'inverterPanel', listing), true, 'a full yard does not block solar panels');
+  const panels = Array.from({ length: solarRackCapacity(listing) }, (_, i) => ({ uid: 'p' + i, id: 'inverterPanel', x: i, z: 0, rot: 0 as const, placed: true }));
+  assert.equal(outdoorRoomFor(panels, 'inverterPanel', listing), false, 'the rack has a real limit');
+});
+
+test('wall pieces can be hung anywhere free on the back or left wall', async () => {
+  const { wallFits, wallLayout } = await import('./shop');
+  const listing = listingsFor(2, 0)[0];
+  const items = [
+    { uid: 'm', id: 'mirrorWall', x: 2, z: 0, rot: 0 as const, placed: true, wallSide: 'back' as const },
+    { uid: 'a', id: 'ac', x: 0, z: 0, rot: 0 as const, placed: true },
+  ];
+  assert.deepEqual(wallLayout(items, listing).m, { side: 'back', at: 2 }, 'a chosen spot is kept');
+  assert.equal(wallFits(items, listing, 'a', 'back', 3), false, 'cannot overlap the mirror wall');
+  assert.equal(wallFits(items, listing, 'a', 'back', 5), true);
+  assert.equal(wallFits(items, listing, 'a', 'left', 2), true, 'the left wall works too');
+});
+
+test('every shop above the kiosk can employ staff', async () => {
+  const { TIERS } = await import('./economy');
+  assert.equal(TIERS[0].staff, 0);
+  for (const t of TIERS.slice(1)) assert.ok(t.staff >= 1, `${t.name} has a staff slot`);
+});
