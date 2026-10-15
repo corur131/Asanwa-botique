@@ -712,9 +712,9 @@ export function prepareFurnitureForMove(items: Placed[], tier: RoomKey, plan: Mo
   if (plan === 'furnished') {
     const stored = equipment.map((item) => ({ ...item, placed: false, x: 0, z: 0 }));
     const packageItems: Placed[] = furnishedKitIds(tier).map((id) => ({ uid: newUid(), id, x: 0, z: 0, rot: 0, placed: true }));
-    return { furniture: [...stored, ...autoPlace(packageItems, tier)], saleProceeds: 0, packageCost: readyFurnishedCost(tier) };
+    return { furniture: [...stored, ...arrangeShop(packageItems, tier)], saleProceeds: 0, packageCost: readyFurnishedCost(tier) };
   }
-  return { furniture: autoPlace(equipment, tier), saleProceeds: 0, packageCost: 0 };
+  return { furniture: arrangeShop(equipment, tier), saleProceeds: 0, packageCost: 0 };
 }
 
 // ---------------------------------------------------------------------------
@@ -801,3 +801,217 @@ export const STARTER_FURNITURE: Omit<Placed, 'uid'>[] = [
 
 let fc = 0;
 export const newUid = () => `f${Date.now().toString(36)}${(fc++).toString(36)}`;
+
+// ---------------------------------------------------------------------------
+// Zoned arrangement for the player's shop (moves, ready-furnished packages).
+// Laid out like a real boutique: till and window display by the entrance, rails
+// and shelves along the walls, feature islands in the middle, a styling area and
+// fitting rooms at the back (the back rooms in multi-room shops), a waiting lounge,
+// and plants and power equipment in the corners. A walkway from the door and the
+// doorways between rooms are kept clear. Anything that does not fit is stored.
+// ---------------------------------------------------------------------------
+type ZoneRole = 'till' | 'window' | 'styling' | 'fitting' | 'wallDisplay' | 'island' | 'seat' | 'rug' | 'corner';
+const TILL_IDS = new Set(['jewelCounter', 'boutiqueDesk', 'posTerminal']);
+const WINDOW_IDS = new Set(['windowPodium', 'litMannequin', 'goldMannequin', 'mannequin']);
+const ISLAND_IDS = new Set(['roundRack', 'islandTable', 'purseIsland', 'nestingTables', 'jewelleryDisplay', 'spinner', 'sunglassesSpinner', 'scarfStand', 'woodTable']);
+const FITTING_IDS = new Set(['fittingRoom', 'premiumFitting', 'curtainCorner']);
+
+function zoneRole(id: string): ZoneRole {
+  const f = furnitureById(id);
+  if (f.walkable) return 'rug';
+  if (TILL_IDS.has(id)) return 'till';
+  if (WINDOW_IDS.has(id)) return 'window';
+  if (FITTING_IDS.has(id)) return 'fitting';
+  if (ISLAND_IDS.has(id)) return 'island';
+  if (f.group === 'Hair & makeup' || f.group === 'Mirrors' || id === 'softboxLight') return 'styling';
+  if (f.group === 'Seating') return 'seat';
+  if (f.group === 'Display') return 'wallDisplay';
+  return 'corner';
+}
+const ROLE_ORDER: ZoneRole[] = ['till', 'window', 'fitting', 'styling', 'wallDisplay', 'island', 'seat', 'corner', 'rug'];
+
+export function arrangeShop(items: Placed[], tier: RoomKey): Placed[] {
+  const r = room(tier);
+  const W = r.w;
+  const D = r.d;
+  const door = Math.floor(W / 2);
+  const walls = cellsBlocked([], tier);
+  const openings = new Set<string>();
+  for (const wall of r.partitions || []) for (const along of wall.openings) {
+    openings.add(wall.axis === 'horizontal' ? `${along},${wall.at}` : `${wall.at},${along}`);
+  }
+  const isWall = (x: number, z: number) => x < 0 || x >= W || z < 0 || (z < D && !!walls[z]?.[x]);
+
+  // Rooms: flood fill with doorways treated as boundaries, then depth from the entrance.
+  const roomId: number[][] = Array.from({ length: D }, () => Array(W).fill(-1));
+  let rooms = 0;
+  for (let z = 0; z < D; z++) for (let x = 0; x < W; x++) {
+    if (roomId[z][x] >= 0 || isWall(x, z) || openings.has(`${x},${z}`)) continue;
+    const stack: [number, number][] = [[x, z]];
+    roomId[z][x] = rooms;
+    while (stack.length) {
+      const [cx, cz] = stack.pop()!;
+      for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+        const nx = cx + dx, nz = cz + dz;
+        if (nx < 0 || nz < 0 || nx >= W || nz >= D || roomId[nz][nx] >= 0 || isWall(nx, nz) || openings.has(`${nx},${nz}`)) continue;
+        roomId[nz][nx] = rooms;
+        stack.push([nx, nz]);
+      }
+    }
+    rooms++;
+  }
+  const frontRoom = roomId[D - 1][door] >= 0 ? roomId[D - 1][door] : 0;
+  const links = new Map<number, Set<number>>();
+  for (const key of openings) {
+    const [ox, oz] = key.split(',').map(Number);
+    const near = new Set<number>();
+    for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      const id = roomId[oz + dz]?.[ox + dx];
+      if (id !== undefined && id >= 0) near.add(id);
+    }
+    for (const a of near) for (const b of near) if (a !== b) links.set(a, new Set([...(links.get(a) || []), b]));
+  }
+  const depth = Array(rooms).fill(99);
+  depth[frontRoom] = 0;
+  const queue = [frontRoom];
+  while (queue.length) {
+    const a = queue.shift()!;
+    for (const b of links.get(a) || []) if (depth[b] > depth[a] + 1) { depth[b] = depth[a] + 1; queue.push(b); }
+  }
+  const maxDepth = Math.max(0, ...depth.filter((d) => d < 99));
+  const depthNorm = (id: number) => (maxDepth ? Math.min(1, (depth[id] ?? maxDepth) / maxDepth) : 0);
+  const centroid = Array.from({ length: rooms }, () => ({ x: 0, z: 0, n: 0 }));
+  for (let z = 0; z < D - 1; z++) for (let x = 0; x < W; x++) { const id = roomId[z][x]; if (id >= 0) { centroid[id].x += x; centroid[id].z += z; centroid[id].n++; } }
+  for (const c of centroid) if (c.n) { c.x /= c.n; c.z /= c.n; }
+
+  // Keep clear: the aisle from the door into the front room, and a cell either side of every doorway.
+  const clear = new Set<string>();
+  for (let z = D - 2; z >= 0 && roomId[z][door] === frontRoom; z--) {
+    clear.add(`${door},${z}`);
+    if (W >= 9) clear.add(`${door - 1},${z}`);
+  }
+  for (const key of openings) {
+    const [ox, oz] = key.split(',').map(Number);
+    for (const [dx, dz] of [[0, 0], [1, 0], [-1, 0], [0, 1], [0, -1]]) clear.add(`${ox + dx},${oz + dz}`);
+  }
+
+  const out: Placed[] = [];
+  const stored: Placed[] = [];
+  const placedBy = new Map<ZoneRole, { x: number; z: number; room: number }[]>();
+  const stylingLeft = (hashOf(String(W * 31 + D)) & 1) === 0;
+  let tillSide = 0;
+
+  // Wall pieces: back wall then left wall, interleaving kinds so AC, art and displays spread out.
+  const wallItems = items.filter((it) => furnitureById(it.id).mount === 'wall');
+  const bucket = (id: string) => { const f = furnitureById(id); return f.group === 'Mirrors' ? 0 : f.group === 'Display' ? 1 : f.group === 'Comfort & power' ? 2 : 3; };
+  const buckets = [0, 1, 2, 3].map((b) => wallItems.filter((it) => bucket(it.id) === b).sort((a, b2) => furnitureById(b2.id).w - furnitureById(a.id).w));
+  const wallSeq: Placed[] = [];
+  while (buckets.some((b) => b.length)) for (const b of buckets) if (b.length) wallSeq.push(b.shift()!);
+  let wallUsedW = 0;
+  for (const it of wallSeq) {
+    const w = furnitureById(it.id).w;
+    if (wallUsedW + w <= wallCapacity(tier)) { out.push({ ...it, placed: true, x: wallUsedW, z: 0, rot: 0 }); wallUsedW += w; }
+    else stored.push({ ...it, placed: false, x: 0, z: 0 });
+  }
+  let ceiling = 0;
+  for (const it of items) {
+    const f = furnitureById(it.id);
+    if (f.mount === 'finish' || f.mount === 'yard') out.push({ ...it, placed: true });
+    else if (f.mount === 'ceiling') {
+      const ok = ceiling < ceilingCapacity(tier);
+      if (ok) ceiling++;
+      (ok ? out : stored).push({ ...it, placed: ok, x: 0, z: 0 });
+    }
+  }
+
+  const floor = items.filter((it) => furnitureById(it.id).mount === 'floor')
+    .sort((a, b) => ROLE_ORDER.indexOf(zoneRole(a.id)) - ROLE_ORDER.indexOf(zoneRole(b.id)) ||
+      furnitureById(b.id).w * furnitureById(b.id).d - furnitureById(a.id).w * furnitureById(a.id).d);
+
+  const centreOf = (list: { x: number; z: number }[]) => list.length ? { x: list.reduce((a, p) => a + p.x, 0) / list.length, z: list.reduce((a, p) => a + p.z, 0) / list.length } : null;
+  for (const it of floor) {
+    const role = zoneRole(it.id);
+    const same = placedBy.get(role) || [];
+    const sameCentre = centreOf(same);
+    const seatsCentre = centreOf(placedBy.get('seat') || []);
+    const candidates: { p: Placed; score: number; cx: number; cz: number; room: number; clearHit: boolean }[] = [];
+    for (let rot = 0 as Rot; rot < 4; rot = (rot + 1) as Rot) {
+      const { w, d } = footprint({ id: it.id, rot });
+      for (let z = 0; z + d <= D - 1; z++) for (let x = 0; x + w <= W; x++) {
+        const id0 = roomId[z][x];
+        if (id0 < 0) continue;
+        let sameRoom = true;
+        let clearHit = false;
+        for (let zz = z; zz < z + d && sameRoom; zz++) for (let xx = x; xx < x + w; xx++) {
+          if (roomId[zz][xx] !== id0) { sameRoom = false; break; }
+          if (clear.has(`${xx},${zz}`)) clearHit = true;
+        }
+        if (!sameRoom) continue;
+        let L = true, R = true, B = true;
+        for (let zz = z; zz < z + d; zz++) { if (!isWall(x - 1, zz)) L = false; if (!isWall(x + w, zz)) R = false; }
+        for (let xx = x; xx < x + w; xx++) if (!isWall(xx, z - 1)) B = false;
+        const F = z + d === D - 1 && id0 === frontRoom;
+        const wallTouch = L || R || B;
+        const corner = (L || R) && (B || F);
+        // Facing: into the room from whichever wall it stands against.
+        const wantRot: Rot | null = B ? 0 : L ? 3 : R ? 1 : F ? 2 : null;
+        const faceOk = wantRot === null ? rot === 0 || rot === 2 : rot === wantRot || (corner && (rot === (L ? 3 : 1) || rot === (B ? 0 : 2)));
+        const cx = x + w / 2, cz = z + d / 2;
+        const dn = depthNorm(id0);
+        const c = centroid[id0];
+        const toCentre = Math.hypot(cx - c.x, cz - c.z) / Math.max(1, Math.hypot(W, D) / 4);
+        const nearSame = same.length ? Math.min(...same.map((p) => Math.hypot(p.x - cx, p.z - cz))) : 99;
+        let score = faceOk ? 0 : 6;
+        switch (role) {
+          case 'till':
+            score += (id0 === frontRoom ? 0 : 40) + Math.abs(Math.abs(cx - door) - 3) + (F ? 0 : 2 + (D - 1 - (z + d)) * 0.8) + (sameCentre ? Math.hypot(cx - sameCentre.x, cz - sameCentre.z) : 0);
+            break;
+          case 'window':
+            score += (id0 === frontRoom ? 0 : 40) + (F ? 0 : 6) + Math.abs(Math.abs(cx - door) - 2) * 0.6 + (tillSide && Math.sign(cx - door) === tillSide ? 3 : 0) + 6 / (1 + nearSame);
+            break;
+          case 'styling':
+            score += (1 - dn) * 12 + (wallTouch ? 0 : 3) + (sameCentre ? Math.hypot(cx - sameCentre.x, cz - sameCentre.z) * 0.9 : (maxDepth ? 0 : z * 0.6 + (stylingLeft ? x : W - x) * 0.4));
+            break;
+          case 'fitting':
+            score += (1 - dn) * 10 + (corner ? 0 : wallTouch ? 3 : 10) + (maxDepth ? 0 : z * 0.6 + (stylingLeft ? W - x : x) * 0.4) + 4 / (1 + nearSame);
+            break;
+          case 'wallDisplay': {
+            const parallel = ((L || R) && d >= w) || (B && w >= d);
+            // Side walls first (like a real shop floor), spread out rather than bunched in one corner.
+            score += (wallTouch ? 0 : 25) + (parallel ? 0 : 3) + dn * 5 + (L || R ? 0 : 1.5) + 3 / (1 + nearSame) +
+              (same.filter((p) => p.room === id0).length / Math.max(1, c.n / 6)) * 2 + Math.abs(cz - c.z) * 0.08;
+            break;
+          }
+          case 'island':
+            score += (wallTouch ? 20 : 0) + toCentre * 3 + dn * 4 + 8 / (1 + nearSame);
+            break;
+          case 'seat':
+            // A waiting lounge in the front room, on the other side of the door from the till.
+            score += (wallTouch ? 0 : 3) + dn * 6 + (id0 === frontRoom ? Math.abs(cz - (D - 3)) * 0.5 : 0) + (tillSide && Math.sign(cx - door) === tillSide && id0 === frontRoom ? 4 : 0) + (sameCentre ? Math.hypot(cx - sameCentre.x, cz - sameCentre.z) * 0.6 : 0);
+            break;
+          case 'rug':
+            score += seatsCentre ? Math.hypot(cx - seatsCentre.x, cz - seatsCentre.z) : toCentre * 3;
+            break;
+          case 'corner':
+            score += (corner ? 0 : wallTouch ? 2 : 8) + 8 / (1 + nearSame);
+            break;
+        }
+        candidates.push({ p: { ...it, x, z, rot, placed: true }, score: score + (x + z * W) * 1e-4, cx, cz, room: id0, clearHit });
+      }
+    }
+    candidates.sort((a, b) => a.score - b.score);
+    let chosen = candidates.find((cnd) => !cnd.clearHit && canPlace(out, tier, cnd.p));
+    if (!chosen) chosen = candidates.find((cnd) => canPlace(out, tier, cnd.p));
+    if (!chosen) { stored.push({ ...it, placed: false, x: 0, z: 0 }); continue; }
+    out.push(chosen.p);
+    placedBy.set(role, [...same, { x: chosen.cx, z: chosen.cz, room: chosen.room }]);
+    if (role === 'till' && !tillSide) tillSide = Math.sign(chosen.cx - door) || 1;
+  }
+  return [...out, ...stored];
+}
+
+function hashOf(text: string) {
+  let h = 2166136261;
+  for (let i = 0; i < text.length; i++) h = Math.imul(h ^ text.charCodeAt(i), 16777619);
+  return h >>> 0;
+}
