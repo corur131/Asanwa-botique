@@ -18,7 +18,7 @@ import { AppId, Phone } from './ui/Phone';
 import { furnitureById, turn, Rot, room, wallFits, wallLayout } from './shop';
 import type { CloudSession } from '../cloud/AuthGate';
 import { AdminPanel } from '../cloud/AdminPanel';
-import { armSound, playNepaReturn, pop, setGenSound, useSound } from './sound';
+import { armSound, playNepaReturn, pop, setGenSound, setWeatherSound, useSound } from './sound';
 import { WEATHER_INFO, outdoorNow, seasonOf } from './climate';
 import { ActionMenu, CameraPad, Catalogue, EnergyBar, SoundSettings, ViewPicker } from './ui/Build';
 import type { CamCmd, DragMode, View } from './scene/ShopScene';
@@ -228,6 +228,9 @@ export default function GameApp({ onLab, initial, storageKey, cloud, notice }: {
   // NEPA news and customer complaints pop up for a few seconds
   useEffect(() => {
     if (!s) return;
+    // A different save (new game, cloud copy) restarts the counter: catch up instead of
+    // ignoring every announcement until the new count passes the old one.
+    if ((s.shoutSeq || 0) < seenShout.current) { seenShout.current = s.shoutSeq || 0; return; }
     const fresh = (s.shouts || []).filter((x) => x.id > seenShout.current);
     if (!fresh.length) return;
     seenShout.current = s.shoutSeq;
@@ -236,6 +239,12 @@ export default function GameApp({ onLab, initial, storageKey, cloud, notice }: {
     setBubbles((b) => [...b, ...fresh].slice(-4));
     fresh.forEach((x) => window.setTimeout(() => setBubbles((b) => b.filter((y) => y.id !== x.id)), x.tone === 'nepa' ? 6000 : 4500));
   }, [s?.shoutSeq]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // rain on the roof on wet days, heavier in a storm
+  useEffect(() => {
+    setWeatherSound(s?.weather === 'storm' ? 'storm' : s?.weather === 'rainy' ? 'rain' : null);
+  }, [s?.weather]);
+  useEffect(() => () => setWeatherSound(null), []);
 
   // the generator hums while it runs
   const genKind = s && s.phase === 'shop' && s.power?.gen && E.source(s) === 'gen' ? E.stats(s).gen : null;

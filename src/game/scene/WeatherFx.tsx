@@ -4,6 +4,7 @@ import React, { useMemo, useRef } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 import type { LagosWeather } from '../types';
+import { thunderClap } from '../sound';
 
 /** Sky behind the shop, by weather, for normal (non-signature) shops. */
 export function skyFor(weather: LagosWeather | undefined, night: boolean): string {
@@ -110,7 +111,7 @@ const Lightning: React.FC = () => {
   const flashAt = useRef(-10);
   useFrame(({ clock }) => {
     const t = clock.elapsedTime;
-    if (t > next.current) { flashAt.current = t; next.current = t + 4 + Math.random() * 7; }
+    if (t > next.current) { flashAt.current = t; next.current = t + 4 + Math.random() * 7; thunderClap(); }
     const since = t - flashAt.current;
     const on = (since >= 0 && since < 0.08) || (since > 0.16 && since < 0.24);
     if (light.current) light.current.intensity = on ? 2.4 : 0;
