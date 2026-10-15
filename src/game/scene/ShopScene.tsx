@@ -1165,13 +1165,15 @@ function Furniture({ s, selected, placing, wallPlacing, onTap, dark, reflections
           const pos: [number, number, number] = at.side === 'back' ? [at.at + f.w / 2, 0, 0] : [0, 0, at.at + f.w / 2];
           return (
             <group key={p.uid} position={pos} rotation={[0, at.side === 'back' ? 0 : Math.PI / 2, 0]} onClick={click} {...hover}>
-              <MirrorLive.Provider value={live.has(p.uid)}>
-                <ApplianceOn.Provider value={powered && !s.off?.[p.uid]}>
-                  <WallPiece id={p.id} colors={colors} />
-                </ApplianceOn.Provider>
-              </MirrorLive.Provider>
-              {selected === p.uid && !wallPlacing && <B p={[0, 0.05, 0.3]} s={[f.w, 0.03, 0.5]} c="#F59E0B" e="#F59E0B" ei={0.6} o={0.6} />}
-              {wallPlacing?.uid === p.uid && <B p={[0, 1.4, 0.06]} s={[f.w - 0.04, 2.6, 0.04]} c={wallOk ? '#22C55E' : '#EF4444'} e={wallOk ? '#22C55E' : '#EF4444'} ei={0.5} o={0.35} />}
+              <WallMount side={at.side} from={at.at} w={f.w}>
+                <MirrorLive.Provider value={live.has(p.uid)}>
+                  <ApplianceOn.Provider value={powered && !s.off?.[p.uid]}>
+                    <WallPiece id={p.id} colors={colors} />
+                  </ApplianceOn.Provider>
+                </MirrorLive.Provider>
+                {selected === p.uid && !wallPlacing && <B p={[0, 0.05, 0.3]} s={[f.w, 0.03, 0.5]} c="#F59E0B" e="#F59E0B" ei={0.6} o={0.6} />}
+                {wallPlacing?.uid === p.uid && <B p={[0, 1.4, 0.06]} s={[f.w - 0.04, 2.6, 0.04]} c={wallOk ? '#22C55E' : '#EF4444'} e={wallOk ? '#22C55E' : '#EF4444'} ei={0.5} o={0.35} />}
+              </WallMount>
             </group>
           );
         }
@@ -1196,6 +1198,41 @@ function Furniture({ s, selected, placing, wallPlacing, onTap, dark, reflections
       ))}
     </group>
   );
+}
+
+/** The room's own geometry, so wall pieces can find how far its decoration sticks out. */
+const RoomGeometry = React.createContext<{ ref: React.RefObject<THREE.Group | null>; key: string } | null>(null);
+
+/**
+ * Hangs a wall piece just in front of whatever is built into the wall behind it (panels,
+ * fluting, feature frames), instead of letting it sink into the decoration. It measures the
+ * room with horizontal rays across the piece's width and height.
+ */
+function WallMount({ side, from, w, children }: { side: 'back' | 'left'; from: number; w: number; children: React.ReactNode }) {
+  const geo = React.useContext(RoomGeometry);
+  const [depth, setDepth] = useState(0);
+  useLayoutEffect(() => {
+    const room = geo?.ref.current;
+    if (!room) return;
+    room.updateMatrixWorld(true);
+    const ray = new THREE.Raycaster();
+    const reach = 0.9;
+    let deepest = 0;
+    for (let i = 0; i <= 4; i++) {
+      const along = from + 0.08 + (i / 4) * Math.max(0, w - 0.16);
+      for (const y of [0.9, 1.3, 1.7, 2.1, 2.5]) {
+        const origin = side === 'back' ? new THREE.Vector3(along, y, reach) : new THREE.Vector3(reach, y, along);
+        ray.set(origin, side === 'back' ? new THREE.Vector3(0, 0, -1) : new THREE.Vector3(-1, 0, 0));
+        ray.far = reach + 0.05;
+        const hit = ray.intersectObject(room, true).find((h) => h.distance > 0.001);
+        if (hit) deepest = Math.max(deepest, reach - hit.distance);
+      }
+    }
+    // The wall's own trim reaches ~3cm; pieces are already built to sit on that.
+    const next = Math.min(0.5, Math.max(0, deepest - 0.03));
+    setDepth((d) => (Math.abs(d - next) > 0.005 ? next : d));
+  }, [geo, side, from, w]);
+  return <group position={[0, 0, depth]}>{children}</group>;
 }
 
 function PlacingGhost({ s, placing }: { s: GameState; placing: NonNullable<SceneProps['placing']> }) {
@@ -1332,6 +1369,9 @@ function useDragGuard() {
 export default function ShopScene(p: SceneProps) {
   const { s } = p;
   const dragGuard = useDragGuard();
+  const roomRef = useRef<THREE.Group>(null);
+  const roomKey = `${s.listing.id}|${s.tier}|${s.furniture.filter((x) => x.placed && furnitureById(x.id).mount === 'finish').map((x) => x.id).join(',')}`;
+  const roomGeo = useMemo(() => ({ ref: roomRef, key: roomKey }), [roomKey]);
   const [graphicsLost, setGraphicsLost] = useState(false);
   const handleCanvasCreated = useCallback(({ gl }: { gl: THREE.WebGLRenderer }) => {
     const canvas = gl.domElement;
@@ -1479,6 +1519,15 @@ export default function ShopScene(p: SceneProps) {
       Math.max(0, Math.min(r.d + 5, Math.floor(e.point.z))),
     ];
   };
+  /** A tap or drag on one of the tall walls while hanging something: put it there. */
+  const wallAt = (side: 'back' | 'left', along: number) => {
+    if (!p.wallPlacing) return;
+    const piece = s.furniture.find((x) => x.uid === p.wallPlacing!.uid);
+    const w = piece ? furnitureById(piece.id).w : 1;
+    const max = (side === 'back' ? r.w : r.d - 1) - w;
+    const at = Math.max(0, Math.min(max, Math.floor(along - w / 2 + 0.5)));
+    if (side !== p.wallPlacing.side || at !== p.wallPlacing.at) p.onWallHover?.(side, at);
+  };
   /** Map a floor point to the nearer tall wall (back or left) and a position along it. */
   const wallHover = (e: { point: THREE.Vector3 }) => {
     if (!p.wallPlacing) return;
@@ -1515,13 +1564,28 @@ export default function ShopScene(p: SceneProps) {
         <CameraRig view={view} r={r} reset={p.camReset || 0} />
         <CameraPad r={r} cmd={p.camCmd} view={view} />
         <WeatherFx weather={s.weather} w={r.w} d={r.d} />
-        <Room r={dressed} tier={s.tier} painted={!!fin.paint} />
+        <group ref={roomRef}><Room r={dressed} tier={s.tier} painted={!!fin.paint} /></group>
+        <RoomGeometry.Provider value={roomGeo}>
         <Thermostat.Provider value={thermostatOf(s)}>
         <Furniture s={s} selected={p.selected} placing={p.placing} wallPlacing={p.wallPlacing} onTap={tap} dark={p.dark} reflections={p.reflections} />
         </Thermostat.Provider>
+        </RoomGeometry.Provider>
         {p.build && <BuildGrid r={r} />}
         {people}
         {p.placing && <PlacingGhost s={s} placing={p.placing} />}
+        {p.wallPlacing && (
+          <>
+            {/* invisible catchers on the two tall walls: tap where the piece should hang */}
+            <mesh position={[r.w / 2, r.height / 2, 0.6]} onPointerMove={(e) => { if (e.pointerType === 'mouse') wallAt('back', e.point.x); }} onClick={(e) => { e.stopPropagation(); wallAt('back', e.point.x); }}>
+              <planeGeometry args={[r.w, r.height]} />
+              <meshBasicMaterial transparent opacity={0} depthWrite={false} />
+            </mesh>
+            <mesh position={[0.6, r.height / 2, (r.d - 1) / 2]} rotation={[0, Math.PI / 2, 0]} onPointerMove={(e) => { if (e.pointerType === 'mouse') wallAt('left', e.point.z); }} onClick={(e) => { e.stopPropagation(); wallAt('left', e.point.z); }}>
+              <planeGeometry args={[r.d - 1, r.height]} />
+              <meshBasicMaterial transparent opacity={0} depthWrite={false} />
+            </mesh>
+          </>
+        )}
         {/* invisible floor to catch taps and the placing cursor */}
         <mesh
           position={[cx, 0.001, (r.d + 5) / 2]}

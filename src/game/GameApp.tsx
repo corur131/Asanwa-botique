@@ -113,7 +113,8 @@ export default function GameApp({ onLab, initial, storageKey, cloud, notice }: {
   const [wallPlacing, setWallPlacing] = useState<{ uid: string; side: 'back' | 'left'; at: number } | null>(null);
   const [build, setBuild] = useState(false);
   /** A catalogue piece you're trying before you buy it. */
-  const [trying, setTrying] = useState<{ id: string; x: number; z: number; rot: Rot; yardSide?: 'left' | 'right' } | null>(null);
+  const [trying, setTrying] = useState<{ id: string; x: number; z: number; rot: Rot; yardSide?: 'left' | 'right'; wallSide?: 'back' | 'left' } | null>(null);
+  const [wallList, setWallList] = useState(false);
   const [view, setView] = useState<View>('angle');
   const [dragMode, setDragMode] = useState<DragMode>('rotate');
   const [camCmd, setCamCmd] = useState<CamCmd | null>(null);
@@ -315,13 +316,15 @@ export default function GameApp({ onLab, initial, storageKey, cloud, notice }: {
     setPlacing(null);
     setSelected(null);
     const pv = E.withPreview(s, id);
-    setTrying({ id, x: pv.x, z: pv.z, rot: pv.rot, yardSide });
+    setTrying({ id, x: pv.x, z: pv.z, rot: pv.rot, yardSide, wallSide: pv.wallSide });
   };
   const tryView = trying ? E.withPreview(s, trying.id, trying) : null;
+  const tryingWall = !!trying?.wallSide && furnitureById(trying.id).mount === 'wall';
   const confirmBuy = () => {
     if (!trying || !tryView?.ok) return;
     const floor = furnitureById(trying.id).mount === 'floor';
-    up((g) => E.buyPreviewed(g, trying.id, floor ? trying : furnitureById(trying.id).mount === 'yard' ? { x: trying.yardSide === 'left' ? -1 : 1, z: trying.z, rot: trying.rot, yardSide: trying.yardSide } : undefined));
+    const wall = furnitureById(trying.id).mount === 'wall';
+    up((g) => E.buyPreviewed(g, trying.id, floor || wall ? trying : furnitureById(trying.id).mount === 'yard' ? { x: trying.yardSide === 'left' ? -1 : 1, z: trying.z, rot: trying.rot, yardSide: trying.yardSide } : undefined));
     setTrying(null);
   };
   const install = (uid: string) => {
@@ -441,8 +444,8 @@ export default function GameApp({ onLab, initial, storageKey, cloud, notice }: {
             reflections={sound.reflections}
             onHover={(x, z) => (trying ? setTrying({ ...trying, x, z }) : placing && setPlacing({ ...placing, x, z }))}
             onSelect={(uid) => { if (!placing && !trying && !wallPlacing) setSelected(uid); }}
-            wallPlacing={build ? wallPlacing : null}
-            onWallHover={(side, at) => wallPlacing && setWallPlacing({ ...wallPlacing, side, at })}
+            wallPlacing={!build ? null : tryingWall ? { uid: E.PREVIEW_UID, side: trying!.wallSide!, at: trying!.x } : wallPlacing}
+            onWallHover={(side, at) => { if (tryingWall) setTrying({ ...trying!, wallSide: side, x: at }); else if (wallPlacing) setWallPlacing({ ...wallPlacing, side, at }); }}
             onItem={(uid) => { if (!styling) { setSitting(null); setLocalAct(null); setMenuFor(uid); } }}
             onCustomer={styleCustomer}
           />
@@ -510,10 +513,30 @@ export default function GameApp({ onLab, initial, storageKey, cloud, notice }: {
             <div className="absolute top-3 left-3 right-3 z-20 flex flex-wrap items-start justify-between gap-2 pointer-events-none">
               <div className="pointer-events-auto"><ViewPicker view={view} setView={setView} /></div>
               <div className="flex gap-1.5 pointer-events-auto">
+                <Btn size="sm" tone={wallList ? 'gold' : 'ghost'} onClick={() => setWallList((o) => !o)}>Wall items</Btn>
                 <Btn size="sm" onClick={() => setPanel(panel === 'furniture' ? null : 'furniture')}>Shop stats</Btn>
                 <Btn size="sm" tone="gold" onClick={exitBuild}>Done</Btn>
               </div>
             </div>
+            {wallList && (() => {
+              const layout = wallLayout(s.furniture, s.listing);
+              const pieces = s.furniture.filter((x) => x.placed && furnitureById(x.id).mount === 'wall');
+              return (
+                <div className="absolute top-14 right-3 z-30 w-64 max-h-[50vh] overflow-y-auto rounded-xl border border-white/15 bg-[#12141c]/95 p-2 space-y-1 text-sm">
+                  <div className="flex items-center justify-between px-1 pb-1"><b className="text-white text-xs">On the walls ({pieces.length})</b><button aria-label="Close" className="text-slate-400 px-1" onClick={() => setWallList(false)}>✕</button></div>
+                  {pieces.length === 0 && <p className="text-xs text-slate-400 px-1 pb-1">Nothing is hanging yet.</p>}
+                  {pieces.map((x) => {
+                    const at = layout[x.uid];
+                    return (
+                      <button key={x.uid} className="w-full flex items-center justify-between gap-2 rounded-lg bg-white/5 px-2 py-1.5 text-left hover:bg-white/10" onClick={() => { setWallList(false); setTrying(null); setPlacing(null); setSelected(x.uid); setWallPlacing({ uid: x.uid, side: at?.side || 'back', at: at?.at || 0 }); }}>
+                        <span className="text-xs text-white truncate">{furnitureById(x.id).name}</span>
+                        <span className="text-[10px] text-amber-300 shrink-0">{at ? `${at.side} wall` : ''} · Move</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              );
+            })()}
             {trying && tryView && (() => {
               const f = furnitureById(trying.id);
               const floor = f.mount === 'floor';
@@ -521,9 +544,18 @@ export default function GameApp({ onLab, initial, storageKey, cloud, notice }: {
                 <div className="absolute top-14 left-1/2 -translate-x-1/2 z-20 rounded-xl border border-amber-500/50 bg-[#12141c]/95 p-2 flex flex-wrap items-center justify-center gap-2 text-sm max-w-[94vw]">
                   <span className="px-1 leading-tight">
                     <span className="block text-white font-semibold text-xs">{f.name} · {naira(f.price)}</span>
-                    <span className={`block text-[11px] ${tryView.ok ? 'text-emerald-300' : 'text-rose-300'}`}>{tryView.ok ? (floor ? 'Fits here · tap the floor to move it' : f.mount === 'finish' ? 'This is how it will look' : f.mount === 'yard' ? `Outdoor placement · ${trying.yardSide === 'left' ? 'left side' : 'right side'}` : 'This is where it will go') : tryView.why}</span>
+                    <span className={`block text-[11px] ${tryView.ok ? 'text-emerald-300' : 'text-rose-300'}`}>{tryView.ok ? (floor ? 'Fits here · tap the floor to move it' : f.mount === 'finish' ? 'This is how it will look' : f.mount === 'yard' ? `Outdoor placement · ${trying.yardSide === 'left' ? 'left side' : 'right side'}` : tryingWall ? `Fits on the ${trying.wallSide} wall · tap a wall to move it` : 'This is where it will go') : tryView.why}</span>
                   </span>
                   {floor && <Btn size="sm" onClick={() => setTrying({ ...trying, rot: turn(trying.rot) })}>↻ Rotate</Btn>}
+                  {tryingWall && (() => {
+                    const len = trying.wallSide === 'back' ? room(s.listing).w : room(s.listing).d - 1;
+                    const nudge = (d: number) => setTrying({ ...trying, x: Math.max(0, Math.min(len - f.w, trying.x + d)) });
+                    return <>
+                      <Btn size="sm" onClick={() => setTrying({ ...trying, wallSide: trying.wallSide === 'back' ? 'left' : 'back', x: 0 })}>{trying.wallSide === 'back' ? 'Back wall → Left wall' : 'Left wall → Back wall'}</Btn>
+                      <Btn size="sm" onClick={() => nudge(-1)}>◀</Btn>
+                      <Btn size="sm" onClick={() => nudge(1)}>▶</Btn>
+                    </>;
+                  })()}
                   {f.mount === 'yard' && <><Btn size="sm" tone={trying.yardSide === 'left' ? 'gold' : 'ghost'} onClick={() => setTrying({ ...trying, yardSide: 'left' })}>← Left side</Btn><Btn size="sm" tone={trying.yardSide !== 'left' ? 'gold' : 'ghost'} onClick={() => setTrying({ ...trying, yardSide: 'right' })}>Right side →</Btn></>}
                   <Btn size="sm" tone="green" disabled={!tryView.ok} onClick={confirmBuy}>Buy</Btn>
                   <Btn size="sm" onClick={() => setTrying(null)}>Cancel</Btn>
@@ -553,7 +585,7 @@ export default function GameApp({ onLab, initial, storageKey, cloud, notice }: {
               const nudge = (d: number) => setWallPlacing({ ...wallPlacing, at: Math.max(0, Math.min(len - w, wallPlacing.at + d)) });
               return (
                 <div className="absolute top-14 left-1/2 -translate-x-1/2 z-20 rounded-xl border border-amber-500/50 bg-[#12141c]/95 p-2 flex flex-wrap items-center justify-center gap-2 text-sm max-w-[94vw]">
-                  <span className={`px-1 text-xs font-semibold ${ok ? 'text-emerald-300' : 'text-rose-300'}`}>{piece ? furnitureById(piece.id).name : ''}: {ok ? 'fits here' : 'something is already there'} · tap near a wall</span>
+                  <span className={`px-1 text-xs font-semibold ${ok ? 'text-emerald-300' : 'text-rose-300'}`}>{piece ? furnitureById(piece.id).name : ''}: {ok ? 'fits here' : 'can\'t hang here'} · tap a wall to move it</span>
                   <Btn size="sm" onClick={() => setWallPlacing({ ...wallPlacing, side: wallPlacing.side === 'back' ? 'left' : 'back', at: 0 })}>{wallPlacing.side === 'back' ? 'Back wall → Left wall' : 'Left wall → Back wall'}</Btn>
                   <Btn size="sm" onClick={() => nudge(-1)}>◀</Btn>
                   <Btn size="sm" onClick={() => nudge(1)}>▶</Btn>
