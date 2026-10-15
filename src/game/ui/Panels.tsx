@@ -1,5 +1,5 @@
 import React, { Suspense, lazy, useMemo, useState } from 'react';
-import { MARKUP, STAFF, TIERS, naira } from '../economy';
+import { MARKUP, STAFF, TIERS, naira, staffMinutes } from '../economy';
 import { POWER, RICH_CUSTOMER_STAFF_LEVEL, contestFor, fuelOf, fuelPerHour, tankSize, Candidate, RaiseAnswer, candidates, canHire, daysToRent, displayCap, displayedCount, listingsNow, marketWage, restockAllCost, stats, waitingRoom } from '../engine';
 import { FURNITURE_GROUPS, FurnitureDef, FurnitureGroup, Listing, MoveEquipmentPlan, ceilingCapacity, ceilingUsed, finishes, furnitureById, furnitureForGroup, listingsFor, readyFurnishedCost, roomOf, wallCapacity, wallUsed } from '../shop';
 import { productKey } from '../market';
@@ -434,10 +434,10 @@ export const StaffPanel: React.FC<{ s: GameState; a: StaffActions }> = ({ s, a }
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div>
               <div className="text-sm font-semibold text-white">{m.name} <Pill tone={m.trained ? 'green' : 'gold'}>{m.trained ? 'Trained by you' : 'Expert'}</Pill></div>
-              <div className="text-[11px] text-slate-400">{m.profession === 'makeup' ? 'Makeup artist' : 'Hair & styling'} · Level {m.level} · {m.level >= RICH_CUSTOMER_STAFF_LEVEL ? 'rich clients eligible' : 'poor/middle clients only'} · {naira(m.wage)}/week · {m.weeks} wk · market {naira(marketWage(m.level))}</div>
+              <div className="text-[11px] text-slate-400">{m.profession === 'makeup' ? 'Makeup artist' : 'Hair & styling'} · Level {m.level} · {m.profession === 'makeup' ? `${staffMinutes(m.level, 'makeup')} min a face` : `${staffMinutes(m.level)} min a look, ${staffMinutes(m.level, 'hair')} min hair-only`} · {m.level >= RICH_CUSTOMER_STAFF_LEVEL ? 'rich clients eligible' : 'poor/middle clients only'} · {naira(m.wage)}/week · {m.weeks} wk · market {naira(marketWage(m.level))}</div>
             </div>
             <div className="flex gap-1.5">
-              <Btn size="sm" tone="green" disabled={m.level >= 10 || s.cash < STAFF.trainFee(m.level)} onClick={() => a.train(m.id)}>Train · {naira(STAFF.trainFee(m.level))}</Btn>
+              <Btn size="sm" tone="green" disabled={m.level >= 10 || s.cash < STAFF.trainFee(m.level)} onClick={() => a.train(m.id)}>Train · {naira(STAFF.trainFee(m.level))}{m.level < 10 ? ` · → ${staffMinutes(m.level + 1, m.profession === 'makeup' ? 'makeup' : 'look')} min` : ''}</Btn>
               <Btn size="sm" onClick={() => a.fire(m.id)}>Let go</Btn>
             </div>
           </div>
@@ -467,7 +467,7 @@ export const StaffPanel: React.FC<{ s: GameState; a: StaffActions }> = ({ s, a }
             <div key={c.kind} className="rounded-lg border border-dashed border-white/20 p-2.5">
               <div className="text-sm font-semibold text-white">{c.name} · {c.kind === 'trainee' ? 'Trainee' : 'Expert'}</div>
               <div className="text-[11px] text-amber-200">{c.profession === 'makeup' ? 'Makeup artist' : 'Hair & styling'}</div>
-              <div className="text-[11px] text-slate-400 mb-2">Level {c.level} · {naira(c.wage)}/week · {c.kind === 'trainee' ? 'signing fee' : 'signing bonus'} {naira(c.signing)}</div>
+              <div className="text-[11px] text-slate-400 mb-2">Level {c.level} · {c.profession === 'makeup' ? `${staffMinutes(c.level, 'makeup')} min a face` : `${staffMinutes(c.level)} min a look`} · {naira(c.wage)}/week · {c.kind === 'trainee' ? 'signing fee' : 'signing bonus'} {naira(c.signing)}</div>
               <Btn size="sm" tone="gold" disabled={!hiring || s.cash < c.signing} onClick={() => a.hire(c)}>{hiring ? 'Hire now' : 'No staff slots available'}</Btn>
             </div>
           ))}

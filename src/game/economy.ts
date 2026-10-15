@@ -36,8 +36,18 @@ export const HOUR_WEIGHTS = [0.45, 0.7, 0.9, 1, 1.35, 1.25, 0.9, 0.85, 1.1, 1.45
  * wear down patience, while seats, cooling, signature shops and regular-customer loyalty add more.
  */
 export const PATIENCE: Record<CustomerClass, number> = { poor: 150, middle: 120, rich: 90 };
-/** Minutes a staff member takes for one customer at a level. */
-export const staffMinutes = (level: number) => Math.max(30, 90 - 6 * level);
+/** Each staff level makes a stylist about 12% quicker. */
+export const STAFF_SPEEDUP = 0.877;
+/** Level-1 minutes for each kind of job: a full look, or a hair/makeup-only visit. */
+export const STAFF_JOB_MINUTES = { look: 60, hair: 30, makeup: 30, both: 40 } as const;
+export type StaffJob = keyof typeof STAFF_JOB_MINUTES;
+/**
+ * Minutes a staff member takes for one customer at a level. A level-1 full look takes an hour;
+ * a level-10 expert does it in about 18 minutes, and a hair-only visit in about 9.
+ * `toolBoost` (0–1) shaves extra time off when the right salon equipment is placed.
+ */
+export const staffMinutes = (level: number, job: StaffJob = 'look', toolBoost = 0) =>
+  Math.max(5, Math.round(STAFF_JOB_MINUTES[job] * STAFF_SPEEDUP ** (Math.max(1, Math.min(10, level)) - 1) * (1 - toolBoost)));
 
 export const START_CASH = 200_000;
 

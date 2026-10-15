@@ -38,7 +38,49 @@ export const RequestCard: React.FC<{ c: Customer; compact?: boolean }> = ({ c, c
   </div>
 );
 
-const ItemList: React.FC<{ title: string; slot: keyof StyleChoice; items: Design[]; empty?: string; choice: StyleChoice; toggle: (slot: keyof StyleChoice, uid: string) => void }> = ({ title, slot, items, empty, choice, toggle }) => {
+type RackControl = { full: boolean; none: boolean; put: (uid: string) => void };
+
+/** Styles sitting in the store room: listed under each section so new buys never look lost. */
+const StoredList: React.FC<{ items: Design[]; rack: RackControl }> = ({ items, rack }) => {
+  const [open, setOpen] = useState(false);
+  const groups = useMemo(() => {
+    const map = new Map<string, Design[]>();
+    for (const d of items) map.set(productKey(d), [...(map.get(productKey(d)) || []), d]);
+    return [...map.values()];
+  }, [items]);
+  if (!groups.length) return null;
+  return (
+    <div className="mt-1.5 rounded-lg border border-dashed border-white/15 bg-white/[0.02]">
+      <button type="button" onClick={() => setOpen((o) => !o)} className="w-full flex items-center justify-between px-2 py-1.5 text-[10px] text-slate-400">
+        <span>📦 In the store room · {groups.length} style{groups.length === 1 ? '' : 's'}</span>
+        <span>{open ? '⌃' : '⌄'}</span>
+      </button>
+      {open && (
+        <div className="px-2 pb-2 space-y-1">
+          {rack.none && <p className="text-[10px] text-rose-200">No racks or shelves are placed, so nothing can go on display. Place display furniture first.</p>}
+          {groups.map((variants) => {
+            const d = variants[0];
+            const units = variants.reduce((a, v) => a + v.pieces, 0);
+            return (
+              <div key={d.uid} className="flex items-center gap-2 opacity-80">
+                <Swatch d={d} size={22} />
+                <span className="min-w-0 flex-1 text-[11px] text-slate-300 truncate">{d.label} · {units} left</span>
+                {!rack.none && (
+                  <button type="button" onClick={() => rack.put(d.uid)} className="shrink-0 rounded-full border border-amber-400/50 px-2 py-0.5 text-[10px] font-semibold text-amber-200 hover:bg-amber-500/10">
+                    {rack.full ? 'Swap onto rack' : 'Put on display'}
+                  </button>
+                )}
+              </div>
+            );
+          })}
+          {rack.full && !rack.none && <p className="text-[9px] text-slate-500">Racks are full: your slowest seller goes to the store room to make space.</p>}
+        </div>
+      )}
+    </div>
+  );
+};
+
+const ItemList: React.FC<{ title: string; slot: keyof StyleChoice; items: Design[]; empty?: string; choice: StyleChoice; toggle: (slot: keyof StyleChoice, uid: string) => void; stored?: Design[]; rack?: RackControl }> = ({ title, slot, items, empty, choice, toggle, stored = [], rack }) => {
   const [expanded, setExpanded] = useState<string | null>(null);
   const groups = useMemo(() => {
     const map = new Map<string, Design[]>();
@@ -100,6 +142,7 @@ const ItemList: React.FC<{ title: string; slot: keyof StyleChoice; items: Design
           })}
         </div>
       )}
+      {rack && <StoredList items={stored} rack={rack} />}
     </div>
   );
 };
@@ -115,7 +158,11 @@ export const Styling: React.FC<{
   /** Keeps work in progress if she steps back to the shop floor. */
   initial?: StyleChoice;
   onChange?: (choice: StyleChoice) => void;
-}> = ({ state, customer: c, onFinish, onTurnAway, onSendToStaff, canWig = true, initial, onChange }) => {
+  /** Bring a stored style onto the racks. `keep` lists styles in this look that must stay out. */
+  onDisplay?: (uid: string, keep: string[]) => void;
+  rackFull?: boolean;
+  noRacks?: boolean;
+}> = ({ state, customer: c, onFinish, onTurnAway, onSendToStaff, canWig = true, initial, onChange, onDisplay, rackFull = false, noRacks = false }) => {
   const [choice, setChoiceRaw] = useState<StyleChoice>(initial || {});
   const setChoice: typeof setChoiceRaw = (f) => setChoiceRaw((ch) => {
     const next = typeof f === 'function' ? f(ch) : f;
@@ -131,11 +178,25 @@ export const Styling: React.FC<{
     return !!e && (e.for === 'both' || e.for === (c.male ? 'm' : 'f'));
   })()), [state.stock, c.male]);
   const kind = (k: Design['kind']) => shown.filter((d) => d.kind === k);
+  // Styles in the store room (none of their colours on display), so new buys are never "missing".
+  const storedAll = useMemo(() => {
+    const onRack = new Set(state.stock.filter((d) => d.displayed).map(productKey));
+    return state.stock.filter((d) => !d.displayed && d.pieces > 0 && !onRack.has(productKey(d)) && (() => {
+      const e = entryFor(d.kind, d.itemId);
+      return !!e && (e.for === 'both' || e.for === (c.male ? 'm' : 'f'));
+    })());
+  }, [state.stock, c.male]);
 
   const look = useMemo(() => buildLook(c, choice, state.stock), [c, choice, state.stock]);
   const preview = useMemo(() => <CharacterSvg config={showBefore ? c.look : look} idPrefix={`sty-${c.id}`} camera={camera} />, [showBefore, c, look, camera]);
   const cost = lookCost(c, choice, state.stock);
   const chosen = designsOf(choice, state.stock);
+  const stored = (k: Design['kind']) => storedAll.filter((d) => d.kind === k);
+  const rack: RackControl | undefined = onDisplay ? {
+    full: rackFull,
+    none: noRacks,
+    put: (uid) => onDisplay(uid, [...new Set(Object.values(chosen).filter((d): d is Design => !!d).map(productKey))]),
+  } : undefined;
 
   const toggle = (slot: keyof StyleChoice, uid: string) => {
     setChoice((ch) => {
@@ -196,25 +257,25 @@ export const Styling: React.FC<{
         <div className="flex-1 overflow-y-auto max-h-[56vh] pr-1">
           {tab === 'outfit' && (
             <>
-              <ItemList title={c.male ? 'Native sets & kaftans' : 'Dresses & gowns'} choice={choice} toggle={toggle} slot="dress" items={kind('dress')} />
-              <ItemList title="Tops" choice={choice} toggle={toggle} slot="top" items={kind('top')} />
-              <ItemList title="Bottoms" choice={choice} toggle={toggle} slot="bottom" items={kind('bottom')} />
-              <ItemList title="Outerwear" choice={choice} toggle={toggle} slot="outer" items={kind('outer')} empty="No jackets on display." />
+              <ItemList title={c.male ? 'Native sets & kaftans' : 'Dresses & gowns'} choice={choice} toggle={toggle} slot="dress" items={kind('dress')} stored={stored('dress')} rack={rack} />
+              <ItemList title="Tops" choice={choice} toggle={toggle} slot="top" items={kind('top')} stored={stored('top')} rack={rack} />
+              <ItemList title="Bottoms" choice={choice} toggle={toggle} slot="bottom" items={kind('bottom')} stored={stored('bottom')} rack={rack} />
+              <ItemList title="Outerwear" choice={choice} toggle={toggle} slot="outer" items={kind('outer')} stored={stored('outer')} rack={rack} empty="No jackets on display." />
             </>
           )}
           {tab === 'feet' && (
             <>
-              <ItemList title="Shoes" choice={choice} toggle={toggle} slot="shoes" items={kind('shoes')} />
-              <ItemList title="Bags" choice={choice} toggle={toggle} slot="bag" items={kind('bag')} empty="No bags on display." />
+              <ItemList title="Shoes" choice={choice} toggle={toggle} slot="shoes" items={kind('shoes')} stored={stored('shoes')} rack={rack} />
+              <ItemList title="Bags" choice={choice} toggle={toggle} slot="bag" items={kind('bag')} stored={stored('bag')} rack={rack} empty="No bags on display." />
             </>
           )}
           {tab === 'extras' && (
             <>
-              <ItemList title="Headwear" choice={choice} toggle={toggle} slot="headwear" items={kind('headwear')} empty="No headwear on display." />
-              {!c.male && <ItemList title="Earrings" choice={choice} toggle={toggle} slot="earrings" items={kind('earrings')} empty="No earrings on display." />}
-              <ItemList title="Necklaces" choice={choice} toggle={toggle} slot="necklace" items={kind('necklace')} empty="No necklaces on display." />
-              <ItemList title="Wrist" choice={choice} toggle={toggle} slot="wrist" items={kind('wrist')} empty="No wristwear on display." />
-              <ItemList title="Eyewear" choice={choice} toggle={toggle} slot="glasses" items={kind('glasses')} empty="No eyewear on display." />
+              <ItemList title="Headwear" choice={choice} toggle={toggle} slot="headwear" items={kind('headwear')} stored={stored('headwear')} rack={rack} empty="No headwear on display." />
+              {!c.male && <ItemList title="Earrings" choice={choice} toggle={toggle} slot="earrings" items={kind('earrings')} stored={stored('earrings')} rack={rack} empty="No earrings on display." />}
+              <ItemList title="Necklaces" choice={choice} toggle={toggle} slot="necklace" items={kind('necklace')} stored={stored('necklace')} rack={rack} empty="No necklaces on display." />
+              <ItemList title="Wrist" choice={choice} toggle={toggle} slot="wrist" items={kind('wrist')} stored={stored('wrist')} rack={rack} empty="No wristwear on display." />
+              <ItemList title="Eyewear" choice={choice} toggle={toggle} slot="glasses" items={kind('glasses')} stored={stored('glasses')} rack={rack} empty="No eyewear on display." />
             </>
           )}
           {tab === 'hair' && (
@@ -234,7 +295,7 @@ export const Styling: React.FC<{
               <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">Colour</div>
               <ColourDots colors={hairColours} value={hairColours.find((h) => h.id === (choice.hairColor || c.look.hairColor))?.color} onPick={(col) => setChoice((ch) => ({ ...ch, hairColor: hairColours.find((h) => h.color === col)?.id }))} />
               <div className="mt-4">
-                <ItemList title="Wigs, braids & stocked hairpieces" choice={choice} toggle={toggle} slot="hairpiece" items={kind('hair')} empty="No wigs or braided-hair pieces on display. Stock some in Yaba Mart." />
+                <ItemList title="Wigs, braids & stocked hairpieces" choice={choice} toggle={toggle} slot="hairpiece" items={kind('hair')} stored={stored('hair')} rack={rack} empty="No wigs or braided-hair pieces on display. Stock some in Yaba Mart." />
               </div>
               {c.male && (
                 <>
