@@ -4,7 +4,7 @@ import * as E from '../engine';
 import { FURNITURE, FURNITURE_GROUPS, FurnitureGroup, furnitureById, furnitureForGroup, outdoorRoomFor } from '../shop';
 import { GameState } from '../types';
 import { useThumb } from '../scene/Thumbs';
-import type { View } from '../scene/ShopScene';
+import type { CamCmd, DragMode, View } from '../scene/ShopScene';
 import { Btn } from './kit';
 import { useSound } from '../sound';
 
@@ -91,6 +91,45 @@ export const ViewPicker: React.FC<{ view: View; setView: (v: View) => void }> = 
     ))}
   </div>
 );
+
+const padBtn = 'w-10 h-10 rounded-xl border border-white/15 bg-[#12141c]/90 backdrop-blur text-white text-base font-semibold flex items-center justify-center shadow-lg active:scale-95 hover:bg-[#202431]';
+
+/**
+ * Camera pad: switch one-finger drag between turning and sliding sideways, zoom, slide with
+ * arrows, and snap back. Two fingers always pinch-zoom and slide.
+ */
+export const CameraPad: React.FC<{ mode: DragMode; setMode: (m: DragMode) => void; send: (k: CamCmd['kind']) => void; reset: () => void; top: boolean }> = ({ mode, setMode, send, reset, top }) => {
+  const [arrows, setArrows] = useState(false);
+  const slide = top || mode === 'move';
+  return (
+    <div className="flex items-center gap-1.5">
+      {arrows && (
+        <div className="grid grid-cols-3 gap-1" aria-label="Slide the camera">
+          <span /><button className={padBtn} aria-label="Slide forward" onClick={() => send('up')}>▲</button><span />
+          <button className={padBtn} aria-label="Slide left" onClick={() => send('left')}>◀</button>
+          <button className={padBtn} aria-label="Back to the start view" onClick={reset}>⌖</button>
+          <button className={padBtn} aria-label="Slide right" onClick={() => send('right')}>▶</button>
+          <span /><button className={padBtn} aria-label="Slide back" onClick={() => send('down')}>▼</button><span />
+        </div>
+      )}
+      <div className="flex flex-col gap-1.5">
+        <button
+          className={`${padBtn} !w-auto px-2 text-[11px] ${slide ? '!bg-amber-500 !text-black border-amber-400' : ''}`}
+          disabled={top}
+          aria-pressed={slide}
+          title={top ? 'Top view: drag to slide around' : slide ? 'Dragging slides the view. Tap to turn instead.' : 'Dragging turns the view. Tap to slide instead.'}
+          onClick={() => setMode(mode === 'move' ? 'rotate' : 'move')}
+        >
+          {slide ? '✋ Slide' : '⟳ Turn'}
+        </button>
+        <button className={padBtn} aria-label="Zoom in" onClick={() => send('zoomIn')}>＋</button>
+        <button className={padBtn} aria-label="Zoom out" onClick={() => send('zoomOut')}>－</button>
+        <button className={`${padBtn} ${arrows ? '!bg-white/20' : ''}`} aria-label={arrows ? 'Hide arrows' : 'Show arrows'} aria-pressed={arrows} onClick={() => setArrows((a) => !a)}>✥</button>
+        {!arrows && <button className={padBtn} aria-label="Back to the start view" onClick={reset}>⌖</button>}
+      </div>
+    </div>
+  );
+};
 
 /** What Divine can do with the piece you tapped. */
 export const ActionMenu: React.FC<{ s: GameState; uid: string; onPick: (id: E.ActionId) => void; onClose: () => void }> = ({ s, uid, onPick, onClose }) => {
