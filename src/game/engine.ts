@@ -15,6 +15,7 @@ import { colourName, sameColour } from './colours';
 import { FURNITURE, KIOSK_LISTING, Listing, Placed, STARTER_FURNITURE, arrangeShop, autoPlace, prepareFurnitureForMove,
   findSpot, canPlace, turn, Rot, ceilingCapacity, ceilingUsed, yardCapacity, yardUsed, wallFits, solarRackCapacity, solarUsed, outdoorRoomFor, cheapestListing, furnitureById, listingsFor, newUid, prestigeRichShift, prestigeTraffic, shopStats, usesFloor, wallCapacity, wallUsed, MoveEquipmentPlan } from './shop';
 import { CharacterMemory, CollaborationEvent, CollaborationReply, Customer, DayLog, Departure, Design, ReplyChoice, GameState, LedgerLine, Message, PoliticianContract, PoliticianContractRequirement, Regular, ScoreBreakdown, Settlement, SponsorshipOffer, StaffMember, StaffProfession, StyleChoice, Visitor } from './types';
+import { addBrag, closeGramDay } from './gram';
 import { autoSaveAtClose, closeBrandDay, ensureBusinessState, getBrandMetrics, initialBankState, investmentValue, processBankWeekly, processFixedDepositMaturities, processInvestments, processPromotionAtClose, processExpansionAtClose, promotionTrafficBoost, recordWeeklyWealth, saveRentAtClose } from './business';
 
 export { brandPower, currentWealthRows, financialAssets, getBrandMetrics, creditProfile, creditRating, creditHistoryReport, premiumLoanEligible, takePremiumBusinessLoan, renegotiateBusinessLoan, loanRateForScore, maximumLoan, netWorthPlayer, netWorthRival, playerWeekTotals, totalLiabilities, unlocksForFollowers, availablePromotionLevels, promotionBudgetBounds, promotionTrafficBoost, startPromotion, stopPromotion, wholesaleUpgradeQuote, upgradeWholesaleInventory, transferBank, setRentSaving, setSavingsGoal, createFixedDeposit, breakFixedDeposit, fixedDepositRate, FIXED_DEPOSIT_TERMS, buyTreasuryBill, treasuryBillYield, TBILL_TENORS, buyBond, sellBond, bondCoupon, BOND_TERMS, MIN_INVESTMENT, bankMarket, investmentValue, setAutoSave, loanPayoffQuote, loanInterestToDate, LOAN_PROCESSING_FEE_RATE, takeBusinessLoan, repayBusinessLoan, arrangeBusinessLoanRepayment, expansionOptions, investInExpansion, financeExpansionPurchase } from './business';
@@ -355,6 +356,7 @@ export function deliverPoliticianContract(s0: GameState, contractId: string): Ga
     },
   };
   s = money(s, contract.reward, `Politician contract payment: ${contract.title}`);
+  s = addBrag(s, 'contract', `Delivered "${contract.title}"`, `Asanwa Boutique delivered an official clothing contract for ${contract.client}.`, 4);
   s = msg(s, contract.client, `Delivery accepted. All requested goods for “${contract.title}” have been checked in. ${naira(contract.reward)} has been paid to your business, and your record with our office has improved. Thank you.`, 'good');
   return refreshEveningHistory(s);
 }
@@ -962,6 +964,9 @@ export function applyLook(s0: GameState, c: Customer, choice: StyleChoice, st0: 
   if (c.influencer) today.events = [...today.events, score.total >= 80 ? `${c.name} posted your work to her followers. Reputation up!` : score.total < 60 ? `${c.name} dragged your shop online. Reputation down.` : `${c.name} posted, nothing special.`];
   let next: GameState = {
     ...s,
+    ...(sold && c.cls === 'rich' && !c.celebrity && score.total >= 85
+      ? { brags: addBrag(s, 'richClient', `Styled a luxury client`, `${c.name}, a rich client, loved her look (${Math.round(score.total)}/100) and paid in full.`, 3).brags }
+      : {}),
     rep: clamp(s.rep + (st.repDelta > 0 ? st.repDelta * (1 + coolNow(s) * 0.6) : st.repDelta), 0, 100),
     stock,
     productSales,
@@ -1115,6 +1120,7 @@ export function closeShop(s0: GameState): GameState {
   s = settleLateRent(s);
   s = saveRentAtClose(s);
   s = autoSaveAtClose(s);
+  s = closeGramDay(s);
 
   if (s.day % 7 === 0) {
     s = payRent(s);
@@ -1966,6 +1972,7 @@ export function buyCart(s0: GameState, lines: CartLine[]): GameState {
   const validation = validateCart(s0, canonicalLines);
   if (!validation.ok) return s0;
   const commission = shopperCommission(s0, canonicalLines);
+  let newCollection = false;
   let s = s0;
   for (const l of canonicalLines) {
     const e = entryFor(l.kind, l.itemId);
@@ -1992,6 +1999,7 @@ export function buyCart(s0: GameState, lines: CartLine[]): GameState {
     const complete = [...needed.entries()].every(([key, amount]) => (purchasedCounts.get(key) || 0) >= amount);
     if (!complete) return job;
     for (const [key, amount] of needed) purchasedCounts.set(key, Math.max(0, (purchasedCounts.get(key) || 0) - amount));
+    if (job.items.reduce((a, l) => a + l.pieces, 0) >= 20) newCollection = true;
     return { ...job, status: 'purchased' as const };
   }).map((job) => {
     const paid = commission.byJob.find((row) => row.id === job.id);
@@ -2002,6 +2010,7 @@ export function buyCart(s0: GameState, lines: CartLine[]): GameState {
   });
   let next: GameState = { ...s, shopperJobs };
   if (commission.total > 0) next = money(next, -commission.total, "Kunle's commission (shopper)");
+  if (newCollection) next = addBrag(next, 'collection', 'New collection in store', 'Fresh stock from Yaba Mart is on the racks at Asanwa Boutique.', 1);
   return next;
 }
 

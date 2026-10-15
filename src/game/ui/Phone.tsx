@@ -8,6 +8,7 @@ import { CharacterMemory, CollaborationReply, GameState, Message, Post, Rival } 
 import { MarketApp } from './MarketApp';
 import { ShopperApp } from './ShopperApp';
 import { BankApp } from './BankApp';
+import { GidigramApp } from './GidigramApp';
 import { generatedFace, isBusinessName, knownFace } from '../faces';
 import { ContractsApp } from './ContractsApp';
 import { MovePanel, StaffActions, StaffPanel } from './Panels';
@@ -30,7 +31,6 @@ const APPS: { id: Exclude<AppId, 'home'>; name: string; bg: string; glyph: strin
   { id: 'forbes', name: 'Forbes', bg: 'bg-gradient-to-br from-zinc-700 to-zinc-950', glyph: '₦' },
   { id: 'promotion', name: 'Promotion', bg: 'bg-gradient-to-br from-fuchsia-600 to-purple-800', glyph: '📣' },
   { id: 'empire', name: 'Expansion', bg: 'bg-gradient-to-br from-indigo-600 to-blue-900', glyph: '🏬' },
-  { id: 'gist', name: 'GistLagos', bg: 'bg-gradient-to-br from-red-500 to-rose-800', glyph: '☕' },
   { id: 'weather', name: 'Lagos Weather', bg: 'bg-gradient-to-br from-sky-400 to-blue-700', glyph: '🌦️' },
 ];
 
@@ -125,9 +125,8 @@ export const Phone: React.FC<PhoneProps> = (p) => {
               </div>
             </AppFrame>
           )}
-          {app === 'gidigram' && <Gidigram s={s} profile={p.profile} setProfile={p.setProfile} onVisit={p.onVisit} />}
+          {app === 'gidigram' && <GidigramApp s={s} up={p.up} profile={p.profile} setProfile={p.setProfile} onVisit={p.onVisit} />}
           {app === 'top20' && <Top20 s={s} open={(id) => { p.setProfile(id); setApp('gidigram'); }} />}
-          {app === 'gist' && <GistApp s={s} />}
           {app === 'weather' && <WeatherApp s={s} />}
           {app === 'staff' && (
             <AppFrame title="Staff" sub="Hire, train, pay" tone="bg-slate-800">
@@ -903,143 +902,10 @@ const PromotionApp: React.FC<{ s: GameState; up: PhoneProps['up'] }> = ({ s, up 
 // ---------------------------------------------------------------------------
 // Gidigram
 // ---------------------------------------------------------------------------
-const FANS = ['tolu_xo', 'amaka.styles', 'lagosbabe_', 'kemi_oflagos', 'chi.chi', 'iam_bisola', 'yababoy', 'sade.k', 'ngozi_nails', 'fola.f', 'thisis_ada', 'mr_obinna'];
-const COMMENTS = ['This is fire 🔥🔥', 'Where is this shop?? 😍', 'Divine you did that!', 'I need this for my sister wedding', 'Price please 🙏🏾', 'Omo! The finishing 💯', 'Booking you next week', 'She looks like money 💸', 'The colours 😩❤️', 'Clean!!'];
-const hash = (str: string) => Array.from(str).reduce((a, c) => (a * 31 + c.charCodeAt(0)) >>> 0, 7);
-
-const PostCard: React.FC<{ p: Post }> = ({ p }) => {
-  const h = hash(p.id);
-  const comments = [0, 1, 2].slice(0, 1 + (h % 3)).map((k) => ({ who: FANS[(h + k * 5) % FANS.length], text: COMMENTS[(h + k * 3) % COMMENTS.length] }));
-  return (
-    <div className="border-b border-white/10 pb-3">
-      <div className="flex items-center gap-2 px-3 py-2">
-        <span className="w-8 h-8 rounded-full bg-gradient-to-tr from-yellow-400 via-pink-500 to-purple-600 p-[2px]"><span className="block w-full h-full rounded-full bg-[#111] text-white text-xs font-bold flex items-center justify-center">D</span></span>
-        <div className="leading-tight">
-          <div className="text-sm text-white font-semibold">divine.styles</div>
-          <div className="text-[10px] text-slate-500">Yaba, Lagos · Day {p.day}</div>
-        </div>
-      </div>
-      <div className="aspect-[4/5] bg-gradient-to-b from-[#2a1f2e] to-[#141018] overflow-hidden">
-        <CharacterSvg config={p.look} idPrefix={`gg-${p.id}`} camera="full" />
-      </div>
-      <div className="px-3 pt-2 text-sm text-white">
-        <div className="flex gap-4 text-lg mb-1"><span>♥</span><span>💬</span><span>➤</span></div>
-        <div className="font-semibold">{Math.max(0, Number(p.likes) || 0)?.toLocaleString('en-NG')} likes</div>
-        <div><b>divine.styles</b> {p.caption} <span className="text-sky-300">@{p.name.toLowerCase()}</span></div>
-        {comments.map((c, i) => <div key={i} className="text-[13px] text-slate-300"><b className="text-white">{c.who}</b> {c.text}</div>)}
-        <div className="text-[11px] text-emerald-300 mt-1">+{p.gained} new followers from this post</div>
-      </div>
-    </div>
-  );
-};
-
-const Gidigram: React.FC<{ s: GameState; profile: string | null; setProfile: (id: string | null) => void; onVisit: (id: string) => void }> = ({ s, profile, setProfile, onVisit }) => {
-  const posts = s.posts || [];
-  const [view, setView] = useState<'grid' | 'feed'>('grid');
-  const [tab, setTab] = useState<'me' | 'explore'>(profile ? 'explore' : 'me');
-  const rival = profile ? s.rivals?.find((r) => r.id === profile) : null;
-  if (rival) return <RivalPage s={s} r={rival} back={() => setProfile(null)} onVisit={onVisit} />;
-  if (tab === 'explore') {
-    const list = [...(s.rivals || [])].sort((a, b) => b.followers - a.followers);
-    return (
-      <AppFrame title="Gidigram" sub="Explore boutiques" tone="bg-[#111] border-b border-white/10" right={<button className="text-xs text-slate-300 border border-white/20 rounded-lg px-2 py-1" onClick={() => setTab('me')}>My page</button>}>
-        <div className="divide-y divide-white/5">
-          {list.map((r) => (
-            <button key={r.id} onClick={() => setProfile(r.id)} className="w-full flex items-center gap-3 px-3 py-2 text-left hover:bg-white/5">
-              <span className="w-11 h-11 rounded-full overflow-hidden bg-[#2a1f2e] shrink-0 ring-2 ring-pink-500/60"><CharacterSvg config={r.look} idPrefix={`ex-${r.id}`} camera="portrait" /></span>
-              <span className="min-w-0 flex-1">
-                <span className="block text-sm text-white font-semibold truncate">{r.handle} {r.main && <span className="text-[10px] text-pink-300">● rival</span>}</span>
-                <span className="block text-[11px] text-slate-400 truncate">{r.shop} · {r.area}</span>
-              </span>
-              <span className="text-[11px] text-slate-300 shrink-0">{Math.max(0, Number(r.followers) || 0)?.toLocaleString('en-NG')}</span>
-            </button>
-          ))}
-        </div>
-      </AppFrame>
-    );
-  }
-  return (
-    <AppFrame title="Gidigram" tone="bg-[#111] border-b border-white/10" right={<span className="flex gap-1.5"><button className="text-xs text-slate-300 border border-white/20 rounded-lg px-2 py-1" onClick={() => setTab('explore')}>Explore</button><button className="text-xs text-slate-300 border border-white/20 rounded-lg px-2 py-1" onClick={() => setView(view === 'grid' ? 'feed' : 'grid')}>{view === 'grid' ? 'Feed' : 'Grid'}</button></span>}>
-      <div className="px-4 py-3 flex items-center gap-4">
-        <span className="w-16 h-16 rounded-full bg-gradient-to-tr from-yellow-400 via-pink-500 to-purple-600 p-[3px] shrink-0"><span className="block w-full h-full rounded-full bg-[#111] text-white text-xl font-serif font-bold flex items-center justify-center">D</span></span>
-        <div className="grid grid-cols-3 flex-1 text-center text-white">
-          <div><div className="font-bold">{posts.length}</div><div className="text-[11px] text-slate-400">posts</div></div>
-          <div><div className="font-bold">{(s.followers || 0)?.toLocaleString('en-NG')}</div><div className="text-[11px] text-slate-400">followers</div></div>
-          <div><div className="font-bold">312</div><div className="text-[11px] text-slate-400">following</div></div>
-        </div>
-      </div>
-      <div className="px-4 pb-3 text-sm text-white">
-        <div className="font-semibold">Divine Styles · Asanwa Boutique</div>
-        <div className="text-slate-300 text-[13px]">Stylist 💇🏾‍♀️ Native & English wear 👗 {s.listing.area}, Lagos 📍</div>
-        <div className="text-[11px] text-slate-500 mt-1">Your audience brings more potential customers (+{Math.round((E.followerTraffic(s.followers || 0) - 1) * 100)}% traffic now). Engagement and audience fit improve the value of your followers.</div><div className="mt-2 rounded-xl border border-pink-400/20 bg-pink-500/5 p-2"><div className="text-[10px] uppercase tracking-wide text-pink-200">Unlocked by your audience</div><div className="text-[11px] text-slate-300 mt-1">{E.unlocksForFollowers(s.followers || 0).length ? E.unlocksForFollowers(s.followers || 0).join(" · ") : "Reach 1,000 followers to attract your first micro-influencer sponsorships."}</div></div>
-      </div>
-      {posts.length === 0 ? (
-        <p className="px-4 py-8 text-center text-sm text-slate-500">No posts yet. After a look scores 70 or more, tap "Post to Gidigram".</p>
-      ) : view === 'grid' ? (
-        <div className="grid grid-cols-3 gap-0.5">
-          {posts.map((p) => (
-            <button key={p.id} onClick={() => setView('feed')} className="aspect-square bg-gradient-to-b from-[#2a1f2e] to-[#141018] overflow-hidden relative">
-              <div className="absolute inset-x-0 -top-2"><CharacterSvg config={p.look} idPrefix={`gt-${p.id}`} camera="bust" /></div>
-              <span className="absolute bottom-1 left-1 text-[10px] text-white font-semibold drop-shadow">♥ {p.likes}</span>
-            </button>
-          ))}
-        </div>
-      ) : (
-        posts.map((p) => <PostCard key={p.id} p={p} />)
-      )}
-    </AppFrame>
-  );
-};
-
 // ---------------------------------------------------------------------------
 // Rival pages, the Top 20 and the gist blog
 // ---------------------------------------------------------------------------
 const SPECIAL: Record<string, string> = { bridal: 'Bridal & luxury', genz: 'Gen Z wear', native: 'Native & aso-ebi', cheap: 'Cheap and fast', wigs: 'Wigs & glam', menswear: 'Menswear', luxury: 'Luxury', thrift: 'Thrift', everyday: 'Everyday wear' };
-
-const RivalPage: React.FC<{ s: GameState; r: Rival; back: () => void; onVisit: (id: string) => void }> = ({ s, r, back, onVisit }) => {
-  const posts = (s.rivalPosts || []).filter((p) => p.rivalId === r.id);
-  const rank = ladder(s).findIndex((x) => x.id === r.id) + 1;
-  const feeling = r.feeling > 30 ? 'Friendly' : r.feeling < -30 ? 'Enemy' : r.feeling < 0 ? 'Cold' : 'Neutral';
-  return (
-    <div className="flex-1 min-h-0 flex flex-col">
-      <div className="bg-[#111] border-b border-white/10 px-3 py-2.5 text-white flex items-center gap-2 shrink-0">
-        <button onClick={back} className="text-xl px-1" aria-label="Back">‹</button>
-        <div className="font-semibold">{r.handle}</div>
-      </div>
-      <div className="flex-1 overflow-y-auto">
-        <div className="px-4 py-3 flex items-center gap-4">
-          <span className="w-16 h-16 rounded-full overflow-hidden bg-[#2a1f2e] ring-2 ring-pink-500 shrink-0"><CharacterSvg config={r.look} idPrefix={`rp-${r.id}`} camera="portrait" /></span>
-          <div className="grid grid-cols-3 flex-1 text-center text-white">
-            <div><div className="font-bold">{posts.length + 30}</div><div className="text-[11px] text-slate-400">posts</div></div>
-            <div><div className="font-bold">{Math.max(0, Number(r.followers) || 0)?.toLocaleString('en-NG')}</div><div className="text-[11px] text-slate-400">followers</div></div>
-            <div><div className="font-bold">#{rank}</div><div className="text-[11px] text-slate-400">Top 20</div></div>
-          </div>
-        </div>
-        <div className="px-4 pb-3 text-sm text-white">
-          <div className="font-semibold">{r.owner} · {r.shop}</div>
-          <div className="text-slate-300 text-[13px]">{SPECIAL[r.speciality]} · {TIERS[r.tier].name} in {r.area} 📍</div>
-          {r.main && <div className="text-[11px] text-slate-500 mt-1">How she feels about you: <b className={r.feeling < 0 ? 'text-rose-300' : 'text-emerald-300'}>{feeling}</b></div>}
-          <button onClick={() => onVisit(r.id)} className="mt-2 w-full rounded-lg bg-white/10 border border-white/15 py-1.5 text-sm font-semibold">Visit the shop</button>
-        </div>
-        {posts.length === 0 ? (
-          <p className="px-4 py-6 text-center text-sm text-slate-500">No new posts this month.</p>
-        ) : (
-          posts.map((p) => (
-            <div key={p.id} className="border-b border-white/10 pb-3">
-              <div className="aspect-[4/5] bg-gradient-to-b from-[#2a1f2e] to-[#141018] overflow-hidden"><CharacterSvg config={p.look} idPrefix={`rpp-${p.id}`} camera="full" /></div>
-              <div className="px-3 pt-2 text-sm text-white">
-                <div className="font-semibold">{Math.max(0, Number(p.likes) || 0)?.toLocaleString('en-NG')} likes</div>
-                <div><b>{r.handle}</b> {p.caption}</div>
-                {p.shade && <div className="text-[11px] text-rose-300 mt-0.5">Everyone in the comments thinks this is about you 👀</div>}
-                <div className="text-[10px] text-slate-500">Day {p.day}</div>
-              </div>
-            </div>
-          ))
-        )}
-      </div>
-    </div>
-  );
-};
 
 const Top20: React.FC<{ s: GameState; open: (id: string) => void }> = ({ s, open }) => {
   const rows = ladder(s);
@@ -1103,21 +969,3 @@ const WeatherApp: React.FC<{ s: GameState }> = ({ s }) => {
   );
 };
 
-const GistApp: React.FC<{ s: GameState }> = ({ s }) => (
-  <AppFrame title="GistLagos" sub="Fashion gist, no filter ☕" tone="bg-gradient-to-r from-red-600 to-rose-800">
-    {(s.gist || []).length === 0 && <p className="p-4 text-sm text-slate-400">No gist yet. Give it a few days.</p>}
-    <div className="divide-y divide-white/5">
-      {(s.gist || []).map((g) => (
-        <article key={g.id} className="px-4 py-3">
-          <div className="flex items-center gap-2 text-[10px] uppercase tracking-wider text-slate-500">
-            <span>Day {g.day}</span>
-            {g.hot && <span className="text-rose-300 font-bold">🔥 Hot</span>}
-            {g.about === 'you' && <span className="text-amber-300 font-bold">About you</span>}
-          </div>
-          <h3 className="text-white font-semibold leading-snug mt-0.5">{g.title}</h3>
-          <p className="text-[13px] text-slate-300 mt-0.5">{g.body}</p>
-        </article>
-      ))}
-    </div>
-  </AppFrame>
-);

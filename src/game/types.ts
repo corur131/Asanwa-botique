@@ -226,6 +226,8 @@ export interface RivalPost {
   caption: string;
   likes: number;
   shade?: boolean;
+  /** 'brag' posts celebrate a win (celebrity, rich client, contract, upgrade). */
+  kind?: 'work' | 'brag';
 }
 
 export interface Gist {
@@ -325,6 +327,29 @@ export interface Post {
   score: number;
   likes: number;
   gained: number;
+  /** Brag posts share news (celebrity, contract, upgrade...) rather than a styled look. */
+  kind?: 'look' | 'brag';
+  title?: string;
+}
+
+/** Something worth bragging about on Gidigram. */
+export interface BragEvent {
+  id: string;
+  day: number;
+  kind: 'celebrity' | 'contract' | 'upgrade' | 'styleOff' | 'top20' | 'collection' | 'richClient';
+  title: string;
+  detail: string;
+  /** How big a deal it is (1 small … 5 huge). */
+  weight: number;
+  posted?: boolean;
+}
+
+/** A Gidigram notification: likes, follows, comments, mentions and industry news. */
+export interface GramNote {
+  id: string;
+  day: number;
+  text: string;
+  kind: 'like' | 'follow' | 'comment' | 'mention' | 'news' | 'celebrity';
 }
 
 export interface Regular {
@@ -849,6 +874,12 @@ export interface GameState {
   dailyRanking?: { day: number; order: string[] }[];
   rivalPosts: RivalPost[];
   gist: Gist[];
+  /** Wins Divine can share on Gidigram. */
+  brags?: BragEvent[];
+  /** Gidigram activity feed. */
+  gramNotes?: GramNote[];
+  /** This week's trending colour and hashtags on Gidigram. */
+  trend?: { week: number; color: string; name: string; tags: string[] };
   drop: Drop | null;
   events: ShowEvent[];
   visit: Visit | null;

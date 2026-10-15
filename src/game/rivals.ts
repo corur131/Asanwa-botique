@@ -10,6 +10,7 @@ import { CELEBRITY_FULFILMENT_RATE, TIERS, naira } from './economy';
 import { celebrityAmountsForTier, celebrityIsScheduled, celebrityDiscoveryChance, celebrityVisitFollowThroughChance, chooseCelebrityTierForShop, celebrityProfileForTier, maximumCelebrityVisitsPerDay } from './customers';
 import { BrandMetrics, GameState, Gist, Message, ReplyChoice, Rival, RivalPost } from './types';
 import { Topic, startConvo } from './convos';
+import { addBrag, gramNote } from './gram';
 import { brandFromLegacy, brandPower, getBrandMetrics } from './business';
 
 const pick = <T,>(a: readonly T[]): T => a[Math.floor(Math.random() * a.length)];
@@ -212,8 +213,8 @@ function gist(s: GameState, title: string, body: string, about?: string, hot = f
   return { ...s, gist: [g, ...(s.gist || [])].slice(0, 40) };
 }
 
-function rivalPost(s: GameState, r: Rival, caption: string, shade = false): GameState {
-  const p: RivalPost = { id: `rp${s.day}-${Math.random().toString(36).slice(2, 7)}`, rivalId: r.id, day: s.day, look: lookFor(r.speciality === 'menswear' && chance(0.7)), caption, likes: Math.round(r.followers * rand(0.04, 0.12)), shade };
+function rivalPost(s: GameState, r: Rival, caption: string, shade = false, kind: RivalPost['kind'] = 'work'): GameState {
+  const p: RivalPost = { id: `rp${s.day}-${Math.random().toString(36).slice(2, 7)}`, rivalId: r.id, day: s.day, look: kind === 'brag' && chance(0.5) ? r.look : lookFor(r.speciality === 'menswear' && chance(0.7)), caption, likes: Math.round(r.followers * rand(kind === 'brag' ? 0.08 : 0.04, kind === 'brag' ? 0.18 : 0.12)), shade, kind };
   return { ...s, rivalPosts: [p, ...(s.rivalPosts || [])].slice(0, 60) };
 }
 
@@ -245,17 +246,15 @@ export function announceCelebrityVisit(s0: GameState, event: CelebrityVisitAnnou
       : `${event.celebrityName} visited but left without completing a purchase.`;
   const body = `${event.ownerName} of ${event.shopName}: ${outcome} Stock, styling and fulfilment costs are accounted for separately.`;
   s = gist(s, headline, body, event.shopId, event.premiumOrder || !event.bought);
-  s = say(s, 'GistLagos',
-    `🚨 CELEBRITY SIGHTING: ${event.shopName} (${event.ownerName}) — ${event.premiumOrder ? `premium order reported at ${moneyText}` : event.bought ? `a purchase reported at ${moneyText}` : 'no purchase was recorded'}.`,
-    { chat: GROUP, tone: event.bought ? 'good' : 'warn' });
+  s = gramNote(s, `🚨 CELEBRITY SIGHTING: ${event.celebrityName} at ${event.shopName} — ${event.premiumOrder ? `premium order reported at ${moneyText}` : event.bought ? `a purchase reported at ${moneyText}` : 'no purchase was recorded'}.`, 'celebrity');
   if (event.shopId === 'you') {
     const gainText = event.followerGain ? ` +${event.followerGain?.toLocaleString('en-NG')} followers.` : '';
-    s = say(s, 'Gidigram', event.premiumOrder
+    s = gramNote(s, event.premiumOrder
       ? `TRENDING NOW 🔥 ${event.celebrityName} placed a premium order at Asanwa Boutique and posted the look.${gainText}`
       : event.bought
         ? `CELEBRITY SPOTTED ✨ ${event.celebrityName} shopped at Asanwa Boutique. Reported revenue: ${moneyText}.`
-        : `CELEBRITY SIGHTING: ${event.celebrityName} visited Asanwa Boutique but left without buying.`,
-      { tone: event.premiumOrder ? 'good' : event.bought ? 'info' : 'warn' });
+        : `CELEBRITY SIGHTING: ${event.celebrityName} visited Asanwa Boutique but left without buying.`, 'celebrity');
+    if (event.bought) s = addBrag(s, 'celebrity', `${event.celebrityName} shopped with us`, `${event.celebrityName} ${event.premiumOrder ? 'placed a premium order' : 'bought a look'} at Asanwa Boutique.`, event.premiumOrder ? 5 : 4);
     s = say(s, 'Asanwa Boutique',
       `Celebrity update: ${event.celebrityName} ${event.premiumOrder ? `placed a premium order worth ${moneyText}` : event.bought ? `made a purchase worth ${moneyText}` : 'left without placing an order'}.`,
       { chat: GROUP, tone: event.bought ? 'good' : 'warn' });
@@ -263,12 +262,11 @@ export function announceCelebrityVisit(s0: GameState, event: CelebrityVisitAnnou
       s = { ...s, today: { ...s.today, events: [...(s.today?.events || []), headline] } };
     }
   } else {
-    s = say(s, 'Gidigram', event.premiumOrder
-      ? `FASHION ALERT ✨ ${event.celebrityName} reportedly placed a premium order at ${event.shopName}: ${moneyText}. Asanwa and the rest of Lagos are watching.`
+    s = gramNote(s, event.premiumOrder
+      ? `FASHION ALERT ✨ ${event.celebrityName} reportedly placed a premium order at ${event.shopName}: ${moneyText}.`
       : event.bought
         ? `CELEBRITY SPOTTED ✨ ${event.celebrityName} made a purchase at ${event.shopName}.`
-        : `CELEBRITY SIGHTING: ${event.celebrityName} visited ${event.shopName} but left without an order.`,
-      { tone: event.premiumOrder ? 'good' : event.bought ? 'info' : 'warn' });
+        : `CELEBRITY SIGHTING: ${event.celebrityName} visited ${event.shopName} but left without an order.`, 'celebrity');
     const rival = rivalById(s, event.shopId);
     if (rival) s = rivalPost(s, rival,
       event.premiumOrder
@@ -276,7 +274,7 @@ export function announceCelebrityVisit(s0: GameState, event: CelebrityVisitAnnou
         : event.bought
           ? `${event.celebrityName} purchased a wardrobe at ${event.shopName} ✨ #LagosFashion`
           : `${event.celebrityName} visited ${event.shopName} today, but no order was completed.`,
-      !event.bought);
+      !event.bought, event.bought ? 'brag' : 'work');
     if (rival?.main) s = inGroup(s, rival,
       event.premiumOrder
         ? `Celebrity client in my shop today 😌✨ Reported order: ${moneyText}. The industry is watching.`
@@ -628,6 +626,7 @@ export function simulateRivals(s0: GameState): GameState {
       s = gist(s, `${r.shop} moves to a ${TIERS[r.tier].name}!`, `${r.owner} has upgraded. Sources say the rent is not small.`, r.id);
       if (r.main) {
         s = talk(s, r, pick([`Guess who just signed for a ${TIERS[r.tier].name}? 😌🔑`, `New shop, new level. ${TIERS[r.tier].name} babyyyy 🎉`, `God did! We have moved to a ${TIERS[r.tier].name} 🙏🏾`]), 'brag');
+        s = rivalPost(s, r, pick([`New shop, new chapter 🔑✨ ${r.shop} is now a ${TIERS[r.tier].name}. Come and see us!`, `We moved UP 😌🔑 ${TIERS[r.tier].name} in ${r.area}. God did 🙏🏾`]), false, 'brag');
         for (const o of mainRivals(s).filter((x) => x.id !== r.id && chance(0.5))) s = inGroup(s, o, chance(0.5) ? pick(LINES.jealous) : pick(LINES.welcomeUp(r.owner.split(' ')[0])));
       }
     } else if (n.kind === 'down') {
@@ -651,6 +650,12 @@ export function simulateRivals(s0: GameState): GameState {
   for (const r of mainRivals(s)) {
     if (chance(0.18)) s = chance(0.6) ? talk(s, r, pick(LINES.brag[r.personality]), 'brag') : inGroup(s, r, pick(LINES.brag[r.personality]), { ctx: { kind: 'brag', rivalId: r.id } });
     if (chance(0.3)) s = rivalPost(s, r, pick(LINES.brag[r.personality]));
+    // Big days get bragged about: rich clients and, for bigger shops, official contracts.
+    if (r.tier >= 1 && chance(0.06)) s = rivalPost(s, r, pick([`Big madam in the shop today 👑 Full wardrobe, no price talk 😌💸 #LagosLuxury`, `When the rich client says "do anything you like" ✨ #${r.shop.replace(/[^A-Za-z]/g, '')}`, `Luxury client, luxury look 💎 Booked again for next week`]), false, 'brag');
+    if (r.tier >= 2 && chance(0.03)) {
+      s = rivalPost(s, r, pick([`Official supplier for a government event 📦🇳🇬 Signed and delivered`, `Another office contract delivered on time 😌 Thank you for the trust`]), false, 'brag');
+      s = gist(s, `${r.shop} lands an official clothing contract`, `${r.owner} confirmed a government supply deal this week. The fashion group chat is talking.`, r.id);
+    }
     // shade: more when Divine is doing well, and from those who dislike her
     const threat = s.today.bestScore >= 85 || lastRank(s, 'you') > youRank ? 0.12 : 0.04;
     if (chance(threat * (0.4 + r.aggression) * (r.feeling < 0 ? 1.5 : 1))) {
@@ -681,11 +686,12 @@ export function publishLadder(s0: GameState): GameState {
   s = { ...s, ranking: [...(s.ranking || []), { week: Math.floor(s.day / 7), order }].slice(-12) };
   const top3 = rows.slice(0, 3).map((r, i) => `${i + 1}. ${r.name}`).join(', ');
   s = gist(s, `Top 20 Boutiques in Lagos: week ${Math.floor(s.day / 7)}`, `${top3}. Asanwa Boutique is #${now}${prev ? ` (${prev > now ? `up from #${prev}` : prev < now ? `down from #${prev}` : 'no change'})` : ''}.`, undefined, true);
-  s = say(s, 'GistLagos', `🏆 This week's Top 20 Boutiques is out! #1 ${rows[0].name}. Asanwa Boutique: #${now}.`, { chat: GROUP });
+  s = gramNote(s, `🏆 This week's Top 20 Boutiques is out! #1 ${rows[0].name}. Asanwa Boutique: #${now}.`, 'news');
   if (prev && now < prev) {
     const passed = rows.slice(now, prev).map((r) => rivalById(s, r.id)).filter((r): r is Rival => !!r && r.main);
     for (const r of passed.slice(0, 2)) s = talk(s, r, pick(LINES.jealous), 'jealous');
     s = say(s, 'Deborah', `Sis!! You're #${now} on the Top 20 now! Tolani was asking me who your landlord is 👀`, { tone: 'good' });
+    s = addBrag(s, 'top20', `Up to #${now} on the Top 20`, `Asanwa Boutique climbed from #${prev} to #${now} on this week's Top 20.`, now <= 3 ? 4 : 2);
   }
   return s;
 }
@@ -696,6 +702,7 @@ export function reactToMove(s0: GameState, up: boolean): GameState {
   if (!s.rivals?.length) return s;
   if (up) {
     s = gist(s, `Asanwa Boutique moves to ${s.listing.area}!`, `Divine has signed for a ${TIERS[s.tier].name} on ${s.listing.street}. Her rivals are watching.`, 'you');
+    s = addBrag(s, 'upgrade', `We moved to a ${TIERS[s.tier].name}`, `Asanwa Boutique now trades from a ${TIERS[s.tier].name} on ${s.listing.street}, ${s.listing.area}.`, 3 + Math.min(2, Math.floor(s.tier / 3)));
     for (const r of mainRivals(s).filter(() => chance(0.6))) s = r.feeling < 10 ? talk(s, r, pick(LINES.jealous), 'jealous') : inGroup(s, r, pick(LINES.welcomeUp('Divine')));
   } else {
     s = gist(s, `Landlord throws Asanwa Boutique out!`, `Divine has moved to a ${TIERS[s.tier].name}. Rivals are laughing in the group chat.`, 'you', true);
