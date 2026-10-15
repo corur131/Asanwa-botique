@@ -396,7 +396,7 @@ export default function GameApp({ onLab, initial, storageKey, cloud, notice }: {
           </div>
         </div>
         {s.weather && <div className="text-xs text-sky-200" title={`${seasonOf(s.day).name}: ${seasonOf(s.day).blurb}`}>
-          {WEATHER_INFO[s.weather].icon} {WEATHER_INFO[s.weather].title} · {Math.round(outdoorNow(s))}°C · {seasonOf(s.day).name}
+          {WEATHER_INFO[s.weather].icon} {WEATHER_INFO[s.weather].title} · {Math.round(outdoorNow(s))}°C{s.phase === 'shop' ? ` · inside ${Math.round(E.shopClimate(s).indoor)}°C` : ''} · {seasonOf(s.day).name}
         </div>}
         <div className={`text-lg font-bold ${s.cash < 0 ? 'text-rose-300' : 'text-emerald-300'}`}>{naira(s.cash)}</div>
         <div className="rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-xs"><div className="text-[10px] text-slate-400">Brand Power</div><div className="font-bold text-fuchsia-200">{brandPower(getBrandMetrics(s), s.followers || 0, s.tier)?.toLocaleString("en-NG")}</div></div>
@@ -1054,6 +1054,56 @@ const SecurityMenu: React.FC<{
 };
 
 /** NEPA status and the generator switch. */
+const COMFORT_LABEL: Record<E.ShopClimate['status'], { text: string; tone: string }> = {
+  cold: { text: 'Too cold', tone: 'text-sky-300' },
+  cool: { text: 'Cool', tone: 'text-cyan-200' },
+  comfy: { text: 'Comfortable', tone: 'text-emerald-300' },
+  warm: { text: 'Warm', tone: 'text-amber-300' },
+  hot: { text: 'Too hot', tone: 'text-rose-300' },
+};
+
+/** Inside vs outside, AC size vs shop size, and the thermostat. */
+const ClimateCard: React.FC<{ s: GameState; up: (f: (g: GameState) => GameState) => void }> = ({ s, up }) => {
+  const c = E.shopClimate(s);
+  const label = COMFORT_LABEL[c.status];
+  const coverage = Math.round((c.acInstalled / c.area) * 100);
+  const advice = c.status === 'cold'
+    ? 'Customers are shivering. Raise the thermostat or switch some AC off.'
+    : c.acInstalled === 0
+      ? c.status === 'hot' || c.status === 'warm' ? 'No AC: on hot days the shop cooks. A fan helps a little; AC fixes it.' : 'No AC needed in this weather.'
+      : c.acInstalled < c.area * 0.95
+        ? `Your AC is too small for this shop: it covers about ${Math.round(c.acInstalled)} of ${c.area} m². On hot afternoons it cannot keep up.`
+        : c.acArea === 0
+          ? 'The AC is off or has no power right now.'
+          : c.acStruggling ? 'The AC is running flat out and still cannot reach the thermostat.' : 'The AC is big enough for this shop.';
+  return (
+    <div className="rounded-xl border border-white/10 bg-white/5 p-3 space-y-2">
+      <div className="flex items-center justify-between gap-2">
+        <b className="text-white">Shop climate</b>
+        <span className={`font-semibold ${label.tone}`}>{label.text}</span>
+      </div>
+      <div className="grid grid-cols-3 gap-2 text-center">
+        <div className="rounded-lg bg-black/20 p-1.5"><div className="text-slate-400 text-[10px]">Outside</div><b className="text-base text-white">{Math.round(c.outdoor)}°C</b></div>
+        <div className="rounded-lg bg-black/20 p-1.5"><div className="text-slate-400 text-[10px]">Inside</div><b className="text-base text-white">{Math.round(c.indoor)}°C</b></div>
+        <div className="rounded-lg bg-black/20 p-1.5"><div className="text-slate-400 text-[10px]">Feels like</div><b className={`text-base ${label.tone}`}>{Math.round(c.feels)}°C</b></div>
+      </div>
+      <div>
+        <div className="flex justify-between text-[11px] text-slate-400"><span>AC capacity</span><span>{Math.round(c.acInstalled)} m² of AC for a {c.area} m² shop</span></div>
+        <div className="h-1.5 rounded-full bg-white/10 overflow-hidden"><div className={`h-full ${coverage >= 95 ? 'bg-emerald-400' : coverage >= 50 ? 'bg-amber-400' : 'bg-rose-500'}`} style={{ width: `${Math.min(100, coverage)}%` }} /></div>
+      </div>
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-slate-300">AC thermostat</span>
+        <span className="flex items-center gap-1.5">
+          <button type="button" aria-label="Lower thermostat" disabled={c.setpoint <= E.THERMOSTAT.min} onClick={() => up((g) => E.setThermostat(g, E.shopClimate(g).setpoint - 1))} className="h-8 w-8 rounded-full bg-white/10 text-white font-bold disabled:opacity-30">−</button>
+          <b className="w-12 text-center text-base text-white tabular-nums">{c.setpoint}°C</b>
+          <button type="button" aria-label="Raise thermostat" disabled={c.setpoint >= E.THERMOSTAT.max} onClick={() => up((g) => E.setThermostat(g, E.shopClimate(g).setpoint + 1))} className="h-8 w-8 rounded-full bg-white/10 text-white font-bold disabled:opacity-30">+</button>
+        </span>
+      </div>
+      <p className="text-[11px] text-slate-400">{advice} Comfortable is about 21–26°C.</p>
+    </div>
+  );
+};
+
 const PowerChip: React.FC<{ s: GameState; up: (f: (g: GameState) => GameState) => void }> = ({ s, up }) => {
   const [open, setOpen] = useState(false);
   const st = E.stats(s);
@@ -1075,6 +1125,7 @@ const PowerChip: React.FC<{ s: GameState; up: (f: (g: GameState) => GameState) =
       <div onClick={(e) => e.stopPropagation()} className="max-h-[85vh] w-full max-w-md space-y-2 overflow-y-auto rounded-t-2xl border border-white/15 bg-[#11141d] p-4 pb-6 shadow-2xl sm:rounded-2xl">
         <div className="mx-auto mb-1 h-1 w-10 rounded-full bg-white/20 sm:hidden" />
         <div className="flex items-center justify-between gap-2"><b className="text-sm text-white">Power &amp; Utilities</b><span className="flex items-center gap-2"><span className={src === 'none' ? 'text-rose-300' : 'text-emerald-300'}>{sourceLabel}</span><button type="button" aria-label="Close" onClick={() => setOpen(false)} className="h-7 w-7 rounded-full bg-white/10 text-slate-300">✕</button></span></div>
+        <ClimateCard s={s} up={up} />
         <div className="grid grid-cols-2 gap-2">
           <div className="rounded-lg bg-white/5 p-2"><div className="text-slate-400">Current load</div><b>{load.toFixed(2)} kW</b></div>
           <div className="rounded-lg bg-white/5 p-2"><div className="text-slate-400">Daily energy estimate</div><b>{dailyKwh.toFixed(1)} kWh</b></div>

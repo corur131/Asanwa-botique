@@ -278,6 +278,10 @@ export interface FurnitureDef {
   seats?: number;
   /** Cooling, 0..1: customers wait longer and reputation grows faster. Needs light or a generator. */
   cool?: number;
+  /** m² of floor one AC unit can cool to the thermostat. */
+  coolArea?: number;
+  /** m² of floor a fan keeps the air moving over. */
+  fanArea?: number;
   /** Is an air conditioner (needs a big generator or 3+ solar panels in a blackout). */
   ac?: boolean;
   /** A generator: small runs lights and fans; big runs everything. You switch it on; it burns fuel. */
@@ -354,10 +358,12 @@ export const FURNITURE: FurnitureDef[] = [
   { id: 'sofa', name: 'Sofa', price: 110_000, w: 2, d: 1, mount: 'floor', group: 'Seating', seats: 4, prestige: 2, minTier: 1, note: 'Four people wait in comfort.' },
   { id: 'velvetSofa', name: 'Velvet lounge sofa', price: 380_000, w: 3, d: 1, mount: 'floor', group: 'Seating', seats: 6, prestige: 4, minTier: 3, richBonus: 1, note: 'Six people, and the rich ones love it.' },
   // comfort and power
-  { id: 'fan', name: 'Standing fan', price: 15_000, w: 1, d: 1, mount: 'floor', group: 'Comfort & power', cool: 0.15, prestige: 0, note: 'A bit cooler: people wait longer. Off when NEPA takes light.' },
-  { id: 'ceilingFan', name: 'Ceiling fan', price: 28_000, w: 1, d: 1, mount: 'ceiling', group: 'Comfort & power', cool: 0.2, prestige: 0, note: 'Cooler, and no floor space. Needs light.' },
-  { id: 'ac', name: 'Split AC', price: 220_000, w: 1, d: 1, mount: 'wall', group: 'Comfort & power', cool: 0.4, ac: true, prestige: 2, minTier: 1, note: 'Cold shop: people wait much longer, reputation grows faster. Needs light.' },
-  { id: 'standingAc', name: 'Standing AC', price: 380_000, w: 1, d: 1, mount: 'floor', group: 'Comfort & power', cool: 0.55, ac: true, prestige: 2, minTier: 2, note: 'The coldest shop on the street. Needs light.' },
+  { id: 'fan', name: 'Standing fan', price: 15_000, w: 1, d: 1, mount: 'floor', group: 'Comfort & power', cool: 0.15, fanArea: 15, prestige: 0, note: 'Moves the air over about 15 m²: feels up to 3°C cooler. Off when NEPA takes light.' },
+  { id: 'ceilingFan', name: 'Ceiling fan', price: 28_000, w: 1, d: 1, mount: 'ceiling', group: 'Comfort & power', cool: 0.2, fanArea: 20, prestige: 0, note: 'Moves the air over about 20 m², and takes no floor space. Needs light.' },
+  { id: 'ac', name: 'Split AC (1.5HP)', price: 220_000, w: 1, d: 1, mount: 'wall', group: 'Comfort & power', cool: 0.4, ac: true, coolArea: 25, prestige: 2, minTier: 1, note: 'Cools about 25 m² to your thermostat. Too small for a big shop on its own. Needs light.' },
+  { id: 'standingAc', name: 'Standing AC (3HP)', price: 380_000, w: 1, d: 1, mount: 'floor', group: 'Comfort & power', cool: 0.55, ac: true, coolArea: 50, prestige: 2, minTier: 2, note: 'Cools about 50 m² to your thermostat. Needs light.' },
+  { id: 'industrialAc', name: 'Industrial floor AC (5HP)', price: 850_000, w: 1, d: 1, mount: 'floor', group: 'Comfort & power', cool: 0.6, ac: true, coolArea: 110, prestige: 3, minTier: 3, note: 'Cools about 110 m². Built for big boutiques and flagships. Needs light; draws 3.7 kW.' },
+  { id: 'centralAc', name: 'Central AC system (ducted)', price: 4_800_000, w: 1, d: 1, mount: 'yard', group: 'Comfort & power', cool: 0.7, ac: true, coolArea: 320, prestige: 4, minTier: 5, note: 'Outdoor plant in the yard, vents in the ceiling. Cools about 320 m². Needs serious power: 9 kW.' },
   { id: 'securityPost', name: 'Small security post', price: 55_000, w: 1, d: 1, mount: 'yard', group: 'Comfort & power', prestige: 0, note: 'Hire a security guard to protect the entrance and run fuel errands.' },
   { id: 'smallGen', name: '"I better pass my neighbour" generator', price: 70_000, w: 1, d: 1, mount: 'yard', group: 'Comfort & power', gen: 'small', prestige: -1, note: 'Stands in the yard outside. Start it when NEPA takes light; runs lights and fans, not AC. 10-litre tank, burns about 1.2 litres an hour. Loud!' },
   { id: 'generator', name: 'Soundproof generator', price: 260_000, w: 1, d: 1, mount: 'yard', group: 'Comfort & power', gen: 'big', prestige: 1, minTier: 1, note: 'Stands in the yard outside. Runs everything, AC included. 30-litre tank, burns about 2.6 litres an hour.' },
@@ -400,7 +406,7 @@ export const FURNITURE: FurnitureDef[] = [
   { id: 'umbrellaCanopy', name: 'Street umbrella canopy', price: 32_000, w: 1, d: 1, mount: 'yard', group: 'Decor', patience: 0.05, prestige: 1, note: 'Shields the queue outside from Lagos sun and rain.' },
   { id: 'flowerWall', name: 'Gidigram flower wall', price: 55_000, w: 2, d: 1, mount: 'wall', group: 'Decor', prestige: 2, traffic: 0.04, note: 'A photo backdrop that boosts Gidigram engagement.' },
   { id: 'lantern', name: 'Rechargeable shop lantern', price: 12_000, w: 1, d: 1, mount: 'ceiling', group: 'Lighting', prestige: 0, note: 'Keeps the shop visible during outages and softens the dark-shop styling penalty.' },
-  { id: 'rechargeableFan', name: 'Rechargeable standing fan', price: 38_000, w: 1, d: 1, mount: 'floor', group: 'Comfort & power', cool: 0.12, prestige: 1, note: 'A backup fan helps Divine and customers cope when NEPA takes light.' },
+  { id: 'rechargeableFan', name: 'Rechargeable standing fan', price: 38_000, w: 1, d: 1, mount: 'floor', group: 'Comfort & power', cool: 0.12, fanArea: 12, prestige: 1, note: 'A backup fan helps Divine and customers cope when NEPA takes light.' },
   // 27 more working shop upgrades: display capacity, service quality, comfort and safety
   { id: 'boutiqueDesk', name: 'Reception desk', price: 42_000, w: 1, d: 1, mount: 'floor', group: 'Display', patience: 0.08, prestige: 1, note: 'A proper welcome point helps customers wait a little longer.' },
   { id: 'doubleSofa', name: 'Two-piece waiting sofa', price: 145_000, w: 2, d: 1, mount: 'floor', group: 'Seating', seats: 5, patience: 0.08, prestige: 2, minTier: 1, note: 'Five extra comfortable waiting places.' },
@@ -482,7 +488,7 @@ export const footprint = (p: Pick<Placed, 'id' | 'rot'>) => {
 export const usesFloor = (id: string) => furnitureById(id).mount === 'floor' && !furnitureById(id).walkable;
 
 /** Appliances Divine can switch on and off. */
-export const SWITCHABLE = new Set(['fan', 'ceilingFan', 'ac', 'standingAc', 'speaker', 'tv']);
+export const SWITCHABLE = new Set(['fan', 'ceilingFan', 'ac', 'standingAc', 'industrialAc', 'centralAc', 'speaker', 'tv']);
 /** Furniture with switched-off appliances left out (they stop cooling, playing, drawing power). */
 export const liveItems = (items: Placed[], off?: Record<string, boolean>) => (off && Object.keys(off).length ? items.filter((p) => !off[p.uid]) : items);
 

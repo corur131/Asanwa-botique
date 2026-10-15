@@ -4,9 +4,9 @@ import { OrbitControls } from '@react-three/drei';
 import * as THREE from 'three';
 import { GameState, Pose } from '../types';
 import { RoomStyle, finishes, room, cellsBlocked, footprint, furnitureById, wallLayout, wallFits, Placed, canPlace, yardCapacity, solarRackCapacity, Rot, rotAngle } from '../shop';
-import { solarCap, source } from '../power';
+import { solarCap, source, thermostatOf } from '../power';
 import { stats } from '../engine';
-import { ApplianceOn, CeilingPiece, FloorPiece, WallPiece, B, MirrorLive } from './Furniture3D';
+import { ApplianceOn, CeilingPiece, FloorPiece, WallPiece, B, MirrorLive, Thermostat } from './Furniture3D';
 import { Cell, Figure, FigureLook, Walker, lookToFigure } from './People';
 import { productKey } from '../market';
 import { WeatherFx, daylightFor, skyFor } from './WeatherFx';
@@ -1036,6 +1036,10 @@ function Yard({ s, selected, onTap }: { s: GameState; selected: string | null; o
                   <meshStandardMaterial color={s.security?.trip ? "#E8B84A" : "#46A36B"} emissive={s.security?.trip ? "#E8B84A" : "#46A36B"} emissiveIntensity={0.4} />
                 </mesh>
               </group>
+            ) : p.id === 'centralAc' ? (
+              <ApplianceOn.Provider value={src !== 'none' && src !== 'solar' && !(src === 'gen' && st.gen === 'small') && !s.off?.[p.uid]}>
+                <FloorPiece id="centralAc" colors={[]} />
+              </ApplianceOn.Provider>
             ) : p.id === 'umbrellaCanopy' ? (
               <group>
                 {/* Distinctive parasol silhouette: tapered fabric, raised crown, rounded scalloped rim. */}
@@ -1512,7 +1516,9 @@ export default function ShopScene(p: SceneProps) {
         <CameraPad r={r} cmd={p.camCmd} view={view} />
         <WeatherFx weather={s.weather} w={r.w} d={r.d} />
         <Room r={dressed} tier={s.tier} painted={!!fin.paint} />
+        <Thermostat.Provider value={thermostatOf(s)}>
         <Furniture s={s} selected={p.selected} placing={p.placing} wallPlacing={p.wallPlacing} onTap={tap} dark={p.dark} reflections={p.reflections} />
+        </Thermostat.Provider>
         {p.build && <BuildGrid r={r} />}
         {people}
         {p.placing && <PlacingGhost s={s} placing={p.placing} />}
