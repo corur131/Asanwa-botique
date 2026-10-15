@@ -15,9 +15,9 @@ import { colourName, sameColour } from './colours';
 import { FURNITURE, KIOSK_LISTING, Listing, Placed, STARTER_FURNITURE, autoPlace, prepareFurnitureForMove,
   findSpot, canPlace, turn, Rot, ceilingCapacity, ceilingUsed, yardCapacity, yardUsed, cheapestListing, furnitureById, listingsFor, newUid, prestigeRichShift, prestigeTraffic, shopStats, usesFloor, wallCapacity, wallUsed, MoveEquipmentPlan } from './shop';
 import { CharacterMemory, CollaborationEvent, CollaborationReply, Customer, DayLog, Departure, Design, ReplyChoice, GameState, LedgerLine, Message, PoliticianContract, PoliticianContractRequirement, Regular, ScoreBreakdown, Settlement, SponsorshipOffer, StaffMember, StaffProfession, StyleChoice, Visitor } from './types';
-import { closeBrandDay, ensureBusinessState, getBrandMetrics, initialBankState, processBankWeekly, processFixedDepositMaturities, processPromotionAtClose, processExpansionAtClose, promotionTrafficBoost, recordWeeklyWealth, saveRentAtClose } from './business';
+import { autoSaveAtClose, closeBrandDay, ensureBusinessState, getBrandMetrics, initialBankState, investmentValue, processBankWeekly, processFixedDepositMaturities, processInvestments, processPromotionAtClose, processExpansionAtClose, promotionTrafficBoost, recordWeeklyWealth, saveRentAtClose } from './business';
 
-export { brandPower, currentWealthRows, financialAssets, getBrandMetrics, creditProfile, creditRating, creditHistoryReport, premiumLoanEligible, takePremiumBusinessLoan, renegotiateBusinessLoan, loanRateForScore, maximumLoan, netWorthPlayer, netWorthRival, playerWeekTotals, totalLiabilities, unlocksForFollowers, availablePromotionLevels, promotionBudgetBounds, promotionTrafficBoost, startPromotion, stopPromotion, wholesaleUpgradeQuote, upgradeWholesaleInventory, transferBank, setRentSaving, setSavingsGoal, createFixedDeposit, takeBusinessLoan, repayBusinessLoan, arrangeBusinessLoanRepayment, expansionOptions, investInExpansion, financeExpansionPurchase } from './business';
+export { brandPower, currentWealthRows, financialAssets, getBrandMetrics, creditProfile, creditRating, creditHistoryReport, premiumLoanEligible, takePremiumBusinessLoan, renegotiateBusinessLoan, loanRateForScore, maximumLoan, netWorthPlayer, netWorthRival, playerWeekTotals, totalLiabilities, unlocksForFollowers, availablePromotionLevels, promotionBudgetBounds, promotionTrafficBoost, startPromotion, stopPromotion, wholesaleUpgradeQuote, upgradeWholesaleInventory, transferBank, setRentSaving, setSavingsGoal, createFixedDeposit, breakFixedDeposit, fixedDepositRate, FIXED_DEPOSIT_TERMS, buyTreasuryBill, treasuryBillYield, TBILL_TENORS, buyBond, sellBond, bondCoupon, BOND_TERMS, MIN_INVESTMENT, bankMarket, investmentValue, setAutoSave, loanPayoffQuote, loanInterestToDate, LOAN_PROCESSING_FEE_RATE, takeBusinessLoan, repayBusinessLoan, arrangeBusinessLoanRepayment, expansionOptions, investInExpansion, financeExpansionPurchase } from './business';
 
 const pick = <T,>(a: readonly T[]): T => a[Math.floor(Math.random() * a.length)];
 const chance = (p: number) => Math.random() < p;
@@ -41,6 +41,7 @@ export function cashFlowSummary(s: GameState) {
     openingCash, cash, operatingResult, cashChange, otherMovement,
     savings: Math.round(bank.savings || 0), rentVault: Math.round(bank.rentVault || 0),
     fixedDeposits: Math.round(fixedDeposits),
+    investments: investmentValue(s),
     recentMovements,
   };
 }
@@ -1106,11 +1107,14 @@ export function closeShop(s0: GameState): GameState {
 
   // Fixed deposits mature on their exact due day, not only on weekly banking days.
   s = processFixedDepositMaturities(s);
+  // Treasury bills mature daily; bonds pay weekly coupons and repay at maturity.
+  s = processInvestments(s);
 
   // Clear any old rent arrears from the Rent Vault and available cash before
   // saving for the next bill or creating a new rent liability.
   s = settleLateRent(s);
   s = saveRentAtClose(s);
+  s = autoSaveAtClose(s);
 
   if (s.day % 7 === 0) {
     s = payRent(s);

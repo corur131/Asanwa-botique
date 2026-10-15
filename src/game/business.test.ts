@@ -34,6 +34,8 @@ import {
   startPromotion,
   processPromotionAtClose,
   recordWeeklyWealth,
+  loanPayoffQuote, loanInterestToDate, createFixedDeposit, fixedDepositRate, breakFixedDeposit,
+  buyTreasuryBill, processInvestments, buyBond, sellBond, setRentSaving, setAutoSave, autoSaveAtClose,
 } from './business';
 import { TIERS } from './economy';
 
@@ -152,8 +154,8 @@ test('loan disbursement and principal repayment preserve net worth apart from in
   const beforeWorth = netWorthPlayer(before);
   const borrowed = takeBusinessLoan(before, 100_000, 8);
   assert.notEqual(borrowed, before, 'eligible loan should be approved');
-  assert.equal(borrowed.cash, before.cash + 100_000);
-  assert.equal(netWorthPlayer(borrowed), beforeWorth, 'cash and loan liability rise by the same amount');
+  assert.equal(borrowed.cash, before.cash + 100_000 - 1_000, 'the 1% processing fee is taken from the payout');
+  assert.equal(netWorthPlayer(borrowed), beforeWorth - 1_000, 'cash and loan liability rise together; only the fee is a cost');
 
   const loan = borrowed.bank!.loans[0];
   const repaid = repayBusinessLoan(borrowed, loan.id, 10_000);
@@ -258,9 +260,11 @@ test('partial loan repayment reduces both debt and recorded arrears without eras
     cash: 5_000,
     bank: { ...initialBankState(), loans: [loan] },
   });
+  // Day 10 is 3 days into the week that started on day 7: 3/7 of the 2,000 weekly interest is paid first.
   const after = repayBusinessLoan(before, 'loan-test', 3_000);
   assert.equal(after.cash, 2_000);
-  assert.equal(after.bank!.loans[0].balance, 97_000);
+  assert.equal(after.bank!.loans[0].balance, 100_000 - (3_000 - 857));
+  assert.equal(after.bank!.loans[0].periodInterestPaid, 857);
   assert.equal(after.bank!.loans[0].arrearsBalance, 9_000);
   assert.equal(after.bank!.loans[0].missedPayments, 1);
 });
@@ -1184,4 +1188,65 @@ test('weekly wealth rankings and value changes reflect the new financial positio
   assert.ok(tolaniNow.rank < ivoryNow.rank, 'the richer rival should take the higher weekly wealth rank');
   assert.ok(ivoryNow.wealthChange < 0, 'wealth history should record Ivory Lane losing value');
   assert.ok(tolaniNow.wealthChange > 0, 'wealth history should record House of Tolani gaining value');
+});
+
+
+test('loans charge interest even when repaid early: at least one week, plus a 1% fee', () => {
+  const before = state({ day: 15, tier: 3, cash: 2_000_000, history: Array.from({ length: 7 }, (_, i) => ({ day: i + 8, served: 5, walkedOut: 0, lost: 0, income: 2_000_000, costs: 500_000, tips: 0, bestScore: 80, repChange: 0, staffServed: 0, events: [] })) });
+  const borrowed = takeBusinessLoan(before, 1_000_000, 8);
+  assert.notEqual(borrowed, before);
+  const loan = borrowed.bank!.loans[0];
+  assert.equal(borrowed.cash, before.cash + 1_000_000 - 10_000, '1% processing fee');
+  const quote = loanPayoffQuote(loan, borrowed.day);
+  const weekInterest = Math.round(1_000_000 * loan.weeklyRatePct / 100);
+  assert.equal(quote.interest, weekInterest, 'same-day payoff still costs one week of interest');
+  const cleared = repayBusinessLoan(borrowed, loan.id, quote.total);
+  assert.equal(cleared.bank!.loans.length, 0);
+  assert.equal(cleared.cash, borrowed.cash - 1_000_000 - weekInterest);
+  // Paying 4 days in: interest so far is 4/7 of a week, but never less than the minimum week.
+  const later = { ...borrowed, day: borrowed.day + 4 };
+  assert.equal(loanInterestToDate(loan, later.day), Math.round(1_000_000 * loan.weeklyRatePct / 100 * 4 / 7));
+});
+
+test('fixed deposits take any amount from cash or savings, pay more for longer and bigger, and can be broken', () => {
+  const before = state({ cash: 50_000_000, bank: { ...initialBankState(), savings: 0 } });
+  const fd = createFixedDeposit(before, 20_000_000, 180, 'cash');
+  assert.equal(fd.cash, 30_000_000);
+  const deposit = fd.bank!.fixedDeposits[0];
+  assert.ok(deposit.ratePct > fixedDepositRate(20_000_000, 28), 'longer terms pay more');
+  assert.ok(fixedDepositRate(200_000_000, 28) > fixedDepositRate(200_000, 28), 'bigger deposits pay more');
+  assert.ok(deposit.ratePct / (180 / 7) > 0.65, 'beats the savings rate per week');
+  const broken = breakFixedDeposit(fd, deposit.id);
+  assert.equal(broken.bank!.savings, 20_000_000, 'principal back, interest forfeited');
+  assert.equal(broken.bank!.fixedDeposits.length, 0);
+});
+
+test('treasury bills pay face value at maturity; bonds pay weekly coupons and can be sold early', () => {
+  let s = state({ day: 14, cash: 10_000_000, bank: { ...initialBankState(), savings: 0 } });
+  s = buyTreasuryBill(s, 1_000_000, 28);
+  const bill = s.bank!.treasuryBills![0];
+  assert.ok(bill.cost < 1_000_000 && s.cash === 10_000_000 - bill.cost, 'bought below face value');
+  const atMaturity = processInvestments({ ...s, day: bill.maturityDay });
+  assert.equal(atMaturity.cash, s.cash + 1_000_000);
+  assert.equal(atMaturity.bank!.treasuryBills!.length, 0);
+
+  s = buyBond(s, 2_000_000, 8);
+  const bond = s.bank!.bonds![0];
+  const week = processInvestments({ ...s, day: 21 });
+  assert.equal(week.cash - s.cash, Math.round(bond.principal * bond.couponPct / 100), 'weekly coupon paid into the current account');
+  const sold = sellBond(week, bond.id);
+  assert.equal(sold.bank!.bonds!.length, 0);
+  assert.ok(Math.abs(sold.cash - week.cash - 2_000_000) < 2_000_000 * 0.07, 'early sale is near what was paid');
+  assert.ok(financialAssets(s) > 0);
+});
+
+test('automatic savings moves a share of daily profit into Savings, never more than rent leaves room for', () => {
+  let s = state({ cash: 1_000_000, today: { income: 500_000, costs: 100_000, events: [] } as unknown as GameState['today'] });
+  s = setRentSaving(s, 'automatic', 30);
+  s = setAutoSave(s, 'automatic', 90);
+  assert.equal(s.bank!.autoSavePercent, 70, 'rent + savings cannot exceed 100%');
+  s = setAutoSave(s, 'automatic', 25);
+  const after = autoSaveAtClose(s);
+  assert.equal(after.bank!.savings, s.bank!.savings + 100_000);
+  assert.equal(after.cash, s.cash - 100_000);
 });

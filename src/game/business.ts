@@ -1,4 +1,4 @@
-import type { BankPocket, BankState, BrandMetrics, BusinessBranch, BusinessExpansionState, BusinessLoan, CreditProfile, DepartmentOperation, ExpansionInvestment, GameState, WholesaleOperation, PromotionCampaign, PromotionLevel, PromotionMode, Rival, WeeklyWealthSnapshot } from './types';
+import type { BankPocket, BankState, Bond, TreasuryBill, BrandMetrics, BusinessBranch, BusinessExpansionState, BusinessLoan, CreditProfile, DepartmentOperation, ExpansionInvestment, GameState, WholesaleOperation, PromotionCampaign, PromotionLevel, PromotionMode, Rival, WeeklyWealthSnapshot } from './types';
 import { TIERS } from './economy';
 import { furnitureById } from './shop';
 
@@ -224,12 +224,178 @@ export function setSavingsGoal(s: GameState, name: string, amount: number): Game
   return { ...s, bank: { ...(s.bank || initialBankState()), savingsGoalName: name.trim().slice(0, 60) || 'Business goal', savingsGoalAmount: roundMoney(amount) } };
 }
 
-export function createFixedDeposit(s0: GameState, amount: number, durationDays: number): GameState {
+// ---------------------------------------------------------------------------
+// Fixed deposits, treasury bills and bonds
+// Rates are per in-game week, set just above the 0.65%/week savings rate so locking
+// money up is worth it without letting interest outrun the shop itself.
+// ---------------------------------------------------------------------------
+export const FIXED_DEPOSIT_TERMS = [7, 14, 28, 56, 90, 180] as const;
+const FD_WEEKLY_RATE: Record<number, number> = { 7: 0.7, 14: 0.75, 28: 0.8, 56: 0.85, 90: 0.9, 180: 0.95 };
+/** Bigger deposits earn a little more per week. */
+export function investmentSizeBonus(amount: number): number {
+  return amount >= 1_000_000_000 ? 0.08 : amount >= 100_000_000 ? 0.06 : amount >= 10_000_000 ? 0.03 : 0;
+}
+/** Total return over the whole term, in percent, for a deposit of this size. */
+export function fixedDepositRate(amount: number, durationDays: number): number {
+  const weekly = (FD_WEEKLY_RATE[durationDays] ?? 0.7) + investmentSizeBonus(amount);
+  return Math.round(weekly * (durationDays / 7) * 100) / 100;
+}
+
+/** Lock money for a fixed term. Funded from Savings (default) or the current account; any amount from ₦10,000. */
+export function createFixedDeposit(s0: GameState, amount: number, durationDays: number, source: 'savings' | 'cash' = 'savings'): GameState {
   const bank = s0.bank || initialBankState();
   const value = roundMoney(amount);
-  if (!Number.isFinite(amount) || amount <= 0 || !value || value > bank.savings || ![7, 14, 28, 56].includes(durationDays)) return s0;
-  const deposit = { id: 'fd-' + s0.day + '-' + Math.random().toString(36).slice(2, 8), amount: value, ratePct: durationDays >= 28 ? 1.35 : 0.9, openedDay: s0.day, maturityDay: s0.day + durationDays };
+  const available = source === 'cash' ? s0.cash : bank.savings;
+  if (!Number.isFinite(amount) || value < 1_000 || value > available || !(FIXED_DEPOSIT_TERMS as readonly number[]).includes(durationDays)) return s0;
+  const deposit = { id: 'fd-' + s0.day + '-' + Math.random().toString(36).slice(2, 8), amount: value, ratePct: fixedDepositRate(value, durationDays), openedDay: s0.day, maturityDay: s0.day + durationDays };
+  if (source === 'cash') {
+    return ledger({ ...s0, bank: { ...bank, fixedDeposits: [...bank.fixedDeposits, deposit] } }, -value, `Fixed deposit opened (${durationDays} days)`, 'transfer');
+  }
   return { ...s0, bank: { ...bank, savings: bank.savings - value, fixedDeposits: [...bank.fixedDeposits, deposit] } };
+}
+
+/** Break a fixed deposit early: the principal goes back to Savings, the interest is forfeited. */
+export function breakFixedDeposit(s0: GameState, id: string): GameState {
+  const bank = s0.bank || initialBankState();
+  const fd = bank.fixedDeposits.find((d) => d.id === id);
+  if (!fd || fd.maturityDay <= s0.day) return s0;
+  return {
+    ...s0,
+    bank: { ...bank, savings: bank.savings + fd.amount, fixedDeposits: bank.fixedDeposits.filter((d) => d.id !== id) },
+    ledger: [{ day: s0.day, t: -1, label: 'Fixed deposit broken early (interest forfeited)', amount: 0, category: 'transfer' as const }, ...(s0.ledger || [])].slice(0, 500),
+  };
+}
+
+export const TBILL_TENORS = [14, 28, 56] as const;
+const TBILL_WEEKLY_YIELD: Record<number, number> = { 14: 0.72, 28: 0.78, 56: 0.84 };
+export const BOND_TERMS = [8, 12, 16, 24] as const;
+const BOND_WEEKLY_COUPON: Record<number, number> = { 8: 0.8, 12: 0.85, 16: 0.9, 24: 1 };
+export const MIN_INVESTMENT = 10_000;
+
+function weekRng(day: number) {
+  let h = 2166136261 ^ Math.floor(day / 7);
+  h = Math.imul(h ^ (h >>> 13), 1274126177);
+  return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
+}
+
+/** This week's market: T-bill yields move a little at each weekly auction; the bond price drifts around par. */
+export function bankMarket(s: GameState): { tbillFactor: number; bondPrice: number } {
+  const m = s.bank?.market;
+  if (m && Math.floor(m.day / 7) === Math.floor(s.day / 7)) return { tbillFactor: m.tbillFactor, bondPrice: m.bondPrice };
+  const r = weekRng(s.day);
+  const tbillFactor = Math.round((0.92 + r * 0.16) * 1000) / 1000;
+  const prev = m?.bondPrice ?? 1;
+  const r2 = weekRng(s.day + 3);
+  const bondPrice = Math.round(clamp(prev + (1 - prev) * 0.3 + (r2 - 0.5) * 0.02, 0.94, 1.06) * 10000) / 10000;
+  return { tbillFactor, bondPrice };
+}
+function withMarket(s: GameState): GameState {
+  const bank = s.bank || initialBankState();
+  const m = bankMarket(s);
+  if (bank.market && Math.floor(bank.market.day / 7) === Math.floor(s.day / 7)) return s;
+  return { ...s, bank: { ...bank, market: { day: s.day, ...m } } };
+}
+
+export function treasuryBillYield(s: GameState, tenorDays: number, amount = 0): number {
+  const weekly = ((TBILL_WEEKLY_YIELD[tenorDays] ?? 0.72) + investmentSizeBonus(amount)) * bankMarket(s).tbillFactor;
+  return Math.round(weekly * (tenorDays / 7) * 100) / 100;
+}
+
+/** Buy a T-bill with a face value: pay less now, receive the full face value at maturity. */
+export function buyTreasuryBill(s0: GameState, face: number, tenorDays: number): GameState {
+  const value = roundMoney(face);
+  if (!Number.isFinite(face) || value < MIN_INVESTMENT || !(TBILL_TENORS as readonly number[]).includes(tenorDays)) return s0;
+  const s1 = withMarket(s0);
+  const yieldPct = treasuryBillYield(s1, tenorDays, value);
+  const cost = roundMoney(value / (1 + yieldPct / 100));
+  if (cost > s1.cash) return s0;
+  const bank = s1.bank || initialBankState();
+  const bill: TreasuryBill = { id: 'tb-' + s1.day + '-' + Math.random().toString(36).slice(2, 8), face: value, cost, yieldPct, tenorDays, boughtDay: s1.day, maturityDay: s1.day + tenorDays };
+  return ledger({ ...s1, bank: { ...bank, treasuryBills: [...(bank.treasuryBills || []), bill] } }, -cost, `Treasury bill bought (${tenorDays} days)`, 'transfer');
+}
+
+export function bondCoupon(termWeeks: number, amount = 0): number {
+  return Math.round(((BOND_WEEKLY_COUPON[termWeeks] ?? 0.8) + investmentSizeBonus(amount)) * 100) / 100;
+}
+
+/** Invest an amount in a bond at this week's market price. */
+export function buyBond(s0: GameState, amount: number, termWeeks: number): GameState {
+  const value = roundMoney(amount);
+  if (!Number.isFinite(amount) || value < MIN_INVESTMENT || value > s0.cash || !(BOND_TERMS as readonly number[]).includes(termWeeks)) return s0;
+  const s1 = withMarket(s0);
+  const price = bankMarket(s1).bondPrice;
+  const principal = roundMoney(value / price);
+  const bank = s1.bank || initialBankState();
+  const bond: Bond = { id: 'bd-' + s1.day + '-' + Math.random().toString(36).slice(2, 8), principal, couponPct: bondCoupon(termWeeks, value), termWeeks, boughtDay: s1.day, maturityDay: s1.day + termWeeks * 7, boughtPrice: price };
+  return ledger({ ...s1, bank: { ...bank, bonds: [...(bank.bonds || []), bond] } }, -value, `Bond bought (${termWeeks} weeks)`, 'transfer');
+}
+
+/** Sell a bond before maturity at this week's market price. */
+export function sellBond(s0: GameState, id: string): GameState {
+  const s1 = withMarket(s0);
+  const bank = s1.bank || initialBankState();
+  const bond = (bank.bonds || []).find((b) => b.id === id);
+  if (!bond) return s0;
+  const proceeds = roundMoney(bond.principal * bankMarket(s1).bondPrice);
+  return ledger({ ...s1, bank: { ...bank, bonds: (bank.bonds || []).filter((b) => b.id !== id) } }, proceeds, 'Bond sold before maturity', 'transfer');
+}
+
+/** Value of T-bills (cost plus interest earned so far) and bonds (at market price). */
+export function investmentValue(s: Pick<GameState, 'bank' | 'day'>): number {
+  const bank = s.bank || initialBankState();
+  const bills = (bank.treasuryBills || []).reduce((sum, b) => {
+    const done = clamp((s.day - b.boughtDay) / Math.max(1, b.tenorDays), 0, 1);
+    return sum + b.cost + (b.face - b.cost) * done;
+  }, 0);
+  const price = bank.market?.bondPrice ?? 1;
+  const bonds = (bank.bonds || []).reduce((sum, b) => sum + b.principal * price, 0);
+  return Math.round(bills + bonds);
+}
+
+/** Daily: matured T-bills pay out; on banking days bonds pay coupons; matured bonds repay principal. */
+export function processInvestments(s0: GameState): GameState {
+  let s = withMarket(s0);
+  const bank = s.bank || initialBankState();
+  const bills = bank.treasuryBills || [];
+  const bonds = bank.bonds || [];
+  if (!bills.length && !bonds.length) return s;
+  const due = bills.filter((b) => b.maturityDay <= s.day);
+  const keepBills = bills.filter((b) => b.maturityDay > s.day);
+  let couponTotal = 0;
+  const weekly = s.day % 7 === 0;
+  if (weekly) {
+    for (const b of bonds) if (b.boughtDay < s.day && s.day <= b.maturityDay) couponTotal += roundMoney(b.principal * b.couponPct / 100);
+  }
+  const matured = bonds.filter((b) => b.maturityDay <= s.day);
+  const keepBonds = bonds.filter((b) => b.maturityDay > s.day);
+  s = { ...s, bank: { ...bank, treasuryBills: keepBills, bonds: keepBonds } };
+  for (const b of due) {
+    s = ledger(s, b.cost, 'Treasury bill matured (your money back)', 'transfer');
+    s = ledger(s, b.face - b.cost, 'Treasury bill interest', 'interest');
+  }
+  if (couponTotal) s = ledger(s, couponTotal, 'Bond coupon (weekly interest)', 'interest');
+  for (const b of matured) s = ledger(s, b.principal, 'Bond matured (principal repaid)', 'transfer');
+  return s;
+}
+
+// ---------------------------------------------------------------------------
+// Automatic savings, like the Rent Vault: a share of each day's profit.
+// ---------------------------------------------------------------------------
+export function setAutoSave(s0: GameState, mode: 'manual' | 'automatic', percent?: number): GameState {
+  const bank = s0.bank || initialBankState();
+  const rentShare = bank.rentMode === 'automatic' ? bank.autoRentPercent : 0;
+  const next = clamp(Number.isFinite(percent) ? Number(percent) : (bank.autoSavePercent ?? 10), 0, Math.max(0, 100 - rentShare));
+  return { ...s0, bank: { ...bank, autoSaveMode: mode, autoSavePercent: next } };
+}
+
+export function autoSaveAtClose(s0: GameState): GameState {
+  const bank = s0.bank || initialBankState();
+  if (bank.autoSaveMode !== 'automatic' || !bank.autoSavePercent) return s0;
+  const operatingProfit = Math.max(0, s0.today.income - s0.today.costs);
+  const amount = Math.min(roundMoney(operatingProfit * bank.autoSavePercent / 100), Math.max(0, s0.cash));
+  if (!amount) return s0;
+  const result = transferBank(s0, 'savings', amount);
+  return { ...result, today: { ...result.today, events: [...result.today.events, 'Automatic savings: ' + amount?.toLocaleString('en-NG') + ' naira moved to Savings.'] } };
 }
 
 export function creditProfile(s: GameState): CreditProfile {
@@ -335,7 +501,28 @@ export function maximumLoan(s: GameState): number {
   return Math.floor(Math.max(0, Math.min(scoreAdjustedTierLimit, affordabilityLimit) - activeDebt) / 10_000) * 10_000;
 }
 
-export function takeBusinessLoan(s0: GameState, requested: number, termWeeks: number): GameState {
+/** Interest built up since the start of the current weekly period, not yet paid. */
+export function loanInterestToDate(loan: BusinessLoan, day: number): number {
+  // The first period runs from payout to the first payment day (7 to 13 days); later ones are a week.
+  const firstPeriod = loan.startDay !== undefined && loan.startDay > loan.nextPaymentDay - 14;
+  const periodStart = firstPeriod ? loan.startDay! : loan.nextPaymentDay - 7;
+  const days = clamp(day - periodStart, 0, 7);
+  return Math.max(0, roundMoney(loan.balance * loan.weeklyRatePct / 100 * days / 7) - (loan.periodInterestPaid || 0));
+}
+
+/** What it costs to clear a loan today: balance plus interest so far, at least one week's interest overall. */
+export function loanPayoffQuote(loan: BusinessLoan, day: number): { balance: number; interest: number; total: number } {
+  const accrued = loanInterestToDate(loan, day);
+  const minimum = loan.minimumInterestMet ? 0 : Math.max(0, roundMoney(loan.principal * loan.weeklyRatePct / 100) - (loan.periodInterestPaid || 0));
+  const interest = Math.max(accrued, minimum);
+  return { balance: loan.balance, interest, total: loan.balance + interest };
+}
+
+export const LOAN_PROCESSING_FEE_RATE = 0.01;
+
+/** feeMode 'deduct' takes the 1% fee from the payout (normal loans); 'capitalise' adds it to the
+ * balance instead, used when KoboBank pays a supplier directly for an expansion. */
+export function takeBusinessLoan(s0: GameState, requested: number, termWeeks: number, feeMode: 'deduct' | 'capitalise' = 'deduct'): GameState {
   const amount = roundMoney(requested);
   if (!Number.isFinite(requested) || requested <= 0 || !amount || ![4, 8, 12, 24].includes(termWeeks) || amount > maximumLoan(s0)) return s0;
   const bank = s0.bank || initialBankState();
@@ -348,8 +535,14 @@ export function takeBusinessLoan(s0: GameState, requested: number, termWeeks: nu
     principal: amount, balance: amount, weeklyRatePct: rate, weeklyPayment, termWeeks,
     // First instalment is due at the first weekly banking cycle at least seven days after origination.
     nextPaymentDay: Math.ceil((s0.day + 7) / 7) * 7, missedPayments: 0, arrearsBalance: 0,
+    startDay: s0.day, periodInterestPaid: 0, minimumInterestMet: false,
   };
-  const next = ledger({ ...s0, bank: { ...bank, loans: [...bank.loans, loan], creditProfile: { ...profile, score: clamp(profile.score - 3, 300, 850), loansTaken: profile.loansTaken + 1, lastApplicationDay: s0.day } } }, amount, 'Business loan disbursement', 'financing');
+  let next = ledger({ ...s0, bank: { ...bank, loans: [...bank.loans, loan], creditProfile: { ...profile, score: clamp(profile.score - 3, 300, 850), loansTaken: profile.loansTaken + 1, lastApplicationDay: s0.day } } }, amount, 'Business loan disbursement', 'financing');
+  const fee = roundMoney(amount * LOAN_PROCESSING_FEE_RATE);
+  if (fee && feeMode === 'capitalise') {
+    const nb = next.bank!;
+    next = { ...next, bank: { ...nb, loans: nb.loans.map((l) => l.id === loan.id ? { ...l, balance: l.balance + fee } : l) }, today: { ...next.today, costs: next.today.costs + fee }, ledger: [{ day: next.day, t: -1, label: 'Loan processing fee (1%, added to loan)', amount: 0, category: 'interest' as const }, ...(next.ledger || [])].slice(0, 500) };
+  } else if (fee) next = ledger({ ...next, today: { ...next.today, costs: next.today.costs + fee } }, -fee, 'Loan processing fee (1%)', 'interest');
   return { ...next, today: { ...next.today, events: [...next.today.events, 'Business loan approved: ' + amount?.toLocaleString('en-NG') + ' naira over ' + termWeeks + ' weeks.'] } };
 }
 
@@ -358,15 +551,21 @@ export function repayBusinessLoan(s0: GameState, loanId: string, amount: number)
   const loan = bank.loans.find((item) => item.id === loanId);
   const value = roundMoney(amount);
   if (!Number.isFinite(amount) || amount <= 0 || !loan || !value || value > s0.cash) return s0;
-  const paid = Math.min(value, loan.balance);
-  const remaining = Math.max(0, loan.balance - paid);
+  // Interest built up so far is paid first; clearing the loan costs at least one week's interest.
+  const quote = loanPayoffQuote(loan, s0.day);
+  const clearing = value >= quote.total;
+  const interestPart = clearing ? quote.interest : Math.min(value, loanInterestToDate(loan, s0.day));
+  const principalPart = clearing ? loan.balance : Math.min(loan.balance, value - interestPart);
+  const paid = interestPart + principalPart;
+  const remaining = Math.max(0, loan.balance - principalPart);
   const remainingArrears = Math.max(0, (loan.arrearsBalance || 0) - paid);
-  const loans = bank.loans.map((item) => item.id === loanId ? { ...item, balance: remaining, arrearsBalance: remainingArrears } : item).filter((item) => item.balance > 0);
+  const loans = bank.loans.map((item) => item.id === loanId ? { ...item, balance: remaining, arrearsBalance: remainingArrears, periodInterestPaid: (item.periodInterestPaid || 0) + interestPart, minimumInterestMet: item.minimumInterestMet || clearing } : item).filter((item) => item.balance > 0);
   const profile = creditProfile(s0);
   const cleared = remaining <= 0;
   const hadDelinquency = (loan.missedPayments || 0) > 0 || (loan.arrearsBalance || 0) > 0;
   const creditProfileNext = cleared ? { ...profile, score: clamp(profile.score + (hadDelinquency ? 3 : 8), 300, 850), onTimePayments: profile.onTimePayments + (hadDelinquency ? 0 : 1) } : profile;
-  return ledger({ ...s0, bank: { ...bank, loans, creditProfile: creditProfileNext } }, -paid, cleared ? 'Loan paid off early' : 'Early loan repayment');
+  const withInterest = interestPart ? { ...s0, today: { ...s0.today, costs: s0.today.costs + interestPart } } : s0;
+  return ledger({ ...withInterest, bank: { ...bank, loans, creditProfile: creditProfileNext } }, -paid, cleared ? (interestPart ? `Loan paid off early (incl. ₦${interestPart?.toLocaleString('en-NG')} interest)` : 'Loan paid off early') : interestPart ? `Early loan repayment (incl. ₦${interestPart?.toLocaleString('en-NG')} interest)` : 'Early loan repayment');
 }
 
 /** Offer one hardship arrangement: lower weekly payments by extending the term and slightly raising the rate. A prior default remains on record until the loan is cleared. */
@@ -472,7 +671,7 @@ export function processBankWeekly(s0: GameState): GameState {
     const currentBank = s.bank || bank;
     const loan = currentBank.loans.find((item) => item.id === loan0.id);
     if (!loan) continue;
-    const interest = roundMoney(loan.balance * loan.weeklyRatePct / 100);
+    const interest = Math.max(0, roundMoney(loan.balance * loan.weeklyRatePct / 100) - (loan.periodInterestPaid || 0));
     const due = Math.min(loan.balance + interest, loan.weeklyPayment);
     if (s.cash >= due) {
       const newBalance = Math.max(0, loan.balance + interest - due);
@@ -485,6 +684,8 @@ export function processBankWeekly(s0: GameState): GameState {
         arrearsBalance: newBalance <= 1 ? 0 : Math.max(0, item.arrearsBalance || 0),
         nextPaymentDay: item.nextPaymentDay + 7,
         missedPayments: 0,
+        periodInterestPaid: 0,
+        minimumInterestMet: true,
       } : item).filter((item) => item.balance > 1);
       const profile = currentBank.creditProfile || creditProfile({ ...s, bank: currentBank });
       const hasDelinquency = (loan.missedPayments || 0) > 0 || (loan.arrearsBalance || 0) > 0;
@@ -498,7 +699,7 @@ export function processBankWeekly(s0: GameState): GameState {
       const feeRoom = Math.max(0, roundMoney(loan.principal * 0.1) - Math.max(0, loan.lateFees || 0));
       const penalty = Math.min(feeRoom, Math.max(2_500, roundMoney(loan.balance * 0.025)));
       const formalCollectionsNotice = nextMissed >= 5 && !loan.collectionsNoticeIssued;
-      const loans = currentBank.loans.map((item) => item.id === loan.id ? { ...item, balance: item.balance + interest + penalty, arrearsBalance: Math.max(0, item.arrearsBalance || 0) + due, lateFees: Math.max(0, item.lateFees || 0) + penalty, nextPaymentDay: item.nextPaymentDay + 7, missedPayments: nextMissed, defaulted: item.defaulted || nextMissed >= 3, collectionsStarted: item.collectionsStarted || nextMissed >= 5, collectionsNoticeIssued: item.collectionsNoticeIssued || nextMissed >= 5 } : item);
+      const loans = currentBank.loans.map((item) => item.id === loan.id ? { ...item, periodInterestPaid: 0, minimumInterestMet: true, balance: item.balance + interest + penalty, arrearsBalance: Math.max(0, item.arrearsBalance || 0) + due, lateFees: Math.max(0, item.lateFees || 0) + penalty, nextPaymentDay: item.nextPaymentDay + 7, missedPayments: nextMissed, defaulted: item.defaulted || nextMissed >= 3, collectionsStarted: item.collectionsStarted || nextMissed >= 5, collectionsNoticeIssued: item.collectionsNoticeIssued || nextMissed >= 5 } : item);
       const scoreLoss = newlyDefaulted ? 65 : 22;
       const creditProfileNext = { ...profile, score: clamp(profile.score - scoreLoss, 300, 850), latePayments: profile.latePayments + 1, defaults: profile.defaults + (newlyDefaulted ? 1 : 0) };
       const missedEntries = [
@@ -599,7 +800,7 @@ export function financeExpansionPurchase(s0: GameState, investment: ExpansionInv
   if (maximumLoan(s0) < shortfall) return s0;
   // The loan is posted through the existing KoboBank ledger and liability system.
   // The proceeds are then spent immediately on the capital asset, preserving net worth.
-  const financed = takeBusinessLoan(s0, shortfall, 24);
+  const financed = takeBusinessLoan(s0, shortfall, 24, 'capitalise');
   if (financed === s0 || (financed.bank?.loans.length || 0) <= (s0.bank?.loans.length || 0)) return s0;
   const invested = investInExpansion(financed, investment);
   if (invested === financed) return s0;
@@ -817,7 +1018,7 @@ export function playerWeekTotals(s: GameState): { revenue: number; costs: number
 export function financialAssets(s: Pick<GameState, 'cash' | 'bank'>): number {
   const bank = s.bank || initialBankState();
   const fixedDeposits = bank.fixedDeposits.reduce((sum, deposit) => sum + Math.max(0, deposit.amount), 0);
-  return Math.round(s.cash + Math.max(0, bank.savings) + Math.max(0, bank.rentVault) + fixedDeposits);
+  return Math.round(s.cash + Math.max(0, bank.savings) + Math.max(0, bank.rentVault) + fixedDeposits + investmentValue({ bank, day: (s as GameState).day || 0 }));
 }
 
 /** Recorded liabilities: outstanding bank loans and any unpaid rent. */
