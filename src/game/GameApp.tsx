@@ -1,4 +1,5 @@
 import React, { Suspense, lazy, useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { CharacterSvg } from '../components/renderer/renderCharacter';
 import { DIVINE_CONFIG } from '../constants/presets';
 import { CharacterConfig } from '../types/character';
@@ -1055,7 +1056,7 @@ const PowerChip: React.FC<{ s: GameState; up: (f: (g: GameState) => GameState) =
       <button type="button" onClick={() => setOpen(true)} className="cursor-pointer rounded-lg border border-white/15 bg-white/5 px-3 py-1.5 font-semibold hover:bg-white/10">
         ⚡ Power &amp; Utilities · {src === 'grid' && !off ? 'NEPA' : src === 'none' ? 'Shortage' : src === 'solar' ? 'Solar' : 'Generator'}
       </button>
-      {open && <div className="fixed inset-0 z-[80] flex items-end justify-center bg-black/55 sm:items-center" onClick={() => setOpen(false)}>
+      {open && createPortal(<div className="fixed inset-0 z-[200] flex items-end justify-center bg-black/55 text-xs text-slate-200 sm:items-center" onClick={() => setOpen(false)}>
       <div onClick={(e) => e.stopPropagation()} className="max-h-[85vh] w-full max-w-md space-y-2 overflow-y-auto rounded-t-2xl border border-white/15 bg-[#11141d] p-4 pb-6 shadow-2xl sm:rounded-2xl">
         <div className="mx-auto mb-1 h-1 w-10 rounded-full bg-white/20 sm:hidden" />
         <div className="flex items-center justify-between gap-2"><b className="text-sm text-white">Power &amp; Utilities</b><span className="flex items-center gap-2"><span className={src === 'none' ? 'text-rose-300' : 'text-emerald-300'}>{sourceLabel}</span><button type="button" aria-label="Close" onClick={() => setOpen(false)} className="h-7 w-7 rounded-full bg-white/10 text-slate-300">✕</button></span></div>
@@ -1094,7 +1095,7 @@ const PowerChip: React.FC<{ s: GameState; up: (f: (g: GameState) => GameState) =
           </div>
         </div>
       </div>
-      </div>}
+      </div>, document.body)}
     </div>
   );
 };
