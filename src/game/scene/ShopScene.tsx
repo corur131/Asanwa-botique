@@ -9,6 +9,7 @@ import { stats } from '../engine';
 import { ApplianceOn, CeilingPiece, FloorPiece, WallPiece, B, MirrorLive } from './Furniture3D';
 import { Cell, Figure, FigureLook, Walker, lookToFigure } from './People';
 import { productKey } from '../market';
+import { WeatherFx, daylightFor, skyFor } from './WeatherFx';
 
 export interface SceneProps {
   s: GameState;
@@ -1462,6 +1463,7 @@ export default function ShopScene(p: SceneProps) {
   const top = view === 'top';
   // Top view always slides; otherwise the player's Move/Turn choice decides.
   const slide = top || p.dragMode === 'move';
+  const sun = daylightFor(s.weather);
   const cellAt = (e: { point: THREE.Vector3 }): Cell => {
     if (p.placing) {
       const fp = s.furniture.find((x) => x.uid === p.placing!.uid);
@@ -1486,10 +1488,10 @@ export default function ShopScene(p: SceneProps) {
   };
   return (
     <div ref={dragGuard} style={{ position: 'relative', width: '100%', height: '100%', touchAction: 'none' }}>
-      <Canvas onCreated={handleCanvasCreated} shadows={r.w * r.d <= 220} dpr={[1, 1.25]} camera={{ fov: 32, position: [cx + dist * 0.72, dist * 1.35, cz + dist], near: 0.1, far: 200 }} style={{ background: r.signatureTheme === 'botanical-atrium' ? 'linear-gradient(#9DCDBF,#263D35)' : r.signatureTheme === 'cobalt-gallery' ? 'linear-gradient(#C9D6ED,#37496D)' : p.night ? 'linear-gradient(#0b0d1a,#1a1630)' : 'linear-gradient(#24305a,#3a4a7a)' }}>
-        <ambientLight color={r.signatureTheme === 'botanical-atrium' ? '#D5F1E0' : r.signatureTheme === 'cobalt-gallery' ? '#DEE8FF' : '#FFFFFF'} intensity={p.night ? 0.35 : p.dark ? 0.14 : r.signatureTheme ? 0.68 : 0.6} />
+      <Canvas onCreated={handleCanvasCreated} shadows={r.w * r.d <= 220} dpr={[1, 1.25]} camera={{ fov: 32, position: [cx + dist * 0.72, dist * 1.35, cz + dist], near: 0.1, far: 200 }} style={{ background: r.signatureTheme === 'botanical-atrium' ? 'linear-gradient(#9DCDBF,#263D35)' : r.signatureTheme === 'cobalt-gallery' ? 'linear-gradient(#C9D6ED,#37496D)' : skyFor(s.weather, !!p.night) }}>
+        <ambientLight color={r.signatureTheme === 'botanical-atrium' ? '#D5F1E0' : r.signatureTheme === 'cobalt-gallery' ? '#DEE8FF' : '#FFFFFF'} intensity={(p.night ? 0.35 : p.dark ? 0.14 : r.signatureTheme ? 0.68 : 0.6) * (p.night || p.dark ? 1 : 0.6 + 0.4 * sun)} />
         <hemisphereLight args={[r.signatureTheme === 'botanical-atrium' ? '#E0F3DD' : r.signatureTheme === 'cobalt-gallery' ? '#E5EBFF' : '#FFF4E0', r.signatureTheme === 'botanical-atrium' ? '#23483A' : r.signatureTheme === 'cobalt-gallery' ? '#354668' : '#3A3A50', p.night ? 0.3 : p.dark ? 0.12 : r.signatureTheme ? 0.6 : 0.55]} />
-        <directionalLight position={[cx + 6, 12, cz + 8]} intensity={p.night ? 0.4 : p.dark ? 0.35 : 1.2} castShadow={r.w * r.d <= 220} shadow-mapSize={[512, 512]} shadow-camera-left={-12} shadow-camera-right={12} shadow-camera-top={12} shadow-camera-bottom={-12} />
+        <directionalLight position={[cx + 6, 12, cz + 8]} intensity={p.night ? 0.4 : p.dark ? 0.35 : 1.2 * sun} color={s.weather === 'harmattan' ? '#FFE2B8' : '#FFFFFF'} castShadow={r.w * r.d <= 220} shadow-mapSize={[512, 512]} shadow-camera-left={-12} shadow-camera-right={12} shadow-camera-top={12} shadow-camera-bottom={-12} />
         <OrbitControls
           makeDefault
           target={[cx, 0.6, cz]}
@@ -1508,6 +1510,7 @@ export default function ShopScene(p: SceneProps) {
         />
         <CameraRig view={view} r={r} reset={p.camReset || 0} />
         <CameraPad r={r} cmd={p.camCmd} view={view} />
+        <WeatherFx weather={s.weather} w={r.w} d={r.d} />
         <Room r={dressed} tier={s.tier} painted={!!fin.paint} />
         <Furniture s={s} selected={p.selected} placing={p.placing} wallPlacing={p.wallPlacing} onTap={tap} dark={p.dark} reflections={p.reflections} />
         {p.build && <BuildGrid r={r} />}

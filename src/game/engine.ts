@@ -15,7 +15,8 @@ import { colourName, sameColour } from './colours';
 import { FURNITURE, KIOSK_LISTING, Listing, Placed, STARTER_FURNITURE, arrangeShop, autoPlace, prepareFurnitureForMove,
   findSpot, canPlace, turn, Rot, ceilingCapacity, ceilingUsed, yardCapacity, yardUsed, wallFits, solarRackCapacity, solarUsed, outdoorRoomFor, cheapestListing, furnitureById, listingsFor, newUid, prestigeRichShift, prestigeTraffic, shopStats, usesFloor, wallCapacity, wallUsed, MoveEquipmentPlan } from './shop';
 import { CharacterMemory, CollaborationEvent, CollaborationReply, Customer, DayLog, Departure, Design, ReplyChoice, GameState, LedgerLine, Message, PoliticianContract, PoliticianContractRequirement, Regular, ScoreBreakdown, Settlement, SponsorshipOffer, StaffMember, StaffProfession, StyleChoice, Visitor } from './types';
-import { addBrag, closeGramDay } from './gram';
+import { addBrag, blogPost, closeGramDay } from './gram';
+import { SeasonId, festive, seasonOf, weatherFor } from './climate';
 import { autoSaveAtClose, closeBrandDay, ensureBusinessState, getBrandMetrics, initialBankState, investmentValue, processBankWeekly, processFixedDepositMaturities, processInvestments, processPromotionAtClose, processExpansionAtClose, promotionTrafficBoost, recordWeeklyWealth, saveRentAtClose } from './business';
 
 export { brandPower, currentWealthRows, financialAssets, getBrandMetrics, creditProfile, creditRating, creditHistoryReport, premiumLoanEligible, takePremiumBusinessLoan, renegotiateBusinessLoan, loanRateForScore, maximumLoan, netWorthPlayer, netWorthRival, playerWeekTotals, totalLiabilities, unlocksForFollowers, availablePromotionLevels, promotionBudgetBounds, promotionTrafficBoost, startPromotion, stopPromotion, wholesaleUpgradeQuote, upgradeWholesaleInventory, transferBank, setRentSaving, setSavingsGoal, createFixedDeposit, breakFixedDeposit, fixedDepositRate, FIXED_DEPOSIT_TERMS, buyTreasuryBill, treasuryBillYield, TBILL_TENORS, buyBond, sellBond, bondCoupon, BOND_TERMS, MIN_INVESTMENT, bankMarket, investmentValue, setAutoSave, loanPayoffQuote, loanInterestToDate, LOAN_PROCESSING_FEE_RATE, takeBusinessLoan, repayBusinessLoan, arrangeBusinessLoanRepayment, expansionOptions, investInExpansion, financeExpansionPurchase } from './business';
@@ -423,14 +424,7 @@ export function newGame(divine: CharacterConfig): GameState {
 export const followerTraffic = (f: number) => 1 + 0.4 * (Math.max(0, f) / (Math.max(0, f) + 3000)) + Math.min(0.28, Math.log10(Math.max(0, f) + 1) / 45);
 
 export function weatherForDay(day: number, seed: number): NonNullable<GameState['weather']> {
-  // A 360-day Lagos year: wet season around May–October, harmattan in Dec–Jan.
-  const month = Math.floor(((Math.max(1, day) - 1) % 360) / 30);
-  const n = Math.sin((seed % 9973) * 0.137 + day * 12.9898 + 78.233) * 43758.5453;
-  const r = n - Math.floor(n);
-  if (month >= 4 && month <= 9) return r < 0.68 ? 'rainy' : r < 0.88 ? 'cloudy' : 'sunny';
-  if (month === 11 || month === 0) return r < 0.68 ? 'harmattan' : r < 0.9 ? 'cloudy' : 'sunny';
-  if (month >= 1 && month <= 3) return r < 0.68 ? 'sunny' : 'cloudy';
-  return r < 0.48 ? 'sunny' : r < 0.85 ? 'cloudy' : 'rainy';
+  return weatherFor(day, seed);
 }
 
 export function customersToday(s: GameState, slow: boolean) {
@@ -439,7 +433,8 @@ export function customersToday(s: GameState, slow: boolean) {
   const brand = getBrandMetrics(s);
   const traffic = prestigeTraffic(stats(s).prestige) * followerTraffic(s.followers || 0) * (1 + stats(s).traffic) * (1 + promotionTrafficBoost(s)) * competition(s) * (s.listing.signature ? 1.35 : 1);
   const brandDemand = 0.55 + brand.awareness / 240 + brand.loyalty / 350 + brand.reliability / 400;
-  const weatherTraffic = s.weather === 'rainy' ? 0.82 : s.weather === 'sunny' ? 1.04 : 1;
+  // Storms keep people indoors; December is owambe season and the streets are full.
+  const weatherTraffic = (s.weather === 'storm' ? 0.68 : s.weather === 'rainy' ? 0.82 : s.weather === 'sunny' ? 1.04 : 1) * (festive(s.day) ? 1.15 : 1);
   return Math.max(4, Math.round(t.customers * traffic * brandDemand * (0.85 + Math.random() * 0.3) * (slow ? 0.55 : 1) * ramp * weatherTraffic));
 }
 
@@ -575,6 +570,13 @@ export function openShop(s0: GameState): GameState {
     outages.push({ from, to: from + Math.round(45 + Math.random() * 150) });
     outages.sort((a, b) => a.from - b.from);
   }
+  // Thunderstorms trip transformers: a long cut is likely.
+  if (s.weather === 'storm' && chance(0.7)) {
+    const from = Math.round(60 + Math.random() * 480);
+    outages.push({ from, to: from + Math.round(120 + Math.random() * 240) });
+    outages.sort((a, b) => a.from - b.from);
+  }
+  if (s.weather === 'storm') s = addShout(s, 'Deborah', 'Thunderstorm today, sis. Fewer people will come out, and NEPA will surely take light. Check the fuel.', 'warn');
   if (s.weather === 'harmattan') s = addShout(s, 'Deborah', 'Harmattan dust everywhere this morning. Keep the clothes covered, sis.', 'warn');
   let next: GameState = { ...s, slowWeek: slow, arrivals, outages, busy: null, power: { ...s.power, gen: false, solar: s.power?.solar || 0 } };
   if (arrivals.some((arrival) => !!arrival.c.celebrity)) {
@@ -638,7 +640,7 @@ export const shopClosing = (s: GameState) => s.phase === 'shop' && s.clock >= SH
 
 function patienceFor(s: GameState, c: Customer) {
   const st = stats(s);
-  const weatherComfort = s.weather === 'rainy' || s.weather === 'harmattan' || s.weather === 'cloudy' ? 1.08 : 1;
+  const weatherComfort = s.weather === 'rainy' || s.weather === 'storm' || s.weather === 'harmattan' || s.weather === 'cloudy' ? 1.08 : 1;
   let p = PATIENCE[c.cls] * (1 + Math.min(0.4, 0.1 * st.seats)) * (1 + coolNow(s) * 0.6) * (1 + st.patience) * weatherComfort;
   if (c.regularId) p += 20;
   return Math.round(p);
@@ -715,6 +717,7 @@ export function tick(s0: GameState, minutes: number): GameState {
     const canopy = s.furniture.some((p) => p.placed && p.id === 'umbrellaCanopy');
     // Rain sends some walk-ins home; a street canopy protects the queue.
     if (!vip && s.weather === 'rainy' && chance(canopy ? 0.06 : 0.18)) { lostWeather++; continue; }
+    if (!vip && s.weather === 'storm' && chance(canopy ? 0.12 : 0.3)) { lostWeather++; continue; }
     if (!vip && s.weather === 'sunny' && chance(canopy ? 0.02 : 0.08)) { lostWeather++; continue; }
     if (!vip && source(s, a.at) === 'none' && chance({ poor: 0.2, middle: 0.35, rich: 0.6 }[a.c.cls])) { lostHeat++; continue; }
     if (!vip && waiting(s).length >= waitingRoom(s)) { lostDoor++; continue; }
@@ -1170,8 +1173,33 @@ export function closeShop(s0: GameState): GameState {
 }
 
 export function nextMorning(s: GameState): GameState {
-  const next = planDrop({ ...s, day: s.day + 1, weather: weatherForDay(s.day + 1, s.seed), phase: 'morning', ...freshDay, busy: null, energy: ENERGY.max, today: emptyLog(s.day + 1, s.cash) });
+  let next = planDrop({ ...s, day: s.day + 1, weather: weatherForDay(s.day + 1, s.seed), phase: 'morning', ...freshDay, busy: null, energy: ENERGY.max, today: emptyLog(s.day + 1, s.cash) });
+  next = seasonChange(next, s.day);
   return ensurePoliticianContractOffer(next);
+}
+
+const SEASON_NEWS: Record<SeasonId, { deborah: string; title: string; body: string }> = {
+  harmattan: { deborah: 'Harmattan don land, sis! Mornings go cold, dust everywhere. Stock jackets and covered looks, and keep the clothes covered.', title: 'Harmattan is here: layer up, Lagos 🧥', body: 'Cold dusty mornings and hot afternoons. Stylists are pushing jackets, shawls and covered silhouettes, with lip balm on standby.' },
+  hotSeason: { deborah: 'The heat don start o. Customers go sweat for that shop if no cooling. Make sure the fans and AC dey work.', title: 'Hot season: Lagos is boiling ☀️', body: 'Breathable fabrics and light colours are moving fast. Boutiques without proper cooling are losing customers to the ones with AC.' },
+  rains: { deborah: 'Rainy season don start. Fewer people go waka come shop, and NEPA go dey misbehave. Get canopy for the door and keep fuel.', title: 'The rains are back 🌧️', body: 'Expect flooded roads, fewer walk-ins and lots of blackouts. Flats over heels this season.' },
+  augustBreak: { deborah: 'August break! The rain go rest small. Nice weather to push sales, sis.', title: 'August break: the rain takes a breather ⛅', body: 'Cool, cloudy days and dry roads. Perfect weather for shopping and outdoor shoots.' },
+  lateRains: { deborah: 'The rain don come back for last round. Storms for evening, so plan well.', title: 'Late rains: one more round of storms ⛈️', body: 'September and October bring the last heavy rains of the year. Waterproof everything.' },
+  drySeason: { deborah: 'Dry season don come. Owambe season dey near, December go busy!', title: 'Dry season: owambe season loading 🎉', body: 'The roads are dry and the party calendar is filling up. Native wear and gele bookings are about to spike.' },
+};
+
+/** A new season starts: Deborah warns you and the fashion blog writes about it. */
+function seasonChange(s: GameState, previousDay: number): GameState {
+  const now = seasonOf(s.day);
+  let next = s;
+  if (now.id !== seasonOf(previousDay).id) {
+    const news = SEASON_NEWS[now.id];
+    next = msg(next, 'Deborah', news.deborah, 'info');
+    next = blogPost(next, news.title, news.body, undefined, true);
+  }
+  if (festive(s.day) && !festive(previousDay)) {
+    next = msg(next, 'Deborah', 'Detty December is here!! Owambe, weddings, end of year parties. Expect more customers and lots of native and gele requests.', 'good');
+  }
+  return next;
 }
 
 /** Add a message to a specific WhatsApp thread without invoking a model call. */

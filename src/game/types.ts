@@ -528,7 +528,7 @@ export interface Message {
   tone: 'info' | 'warn' | 'danger' | 'good';
 }
 
-export type LagosWeather = 'sunny' | 'rainy' | 'harmattan' | 'cloudy';
+export type LagosWeather = 'sunny' | 'rainy' | 'storm' | 'harmattan' | 'cloudy';
 
 /** Compact memory the AI can use across chat sessions without another API call. */
 export interface CharacterMemory {
