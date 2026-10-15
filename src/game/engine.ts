@@ -598,7 +598,8 @@ export const staffCapacity = (s: GameState) => s.staff.length * STAFF_CAPACITY;
 export const inBlackout = (s: GameState, t = s.clock) => nepaOff(s, t);
 /** Fans and AC only work when there is light, solar or a generator. */
 export const coolNow = (s: GameState) => coolRunning(s);
-export { POWER, EQUIPMENT_WATTS, activeGeneratorUid, dailyEnergyCost, dailyEnergyKwh, equipmentLoadKw, fuelOf, fuelPerHour, fuelPrice, generatorCapacityKw, generatorOverloaded, generatorKind, kwhForLoad, loadExceedsCapacity, loadKw, pourFuel, refuel, scarcity, setGen, solarCap, source, tariffFor, tankSize } from './power';
+export { POWER, EQUIPMENT_WATTS, activeGeneratorUid, dailyEnergyCost, dailyEnergyKwh, equipmentLoadKw, fuelOf, fuelPerHour, fuelPrice, generatorCapacityKw, generatorOverloaded, generatorKind, kwhForLoad, loadExceedsCapacity, loadKw, pourFuel, refuel, scarcity, setGen, setThermostat, shopClimate, solarCap, source, tariffFor, tankSize, THERMOSTAT } from './power';
+export type { ShopClimate } from './power';
 export { ENERGY, actionsFor, busyNow, energyOf, exhausted, interact, isTired, weeklyBills } from './life';
 export type { Action, ActionId } from './life';
 export const waiting = (s: GameState) => s.inShop.filter((v) => !v.by);

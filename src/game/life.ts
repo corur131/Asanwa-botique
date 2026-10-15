@@ -12,7 +12,7 @@
  *   she is busy. Before opening and after closing they take no time.
  */
 import { naira } from './economy';
-import { POWER, addShout, coolRunning, fuelOf, fuelPrice, liveStats, nepaOff, refuel, setGen, solarCap, tankSize, tariffFor } from './power';
+import { POWER, addShout, fuelOf, fuelPrice, liveStats, nepaOff, refuel, setGen, solarCap, tankSize, tariffFor, shopClimate } from './power';
 import { furnitureById, roomOf, SWITCHABLE } from './shop';
 import { CharacterConfig } from '../types/character';
 import { Busy, GameState, Pose } from './types';
@@ -53,10 +53,10 @@ export const gainEnergy = (s: GameState, n: number) => setEnergy(s, energyOf(s) 
 export function energyStep(s: GameState, minutes: number): GameState {
   if (s.phase !== 'shop' || minutes <= 0) return s;
   if (s.busy?.pose === 'sit') return s;
-  const cool = coolRunning(s);
-  const k = cool >= 0.4 ? 0.55 : cool > 0 ? 0.75 : 1.35;
-  const weatherHeat = s.weather === 'sunny' && cool < 0.4 ? 1.35 : s.weather === 'harmattan' ? 0.82 : s.weather === 'rainy' || s.weather === 'storm' || s.weather === 'cloudy' ? 0.92 : 1;
-  return setEnergy(s, energyOf(s) - ENERGY.perMinute * k * weatherHeat * minutes);
+  // What the shop feels like already includes the weather, the crowd and any fans or AC.
+  const { feels } = shopClimate(s);
+  const k = feels < 19 ? 0.8 : feels <= 25 ? 0.6 : Math.min(1.3, 0.6 + (feels - 25) * 0.1);
+  return setEnergy(s, energyOf(s) - ENERGY.perMinute * k * minutes);
 }
 
 /** Score changes from how Divine is doing today. */

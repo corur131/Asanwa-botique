@@ -35,6 +35,8 @@ const MIRROR = '#BFD6E2';
 
 /** Whether this appliance has power and is switched on (fans spin, etc.). */
 export const ApplianceOn = createContext(true);
+/** The AC thermostat, shown on the standing AC's screen. */
+export const Thermostat = createContext(24);
 
 /** Spins its children around one axis; speeds up and slows down smoothly. */
 function Spin({ axis, speed, on, sway, children }: { axis: 'y' | 'z'; speed: number; on: boolean; sway?: boolean; children: React.ReactNode }) {
@@ -63,6 +65,17 @@ function PowerLed({ p, on, c = '#22E06A', r = 0.025 }: { p: V3; on: boolean; c?:
 
 /** Seven-segment digit for appliance displays. */
 const SEGMENTS: Record<string, string> = { '0': 'abcdef', '1': 'bc', '2': 'abdeg', '3': 'abcdg', '4': 'bcfg', '5': 'acdfg', '6': 'acdefg', '7': 'abc', '8': 'abcdefg', '9': 'abcdfg' };
+/** Condenser fan blades: spin while the unit runs. */
+function Spinner({ on, p }: { on: boolean; p: V3 }) {
+  const ref = useRef<THREE.Group>(null);
+  useFrame((_, dt) => { if (on && ref.current) ref.current.rotation.y += dt * 14; });
+  return (
+    <group ref={ref} position={p}>
+      {[0, 1, 2].map((k) => <B key={k} p={[0, 0, 0]} s={[0.6, 0.012, 0.08]} c="#3A3F44" rot={[0, (k * Math.PI) / 3, 0]} />)}
+    </group>
+  );
+}
+
 function Digit({ ch, at, h = 0.09, c = '#3BFF8A' }: { ch: string; at: V3; h?: number; c?: string }) {
   const w = h * 0.55;
   const t = h * 0.14;
@@ -265,6 +278,7 @@ function FoldedPile({ colors, n, w, y, d = 0.35 }: { colors: string[]; n: number
 
 export function FloorPiece({ id, colors, selected }: { id: string; colors: string[]; selected?: boolean }) {
   const on = useContext(ApplianceOn);
+  const setpoint = useContext(Thermostat);
   const glow = selected ? <B p={[0, 0.01, 0]} s={[0.98, 0.02, 0.98]} c="#F59E0B" e="#F59E0B" ei={0.6} o={0.5} /> : null;
   switch (id) {
     case 'rustyRail':
@@ -666,16 +680,35 @@ export function FloorPiece({ id, colors, selected }: { id: string; colors: strin
         </group>
       );
     case 'standingAc':
+    case 'industrialAc': {
+      const big = id === 'industrialAc';
+      const temp = String(Math.round(setpoint)).padStart(2, '0');
       return (
-        <group position={[0, 0, -0.1]}>
+        <group position={[0, 0, -0.1]} scale={big ? [1.35, 1.08, 1.25] : 1}>
           {glow}
-          <B p={[0, 0.9, 0]} s={[0.45, 1.8, 0.35]} c="#F6F6F2" />
+          <B p={[0, 0.9, 0]} s={[0.45, 1.8, 0.35]} c={big ? '#E4E7EA' : '#F6F6F2'} />
           <B p={[0, 1.35, 0.18]} s={[0.35, 0.5, 0.02]} c="#CCD3D8" />
-          {/* control screen: green temperature when running, black when off */}
+          {big && [1.18, 1.26, 1.34, 1.42, 1.5].map((y) => <B key={y} p={[0, y, 0.192]} s={[0.33, 0.02, 0.006]} c="#9AA3AB" />)}
+          {/* control screen: the thermostat in green when running, black when off */}
           <B p={[0, 0.98, 0.178]} s={[0.34, 0.2, 0.012]} c="#050607" />
-          {on && <><Digit ch="2" at={[-0.085, 0.91, 0.186]} h={0.13} /><Digit ch="2" at={[0.015, 0.91, 0.186]} h={0.13} /><Ball p={[0.1, 1.03, 0.186]} r={0.016} c="#3BFF8A" e="#3BFF8A" ei={1.8} /></>}
+          {on && <><Digit ch={temp[0]} at={[-0.085, 0.91, 0.186]} h={0.13} /><Digit ch={temp[1]} at={[0.015, 0.91, 0.186]} h={0.13} /><Ball p={[0.1, 1.03, 0.186]} r={0.016} c="#3BFF8A" e="#3BFF8A" ei={1.8} /></>}
           <PowerLed p={[0.13, 0.74, 0.18]} on={on} r={0.018} />
           <Puffs at={[0, 1.35, 0.22]} on={on} c="#E8F6FF" />
+        </group>
+      );
+    }
+    case 'centralAc':
+      // Outdoor condenser of a ducted system: a big grey box with a fan grille on top.
+      return (
+        <group>
+          {glow}
+          <B p={[0, 0.06, 0]} s={[1.05, 0.12, 0.9]} c="#55595E" />
+          <B p={[0, 0.55, 0]} s={[0.95, 0.86, 0.8]} c="#D9DDE0" />
+          {[-0.3, -0.15, 0, 0.15, 0.3].map((x) => <B key={x} p={[x, 0.55, 0.405]} s={[0.04, 0.7, 0.01]} c="#9AA1A8" />)}
+          <Cyl p={[0, 1.0, 0]} r1={0.34} h={0.04} c="#2B2F33" seg={24} />
+          <Spinner on={on} p={[0, 1.03, 0]} />
+          <PowerLed p={[0.4, 0.88, 0.41]} on={on} r={0.025} />
+          <B p={[-0.25, 0.3, 0.41]} s={[0.3, 0.12, 0.01]} c="#2F6FA8" />
         </group>
       );
     case 'smallGen':

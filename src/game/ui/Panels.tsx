@@ -1,6 +1,6 @@
 import React, { Suspense, lazy, useMemo, useState } from 'react';
 import { MARKUP, STAFF, TIERS, naira, staffMinutes } from '../economy';
-import { POWER, RICH_CUSTOMER_STAFF_LEVEL, contestFor, fuelOf, fuelPerHour, tankSize, Candidate, RaiseAnswer, candidates, canHire, daysToRent, displayCap, displayedCount, listingsNow, marketWage, restockAllCost, stats, waitingRoom } from '../engine';
+import { POWER, RICH_CUSTOMER_STAFF_LEVEL, contestFor, fuelOf, fuelPerHour, tankSize, Candidate, RaiseAnswer, candidates, canHire, daysToRent, displayCap, displayedCount, listingsNow, marketWage, restockAllCost, shopClimate, stats, waitingRoom } from '../engine';
 import { FURNITURE_GROUPS, FurnitureDef, FurnitureGroup, Listing, MoveEquipmentPlan, ceilingCapacity, ceilingUsed, finishes, furnitureById, furnitureForGroup, listingsFor, readyFurnishedCost, roomOf, wallCapacity, wallUsed } from '../shop';
 import { productKey } from '../market';
 import { colourName } from '../colours';
@@ -172,7 +172,7 @@ export const ShopStatsCard: React.FC<{ s: GameState }> = ({ s }) => {
         ['Waiting room', `${waitingRoom(s)}`, `people · they wait ${pct(Math.min(0.4, 0.1 * st.seats) + st.patience)} longer`],
         ['Look bonus', `+${st.mirror + st.scoreBonus}`, `mirror +${st.mirror}${st.scoreBonus ? `, steamer/lights +${st.scoreBonus}` : ''}`],
         ['Hair / makeup', `+${st.hairBonus} / +${st.makeupBonus}`, st.wigs ? 'wigs: yes' : 'wigs: need a hair station'],
-        ['Cooling', st.cool ? pct(st.cool) : 'Hot', st.cool ? 'off in blackouts unless solar or gen' : 'buy a fan or AC: customers complain of heat'],
+        ['AC capacity', `${Math.round(shopClimate(s).acInstalled)} / ${shopClimate(s).area} m²`, shopClimate(s).acInstalled >= shopClimate(s).area * 0.95 ? 'big enough to cool the whole shop' : shopClimate(s).acInstalled ? 'too small for the shop: hot afternoons will beat it' : 'no AC: fans only make it feel up to 3°C cooler'],
         ['Power', st.solarPanels ? `${st.solarPanels} solar` : st.gen ? 'Generator' : 'NEPA only', `${st.gen ? `${st.gen === 'big' ? 'big' : 'small'} gen (${fuelPerHour(s)} L/hr, ${Math.round(fuelOf(s) * 10) / 10}/${tankSize(s)} L)` : 'no gen'} · solar ${Math.round(s.power?.solar || 0)}/${st.solarPanels * POWER.minutesPerPanel} min${st.solarPanels >= POWER.acPanels ? ' · runs AC' : ''}`],
         ['Walk-ins', st.traffic ? pct(st.traffic) : '+0%', 'signs, music, window display'],
         ['Tips', st.tipBonus ? pct(st.tipBonus) : '+0%', 'counter, scent'],

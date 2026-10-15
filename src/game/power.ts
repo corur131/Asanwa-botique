@@ -12,7 +12,8 @@
  *   customers leave within minutes unless something is done.
  */
 import { CustomerClass, GameState, Shout } from './types';
-import { furnitureById, liveItems, shopStats } from './shop';
+import { furnitureById, liveItems, roomOf, shopStats } from './shop';
+import { outdoorTemp } from './climate';
 import { naira } from './economy';
 
 /** The shop's stats with switched-off appliances left out. */
@@ -158,19 +159,106 @@ export function source(s: GameState, t = s.clock): Source {
   return 'none';
 }
 
-/** Cooling that is actually running. */
-export function coolRunning(s: GameState): number {
-  const st = liveStats(s);
-  switch (source(s)) {
-    case 'grid':
-      return st.cool;
-    case 'gen':
-      return st.gen === 'big' ? st.cool : st.coolFans;
-    case 'solar':
-      return Math.min(0.8, st.coolFans + (st.solarPanels >= POWER.acPanels ? st.coolAc : 0));
-    default:
-      return s.power?.fanBattery && s.power.fanBattery > 0 && s.furniture.some((p) => p.placed && p.id === 'rechargeableFan') ? 0.12 : 0;
+// ---------------------------------------------------------------------------
+// Shop climate: indoor temperature from the weather, the crowd and the cooling.
+// ---------------------------------------------------------------------------
+/** Thermostat range for the ACs, °C. */
+export const THERMOSTAT = { min: 16, max: 30, default: 24 } as const;
+export const thermostatOf = (s: Pick<GameState, 'thermostat'>) => Math.max(THERMOSTAT.min, Math.min(THERMOSTAT.max, s.thermostat ?? THERMOSTAT.default));
+export const setThermostat = (s: GameState, t: number): GameState => ({ ...s, thermostat: Math.max(THERMOSTAT.min, Math.min(THERMOSTAT.max, Math.round(t))) });
+
+/** Most an AC system can pull a shop below its uncooled temperature, at full capacity. */
+const AC_MAX_PULL = 13;
+
+const areaCache = new Map<string, number>();
+/** Shop floor area in m² (one grid cell is one square metre). */
+export function shopArea(s: Pick<GameState, 'listing'>): number {
+  const key = `${s.listing.tier}|${s.listing.stars}|${s.listing.signature ? 1 : 0}`;
+  let a = areaCache.get(key);
+  if (a === undefined) {
+    const r = roomOf(s.listing);
+    a = Math.max(6, r.w * r.d);
+    areaCache.set(key, a);
   }
+  return a;
+}
+
+export type ComfortStatus = 'cold' | 'cool' | 'comfy' | 'warm' | 'hot';
+export interface ShopClimate {
+  outdoor: number;
+  /** Air temperature inside. */
+  indoor: number;
+  /** What it feels like with fans blowing. */
+  feels: number;
+  area: number;
+  /** m² the running ACs / fans can handle. */
+  acArea: number;
+  fanArea: number;
+  /** m² the installed ACs could handle if they were all running. */
+  acInstalled: number;
+  setpoint: number;
+  /** 0..1: how hard the ACs are working. */
+  acDuty: number;
+  /** True when the running ACs are too small to reach the thermostat. */
+  acStruggling: boolean;
+  status: ComfortStatus;
+}
+
+/** Which cooling pieces actually have power right now. */
+function runningCooling(s: GameState): { acArea: number; fanArea: number } {
+  const live = liveItems(s.furniture.filter((p) => p.placed), s.off).map((p) => furnitureById(p.id));
+  const src = source(s);
+  const st = liveStats(s);
+  const acOk = src === 'grid' || (src === 'gen' && st.gen !== 'small') || (src === 'solar' && st.solarPanels >= POWER.acPanels);
+  const fansOk = src !== 'none';
+  let acArea = 0;
+  let fanArea = 0;
+  for (const f of live) {
+    if (f.ac && acOk) acArea += f.coolArea || 0;
+    if (!f.ac && f.fanArea) {
+      if (fansOk) fanArea += f.fanArea;
+      else if (f.id === 'rechargeableFan' && (s.power?.fanBattery || 0) > 0) fanArea += f.fanArea;
+    }
+  }
+  return { acArea, fanArea };
+}
+
+export function shopClimate(s: GameState, clock = s.clock): ShopClimate {
+  const outdoor = outdoorTemp(s.day, s.seed, clock, s.weather);
+  const area = shopArea(s);
+  // A closed building runs a little warmer than outside; bodies add heat in a small room.
+  const people = s.inShop.length + s.staff.length + 1;
+  const uncooled = outdoor + 1.5 + Math.min(3, (3 * people) / area);
+  const setpoint = thermostatOf(s);
+  const { acArea, fanArea } = runningCooling(s);
+  const acInstalled = s.furniture.filter((p) => p.placed).reduce((a, p) => a + (furnitureById(p.id).ac ? furnitureById(p.id).coolArea || 0 : 0), 0);
+  // Spare capacity cools harder, up to half again; too little can't keep up.
+  const capacity = Math.min(1.5, acArea / area);
+  const maxPull = AC_MAX_PULL * capacity;
+  const needed = Math.max(0, uncooled - setpoint);
+  const pull = Math.min(needed, maxPull);
+  const indoor = uncooled - pull;
+  // Moving air feels cooler, up to 3°C when the fans cover the whole floor.
+  const feels = indoor - Math.min(3, 3 * (fanArea / area));
+  const status: ComfortStatus = feels < 19 ? 'cold' : feels < 21.5 ? 'cool' : feels <= 26 ? 'comfy' : feels <= 28.5 ? 'warm' : 'hot';
+  return {
+    outdoor, indoor: Math.round(indoor * 10) / 10, feels: Math.round(feels * 10) / 10, area, acArea, fanArea, acInstalled, setpoint,
+    acDuty: maxPull > 0 ? Math.min(1, needed / maxPull) : 0,
+    acStruggling: acArea > 0 && needed > maxPull + 0.5,
+    status,
+  };
+}
+
+/**
+ * How pleasant the shop feels, 0..0.6. Kept for patience, reputation and Divine's energy.
+ * Comfortable is best; too hot is worst; an over-cold shop is unpleasant too.
+ */
+export function coolRunning(s: GameState): number {
+  const { feels } = shopClimate(s);
+  if (feels >= 30) return 0;
+  if (feels > 25) return Math.round(0.6 * (30 - feels) / 5 * 100) / 100;
+  if (feels >= 20) return 0.6;
+  return Math.max(0.1, Math.round((0.6 - (20 - feels) * 0.15) * 100) / 100);
 }
 
 /** How fast waiting customers use up their patience. */
@@ -179,8 +267,11 @@ export function drainRate(s: GameState, cls: CustomerClass): number {
   // Power cuts still make customers less comfortable, but should not erase
   // most of the longer patience window—especially for rich customers.
   if (src === 'none') return { poor: 1.15, middle: 1.35, rich: 1.6 }[cls];
-  const hot = coolRunning(s) <= 0;
-  let r = hot ? { poor: 1.05, middle: 1.1, rich: 1.2 }[cls] : 1;
+  const { status } = shopClimate(s);
+  let r = status === 'hot' ? { poor: 1.08, middle: 1.14, rich: 1.25 }[cls]
+    : status === 'warm' ? { poor: 1.02, middle: 1.05, rich: 1.09 }[cls]
+      : status === 'cold' ? { poor: 1.04, middle: 1.06, rich: 1.1 }[cls]
+        : 1;
   if (src === 'solar') r *= 0.9; // cool, quiet, and they're impressed
   return r;
 }
@@ -199,6 +290,8 @@ export const COMPLAIN = {
   dark: ['Ah ah, madam, you no get gen?', 'Abeg on gen na, you wan roast person for here?', 'Light don go o! Where your solar?', 'How you wan do my makeup for this darkness?', 'Heat wan kill me for this shop o.', 'NEPA again! Abeg do something.'],
   darkRich: ["I can't sit in this heat. Do you not have a generator?", "It's dark and hot. I'm not staying long like this.", 'Is this how you treat clients? No light?'],
   hot: ['E hot for here o, you no get fan?', 'Abeg, heat dey this shop.', 'I dey sweat like Christmas goat.', 'Fan nko? This heat no be small.'],
+  cold: ['Abeg reduce this AC, I dey shiver.', 'Na fridge una open for here?', 'Haba, this cold too much. Harmattan no do una?', 'My hand don freeze o, off that AC small.'],
+  coldRich: ["It's freezing in here. Please turn the AC down.", 'Do you keep the shop this cold on purpose?', "I didn't come here to catch a cold."],
   solar: ['Ehen! You get solar. Una try.', 'At least it is cool in here.', 'NEPA took light and your shop is still bright? Nice.'],
 };
 
@@ -265,13 +358,16 @@ export function powerStep(s0: GameState, from: number, to: number): GameState {
 
   // customers say what they feel
   const src = source(s, to);
-  const hot = coolRunning(s) <= 0;
+  const comfort = shopClimate(s).status;
+  const hot = comfort === 'hot';
+  const cold = comfort === 'cold';
   const waiting = s.inShop.filter((v) => !v.by && !v.complained);
   for (const v of waiting) {
     let line: string | null = null;
     if (src === 'none' && Math.random() < 0.06 * minutes) line = pick(v.c.cls === 'rich' ? COMPLAIN.darkRich : COMPLAIN.dark);
     else if (src === 'solar' && Math.random() < 0.02 * minutes) line = pick(COMPLAIN.solar);
-    else if (src === 'grid' && hot && Math.random() < 0.006 * minutes) line = pick(COMPLAIN.hot);
+    else if (src !== 'none' && hot && Math.random() < 0.008 * minutes) line = pick(COMPLAIN.hot);
+    else if (cold && Math.random() < 0.006 * minutes) line = pick(v.c.cls === 'rich' ? COMPLAIN.coldRich : COMPLAIN.cold);
     if (line) {
       s = addShout(s, v.c.name, line, src === 'solar' ? 'good' : 'complain');
       s = { ...s, inShop: s.inShop.map((x) => (x.c.id === v.c.id ? { ...x, complained: true } : x)) };
