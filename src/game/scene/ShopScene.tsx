@@ -10,6 +10,7 @@ import { ApplianceOn, CeilingPiece, FloorPiece, WallPiece, B, MirrorLive, Thermo
 import { Cell, Figure, FigureLook, Walker, lookToFigure } from './People';
 import { productKey } from '../market';
 import { WeatherFx, daylightFor, skyFor } from './WeatherFx';
+import { PerfGuard } from './people/PerfGuard';
 
 export interface SceneProps {
   s: GameState;
@@ -1324,7 +1325,9 @@ function CameraRig({ view, r, reset }: { view: View; r: RoomStyle; reset?: numbe
   const controls = useThree((st) => st.controls) as unknown as { target: THREE.Vector3; update: () => void } | null;
   const cx = r.w / 2;
   const cz = r.d / 2;
-  const dist = Math.max(r.w, r.d) * 1.25 + 3;
+  // Big shops start closer (people stay readable); slide and zoom out to see the rest.
+  const full = Math.max(r.w, r.d) * 1.25 + 3;
+  const dist = full * Math.max(0.6, Math.min(1, 14 / full));
   useEffect(() => {
     const pos: Record<View, [number, number, number]> = {
       angle: [cx + dist * 0.72, dist * 1.35, cz + dist],
@@ -1473,6 +1476,10 @@ export default function ShopScene(p: SceneProps) {
           seatPosition={serviceSeatPosition || seat?.position}
           seatFace={serviceSeatFace ?? seat?.face}
           onClick={clickable ? () => p.onCustomer(v.c.id) : undefined}
+          tag={!v.by && !p.build ? (() => {
+            const left = Math.max(0, 1 - (v.waited ?? s.clock - v.arrived) / v.patience);
+            return { text: v.c.name.split(' ')[0], tone: v.c.celebrity ? 'gold' as const : left > 0.5 ? 'green' as const : left > 0.25 ? 'amber' as const : 'red' as const };
+          })() : null}
         />,
       );
     }
@@ -1564,6 +1571,7 @@ export default function ShopScene(p: SceneProps) {
         <CameraRig view={view} r={r} reset={p.camReset || 0} />
         <CameraPad r={r} cmd={p.camCmd} view={view} />
         <WeatherFx weather={s.weather} w={r.w} d={r.d} />
+        <PerfGuard />
         <group ref={roomRef}><Room r={dressed} tier={s.tier} painted={!!fin.paint} /></group>
         <RoomGeometry.Provider value={roomGeo}>
         <Thermostat.Provider value={thermostatOf(s)}>
