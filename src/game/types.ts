@@ -66,6 +66,17 @@ export interface ShopperJob {
   contractId?: string;
   /** Snapshot of the player's strict category and dressing-rank filters for this order. */
   preferences?: ShopperBuyingPreference[];
+  /** Commission already paid to the shopper for this order (absent in older saves). */
+  commissionPaid?: number;
+  /** Pieces of each order line already paid for, so commission is never charged twice. */
+  paidPieces?: Record<string, number>;
+}
+
+/** A customer asked for a colour the shop had no clothes in. */
+export interface ColourMiss {
+  day: number;
+  color: string;
+  name: string;
 }
 
 export type PoliticianContractStatus = 'offered' | 'accepted' | 'fulfilled' | 'failed' | 'declined' | 'expired';
@@ -722,6 +733,8 @@ export interface GameState {
   productSales?: ProductSalesRecord[];
   /** Shopper orders and their statuses are part of the saved game. */
   shopperJobs?: ShopperJob[];
+  /** Colour requests the racks could not answer; the shopper buys more of these. */
+  colourMisses?: ColourMiss[];
   /** Player's reusable Shopper category/rank selections, retained across app opens and reloads. */
   shopperPreferences?: ShopperBuyingPreference[];
   /** Government/office clothing contracts, offer history and deadlines. */

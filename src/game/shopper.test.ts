@@ -6,7 +6,7 @@ import { buyCart, cartTotal, fromData, newGame, validateCart } from './engine';
 import { canBuy, MARKET, pieceCost } from './market';
 import {
   prepareShopperOrder, shopperDressRank, shopperEntryMatchesPreferences, shopperPriceBandMatches,
-  shopperPriceCeiling, SHOPPER_PREFERENCE_CATEGORIES, shopperCategoryForKind,
+  shopperPriceCeiling, SHOPPER_PREFERENCE_CATEGORIES, shopperCategoryForKind, shopperAvailableBudget,
 } from './shopper';
 import type { ShopperBuyingPreference } from './types';
 import type { GameState, ShopperOrderLine } from './types';
@@ -97,7 +97,9 @@ test('shopper cannot spend cash already reserved by items in the existing cart',
 
 
 test('rich-customer mission prioritises unlocked luxury items and scales order quantities with budget', () => {
-  const s = game({ cash: 100_000_000, tier: 2, stock: [], marketCart: [], productSales: [] });
+  // Scaling is checked at Luxury Maison: a small Boutique has too few luxury styles for
+  // ₦50m to buy anything but duplicates, which celebrity shopping deliberately avoids.
+  const s = game({ cash: 200_000_000, tier: 5, stock: [], marketCart: [], productSales: [] });
   const small = prepareShopperOrder(s, 'richCustomers', 5_000_000);
   const large = prepareShopperOrder(s, 'richCustomers', 50_000_000);
   assert.ok(small.job, small.error);
@@ -110,6 +112,8 @@ test('rich-customer mission prioritises unlocked luxury items and scales order q
   assert.ok(luxuryLines.length > 0, 'rich-customer sourcing should include unlocked luxury products where the tier has them');
   assert.ok(large.job.items.some((line) => line.pieces > 1), 'premium shopping should buy more than one piece when the budget supports it');
   assert.ok(large.job.estimatedTotal > small.job.estimatedTotal * 2, 'a much larger budget should materially increase the proposed order, not return almost the same tiny cart');
+  assert.ok(large.job.items.length > small.job.items.length, 'a larger budget should bring more styles or colourways');
+  assert.ok(large.job.items.every((line) => line.pieces <= 3), 'celebrity orders never pile up one luxury colourway');
   assert.ok(small.job.estimatedTotal <= 5_000_000);
   assert.ok(large.job.estimatedTotal <= 50_000_000);
 
@@ -391,4 +395,48 @@ test('shopper category mapping combines jewellery product kinds without losing o
   assert.equal(shopperCategoryForKind('top'), 'top');
   assert.equal(shopperCategoryForKind('glasses'), 'glasses');
   assert.equal(SHOPPER_PREFERENCE_CATEGORIES.length, 10);
+});
+
+test('Kunle charges 5% commission (min ₦1,500) at checkout, only on his own items, only once', () => {
+  const s = game({ cash: 2_000_000, tier: 1, stock: [], marketCart: [], productSales: [] });
+  const order = prepareShopperOrder(s, 'variety', 300_000);
+  assert.ok(order.job, order.error);
+  const cart = order.state.marketCart || [];
+  const goods = cartTotal(cart);
+  const check = validateCart(order.state, cart);
+  assert.equal(check.ok, true, check.errors.join('; '));
+  assert.equal(check.commission, Math.max(1_500, Math.round(goods * 0.05 / 100) * 100));
+  const after = buyCart(order.state, cart);
+  assert.equal(after.cash, order.state.cash - goods - check.commission, 'goods and commission are both paid');
+  assert.ok(after.ledger.some((row) => row.label.includes("Kunle's commission") && row.amount === -check.commission));
+  assert.equal(validateCart(after, cart).commission, 0, 'a purchased order is never commissioned again');
+
+  const manual = MARKET.find((item) => canBuy(item, 1) && !cart.some((l) => l.itemId === item.id) && pieceCost(item, item.fabric) < 10_000)!;
+  assert.equal(validateCart(s, [lineFor(manual, 2)]).commission, 0, 'manual Yaba Mart shopping is free');
+  assert.ok(shopperAvailableBudget(s) <= Math.floor((s.cash - 1_500) / 100) * 100, 'his fee is reserved before he spends');
+});
+
+test('fresh orders fill requested colours the racks are missing, and missed requests are prioritised', () => {
+  const base = game({ cash: 50_000_000, tier: 3, stock: [], marketCart: [], productSales: [] });
+  const misses = Array.from({ length: 8 }, () => ({ day: base.day - 2, color: '#6B8E23', name: 'lime' }));
+  const result = prepareShopperOrder({ ...base, colourMisses: misses }, 'variety', 10_000_000);
+  assert.ok(result.job, result.error);
+  const clothing = result.job.items.filter((line) => ['top', 'bottom', 'dress', 'outer'].includes(line.kind));
+  const requested = new Set(clothing.map((line) => line.color.toUpperCase()));
+  assert.ok(requested.has('#6B8E23'), 'a colour customers kept asking for is bought');
+  assert.ok(requested.size >= 10, `orders should cover most requested colours, got ${requested.size}`);
+  const perStyle = new Map<string, number>();
+  for (const line of clothing) perStyle.set(line.itemId, (perStyle.get(line.itemId) || 0) + 1);
+  assert.ok([...perStyle.values()].every((n) => n <= 5), 'no everyday style is bought in every colour');
+  assert.ok(result.job.summary.includes('lime'), 'his report explains the missed colour');
+});
+
+test('celebrity orders are mostly clothes, one piece per clothing colourway', () => {
+  const s = game({ cash: 900_000_000, tier: 6, stock: [], marketCart: [], productSales: [] });
+  const result = prepareShopperOrder(s, 'richCustomers', 300_000_000);
+  assert.ok(result.job, result.error);
+  const clothing = result.job.items.filter((line) => ['top', 'bottom', 'dress', 'outer'].includes(line.kind));
+  assert.ok(clothing.length / result.job.items.length >= 0.6, 'clothes lead a celebrity order');
+  assert.ok(clothing.every((line) => line.pieces === 1), 'celebrity clothes are one-offs per colour');
+  assert.ok(result.job.items.length <= 250, 'the cart limit is respected');
 });

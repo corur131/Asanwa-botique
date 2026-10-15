@@ -96,8 +96,10 @@ export const MarketApp: React.FC<{ s: GameState; cart: CartLine[]; setCart: (f: 
   );
 
   if (view === 'cart') {
-    const total = cartTotal(cart);
+    const goods = cartTotal(cart);
     const validation = validateCart(s, cart);
+    const commission = validation.commission || 0;
+    const total = goods + commission;
     const fresh = cartNewDesigns(s, cart);
     const free = Math.max(0, displayCap(s) - displayedCount(s));
     const toStorage = Math.max(0, fresh - free);
@@ -122,7 +124,8 @@ export const MarketApp: React.FC<{ s: GameState; cart: CartLine[]; setCart: (f: 
         </div>
         {cart.length > 0 && (
           <div className="border-t border-white/10 p-3 space-y-1.5 bg-[#161616] shrink-0">
-            <div className="flex justify-between text-sm text-slate-300"><span>{pieces} pieces · {cart.length} line{cart.length > 1 ? 's' : ''}</span><span className="text-white font-bold text-lg">{naira(total)}</span></div>
+            <div className="flex justify-between text-sm text-slate-300"><span>{pieces} pieces · {cart.length} line{cart.length > 1 ? 's' : ''}</span><span className="text-white font-bold text-lg">{naira(goods)}</span></div>
+            {commission > 0 && <div className="flex justify-between text-xs text-violet-200"><span>Kunle's commission (5% of his picks)</span><span>{naira(commission)}</span></div>}
             <div className="flex justify-between text-xs text-slate-400"><span>Balance after</span><span className={s.cash - total < 0 ? 'text-rose-300' : ''}>{naira(s.cash - total)}</span></div>
             <div className="text-[11px] text-slate-400">
               {fresh} new design{fresh === 1 ? '' : 's'}, {free} free display space{free === 1 ? '' : 's'}.{toStorage > 0 ? ` ${toStorage} will go to storage until you buy more rails.` : ''}

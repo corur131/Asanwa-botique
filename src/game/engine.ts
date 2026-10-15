@@ -1,6 +1,6 @@
 import { CharacterConfig } from '../types/character';
 import { generateRandomCustomer } from '../utils/randomizer';
-import { DIVINE_CAPACITY, HOUR_WEIGHTS, PATIENCE, SHOP_MINUTES, staffMinutes, NEW_SHOP_RAMP_DAYS, NEW_SHOP_START, SERVICE_FEE, SLOW_WEEK_CHANCE, STAFF, STAFF_CAPACITY, START_CASH, SUPPLIES_SHARE, MARKUP, TIERS, FABRIC_COST, CELEBRITY_FULFILMENT_RATE, naira } from './economy';
+import { DIVINE_CAPACITY, HOUR_WEIGHTS, PATIENCE, SHOP_MINUTES, staffMinutes, NEW_SHOP_RAMP_DAYS, NEW_SHOP_START, SERVICE_FEE, SLOW_WEEK_CHANCE, STAFF, STAFF_CAPACITY, START_CASH, SUPPLIES_SHARE, MARKUP, TIERS, FABRIC_COST, CELEBRITY_FULFILMENT_RATE, naira, SHOPPER_COMMISSION_MIN, SHOPPER_COMMISSION_RATE } from './economy';
 import { canBuy, entryFor, HAIR_SWATCHES, isClothing, makeDesign, pieceCost, productKey, MARKET } from './market';
 import { FabricId } from '../types/character';
 import { announceCelebrityVisit, answerRival, competition, initRivals, poacher, reactToMove, simulateRivals } from './rivals';
@@ -11,7 +11,7 @@ import { ENERGY, busyNow, divineBonus, energyOf, energyStep, exhausted, payBills
 import { makeCustomer, makeCelebrityCustomer, celebrityIsScheduled, celebrityDiscoveryChance, celebrityVisitFollowThroughChance, affluentCustomerShareShift, visibilityDiscoveryChance, maximumCelebrityTierForShop, chooseCelebrityTierForShop, maximumCelebrityVisitsPerDay, sanitizeSavedCelebrityNameCollisions } from './customers';
 import { buildLook, hairGroup, lookCost, scoreLook } from './scoring';
 import { FABRIC_COLORS, FEMALE_HAIR, MAKEUP_LOOKS } from '../constants/catalog';
-import { colourName } from './colours';
+import { colourName, sameColour } from './colours';
 import { FURNITURE, KIOSK_LISTING, Listing, Placed, STARTER_FURNITURE, autoPlace, prepareFurnitureForMove,
   findSpot, canPlace, turn, Rot, ceilingCapacity, ceilingUsed, yardCapacity, yardUsed, cheapestListing, furnitureById, listingsFor, newUid, prestigeRichShift, prestigeTraffic, shopStats, usesFloor, wallCapacity, wallUsed, MoveEquipmentPlan } from './shop';
 import { CharacterMemory, CollaborationEvent, CollaborationReply, Customer, DayLog, Departure, Design, ReplyChoice, GameState, LedgerLine, Message, PoliticianContract, PoliticianContractRequirement, Regular, ScoreBreakdown, Settlement, SponsorshipOffer, StaffMember, StaffProfession, StyleChoice, Visitor } from './types';
@@ -929,6 +929,17 @@ export function applyLook(s0: GameState, c: Customer, choice: StyleChoice, st0: 
     // Keep a generous rolling window so the save does not grow forever.
     productSales = productSales.filter((row) => row.day >= s.day - 179).slice(-5000);
   }
+  // Remember colour requests the racks could not answer at all, so the shopper
+  // buys more of them. Only counts when no clothing on display had that colour.
+  let colourMisses = s.colourMisses || [];
+  if (!c.service) {
+    for (const w of c.wants) {
+      if (w.kind !== 'color') continue;
+      const onRack = s.stock.some((d) => d.displayed && d.pieces > 0 && isClothing(d.kind) && sameColour(d.color, w.color));
+      if (!onRack) colourMisses = [...colourMisses, { day: s.day, color: w.color, name: w.name }];
+    }
+    colourMisses = colourMisses.filter((row) => row.day >= s.day - 60).slice(-300);
+  }
   let regulars = s.regulars;
   if (c.regularId) {
     regulars = regulars.map((r) => (r.id === c.regularId ? { ...r, visits: r.visits + 1, loyalty: clamp(r.loyalty + (score.total - 70) / 2, 0, 100), bestScore: Math.max(r.bestScore, score.total), tasteKnown: r.tasteKnown || r.visits >= 1 } : r));
@@ -953,6 +964,7 @@ export function applyLook(s0: GameState, c: Customer, choice: StyleChoice, st0: 
     rep: clamp(s.rep + (st.repDelta > 0 ? st.repDelta * (1 + coolNow(s) * 0.6) : st.repDelta), 0, 100),
     stock,
     productSales,
+    colourMisses,
     regulars,
     today,
     stats: { ...s.stats, served: s.stats.served + (sold ? 1 : 0), totalEarned: s.stats.totalEarned + (sold ? st.paid + st.tip - st.cost : 0), bestScore: Math.max(s.stats.bestScore, score.total) },
@@ -1789,7 +1801,54 @@ export const cartTotal = (lines: CartLine[]) => lines.reduce((a, l) => a + cartL
 export interface CartValidation {
   ok: boolean;
   total: number;
+  /** Shopper commission due at checkout for the items he picked; 0 for manual shopping. */
+  commission: number;
   errors: string[];
+}
+
+const shopperLineKey = (l: Pick<CartLine, 'kind' | 'itemId' | 'fabric' | 'color' | 'color2' | 'pattern'>) =>
+  [l.kind, l.itemId, l.fabric || '', l.color, l.color2, l.pattern].join('|');
+
+/**
+ * Kunle's commission on a checkout: 5% of the goods in this cart that came from his
+ * open orders, with a ₦1,500 minimum per order the first time it is paid. Items the
+ * player added by hand, or removed from his list, are not commissioned.
+ */
+export function shopperCommission(s: GameState, lines: CartLine[]): { total: number; byJob: { id: string; amount: number; pieces: Record<string, number> }[] } {
+  const remaining = new Map<string, { pieces: number; unit: number }>();
+  for (const raw of lines) {
+    const line = canonicaliseCartColours(raw);
+    const entry = entryFor(line.kind, line.itemId);
+    if (!entry || line.pieces <= 0) continue;
+    const key = shopperLineKey(line);
+    const unit = pieceCost(entry, isClothing(line.kind) ? (line.fabric || 'plain') as FabricId : undefined);
+    const prev = remaining.get(key);
+    remaining.set(key, { pieces: (prev?.pieces || 0) + line.pieces, unit });
+  }
+  const byJob: { id: string; amount: number; pieces: Record<string, number> }[] = [];
+  let total = 0;
+  for (const job of s.shopperJobs || []) {
+    if (job.status !== 'ready') continue;
+    let matched = 0;
+    const pieces: Record<string, number> = {};
+    for (const item of job.items) {
+      const key = shopperLineKey(item);
+      const have = remaining.get(key);
+      if (!have || have.pieces <= 0) continue;
+      const owed = Math.max(0, item.pieces - (job.paidPieces?.[key] || 0));
+      const take = Math.min(owed, have.pieces);
+      if (take <= 0) continue;
+      have.pieces -= take;
+      pieces[key] = take;
+      matched += take * have.unit;
+    }
+    if (matched <= 0) continue;
+    let amount = Math.round((matched * SHOPPER_COMMISSION_RATE) / 100) * 100;
+    if (!job.commissionPaid) amount = Math.max(SHOPPER_COMMISSION_MIN, amount);
+    byJob.push({ id: job.id, amount, pieces });
+    total += amount;
+  }
+  return { total, byJob };
 }
 
 /** Match official palette colours robustly without allowing unsupported colours. */
@@ -1866,8 +1925,9 @@ export function validateCart(s: GameState, lines: CartLine[]): CartValidation {
     seen.add(canonicalKey);
     total += pieceCost(entry, isClothing(line.kind) ? fabric as FabricId : undefined) * line.pieces;
   }
-  if (errors.length === 0 && s.cash < total) errors.push('There is not enough available cash to pay for this cart.');
-  return { ok: errors.length === 0, total, errors };
+  const commission = errors.length === 0 ? shopperCommission(s, lines).total : 0;
+  if (errors.length === 0 && s.cash < total + commission) errors.push('There is not enough available cash to pay for this cart and the shopper commission.');
+  return { ok: errors.length === 0, total, commission, errors };
 }
 
 const sameDesign = (d: Design, l: CartLine) => d.kind === l.kind && d.itemId === l.itemId && (!isClothing(l.kind) || d.fabric === (l.fabric || d.fabric)) && d.color === l.color && (!isClothing(l.kind) || (d.color2 === l.color2 && d.pattern === l.pattern));
@@ -1891,6 +1951,7 @@ export function buyCart(s0: GameState, lines: CartLine[]): GameState {
   const canonicalLines = lines.map(canonicaliseCartColours);
   const validation = validateCart(s0, canonicalLines);
   if (!validation.ok) return s0;
+  const commission = shopperCommission(s0, canonicalLines);
   let s = s0;
   for (const l of canonicalLines) {
     const e = entryFor(l.kind, l.itemId);
@@ -1918,8 +1979,16 @@ export function buyCart(s0: GameState, lines: CartLine[]): GameState {
     if (!complete) return job;
     for (const [key, amount] of needed) purchasedCounts.set(key, Math.max(0, (purchasedCounts.get(key) || 0) - amount));
     return { ...job, status: 'purchased' as const };
+  }).map((job) => {
+    const paid = commission.byJob.find((row) => row.id === job.id);
+    if (!paid) return job;
+    const paidPieces = { ...(job.paidPieces || {}) };
+    for (const [key, n] of Object.entries(paid.pieces)) paidPieces[key] = (paidPieces[key] || 0) + n;
+    return { ...job, commissionPaid: (job.commissionPaid || 0) + paid.amount, paidPieces };
   });
-  return { ...s, shopperJobs };
+  let next: GameState = { ...s, shopperJobs };
+  if (commission.total > 0) next = money(next, -commission.total, "Kunle's commission (shopper)");
+  return next;
 }
 
 /** Sell old stock back to the market at half price. */
