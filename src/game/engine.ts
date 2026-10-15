@@ -13,7 +13,7 @@ import { buildLook, hairGroup, lookCost, scoreLook } from './scoring';
 import { FABRIC_COLORS, FEMALE_HAIR, MAKEUP_LOOKS } from '../constants/catalog';
 import { colourName, sameColour } from './colours';
 import { FURNITURE, KIOSK_LISTING, Listing, Placed, STARTER_FURNITURE, arrangeShop, autoPlace, prepareFurnitureForMove,
-  findSpot, canPlace, turn, Rot, ceilingCapacity, ceilingUsed, yardCapacity, yardUsed, wallFits, solarRackCapacity, solarUsed, outdoorRoomFor, cheapestListing, furnitureById, listingsFor, newUid, prestigeRichShift, prestigeTraffic, shopStats, usesFloor, wallCapacity, wallUsed, MoveEquipmentPlan } from './shop';
+  findSpot, canPlace, turn, Rot, ceilingCapacity, ceilingUsed, yardCapacity, yardUsed, wallFits, solarRackCapacity, solarUsed, outdoorRoomFor, cheapestListing, furnitureById, listingsFor, newUid, prestigeRichShift, prestigeTraffic, shopStats, usesFloor, wallCapacity, wallUsed, MoveEquipmentPlan, firstWallSpot, wallNoHang, WallSide } from './shop';
 import { CharacterMemory, CollaborationEvent, CollaborationReply, Customer, DayLog, Departure, Design, ReplyChoice, GameState, LedgerLine, Message, PoliticianContract, PoliticianContractRequirement, Regular, ScoreBreakdown, Settlement, SponsorshipOffer, StaffMember, StaffProfession, StyleChoice, Visitor } from './types';
 import { addBrag, blogPost, closeGramDay } from './gram';
 import { SeasonId, festive, seasonOf, weatherFor } from './climate';
@@ -1755,6 +1755,9 @@ export function placeFurniture(s: GameState, uid: string, x: number, z: number, 
   return { ...s, furniture: s.furniture.map((f) => (f.uid === uid ? cand : f)) };
 }
 
+/** Where a piece being tried would go: a floor cell, a yard side, or a spot on a wall. */
+export type PreviewAt = { x: number; z: number; rot: Rot; yardSide?: 'left' | 'right'; wallSide?: WallSide };
+
 /** Hang a wall piece exactly where the player chose, if that part of the wall is free. */
 export function placeWallItem(s: GameState, uid: string, side: 'back' | 'left', at: number): GameState {
   const p = s.furniture.find((f) => f.uid === uid);
@@ -2459,7 +2462,7 @@ export const PREVIEW_UID = '__preview';
  * "Buy / Cancel" step. Paint and flooring show on the walls and floor;
  * floor pieces sit where they would go (x, z, rot), others in their spot.
  */
-export function withPreview(s: GameState, id: string, at?: { x: number; z: number; rot: Rot; yardSide?: 'left' | 'right' }): { view: GameState; ok: boolean; why?: string; x: number; z: number; rot: Rot } {
+export function withPreview(s: GameState, id: string, at?: PreviewAt): { view: GameState; ok: boolean; why?: string; x: number; z: number; rot: Rot; wallSide?: WallSide } {
   const f = furnitureById(id);
   const base = { uid: PREVIEW_UID, id, x: 0, z: 0, rot: 0 as Rot, placed: true };
   let furniture = s.furniture;
@@ -2475,9 +2478,17 @@ export function withPreview(s: GameState, id: string, at?: { x: number; z: numbe
   } else if (f.mount === 'finish') {
     furniture = furniture.filter((p) => { const o = furnitureById(p.id); return o.mount !== 'finish' || (f.paint ? !o.paint : !o.floorTiles); });
   } else if (f.mount === 'wall') {
-    ok = wallUsed(furniture) + f.w <= wallCapacity(s.listing);
-    item = { ...base, x: wallUsed(furniture), placed: ok };
-    if (!ok) why = 'No wall space left';
+    // The player chooses the spot; by default the first free gap.
+    const spot = at?.wallSide ? { side: at.wallSide, at: at.x } : firstWallSpot(furniture, s.listing, f.w);
+    if (!spot) {
+      ok = false;
+      why = 'No wall space left';
+      item = { ...base, placed: false };
+    } else {
+      item = { ...base, x: spot.at, z: 0, wallSide: spot.side, placed: true };
+      ok = wallFits([...furniture, item], s.listing, PREVIEW_UID, spot.side, spot.at);
+      if (!ok) why = wallNoHang(s.listing)[spot.side].some(([a, b]) => spot.at + f.w > a && spot.at < b) ? 'That is the feature wall: pick another spot' : 'Something already hangs there';
+    }
   } else if (f.mount === 'ceiling') {
     ok = ceilingUsed(furniture) < ceilingCapacity(s.listing);
     item = { ...base, placed: ok };
@@ -2489,16 +2500,21 @@ export function withPreview(s: GameState, id: string, at?: { x: number; z: numbe
   }
   if (s.cash < f.price) { ok = false; why = `You need ${naira(f.price)}`; }
   if ((f.minTier || 0) > s.tier) { ok = false; why = `Needs a ${TIERS[f.minTier || 0].name}`; }
-  return { view: { ...s, furniture: [...furniture, item] }, ok, why, x: item.x, z: item.z, rot: item.rot };
+  return { view: { ...s, furniture: [...furniture, item] }, ok, why, x: item.x, z: item.z, rot: item.rot, wallSide: item.wallSide };
 }
 
 /** Buy the piece you were trying, where you put it. */
-export function buyPreviewed(s: GameState, id: string, at?: { x: number; z: number; rot: Rot; yardSide?: 'left' | 'right' }): GameState {
+export function buyPreviewed(s: GameState, id: string, at?: PreviewAt): GameState {
   const before = new Set(s.furniture.map((p) => p.uid));
   let next = buyFurniture(s, id);
   if (next === s) return s;
   const fresh = next.furniture.find((p) => !before.has(p.uid));
   if (fresh && at && furnitureById(id).mount === 'floor') next = placeFurniture(next, fresh.uid, at.x, at.z, at.rot);
+  if (fresh && at?.wallSide && furnitureById(id).mount === 'wall') {
+    const hung = placeWallItem(next, fresh.uid, at.wallSide, at.x);
+    if (hung === next) return s; // the chosen spot was taken: don't charge for a piece hung elsewhere
+    next = hung;
+  }
   if (fresh && at && furnitureById(id).mount === 'yard') next = { ...next, furniture: next.furniture.map((p) => p.uid === fresh.uid ? { ...p, yardSide: at.yardSide || (at.x < 0 ? 'left' : 'right') } : p) };
   return next;
 }

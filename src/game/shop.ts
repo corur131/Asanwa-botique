@@ -513,15 +513,36 @@ export function finishes(items: Placed[]) {
   return { paint: [...on].reverse().find((f) => f.paint), floor: [...on].reverse().find((f) => f.floorTiles) };
 }
 
-/** Wall items go along the back wall, then the left wall (the two tall walls). */
-export const wallCapacity = (k: RoomKey) => room(k).w + room(k).d - 1;
+export type WallSide = 'back' | 'left';
+type Span = [number, number];
+
+/**
+ * Parts of the tall walls that nothing may hang on: the big centre feature panels built into
+ * signature shops and the Fashion Empire House. Spans are whole metres along the wall.
+ */
+export function wallNoHang(k: RoomKey): Record<WallSide, Span[]> {
+  const r = room(k);
+  const tier = typeof k === 'number' ? k : k.tier;
+  let feature = 0;
+  if (r.signature && !r.signatureTheme) feature = Math.max(4.6, r.w * 0.58, tier === 2 ? r.w * 0.72 : 0);
+  else if (r.kind === 'empire' && !r.signature) feature = 5.8;
+  if (!feature) return { back: [], left: [] };
+  const from = Math.max(0, Math.floor(r.w / 2 - feature / 2));
+  const to = Math.min(r.w, Math.ceil(r.w / 2 + feature / 2));
+  return { back: [[from, to]], left: [] };
+}
+const wallLength = (k: RoomKey): Record<WallSide, number> => ({ back: room(k).w, left: room(k).d - 1 });
+const blockedLength = (k: RoomKey) => Object.values(wallNoHang(k)).flat().reduce((a, [x, y]) => a + (y - x), 0);
+
+/** Wall items go along the back wall, then the left wall (the two tall walls), around any feature panel. */
+export const wallCapacity = (k: RoomKey) => room(k).w + room(k).d - 1 - blockedLength(k);
 
 /** Where each wall item hangs: side 'back' (along x at z=0) or 'left' (along z at x=0). */
 export function wallLayout(items: Placed[], tier: RoomKey): Record<string, { side: 'back' | 'left'; at: number }> {
-  const r = room(tier);
   const out: Record<string, { side: 'back' | 'left'; at: number }> = {};
-  const len = { back: r.w, left: r.d - 1 };
-  const taken = { back: [] as [number, number][], left: [] as [number, number][] };
+  const len = wallLength(tier);
+  const noHang = wallNoHang(tier);
+  const taken = { back: [...noHang.back] as [number, number][], left: [...noHang.left] as [number, number][] };
   const free = (side: 'back' | 'left', at: number, w: number) =>
     at >= 0 && at + w <= len[side] && taken[side].every(([a, b]) => at + w <= a || at >= b);
   const wall = items.filter((p) => p.placed && furnitureById(p.id).mount === 'wall');
@@ -541,8 +562,32 @@ export function wallLayout(items: Placed[], tier: RoomKey): Record<string, { sid
       }
       if (placed) break;
     }
+    // Never lose a piece: if only the feature panel is left, hang it there rather than hide it.
+    if (!placed) {
+      for (const side of ['back', 'left'] as const) {
+        for (let at = 0; at + w <= len[side] && !placed; at++) {
+          if (taken[side].slice(noHang[side].length).every(([a, b]) => at + w <= a || at >= b)) { out[p.uid] = { side, at }; taken[side].push([at, at + w]); placed = true; }
+        }
+        if (placed) break;
+      }
+    }
   }
   return out;
+}
+
+/** The first free spot on the walls for a piece this wide, or null when the walls are full. */
+export function firstWallSpot(items: Placed[], tier: RoomKey, w: number): { side: WallSide; at: number } | null {
+  const len = wallLength(tier);
+  const layout = wallLayout(items, tier);
+  const taken: Record<WallSide, Span[]> = { back: [...wallNoHang(tier).back], left: [...wallNoHang(tier).left] };
+  for (const p of items) {
+    const spot = layout[p.uid];
+    if (spot) taken[spot.side].push([spot.at, spot.at + furnitureById(p.id).w]);
+  }
+  for (const side of ['back', 'left'] as const) {
+    for (let at = 0; at + w <= len[side]; at++) if (taken[side].every(([a, b]) => at + w <= a || at >= b)) return { side, at };
+  }
+  return null;
 }
 
 /** Could this wall piece hang here (in bounds, not overlapping another piece)? */
@@ -552,6 +597,7 @@ export function wallFits(items: Placed[], tier: RoomKey, uid: string, side: 'bac
   if (!p) return false;
   const w = furnitureById(p.id).w;
   if (at < 0 || at + w > (side === 'back' ? r.w : r.d - 1)) return false;
+  if (wallNoHang(tier)[side].some(([a, b]) => at + w > a && at < b)) return false;
   const layout = wallLayout(items.filter((x) => x.uid !== uid), tier);
   return Object.entries(layout).every(([id, spot]) => {
     if (spot.side !== side) return true;
