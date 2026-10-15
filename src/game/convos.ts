@@ -14,6 +14,9 @@
  * avoided so chats don't repeat.
  */
 import { GameState, Message, Rival } from './types';
+import { TIERS } from './economy';
+import { FOLLOWUP, SUBJECT_REPLIES, SUBJECT_THEIRS, subjectOf } from './chatSubjects';
+import type { Ctx, Line, Subject } from './chatSubjects';
 
 // ---------------------------------------------------------------------------
 // Shapes
@@ -56,6 +59,8 @@ export interface Convo {
   gist?: { story: number; step: number; about: string };
   last?: Reaction;
   done?: boolean;
+  /** What the opener was about, so replies answer it (older saves: undefined). */
+  subject?: Subject;
 }
 
 export const TAGS: Record<Move, string> = {
@@ -81,8 +86,6 @@ const HEAT: Record<Topic, number> = { brag: 1, wonShow: 2, jealous: 2, shade: 3,
 // ---------------------------------------------------------------------------
 // What Divine can say
 // ---------------------------------------------------------------------------
-type Ctx = { me: string; them: string; area: string; shop: string; rank: number; theirRank: number; followers: number; theirFollowers: number; other: string };
-type Line = string | ((c: Ctx) => string | null);
 
 const FIGHT: Partial<Record<Move, Line[]>> = {
   classy: [
@@ -121,10 +124,7 @@ const FIGHT: Partial<Record<Move, Line[]>> = {
     (c) => (c.rank && c.theirRank && c.rank < c.theirRank ? `Top 20 says I'm #${c.rank}. You're #${c.theirRank}. Numbers don't lie 📊` : null),
     (c) => (c.followers > c.theirFollowers ? `${Math.max(0, Number(c.followers) || 0)?.toLocaleString('en-NG')} followers on Gidigram. Count yours and come back 😌` : null),
     (c) => (c.rank && c.theirRank && c.rank > c.theirRank ? `You're ahead on the Top 20 this week, I see it. Check again next Sunday 😉` : null),
-    'Should I post the screenshot of you asking my supplier for a discount? 👀',
     'My customers leave reviews. Go and read yours before you talk.',
-    'I have the voice note where you begged my stylist to come and work for you 🎙️',
-    'Your "new collection" is my old collection with a different filter 📸',
   ],
   sweet: [
     'Thank you for the free promo, darling 😘 My DMs just got busy.',
@@ -379,6 +379,7 @@ function ctxFor(s: GameState, c: Convo): Ctx {
     followers: s.followers || 0,
     theirFollowers: r?.followers || 0,
     other: others.length ? first(others[Math.floor(Math.random() * others.length)].owner) : 'Amaka',
+    tierName: TIERS[Math.max(0, Math.min(TIERS.length - 1, s.tier))]?.name || 'shop',
   };
 }
 const fill = (t: string, c: Ctx) => t.replace(/\{(\w+)\}/g, (_, k) => String((c as unknown as Record<string, unknown>)[k] ?? ''));
@@ -395,6 +396,24 @@ const remember = (s: GameState, lines: string[]): GameState => ({ ...s, said: [.
 
 const poolFor = (topic: Topic) => (topic === 'gist' ? GIST : topic === 'brag' || topic === 'wonShow' ? BRAG : FIGHT);
 
+/** Subject replies for the opener, then replies that follow their last reaction. */
+function subjectTable(c: Convo): Partial<Record<Move, Line[]>> | null {
+  if (c.topic === 'gist') return null;
+  if (c.turn === 0) {
+    const t = c.subject ? SUBJECT_REPLIES[c.subject] : undefined;
+    return t && Object.keys(t).length >= 3 ? t : null;
+  }
+  if (c.last && c.last !== 'exit') {
+    const follow = { ...FOLLOWUP[c.last] };
+    // keep one on-topic answer in the mix, if there is one left
+    const on = c.subject ? SUBJECT_REPLIES[c.subject] : undefined;
+    if (on?.clap && c.last === 'escalate') follow.clap = [...(follow.clap || []), ...on.clap];
+    if (on?.receipts && c.last === 'escalate') follow.receipts = [...(follow.receipts || []), ...on.receipts];
+    return Object.keys(follow).length >= 2 ? follow : null;
+  }
+  return null;
+}
+
 /** Five different replies for this turn. */
 function options(s: GameState, c: Convo) {
   const cx = ctxFor(s, c);
@@ -405,6 +424,21 @@ function options(s: GameState, c: Convo) {
     const canMore = c.gist!.step < st.more.length;
     moves = [...(canMore ? (['more'] as Move[]) : []), 'spill', 'laugh', 'pray', 'useIt', 'proof', 'scold'];
     if (c.turn > 0) moves = moves.filter((m) => m !== 'proof' || canMore);
+  } else if (subjectTable(c)) {
+    // Replies written for what was actually said (turn 0) or for how they just answered.
+    const table = subjectTable(c)!;
+    const offered = (Object.keys(table) as Move[]).filter((m) => (table[m] || []).some((l) => { const t = resolve(l, cx); return !!t && !c.used.includes(t); }));
+    const out: { id: string; label: string; tag: string }[] = [];
+    for (const m of offered.sort(() => Math.random() - 0.5)) {
+      if (out.length >= 4) break;
+      const lines = (table[m] || []).map((l) => resolve(l, cx)).filter((x): x is string => !!x && (c.chat === GROUP || !/group|Group|popcorn/.test(x)));
+      const text = fresh(lines, c.used, s.said || []);
+      if (text) out.push({ id: m, label: text, tag: TAGS[m] });
+    }
+    if (out.length >= 2 || (c.turn > 0 && out.length >= 1)) return out;
+    // Out of replies that fit: a follow-up turn simply ends instead of going random.
+    if (c.turn > 0) return out;
+    moves = Object.keys(pool) as Move[];
   } else {
     const all = Object.keys(pool) as Move[];
     const fight = c.topic !== 'brag' && c.topic !== 'wonShow';
@@ -493,7 +527,7 @@ export function startConvo(s0: GameState, o: { with: string; rivalId?: string; c
   if (live && live.heat >= HEAT[o.topic] && live.turn > 0) return remember(post(s, o.with, o.opener, { chat: o.chat, tone: o.tone || 'info' }), [o.opener]);
   if (live) s = { ...s, convos: s.convos!.map((c) => (c.id === live.id ? { ...c, done: true } : c)), messages: s.messages.map((m) => (m.convo === live.id && !m.answered && m.choices ? { ...m, choices: undefined } : m)) };
   const heat = HEAT[o.topic] + (o.rivalId && (rivalOf(s, o.rivalId)?.feeling ?? 0) < -30 ? 1 : 0);
-  const c: Convo = { id: `cv${s.day}-${Math.random().toString(36).slice(2, 7)}`, with: o.with, rivalId: o.rivalId, chat, topic: o.topic, heat, peak: heat, turn: 0, max: clamp(1 + heat, 2, 6), score: 0, used: [o.opener] };
+  const c: Convo = { id: `cv${s.day}-${Math.random().toString(36).slice(2, 7)}`, with: o.with, rivalId: o.rivalId, chat, topic: o.topic, heat, peak: heat, turn: 0, max: clamp(1 + heat, 2, 6), score: 0, used: [o.opener], subject: o.topic === 'gist' ? undefined : subjectOf(o.opener, o.topic) };
   if (o.topic === 'gist') {
     const story = o.story ?? Math.floor(Math.random() * STORIES.length);
     c.gist = { story, step: 0, about: o.rivalId || '' };
@@ -630,7 +664,11 @@ export function answerConvo(s0: GameState, msgId: number, choiceId: string): Gam
   const pers = r?.personality || 'pro';
   const groupy = /Ladies|Una |una |anyone|Anybody|Has anyone|Who wan|Una see/;
   const braggy = c.topic === 'brag' || c.topic === 'wonShow';
-  const base = braggy && move === 'ask' && re !== 'escalate' && re !== 'exit' ? ANSWERS : braggy && R_BRAG[re] ? R_BRAG[re]! : [...(R[re][pers] || []), ...(R[re].any || [])];
+  const onTopic = c.subject && (re === 'escalate' || re === 'back' || re === 'soft') ? (SUBJECT_THEIRS[c.subject]?.[re] || []).filter((x) => !c.used.includes(x)) : [];
+  // A kind reply that only gets a grudging "back" deserves a warmer answer than "Point taken".
+  const kindBack = (move === 'classy' || move === 'truce' || move === 'sweet') && re === 'back' ? ['Okay sis ❤️', 'Hmm okay. Thank you.', 'Alright, no wahala.', 'Aww okay 😊', 'You\'re welcome sha 😅'] : [];
+  const base = onTopic.length && chance(0.75) ? onTopic : kindBack.length ? kindBack
+    : braggy && move === 'ask' && re !== 'escalate' && re !== 'exit' ? ANSWERS : braggy && R_BRAG[re] ? R_BRAG[re]! : [...(R[re][pers] || []), ...(R[re].any || [])];
   const pool = base.filter((x) => c.chat === GROUP || !groupy.test(x));
   const reply = fresh(pool, c.used, s.said || []) || pool[0];
   if (c.heat <= 0 && c.turn < minTurns) c = { ...c, heat: 1 };
@@ -642,8 +680,13 @@ export function answerConvo(s0: GameState, msgId: number, choiceId: string): Gam
     return wrapUp(s, c);
   }
   const choices = options({ ...s, said: [reply, ...(s.said || [])] }, c);
+  if (!choices.length) {
+    c = { ...c, done: true };
+    s = post(save(), c.with, reply, { chat: where });
+    return wrapUp(remember(s, [reply]), c);
+  }
   c = { ...c, used: [...c.used, ...choices.map((x) => x.label)] };
-  s = post(save(), c.with, reply, { chat: where, convo: c.id, choices: choices.length ? choices : undefined });
+  s = post(save(), c.with, reply, { chat: where, convo: c.id, choices });
   return remember(s, [reply]);
 }
 
