@@ -52,7 +52,11 @@ const Chip: React.FC<{ on?: boolean; onClick: () => void; children: React.ReactN
   <button onClick={onClick} className={`shrink-0 px-3 py-1.5 rounded-full text-xs font-semibold border ${on ? 'bg-orange-500 border-orange-500 text-white' : 'border-white/15 text-slate-200 bg-white/5'}`}>{children}</button>
 );
 
-export const MarketApp: React.FC<{ s: GameState; cart: CartLine[]; setCart: (f: (c: CartLine[]) => CartLine[]) => void; onPay: () => boolean; onBuyDrop: (n: number) => void; initialView?: 'list' | 'cart' }> = ({ s, cart, setCart, onPay, onBuyDrop, initialView = 'list' }) => {
+const listOf = (xs: string[]) => (xs.length <= 3 ? xs.join(', ') : `${xs.slice(0, 3).join(', ')} and ${xs.length - 3} more`);
+
+export type CheckoutReceipt = { total: number; shown: string[]; stored: string[]; swappedOut: string[] };
+
+export const MarketApp: React.FC<{ s: GameState; cart: CartLine[]; setCart: (f: (c: CartLine[]) => CartLine[]) => void; onPay: (makeRoom: boolean) => CheckoutReceipt | false; onBuyDrop: (n: number) => void; initialView?: 'list' | 'cart' }> = ({ s, cart, setCart, onPay, onBuyDrop, initialView = 'list' }) => {
   const [view, setView] = useState<'list' | 'item' | 'cart'>(initialView);
   const [cat, setCat] = useState<MarketCategory>('clothes');
   const [who, setWho] = useState<'f' | 'm'>('f');
@@ -64,6 +68,8 @@ export const MarketApp: React.FC<{ s: GameState; cart: CartLine[]; setCart: (f: 
   const [picks, setPicks] = useState<{ color: string; n: number }[]>([]);
   const [preview, setPreview] = useState(FABRIC_COLORS[5]);
   const [flash, setFlash] = useState('');
+  const [makeRoom, setMakeRoom] = useState(true);
+  const [receipt, setReceipt] = useState<CheckoutReceipt | null>(null);
   const pieces = cart.reduce((a, l) => a + l.pieces, 0);
 
   const list = useMemo(
@@ -103,6 +109,7 @@ export const MarketApp: React.FC<{ s: GameState; cart: CartLine[]; setCart: (f: 
     const fresh = cartNewDesigns(s, cart);
     const free = Math.max(0, displayCap(s) - displayedCount(s));
     const toStorage = Math.max(0, fresh - free);
+    const cap = displayCap(s);
     return (
       <div className="flex-1 min-h-0 flex flex-col">
         {header('Your cart', () => setView(sel ? 'item' : 'list'))}
@@ -127,9 +134,22 @@ export const MarketApp: React.FC<{ s: GameState; cart: CartLine[]; setCart: (f: 
             <div className="flex justify-between text-sm text-slate-300"><span>{pieces} pieces · {cart.length} line{cart.length > 1 ? 's' : ''}</span><span className="text-white font-bold text-lg">{naira(goods)}</span></div>
             {commission > 0 && <div className="flex justify-between text-xs text-violet-200"><span>Kunle's commission (5% of his picks)</span><span>{naira(commission)}</span></div>}
             <div className="flex justify-between text-xs text-slate-400"><span>Balance after</span><span className={s.cash - total < 0 ? 'text-rose-300' : ''}>{naira(s.cash - total)}</span></div>
-            <div className="text-[11px] text-slate-400">
-              {fresh} new design{fresh === 1 ? '' : 's'}, {free} free display space{free === 1 ? '' : 's'}.{toStorage > 0 ? ` ${toStorage} will go to storage until you buy more rails.` : ''}
-            </div>
+            {toStorage === 0 ? (
+              <div className="text-[11px] text-slate-400">{fresh ? `${fresh} new style${fresh === 1 ? '' : 's'} · all fit on your racks (${free} free space${free === 1 ? '' : 's'}).` : 'Top-ups of styles you already stock.'}</div>
+            ) : cap === 0 ? (
+              <div role="alert" className="rounded-lg border border-rose-400/40 bg-rose-500/10 p-2.5 text-xs text-rose-100">
+                <div className="font-semibold">You have no racks or shelves placed</div>
+                Everything new goes to the store room and can't be used for styling. Place display furniture in the shop first.
+              </div>
+            ) : (
+              <div role="alert" className="rounded-lg border border-amber-400/40 bg-amber-500/10 p-2.5 text-xs text-amber-100 space-y-1.5">
+                <div className="font-semibold">{toStorage} new style{toStorage === 1 ? '' : 's'} won't fit on your racks</div>
+                <label className="flex items-start gap-2">
+                  <input type="checkbox" className="mt-0.5 accent-amber-500" checked={makeRoom} onChange={(e) => setMakeRoom(e.target.checked)} />
+                  <span>{makeRoom ? `Swap out my ${toStorage === 1 ? 'slowest seller' : `${Math.min(toStorage, displayedCount(s))} slowest sellers`} so the new buys go on display now.` : `Send ${toStorage === 1 ? 'it' : 'them'} to the store room. You won't be able to style with ${toStorage === 1 ? 'it' : 'them'} until ${toStorage === 1 ? "it's" : "they're"} on display.`}</span>
+                </label>
+              </div>
+            )}
             {!validation.ok && validation.errors.length > 0 && (
               <div role="alert" className="rounded-lg border border-amber-400/30 bg-amber-500/10 p-2.5 text-xs text-amber-100 space-y-1">
                 <div className="font-semibold">Checkout issue</div>
@@ -139,7 +159,7 @@ export const MarketApp: React.FC<{ s: GameState; cart: CartLine[]; setCart: (f: 
             )}
             <div className="flex gap-2 pt-1">
               <button className="rounded-full border border-white/20 text-slate-200 text-sm px-4 py-2.5" onClick={() => setCart(() => [])}>Clear</button>
-              <button className="flex-1 rounded-full bg-orange-500 text-white font-bold py-2.5 disabled:opacity-40" disabled={!validation.ok} onClick={() => { const paid = onPay(); setFlash(paid ? `Paid ${naira(total)}. It's in the shop.` : 'Checkout did not complete. No money was deducted. Your cart is unchanged; try removing and re-adding the affected item, then check again.'); if (paid) setView('list'); setTimeout(() => setFlash(''), 4500); }}>
+              <button className="flex-1 rounded-full bg-orange-500 text-white font-bold py-2.5 disabled:opacity-40" disabled={!validation.ok} onClick={() => { const paid = onPay(makeRoom); if (paid) { setReceipt(paid); setView('list'); return; } setFlash('Checkout did not complete. No money was deducted. Your cart is unchanged; try removing and re-adding the affected item, then check again.'); setTimeout(() => setFlash(''), 4500); }}>
                 {!validation.ok ? (validation.errors[0]?.includes('available cash') ? 'Not enough spending cash' : 'Fix cart issue to pay') : `Pay ${naira(total)}`}
               </button>
             </div>
@@ -263,6 +283,18 @@ export const MarketApp: React.FC<{ s: GameState; cart: CartLine[]; setCart: (f: 
         </div>
       </div>
       {flash && <div className="text-center text-xs text-emerald-300 py-1">{flash}</div>}
+      {receipt && (
+        <div role="status" className="mx-3 mb-1 rounded-xl border border-emerald-400/30 bg-emerald-500/10 p-2.5 text-xs text-emerald-50 space-y-1">
+          <div className="flex items-start gap-2">
+            <span className="font-semibold flex-1">Paid {naira(receipt.total)}.</span>
+            <button onClick={() => setReceipt(null)} className="text-emerald-200/80 px-1" aria-label="Dismiss receipt">✕</button>
+          </div>
+          {receipt.shown.length > 0 && <div>On display now: {listOf(receipt.shown)}.</div>}
+          {receipt.swappedOut.length > 0 && <div className="text-slate-300">Moved to the store room to make space: {listOf(receipt.swappedOut)}.</div>}
+          {receipt.stored.length > 0 && <div className="text-amber-200">In the store room (not on racks, can't be styled yet): {listOf(receipt.stored)}.</div>}
+          {!receipt.shown.length && !receipt.stored.length && <div>Your existing styles were topped up.</div>}
+        </div>
+      )}
       {s.drop && s.drop.day === s.day && <DropCard s={s} onBuy={(n) => { onBuyDrop(n); setFlash(`Got ${n} of the hot drop!`); setTimeout(() => setFlash(''), 2500); }} />}
       <div className="flex-1 overflow-y-auto p-3 pt-1 grid grid-cols-2 gap-2 content-start">
         {list.length === 0 && <p className="col-span-2 text-sm text-slate-500 text-center py-8">Nothing here for this filter.</p>}

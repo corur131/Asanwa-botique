@@ -613,6 +613,17 @@ export function staffCanServeCustomer(staff: Pick<StaffMember, 'level' | 'profes
   return customer.service !== 'makeup';
 }
 
+/** How long this employee needs for this customer: job size, level and salon equipment. */
+export function staffJobMinutes(s: GameState, m: Pick<StaffMember, 'level'>, c: Pick<Customer, 'service'>): number {
+  const job = c.service || 'look';
+  const st = stats(s);
+  // Proper salon kit speeds the matching work up: up to 15% off with top equipment.
+  const hairTools = Math.min(0.15, 0.05 * (st.hairBonus || 0));
+  const faceTools = Math.min(0.15, 0.04 * (st.makeupBonus || 0));
+  const boost = job === 'hair' ? hairTools : job === 'makeup' ? faceTools : job === 'both' ? (hairTools + faceTools) / 2 : 0;
+  return staffMinutes(m.level, job, boost);
+}
+
 /** Celebrities are never auto-dispatched; an explicit player assignment is required. */
 export function staffMayAutoDispatch(v: Pick<Visitor, 'c' | 'forStaff'>): boolean {
   return !v.c.celebrity || !!v.forStaff;
@@ -746,7 +757,7 @@ export function tick(s0: GameState, minutes: number): GameState {
       const next = waiting(s)
         .filter((v) => staffMayAutoDispatch(v) && staffCanServeCustomer(m, v.c) && staffChoice(s, v.c) !== null)
         .sort((a, b) => Number(!!b.forStaff) - Number(!!a.forStaff) || a.arrived - b.arrived)[0];
-      if (next && end < SHOP_MINUTES) s = { ...s, inShop: s.inShop.map((v) => (v.c.id === next.c.id ? { ...v, by: m.id, until: end + staffMinutes(m.level) } : v)) };
+      if (next && end < SHOP_MINUTES) s = { ...s, inShop: s.inShop.map((v) => (v.c.id === next.c.id ? { ...v, by: m.id, until: end + staffJobMinutes(s, m, next.c) } : v)) };
     }
   }
   // 8pm: the doors shut
@@ -1786,6 +1797,62 @@ export function setDisplayed(s: GameState, uid: string, on: boolean): GameState 
   return { ...s, stock: s.stock.map((d) => (productKey(d) === key ? { ...d, displayed: on } : d)) };
 }
 
+/** Units of a style (all colours) sold over the last `days` days. */
+function recentStyleSales(s: GameState, key: string, days = 14): number {
+  return (s.productSales || []).filter((r) => r.day > s.day - days && productKey(r) === key).reduce((a, r) => a + r.units, 0);
+}
+
+/**
+ * The displayed style that earns its rack space least: sold-out styles first, then the
+ * fewest pieces sold in the last two weeks. `keep` styles are never chosen.
+ */
+export function slowestDisplayedStyle(s: GameState, keep: Set<string> = new Set()): { key: string; label: string } | null {
+  const shown = new Map<string, Design[]>();
+  for (const d of s.stock) if (d.displayed) shown.set(productKey(d), [...(shown.get(productKey(d)) || []), d]);
+  let best: { key: string; label: string; rank: number } | null = null;
+  for (const [key, variants] of shown) {
+    if (keep.has(key)) continue;
+    const pieces = variants.reduce((a, d) => a + d.pieces, 0);
+    const rank = (pieces > 0 ? 1_000_000 : 0) + recentStyleSales(s, key) * 1000 + Math.min(999, pieces);
+    if (!best || rank < best.rank) best = { key, label: variants[0].label, rank };
+  }
+  return best && { key: best.key, label: best.label };
+}
+
+/**
+ * Put a stored style on the racks. If the racks are full, the slowest seller goes to the
+ * store room to make space. Returns the state unchanged when there are no racks at all.
+ */
+export function putOnDisplay(s: GameState, uid: string, keep: Set<string> = new Set()): GameState {
+  const target = s.stock.find((d) => d.uid === uid);
+  if (!target) return s;
+  const key = productKey(target);
+  if (s.stock.some((d) => productKey(d) === key && d.displayed)) return s;
+  if (displayCap(s) <= 0) return s;
+  let next = s;
+  if (displayedCount(next) >= displayCap(next)) {
+    const out = slowestDisplayedStyle(next, new Set([...keep, key]));
+    if (!out) return s;
+    next = { ...next, stock: next.stock.map((d) => (productKey(d) === out.key ? { ...d, displayed: false } : d)) };
+  }
+  return setDisplayed(next, uid, true);
+}
+
+/** What a checkout did to the racks, for an honest receipt. */
+export function checkoutPlacement(before: GameState, after: GameState): { shown: string[]; stored: string[]; swappedOut: string[] } {
+  const had = new Set(before.stock.map(productKey));
+  const wasShown = new Set(before.stock.filter((d) => d.displayed).map(productKey));
+  const isShown = new Set(after.stock.filter((d) => d.displayed).map(productKey));
+  const fresh = new Map<string, string>();
+  for (const d of after.stock) if (!had.has(productKey(d))) fresh.set(productKey(d), d.label);
+  const labelOf = (key: string) => before.stock.find((d) => productKey(d) === key)?.label || key;
+  return {
+    shown: [...fresh].filter(([k]) => isShown.has(k)).map(([, l]) => l),
+    stored: [...fresh].filter(([k]) => !isShown.has(k)).map(([, l]) => l),
+    swappedOut: [...wasShown].filter((k) => !isShown.has(k)).map(labelOf),
+  };
+}
+
 /** Buy more pieces of a design Divine already stocks. */
 export function restock(s: GameState, uid: string, pieces: number): GameState {
   const d = s.stock.find((x) => x.uid === uid);
@@ -1967,7 +2034,7 @@ export const cartNewDesigns = (s: GameState, lines: CartLine[]) => {
 }
 
 /** Pay for everything in the cart. Matching designs already in stock get topped up. */
-export function buyCart(s0: GameState, lines: CartLine[]): GameState {
+export function buyCart(s0: GameState, lines: CartLine[], opts: { makeRoom?: boolean } = {}): GameState {
   const canonicalLines = lines.map(canonicaliseCartColours);
   const validation = validateCart(s0, canonicalLines);
   if (!validation.ok) return s0;
@@ -2009,6 +2076,13 @@ export function buyCart(s0: GameState, lines: CartLine[]): GameState {
     return { ...job, commissionPaid: (job.commissionPaid || 0) + paid.amount, paidPieces };
   });
   let next: GameState = { ...s, shopperJobs };
+  if (opts.makeRoom) {
+    // Swap slow sellers off the racks so the new styles are usable straight away.
+    const had = new Set(s0.stock.map(productKey));
+    const fresh = next.stock.filter((d, i, all) => !had.has(productKey(d)) && all.findIndex((x) => productKey(x) === productKey(d)) === i);
+    const keep = new Set(fresh.map(productKey));
+    for (const d of fresh) next = putOnDisplay(next, d.uid, keep);
+  }
   if (commission.total > 0) next = money(next, -commission.total, "Kunle's commission (shopper)");
   if (newCollection) next = addBrag(next, 'collection', 'New collection in store', 'Fresh stock from Yaba Mart is on the racks at Asanwa Boutique.', 1);
   return next;

@@ -740,6 +740,9 @@ export default function GameApp({ onLab, initial, storageKey, cloud, notice }: {
               canWig={st.wigs}
               initial={drafts[current.id]}
               onChange={(ch) => setDrafts((d) => ({ ...d, [current.id]: ch }))}
+              onDisplay={(uid, keep) => up((g) => E.putOnDisplay(g, uid, new Set(keep)))}
+              rackFull={E.displayedCount(s) >= E.displayCap(s)}
+              noRacks={E.displayCap(s) <= 0}
               onFinish={(choice) => {
                 if (!current.contest) return setStep({ kind: 'price', c: current, choice });
                 // a style-off model doesn't pay: the judges score her against the rival's model

@@ -104,13 +104,14 @@ export const Phone: React.FC<PhoneProps> = (p) => {
         <div className="flex-1 min-h-0 flex flex-col bg-[#111]">
           {app === 'home' && <Home s={s} unread={unread} open={(target) => { if (target === 'market') setMarketStartView('list'); setApp(target); }} />}
           {app === 'chats' && <Chats {...p} />}
-          {app === 'market' && <MarketApp key={marketStartView} initialView={marketStartView} s={s} cart={p.cart} setCart={p.setCart} onPay={() => {
+          {app === 'market' && <MarketApp key={marketStartView} initialView={marketStartView} s={s} cart={p.cart} setCart={p.setCart} onPay={(makeRoom) => {
             const before = s;
-            const after = E.buyCart(before, p.cart);
+            const after = E.buyCart(before, p.cart, { makeRoom });
             if (after === before) return false;
+            const total = before.cash - after.cash;
             p.up(() => after);
             p.setCart(() => []);
-            return true;
+            return { total, ...E.checkoutPlacement(before, after) };
           }} onBuyDrop={(n) => p.up((g) => E.buyDrop(g, n))} />}
           {app === 'shopper' && <ShopperApp s={s} up={p.up} cart={p.cart} openContracts={() => setApp('contracts')} openMarket={() => { setMarketStartView('cart'); setApp('market'); }} />}
           {app === 'contracts' && <ContractsApp s={s} up={p.up} openShopper={() => setApp('shopper')} />}
