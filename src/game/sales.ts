@@ -66,7 +66,7 @@ export function planSale(s0: GameState, off: SaleOff): GameState {
   const fans = s0.followers || 0;
   const gained = Math.round(Math.min(600, 10 + fans * 0.004 * (off / 10)) * (event ? 1.3 : 1));
   let s: GameState = { ...s0, sale: { day, off, prev: s0.lastSaleDay }, lastSaleDay: day, followers: fans + gained };
-  s = gramNote(s, `Your sale post is up: "${event ? `${event} at Asanwa Boutique! ` : ''}${off}% OFF EVERYTHING tomorrow 🛍️". +${gained.toLocaleString('en-NG')} followers and the shares are flying.`, 'like');
+  s = gramNote(s, `Your sale post is up: "${event ? `${event} at Asanwa Boutique! ` : ''}${off}% OFF EVERYTHING tomorrow 🛍️". +${gained?.toLocaleString('en-NG')} followers and the shares are flying.`, 'like');
   const r = reactToSale(s, off, event);
   s = r.s;
   if (r.counter) s = { ...s, sale: { ...s.sale!, rivalCounter: r.counter } };
