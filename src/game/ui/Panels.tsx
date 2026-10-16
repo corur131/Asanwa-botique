@@ -1,6 +1,6 @@
 import React, { Suspense, lazy, useMemo, useState } from 'react';
 import { MARKUP, STAFF, TIERS, naira, staffMinutes } from '../economy';
-import { POWER, RICH_CUSTOMER_STAFF_LEVEL, contestFor, fuelOf, fuelPerHour, tankSize, Candidate, RaiseAnswer, candidates, canHire, daysToRent, displayCap, displayedCount, listingsNow, marketWage, restockAllCost, shopClimate, stats, waitingRoom } from '../engine';
+import { POWER, RICH_CUSTOMER_STAFF_LEVEL, atTraining, PoachAnswer, contestFor, fuelOf, fuelPerHour, tankSize, Candidate, RaiseAnswer, candidates, canHire, daysToRent, displayCap, displayedCount, listingsNow, marketWage, restockAllCost, shopClimate, stats, waitingRoom } from '../engine';
 import { FURNITURE_GROUPS, FurnitureDef, FurnitureGroup, Listing, MoveEquipmentPlan, ceilingCapacity, ceilingUsed, finishes, furnitureById, furnitureForGroup, listingsFor, readyFurnishedCost, roomOf, wallCapacity, wallUsed } from '../shop';
 import { productKey } from '../market';
 import { colourName } from '../colours';
@@ -436,6 +436,7 @@ export interface StaffActions {
   train: (id: string) => void;
   fire: (id: string) => void;
   raise: (id: string, a: RaiseAnswer) => void;
+  poach: (id: string, a: PoachAnswer) => void;
 }
 
 export const StaffPanel: React.FC<{ s: GameState; a: StaffActions }> = ({ s, a }) => {
@@ -455,11 +456,24 @@ export const StaffPanel: React.FC<{ s: GameState; a: StaffActions }> = ({ s, a }
               <div className="text-[11px] text-slate-400">{m.profession === 'makeup' ? 'Makeup artist' : 'Hair & styling'} · Level {m.level} · {m.profession === 'makeup' ? `${staffMinutes(m.level, 'makeup')} min a face` : `${staffMinutes(m.level)} min a look, ${staffMinutes(m.level, 'hair')} min hair-only`} · {m.level >= RICH_CUSTOMER_STAFF_LEVEL ? 'rich clients eligible' : 'poor/middle clients only'}{m.level >= 8 ? ' · charges 96–100% of budget, styles 80–100, posts 95+ looks' : m.level >= 7 ? ' · charges 95–97% of budget' : ''} · {naira(m.wage)}/week · {m.weeks} wk · market {naira(marketWage(m.level))}</div>
             </div>
             <div className="flex gap-1.5">
-              <Btn size="sm" tone="green" disabled={m.level >= 10 || s.cash < STAFF.trainFee(m.level)} onClick={() => a.train(m.id)}>Train · {naira(STAFF.trainFee(m.level))}{m.level < 10 ? ` · → ${staffMinutes(m.level + 1, m.profession === 'makeup' ? 'makeup' : 'look')} min` : ''}</Btn>
+              {atTraining(s, m)
+                ? <span className="rounded-lg bg-sky-500/15 px-2 py-1 text-[11px] font-semibold text-sky-200">At training · back day {m.awayUntil}</span>
+                : <Btn size="sm" tone="green" disabled={m.level >= 10 || s.cash < STAFF.trainFee(m.level)} onClick={() => a.train(m.id)}>{m.level >= 10 ? 'Fully trained' : `Train to ${m.level + 1} · ${naira(STAFF.trainFee(m.level))} · ${STAFF.trainDays(m.level)} day${STAFF.trainDays(m.level) > 1 ? 's' : ''} away`}</Btn>}
               <Btn size="sm" onClick={() => a.fire(m.id)}>Let go</Btn>
             </div>
           </div>
           <div className="mt-2"><Bar label="Loyalty" value={m.loyalty} max={100} tone={m.loyalty > 60 ? 'bg-emerald-400' : m.loyalty > 30 ? 'bg-amber-400' : 'bg-rose-400'} /></div>
+          {m.bond && m.bond.until >= s.day && <div className="mt-1 text-[10px] text-slate-400">Training bond: a rival who takes her before day {m.bond.until} repays you {naira(m.bond.amount)}.</div>}
+          {m.poachOffer && (
+            <div className="mt-2 rounded-lg border border-rose-500/40 bg-rose-500/10 p-2 text-xs">
+              <div className="text-rose-100 mb-1.5"><b>{m.poachOffer.owner}</b> from {m.poachOffer.shop} offered {m.name} <b>{naira(m.poachOffer.wage)}</b> a week (you pay {naira(m.wage)}). Answer before next week or she decides herself.</div>
+              <div className="flex flex-wrap gap-1.5">
+                <Btn size="sm" tone="gold" onClick={() => a.poach(m.id, 'match')}>Match {naira(m.poachOffer.wage)}</Btn>
+                <Btn size="sm" onClick={() => a.poach(m.id, 'counter')}>Counter {naira(Math.round((m.wage + m.poachOffer.wage) / 2 / 500) * 500)}</Btn>
+                <Btn size="sm" tone="danger" onClick={() => a.poach(m.id, 'release')}>Let her go</Btn>
+              </div>
+            </div>
+          )}
           {m.raiseAsk && (
             <div className="mt-2 rounded-lg border border-amber-500/40 bg-amber-500/10 p-2 text-xs">
               <div className="text-amber-200 mb-1.5">{m.name} wants {naira(m.raiseAsk)} a week, or she leaves.</div>
@@ -482,8 +496,8 @@ export const StaffPanel: React.FC<{ s: GameState; a: StaffActions }> = ({ s, a }
         </label>
         <div className="grid sm:grid-cols-2 gap-2">
           {cands.map((c) => (
-            <div key={c.kind} className="rounded-lg border border-dashed border-white/20 p-2.5">
-              <div className="text-sm font-semibold text-white">{c.name} · {c.kind === 'trainee' ? 'Trainee' : 'Expert'}</div>
+            <div key={c.kind} className={`rounded-lg border border-dashed p-2.5 ${c.kind === 'headhunt' ? 'border-amber-400/60 bg-amber-500/5' : 'border-white/20'}`}>
+              <div className="text-sm font-semibold text-white">{c.name} · {c.kind === 'trainee' ? 'Trainee' : c.kind === 'headhunt' ? 'Headhunted star' : 'Expert'}</div>
               <div className="text-[11px] text-amber-200">{c.profession === 'makeup' ? 'Makeup artist' : 'Hair & styling'}</div>
               <div className="text-[11px] text-slate-400 mb-2">Level {c.level} · {c.profession === 'makeup' ? `${staffMinutes(c.level, 'makeup')} min a face` : `${staffMinutes(c.level)} min a look`} · {naira(c.wage)}/week · {c.kind === 'trainee' ? 'signing fee' : 'signing bonus'} {naira(c.signing)}</div>
               <Btn size="sm" tone="gold" disabled={!hiring || s.cash < c.signing} onClick={() => a.hire(c)}>{hiring ? 'Hire now' : 'No staff slots available'}</Btn>

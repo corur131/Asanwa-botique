@@ -392,6 +392,7 @@ export default function GameApp({ onLab, initial, storageKey, cloud, notice }: {
     train: (id) => up((g) => E.train(g, id)),
     fire: (id) => up((g) => E.fire(g, id)),
     raise: (id, a) => up((g) => E.answerRaise(g, id, a)),
+    poach: (id, a) => up((g) => E.answerPoach(g, id, a)),
   };
 
   return (

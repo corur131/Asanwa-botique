@@ -103,8 +103,14 @@ export const STAFF = {
   traineeWage: 12_000,
   expertWage: 60_000,
   traineeLevel: 2,
-  expertLevel: 8,
-  trainFee: (level: number) => 15_000 * level,
+  /** Experts on the job market arrive at level 5 or 6; levels 7+ are trained (or headhunted). */
+  expertLevel: 6,
+  /** Training to the next level gets steep in the money levels (7+ charge from the budget). */
+  trainFee: (level: number) => [30_000, 30_000, 60_000, 120_000, 250_000, 500_000, 1_200_000, 2_500_000, 4_000_000, 6_000_000][Math.max(1, Math.min(9, level))],
+  /** Days the staff member is away at training (serving nobody). */
+  trainDays: (level: number) => (level >= 7 ? 3 : level >= 5 ? 2 : 1),
+  /** A rival must repay half the training fee if they poach someone within this many days of training. */
+  bondDays: 56,
   raisePerLevel: 1.12,
   hireDelayDays: 7,
 };

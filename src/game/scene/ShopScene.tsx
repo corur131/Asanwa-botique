@@ -1429,6 +1429,7 @@ export default function ShopScene(p: SceneProps) {
     return candidates.find(([x, z]) => x >= 0 && x < r.w && z >= 0 && z < r.d && !blocked[z]?.[x]) || c;
   };
   s.staff.forEach((m, i) => {
+    if ((m.awayUntil || 0) > s.day) return; // away at training
     const assigned = s.inShop.find((v) => v.by === m.id);
     const station = assigned ? serviceStation(m.profession) : null;
     const workCell = station || sp.staffClient[i] || sp.style;
