@@ -19,6 +19,8 @@ import { addBrag, blogPost, closeGramDay } from './gram';
 import { SeasonId, festive, seasonOf, weatherFor } from './climate';
 import { OrderAnswer, answerOrder as answerOrderWith, receiveOrders, settleOrders } from './orders';
 export { newOrders } from './orders';
+import { salePrice, saleToday, saleEvent, saleTraffic } from './sales';
+export { SALE_BOOST, SALE_GAP, SALE_OFFS, canPlanSale, cancelSale, nextSaleDay, planSale, saleAhead, saleEvent, salePrice, saleToday, saleTraffic } from './sales';
 export type { OrderAnswer } from './orders';
 import { autoSaveAtClose, closeBrandDay, ensureBusinessState, getBrandMetrics, initialBankState, investmentValue, processBankWeekly, processFixedDepositMaturities, processInvestments, processPromotionAtClose, processExpansionAtClose, promotionTrafficBoost, recordWeeklyWealth, saveRentAtClose } from './business';
 
@@ -438,7 +440,7 @@ export function customersToday(s: GameState, slow: boolean) {
   const brandDemand = 0.55 + brand.awareness / 240 + brand.loyalty / 350 + brand.reliability / 400;
   // Storms keep people indoors; December is owambe season and the streets are full.
   const weatherTraffic = (s.weather === 'storm' ? 0.68 : s.weather === 'rainy' ? 0.82 : s.weather === 'sunny' ? 1.04 : 1) * (festive(s.day) ? 1.15 : 1);
-  return Math.max(4, Math.round(t.customers * traffic * brandDemand * (0.85 + Math.random() * 0.3) * (slow ? 0.55 : 1) * ramp * weatherTraffic));
+  return Math.max(4, Math.round(t.customers * traffic * brandDemand * (0.85 + Math.random() * 0.3) * (slow ? 0.55 : 1) * ramp * weatherTraffic * saleTraffic(s)));
 }
 
 /** How many people can wait inside: three standing, plus seats. */
@@ -581,6 +583,12 @@ export function openShop(s0: GameState): GameState {
   }
   if (s.weather === 'storm') s = addShout(s, 'Deborah', 'Thunderstorm today, sis. Fewer people will come out, and NEPA will surely take light. Check the fuel.', 'warn');
   if (s.weather === 'harmattan') s = addShout(s, 'Deborah', 'Harmattan dust everywhere this morning. Keep the clothes covered, sis.', 'warn');
+  const sale = saleToday(s);
+  if (sale) {
+    const event = saleEvent(s.day);
+    const rival = sale.rivalCounter ? (s.rivals || []).find((r) => r.id === sale.rivalCounter) : undefined;
+    s = addShout(s, 'Deborah', `${event ? `${event} sale` : 'Sale day'}! ${sale.off}% off everything. People are already gathering outside, sis. Move fast today.${rival ? ` ${rival.shop} is running a sale too, so some people went there.` : ''}`, 'good');
+  }
   let next: GameState = { ...s, slowWeek: slow, arrivals, outages, busy: null, power: { ...s.power, gen: false, solar: s.power?.solar || 0 } };
   if (arrivals.some((arrival) => !!arrival.c.celebrity)) {
     next = { ...next, lastCelebrityVisitDay: s.day };
@@ -1088,13 +1096,13 @@ export function staffFinish(s: GameState, c: Customer, m: StaffMember): GameStat
   if (m.level >= EXPERT_PRICE_LEVEL) {
     // Experienced staff charge from the client's budget, never below 95% of it, and see the
     // payment through (they wait for the transfer alert), celebrities included.
-    const price = expertStaffPrice(c.budget, m.level);
+    const price = salePrice(s, expertStaffPrice(c.budget, m.level));
     const settled = settle(c, score, price, cost.consumables, { hasPOS: true });
     st = settled.outcome === 'walked' || settled.outcome === 'refused'
       ? { ...settled, paid: price, outcome: 'paid', reaction: 'smile', repDelta: Math.max(0, settled.repDelta), line: `${c.name} paid ${naira(price)} for ${m.name}'s look.` }
       : { ...settled, paid: Math.max(settled.paid, price) };
   } else {
-    st = settle(c, score, Math.min(cost.fair, c.budget), cost.consumables);
+    st = settle(c, score, salePrice(s, Math.min(cost.fair, c.budget)), cost.consumables);
   }
   let next = applyLook(s, c, choice, st, score);
   // Top stylists show off their best work on Gidigram.
@@ -1142,6 +1150,12 @@ export function closeShop(s0: GameState): GameState {
   }
   if (d.heatLost) ev.push(`${d.heatLost} walked past a dark, hot shop without coming in.`);
   if (d.litres) ev.push(`Bought ${Math.round(d.litres * 10) / 10} litres of fuel for ${naira(d.fuel || 0)}.`);
+  const sale = saleToday(s);
+  if (sale) {
+    const gained = Math.round(d.served * (1 + sale.off / 10) + Math.min(150, (s.followers || 0) * 0.002));
+    s = { ...s, followers: (s.followers || 0) + gained };
+    ev.push(`Sale day (${sale.off}% off): ${d.served} customers served, ${naira(d.income)} taken. Happy bargain hunters tagged the shop: +${gained} followers.`);
+  }
   if (d.closedOn) ev.push(`${d.closedOn} ${d.closedOn > 1 ? 'were' : 'was'} still waiting at closing time and went home.`);
   s = { ...s, today: { ...s.today, events: [...s.today.events, ...ev] } };
   s = processExpansionAtClose(s);

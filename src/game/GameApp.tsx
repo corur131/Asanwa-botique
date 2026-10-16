@@ -412,6 +412,8 @@ export default function GameApp({ onLab, initial, storageKey, cloud, notice }: {
           {WEATHER_INFO[s.weather].icon} {WEATHER_INFO[s.weather].title} · {Math.round(outdoorNow(s))}°C{s.phase === 'shop' ? ` · inside ${Math.round(E.shopClimate(s).indoor)}°C` : ''} · {seasonOf(s.day).name}
         </div>}
         <div className={`text-lg font-bold ${s.cash < 0 ? 'text-rose-300' : 'text-emerald-300'}`}>{naira(s.cash)}</div>
+        {E.saleToday(s) && <div className="rounded-full bg-rose-600 px-2.5 py-0.5 text-xs font-black tracking-wide text-white">SALE −{E.saleToday(s)!.off}%</div>}
+        {!E.saleToday(s) && E.saleAhead(s) && <div className="rounded-full border border-rose-400/50 px-2.5 py-0.5 text-xs font-semibold text-rose-200">Sale tomorrow · −{E.saleAhead(s)!.off}%</div>}
         <div className="rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-xs"><div className="text-[10px] text-slate-400">Brand Power</div><div className="font-bold text-fuchsia-200">{brandPower(getBrandMetrics(s), s.followers || 0, s.tier)?.toLocaleString("en-NG")}</div></div>
         <EnergyBar s={s} />
         <div className="text-xs text-slate-300 max-sm:hidden">
@@ -767,7 +769,7 @@ export default function GameApp({ onLab, initial, storageKey, cloud, notice }: {
 
         {s.phase === 'evening' && !build && !(styling && step.kind === 'reveal') && (
           <div className="absolute inset-0 z-20 overflow-y-auto bg-black/40">
-            <Evening s={s} onPhone={() => openPhone()} unread={unread} onSleep={() => up(E.nextMorning)} onBuild={enterBuild} />
+            <Evening s={s} up={up} onPhone={() => openPhone()} unread={unread} onSleep={() => up(E.nextMorning)} onBuild={enterBuild} />
           </div>
         )}
       </div>
@@ -827,7 +829,7 @@ export default function GameApp({ onLab, initial, storageKey, cloud, notice }: {
                 const c = step.c;
                 const score = E.scoreInShop(s, c, step.choice);
                 const cost = lookCost(c, step.choice, s.stock);
-                const result = E.settle(c, score, price, cost.consumables, {
+                const result = E.settle(c, score, E.salePrice(s, price), cost.consumables, {
                   hasPOS: s.furniture.some((p) => p.placed && p.id === 'posTerminal'),
                   hasAlterations: s.furniture.some((p) => p.placed && p.id === 'alterationsCorner'),
                   fitted: c.wants.some((w) => w.kind === 'fitted') && Object.values(step.choice).some((uid) => typeof uid === 'string' && s.stock.some((d) => d.uid === uid && ['bodyconMini', 'mermaidGown', 'tubeMidi', 'corsetGown', 'offShoulderGown', 'slitGown', 'pencilSkirt', 'skinnyJeans', 'corsetTop', 'tubeTop', 'jumpsuit', 'slipDress', 'laceGown', 'capeGown'].includes(d.itemId))),
@@ -1235,7 +1237,38 @@ const WaitChip: React.FC<{ v: Visitor; clock: number; disabled: boolean; onClick
   );
 };
 
-const Evening: React.FC<{ s: GameState; onSleep: () => void; onPhone: () => void; onBuild: () => void; unread: number }> = ({ s, onSleep, onPhone, onBuild, unread }) => {
+const SaleCard: React.FC<{ s: GameState; up: (f: (g: GameState) => GameState) => void }> = ({ s, up }) => {
+  const ahead = E.saleAhead(s);
+  const can = E.canPlanSale(s);
+  const event = E.saleEvent(s.day + 1);
+  return (
+    <Card title="🛍️ Run a sale tomorrow?" className="bg-[#15171f]/95">
+      {ahead ? (
+        <div className="space-y-2 text-sm">
+          <p className="text-slate-200">Your <b className="text-rose-300">{ahead.off}% off</b> sale runs tomorrow. Gidigram has seen the post; expect about <b className="text-white">{Math.round((E.SALE_BOOST[ahead.off] - 1) * 100)}% more customers</b>{event ? ` (${event} crowds too!)` : ''}.</p>
+          {ahead.rivalCounter && <p className="text-amber-200 text-xs">{(s.rivals || []).find((r) => r.id === ahead.rivalCounter)?.shop} is running a sale the same day, so some shoppers will go there.</p>}
+          <p className="text-xs text-slate-400">Every price is cut at checkout, staff included. Stock up tonight so the rails don't run empty.</p>
+          <Btn size="sm" onClick={() => up(E.cancelSale)}>Call it off</Btn>
+        </div>
+      ) : (
+        <div className="space-y-2 text-sm">
+          <p className="text-slate-300">Cut every price tomorrow to pull a crowd. Bigger discount, bigger crowd, smaller profit on each look.{event ? <b className="text-amber-200"> It's {event}: shoppers are out in force.</b> : ''}</p>
+          <div className="grid grid-cols-3 gap-2">
+            {E.SALE_OFFS.map((off) => (
+              <button key={off} disabled={!can.ok} onClick={() => up((g) => E.planSale(g, off))} className="rounded-xl border border-rose-400/40 bg-rose-500/10 px-2 py-2 text-center disabled:opacity-40">
+                <div className="text-lg font-black text-rose-200">{off}% off</div>
+                <div className="text-[11px] text-slate-300">+{Math.round((E.SALE_BOOST[off] - 1) * 100)}% customers</div>
+              </button>
+            ))}
+          </div>
+          {!can.ok && <p className="text-xs text-slate-400">{can.reason}</p>}
+        </div>
+      )}
+    </Card>
+  );
+};
+
+const Evening: React.FC<{ s: GameState; up: (f: (g: GameState) => GameState) => void; onSleep: () => void; onPhone: () => void; onBuild: () => void; unread: number }> = ({ s, up, onSleep, onPhone, onBuild, unread }) => {
   const d = s.today;
   const flow = E.cashFlowSummary(s);
   const net = flow.operatingResult;
@@ -1269,6 +1302,7 @@ const Evening: React.FC<{ s: GameState; onSleep: () => void; onPhone: () => void
           {d.events.map((e, i) => <li key={i}>{e}</li>)}
         </ul>
       </Card>
+      <SaleCard s={s} up={up} />
       <Card title="Cash flow · where your money went" className="bg-[#15171f]/95">
         <div className="grid grid-cols-2 gap-2 text-sm">
           <div className="rounded-lg border border-white/10 bg-black/15 p-3"><div className="text-[11px] text-slate-400">Cash at start of day</div><div className="mt-1 font-semibold text-white">{flow.openingCash === null ? 'Not recorded' : naira(flow.openingCash)}</div></div>
