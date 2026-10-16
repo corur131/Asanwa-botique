@@ -347,6 +347,32 @@ export interface BragEvent {
 }
 
 /** A Gidigram notification: likes, follows, comments, mentions and industry news. */
+/** Someone DM'd on Gidigram to buy something they saw. */
+export interface DmOrder {
+  id: string;
+  day: number;
+  name: string;
+  handle: string;
+  area: string;
+  riderFee: number;
+  /** She asked the shop to pay the rider. */
+  freeDelivery?: boolean;
+  itemUid: string;
+  label: string;
+  color: string;
+  price: number;
+  /** Asked for "last price". */
+  beg: boolean;
+  pay: 'transfer' | 'pod';
+  line: string;
+  status: 'new' | 'accepted' | 'declined' | 'expired' | 'delivered' | 'failed';
+  reply?: string;
+  outcome?: string;
+  paid?: boolean;
+  deliverDay?: number;
+  delayed?: boolean;
+}
+
 export interface GramNote {
   id: string;
   day: number;
@@ -888,6 +914,8 @@ export interface GameState {
   brags?: BragEvent[];
   /** Gidigram activity feed. */
   gramNotes?: GramNote[];
+  /** Gidigram order DMs (newest first). */
+  dmOrders?: DmOrder[];
   /** This week's trending colour and hashtags on Gidigram. */
   trend?: { week: number; color: string; name: string; tags: string[] };
   drop: Drop | null;
