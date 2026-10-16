@@ -347,7 +347,6 @@ export interface BragEvent {
 }
 
 /** A Gidigram notification: likes, follows, comments, mentions and industry news. */
-/** Someone DM'd on Gidigram to buy something they saw. */
 export type EntrantKind = 'influencer' | 'regular' | 'fan' | 'student' | 'bigSpender' | 'rivalFan' | 'fake' | 'friend';
 export interface GiveawayEntrant {
   id: string;
@@ -392,6 +391,23 @@ export interface SaleDay {
   rivalCounter?: string;
 }
 
+/** An owambe (party) invitation. */
+export interface Owambe {
+  id: string;
+  host: string;
+  title: string;
+  day: number;
+  /** Asoebi colour of the day. */
+  color: string;
+  colorName: string;
+  status: 'invited' | 'accepted' | 'declined' | 'done' | 'missed';
+  score?: number;
+  spray?: number;
+  result?: 'great' | 'okay' | 'poor';
+  outcome?: string;
+}
+
+/** Someone DM'd on Gidigram to buy something they saw. */
 export interface DmOrder {
   id: string;
   day: number;
@@ -592,7 +608,7 @@ export interface Message {
   /** The back-and-forth conversation this message belongs to. */
   convo?: string;
   /** What the message is about, for the reply's effect. */
-  ctx?: { kind: 'shade' | 'brag' | 'bait' | 'invite' | 'sponsorship'; rivalId?: string; eventId?: string; offerId?: string };
+  ctx?: { kind: 'shade' | 'brag' | 'bait' | 'invite' | 'sponsorship' | 'owambe'; rivalId?: string; eventId?: string; offerId?: string };
   /** Structured business proposal returned by the AI; only explicit player confirmation makes it real. */
   collaboration?: CollaborationReply;
   /** Result of the player's action on a collaboration proposal. */
@@ -971,6 +987,11 @@ export interface GameState {
   buzz?: { until: number; mult: number; why: string };
   /** A rich client coming in on this day (a giveaway winner's family). */
   vipGuestDay?: number;
+  owambe?: Owambe;
+  /** Divine partied last night: she starts the day tired. */
+  owambeTired?: boolean;
+  /** Wealthy clients come more often until this day (after a great owambe). */
+  richUntil?: number;
   /** This week's trending colour and hashtags on Gidigram. */
   trend?: { week: number; color: string; name: string; tags: string[] };
   drop: Drop | null;

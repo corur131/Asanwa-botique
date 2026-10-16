@@ -18,11 +18,11 @@ const wantLabel = (w: Want) =>
 
 const SERVICE_LABEL = { hair: 'Hair only', makeup: 'Makeup only', both: 'Hair & makeup only' } as const;
 
-export const RequestCard: React.FC<{ c: Customer; compact?: boolean }> = ({ c, compact }) => (
+export const RequestCard: React.FC<{ c: Customer; compact?: boolean; self?: boolean }> = ({ c, compact, self }) => (
   <div className="rounded-xl border border-amber-500/25 bg-gradient-to-br from-amber-500/10 to-transparent p-4">
     <div className="flex flex-wrap items-center gap-2 mb-2">
       <span className="text-lg font-serif font-bold text-white">{c.name}</span>
-      <Pill tone={CLASS_TONE[c.cls]}>{CLASS_LABEL[c.cls]}</Pill>
+      {!self && <Pill tone={CLASS_TONE[c.cls]}>{CLASS_LABEL[c.cls]}</Pill>}
       <Pill tone="purple">{OCCASION_LABEL[c.occasion]}</Pill>
       {c.regularId && <Pill tone="green">Regular</Pill>}
       {c.service && <Pill tone="blue">{c.male ? 'Haircut only' : SERVICE_LABEL[c.service]}</Pill>}
@@ -30,7 +30,7 @@ export const RequestCard: React.FC<{ c: Customer; compact?: boolean }> = ({ c, c
     </div>
     {!compact && <p className="text-sm text-slate-200 leading-relaxed italic">"{c.request}"</p>}
     <div className="flex flex-wrap gap-1.5 mt-2">
-      {c.contest ? <Pill tone="red">Style-off: beat {c.contest.rivalScore >= 80 ? 'a strong' : 'your'} rival · prize {naira(c.contest.prize)}</Pill> : <Pill tone="gold">Budget about {naira(c.budget)}</Pill>}
+      {c.contest ? <Pill tone="red">Style-off: beat {c.contest.rivalScore >= 80 ? 'a strong' : 'your'} rival · prize {naira(c.contest.prize)}</Pill> : !self && <Pill tone="gold">Budget about {naira(c.budget)}</Pill>}
       {c.wants.map((w, i) => (
         <Pill key={i}>{wantLabel(w)}</Pill>
       ))}
@@ -162,7 +162,9 @@ export const Styling: React.FC<{
   onDisplay?: (uid: string, keep: string[]) => void;
   rackFull?: boolean;
   noRacks?: boolean;
-}> = ({ state, customer: c, onFinish, onTurnAway, onSendToStaff, canWig = true, initial, onChange, onDisplay, rackFull = false, noRacks = false }) => {
+  /** Divine dressing herself: no price, different button labels. */
+  self?: { cancel: string; finish: string };
+}> = ({ state, customer: c, onFinish, onTurnAway, onSendToStaff, canWig = true, initial, onChange, onDisplay, rackFull = false, noRacks = false, self }) => {
   const [choice, setChoiceRaw] = useState<StyleChoice>(initial || {});
   const setChoice: typeof setChoiceRaw = (f) => setChoiceRaw((ch) => {
     const next = typeof f === 'function' ? f(ch) : f;
@@ -223,7 +225,7 @@ export const Styling: React.FC<{
     <div className="grid lg:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)] gap-4 p-4">
       {/* left: customer */}
       <div className="space-y-3 min-w-0">
-        <RequestCard c={c} />
+        <RequestCard c={c} self={!!self} />
         <div className="relative rounded-xl border border-white/10 bg-gradient-to-b from-[#1b1d27] to-[#101118] overflow-hidden">
           <div className="absolute top-2 left-2 z-10 flex gap-1">
             {(['full', 'bust', 'portrait'] as CameraView[]).map((v) => (
@@ -372,7 +374,7 @@ export const Styling: React.FC<{
             <span className="text-slate-400">
               Pieces used: <b className="text-slate-100">{Object.keys(chosen).length}</b> · Goods {naira(cost.goods)} · Hair {naira(cost.hair)}
             </span>
-            {!canFinish ? (
+            {self ? null : !canFinish ? (
               <span className="text-slate-500">{serviceOnly ? `Do the ${c.service === 'makeup' ? 'makeup' : 'hair'} to see the price` : 'Pick clothes from the rail to see the price'}</span>
             ) : (
               <span className={cost.fair > c.budget * 1.05 ? 'text-rose-300 font-semibold' : 'text-emerald-300 font-semibold'}>
@@ -382,7 +384,7 @@ export const Styling: React.FC<{
           </div>
           <div className="flex flex-wrap gap-2 justify-end">
             <Btn tone="ghost" size="sm" onClick={onTurnAway}>
-              Turn away
+              {self?.cancel || 'Turn away'}
             </Btn>
             {onSendToStaff && (
               <Btn tone="ghost" size="sm" onClick={onSendToStaff}>
@@ -390,7 +392,7 @@ export const Styling: React.FC<{
               </Btn>
             )}
             <Btn tone="gold" onClick={() => onFinish(serviceOnly ? { hair: choice.hair, hairColor: choice.hairColor, makeup: choice.makeup, makeupLook: choice.makeupLook, beard: choice.beard } : choice)} disabled={!canFinish}>
-              Finish look →
+              {self?.finish || 'Finish look →'}
             </Btn>
           </div>
           {!serviceOnly && !hasOutfit && didService && <p className="text-[11px] text-amber-300 mt-2">No clothes picked. {c.name} came for a full look, so the score will be low.</p>}

@@ -21,6 +21,9 @@ import { OrderAnswer, answerOrder as answerOrderWith, receiveOrders, settleOrder
 export { newOrders } from './orders';
 import { salePrice, saleToday, saleEvent, saleTraffic } from './sales';
 import { closeGiveawayEntries, giveawayAtClose } from './giveaway';
+import { answerOwambe, attendOwambe as attendOwambeWith, owambeMorning, planOwambe } from './owambe';
+export { SPRAY, owambeGuest, owambeTonight } from './owambe';
+export const attendOwambe = (s: GameState, choice: StyleChoice, spray: number) => attendOwambeWith(s, choice, spray, money);
 export { ENTRANT_FILTERS, GIVEAWAY_GAP, GIVEAWAY_MIN_FOLLOWERS, awaitingWinner, canStartGiveaway, expectedEntries, nextGiveawayDay, pickWinner, prizeOptions, startGiveaway } from './giveaway';
 export { SALE_BOOST, SALE_GAP, SALE_OFFS, canPlanSale, cancelSale, nextSaleDay, planSale, saleAhead, saleEvent, salePrice, saleToday, saleTraffic } from './sales';
 export type { OrderAnswer } from './orders';
@@ -512,6 +515,14 @@ export function openShop(s0: GameState): GameState {
   } else {
     mix[0] = Math.max(0.05, mix[0] - shift);
     mix[2] = Math.max(0, mix[2] + shift);
+  }
+  // After a great owambe entrance, the rich aunties come to shop.
+  if (s.richUntil && s.day <= s.richUntil && !s.listing.signature) {
+    const moved = Math.min(0.15, mix[0] + mix[1]);
+    const total = mix[0] + mix[1] || 1;
+    mix[0] -= moved * (mix[0] / total);
+    mix[1] -= moved * (mix[1] / total);
+    mix[2] += moved;
   }
   const signatureProperty = !!s.listing.signature;
   const promotionLevel = s.promotion?.active && s.promotion.target !== 'warehouse'
@@ -1216,6 +1227,7 @@ export function closeShop(s0: GameState): GameState {
   // now and then Deborah has gist
   if (s.day > 2 && Math.random() < 0.25 && !(s.convos || []).some((c) => c.with === 'Deborah' && !c.done)) s = startGist(s);
   s = planEvents(s);
+  s = planOwambe(s);
   s = planTips(s);
   s = planSponsorshipOffer(s);
   s = resolveDueCollaborations(s);
@@ -1237,6 +1249,11 @@ export function nextMorning(s: GameState): GameState {
   next = seasonChange(next, s.day);
   next = receiveOrders(next);
   next = closeGiveawayEntries(next);
+  next = owambeMorning(next);
+  if (s.owambeTired) {
+    next = { ...next, energy: Math.round(ENERGY.max * 0.6), owambeTired: false };
+    next = msg(next, 'Deborah', 'You partied hard last night o 😂 You\'re tired this morning, so take it small small today.', 'info');
+  }
   return ensurePoliticianContractOffer(next);
 }
 
@@ -1488,6 +1505,7 @@ export function answerMessage(s: GameState, msgId: number, choice: ReplyChoice['
   const m = s.messages.find((x) => x.id === msgId);
   if (!m) return s;
   if (m.ctx?.kind === 'invite') return answerInvite(s, m, choice);
+  if (m.ctx?.kind === 'owambe') return answerOwambe(s, m, choice);
   if (m.ctx?.kind === 'sponsorship') return answerSponsorship(s, m, choice);
   if (m.convo) return answerConvo(s, msgId, choice);
   return answerRival(s, msgId, choice);

@@ -23,6 +23,7 @@ import { WEATHER_INFO, outdoorNow, seasonOf } from './climate';
 import { ActionMenu, CameraPad, Catalogue, EnergyBar, SoundSettings, ViewPicker } from './ui/Build';
 import type { CamCmd, DragMode, View } from './scene/ShopScene';
 import type { Pose } from './types';
+import { OwambeCard, OwambeFlow } from './ui/Owambe';
 
 const ShopScene = lazy(() => import('./scene/ShopScene'));
 const ThumbStudio = lazy(() => import('./scene/Thumbs').then((m) => ({ default: m.ThumbStudio })));
@@ -135,6 +136,7 @@ export default function GameApp({ onLab, initial, storageKey, cloud, notice }: {
   const [controlsCollapsed, setControlsCollapsed] = useState(false);
   const [hidden, setHidden] = useState(false);
   const [confirmClose, setConfirmClose] = useState(false);
+  const [owambeOpen, setOwambeOpen] = useState(false);
   const [lookEdit, setLookEdit] = useState<CharacterConfig | null>(null);
   const [bubbles, setBubbles] = useState<Shout[]>([]);
   const seenShout = useRef<number>(s?.shoutSeq || 0);
@@ -769,10 +771,12 @@ export default function GameApp({ onLab, initial, storageKey, cloud, notice }: {
 
         {s.phase === 'evening' && !build && !(styling && step.kind === 'reveal') && (
           <div className="absolute inset-0 z-20 overflow-y-auto bg-black/40">
-            <Evening s={s} up={up} onPhone={() => openPhone()} unread={unread} onSleep={() => up(E.nextMorning)} onBuild={enterBuild} />
+            <Evening s={s} up={up} onOwambe={() => setOwambeOpen(true)} onPhone={() => openPhone()} unread={unread} onSleep={() => up(E.nextMorning)} onBuild={enterBuild} />
           </div>
         )}
       </div>
+
+      {owambeOpen && <OwambeFlow s={s} up={up} onClose={() => setOwambeOpen(false)} />}
 
       {/* styling, full screen over the shop */}
       {styling && (current || step.kind !== 'style') && (
@@ -1268,7 +1272,7 @@ const SaleCard: React.FC<{ s: GameState; up: (f: (g: GameState) => GameState) =>
   );
 };
 
-const Evening: React.FC<{ s: GameState; up: (f: (g: GameState) => GameState) => void; onSleep: () => void; onPhone: () => void; onBuild: () => void; unread: number }> = ({ s, up, onSleep, onPhone, onBuild, unread }) => {
+const Evening: React.FC<{ s: GameState; up: (f: (g: GameState) => GameState) => void; onOwambe: () => void; onSleep: () => void; onPhone: () => void; onBuild: () => void; unread: number }> = ({ s, up, onOwambe, onSleep, onPhone, onBuild, unread }) => {
   const d = s.today;
   const flow = E.cashFlowSummary(s);
   const net = flow.operatingResult;
@@ -1292,6 +1296,7 @@ const Evening: React.FC<{ s: GameState; up: (f: (g: GameState) => GameState) => 
           </div>
         ))}
       </div>
+      <OwambeCard s={s} onGo={onOwambe} />
       <Card title="Today" className="bg-[#15171f]/95">
         <ul className="text-sm text-slate-300 space-y-1">
           <li>Operating result: <b className={net >= 0 ? 'text-emerald-300' : 'text-rose-300'}>{naira(net)}</b> — today's recorded business income minus recorded costs. This is not the same as the change in your cash balance.</li>
