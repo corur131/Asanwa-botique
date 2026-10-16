@@ -383,6 +383,12 @@ export interface StaffMember {
   profession?: StaffProfession;
   /** A pending raise demand (weekly wage asked for). */
   raiseAsk?: number;
+  /** At training: serves nobody until this day. */
+  awayUntil?: number;
+  /** A rival's job offer waiting for Divine's answer. */
+  poachOffer?: { rivalId?: string; shop: string; owner: string; wage: number; day: number };
+  /** Training bond: a poacher repays this much until `until` (day). */
+  bond?: { amount: number; until: number };
 }
 
 /** What Divine puts on the customer. Stock is referenced by design uid. */

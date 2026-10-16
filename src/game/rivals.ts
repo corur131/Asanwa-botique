@@ -783,6 +783,19 @@ export function reactToMove(s0: GameState, up: boolean): GameState {
 }
 
 /** A rival's name for staff-poaching messages. */
+/** A rival poached one of Divine's stylists: their shop gets better and they brag about it. */
+export function rivalHiresStylist(s0: GameState, rivalId: string, name: string, level: number): GameState {
+  const r = (s0.rivals || []).find((x) => x.id === rivalId);
+  if (!r) return s0;
+  const boost = 0.01 * Math.max(1, level - 4);
+  let s: GameState = { ...s0, rivals: s0.rivals.map((x) => (x.id === rivalId ? { ...x, skill: Math.min(1.22, x.skill + boost), rep: Math.min(99, x.rep + 1) } : x)) };
+  const rr = s.rivals.find((x) => x.id === rivalId)!;
+  s = rivalPost(s, rr, pick([`Welcome to the team, ${name.split(' ')[0]} 🔥 The best stylists know where to work 😌`, `New hire alert 💅🏾 ${name.split(' ')[0]} is now styling at ${rr.shop}. Book now!`, `Talent recognises talent ✨ Say hi to ${name.split(' ')[0]}, our newest stylist`]), false, 'brag');
+  s = gist(s, `${rr.shop} poaches a top stylist from Asanwa Boutique 👀`, `${name}, a level ${level} stylist, has left Asanwa Boutique for ${rr.shop}. Insiders say the pay was too good to refuse.`, rr.id, true);
+  if (r.main && chance(0.7)) s = inGroup(s, rr, pick(['Some people cannot keep their staff 😌', 'When you pay well, talent comes running 💅🏾', 'Divine, thank you for training her for me o 😂']));
+  return s;
+}
+
 export function poacher(s: GameState): Rival | undefined {
   const near = (s.rivals || []).filter((r) => r.tier >= s.tier && r.tier <= s.tier + 2);
   return near.length ? pick(near) : undefined;

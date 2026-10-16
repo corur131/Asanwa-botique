@@ -3,7 +3,7 @@ import { generateRandomCustomer } from '../utils/randomizer';
 import { DIVINE_CAPACITY, HOUR_WEIGHTS, PATIENCE, SHOP_MINUTES, staffMinutes, NEW_SHOP_RAMP_DAYS, NEW_SHOP_START, SERVICE_FEE, SLOW_WEEK_CHANCE, STAFF, STAFF_CAPACITY, START_CASH, SUPPLIES_SHARE, MARKUP, TIERS, FABRIC_COST, CELEBRITY_FULFILMENT_RATE, naira, SHOPPER_COMMISSION_MIN, SHOPPER_COMMISSION_RATE } from './economy';
 import { canBuy, entryFor, HAIR_SWATCHES, isClothing, makeDesign, pieceCost, productKey, MARKET } from './market';
 import { FabricId } from '../types/character';
-import { announceCelebrityVisit, answerRival, competition, initRivals, poacher, reactToMove, simulateRivals } from './rivals';
+import { announceCelebrityVisit, answerRival, competition, initRivals, poacher, reactToMove, rivalHiresStylist, simulateRivals } from './rivals';
 import { answerInvite, contestFor, contestModel, dropStep, judge, planDrop, planEvents, planTips, visitStep, wonListing } from './encounters';
 import { POWER as POWER_CFG, activeGeneratorUid, addShout, coolRunning, drainRate, fuelOf, fuelPrice, liveStats, nepaOff, outageAt, planOutages, pourFuel, powerStep, scarcity, source, tankSize } from './power';
 import { answerConvo, startGist } from './convos';
@@ -635,7 +635,7 @@ export function staffMayAutoDispatch(v: Pick<Visitor, 'c' | 'forStaff'>): boolea
 /** Whether at least one qualified employee can take this unassigned visitor. */
 export function canAssignToStaff(s: GameState, id: string): boolean {
   const v = visitor(s, id);
-  return !!v && (!v.by || (v.by === 'divine' && s.serving === id)) && s.staff.some((m) => staffCanServeCustomer(m, v.c) && staffChoice(s, v.c) !== null);
+  return !!v && (!v.by || (v.by === 'divine' && s.serving === id)) && s.staff.some((m) => !atTraining(s, m) && staffCanServeCustomer(m, v.c) && staffChoice(s, v.c) !== null);
 }
 export const shopClosing = (s: GameState) => s.phase === 'shop' && s.clock >= SHOP_MINUTES;
 
@@ -752,6 +752,7 @@ export function tick(s0: GameState, minutes: number): GameState {
   }
   // staff finish and pick up the next person
   for (const m of s.staff) {
+    if (atTraining(s, m)) continue;
     const mine = s.inShop.find((v) => v.by === m.id);
     if (mine && (mine.until || 0) <= end) {
       s = staffFinish(s, mine.c, m);
@@ -2206,7 +2207,7 @@ export function markRead(s: GameState, from: string): GameState {
 // ---------------------------------------------------------------------------
 const STAFF_NAMES = ['Kemi', 'Blessing', 'Chidinma', 'Sola', 'Grace', 'Rukayat', 'Amarachi', 'Tosin', 'Ladi', 'Nneka', 'Bimpe', 'Jumoke', 'Ese', 'Rita', 'Seun', 'Uju'];
 
-export interface Candidate { name: string; kind: 'trainee' | 'expert'; level: number; wage: number; signing: number; profession: StaffProfession }
+export interface Candidate { name: string; kind: 'trainee' | 'expert' | 'headhunt'; level: number; wage: number; signing: number; profession: StaffProfession }
 
 export function candidates(s: GameState, profession: StaffProfession = 'stylist'): Candidate[] {
   const used = new Set(s.staff.map((x) => x.name));
@@ -2214,10 +2215,20 @@ export function candidates(s: GameState, profession: StaffProfession = 'stylist'
   const seed = s.day * 31 + s.staff.length * 7;
   const a = free[seed % free.length];
   const b = free[(seed * 7 + 3) % free.length] === a ? free[(seed + 1) % free.length] : free[(seed * 7 + 3) % free.length];
-  return [
+  // Experts arrive at level 5 or 6 at market pay; level 7+ only by training, or a rare,
+  // expensive headhunt in a big shop.
+  const expertLevel = seed % 3 === 0 ? STAFF.expertLevel : STAFF.expertLevel - 1;
+  const expertWage = Math.max(STAFF.expertWage, Math.round((marketWage(expertLevel) * 1.2) / 500) * 500);
+  const out: Candidate[] = [
     { name: a, kind: 'trainee', level: STAFF.traineeLevel, wage: STAFF.traineeWage, signing: STAFF.traineeWage * 0.5, profession },
-    { name: b, kind: 'expert', level: STAFF.expertLevel, wage: STAFF.expertWage, signing: STAFF.expertWage * 2, profession },
+    { name: b, kind: 'expert', level: expertLevel, wage: expertWage, signing: expertWage * 2, profession },
   ];
+  const c = free.find((n) => n !== a && n !== b);
+  if (c && s.tier >= 3 && (s.day * 13 + s.staff.length) % 5 === 0) {
+    const wage = Math.round((marketWage(7) * 1.15) / 500) * 500;
+    out.push({ name: c, kind: 'headhunt', level: 7, wage, signing: 3_000_000 + s.tier * 500_000, profession });
+  }
+  return out;
 }
 
 export function canHire(s: GameState) {
@@ -2226,17 +2237,25 @@ export function canHire(s: GameState) {
 
 export function hire(s: GameState, c: Candidate): GameState {
   if (!canHire(s) || s.cash < c.signing) return s;
-  const member: StaffMember = { id: `s${Date.now().toString(36)}`, name: c.name, level: c.level, wage: c.wage, loyalty: c.kind === 'trainee' ? 30 : 20, trained: c.kind === 'trainee', weeks: 0, profession: c.profession || 'stylist', look: { ...generateRandomCustomer('styled') } };
+  const member: StaffMember = { id: `s${Date.now().toString(36)}`, name: c.name, level: c.level, wage: c.wage, loyalty: c.kind === 'trainee' ? 30 : c.kind === 'headhunt' ? 15 : 20, trained: c.kind === 'trainee', weeks: 0, profession: c.profession || 'stylist', look: { ...generateRandomCustomer('styled') } };
   return msg(money({ ...s, staff: [...s.staff, member], hireOkDay: s.day }, -c.signing, `Signing: ${c.name}`), c.name, c.profession === 'makeup' ? 'I specialise in makeup, ma. I will take care of the face clients.' : c.kind === 'trainee' ? 'Thank you for this chance, ma. I will learn fast!' : `I'm a stylist. Pay me well and I'll keep your customers looking good.`, 'good');
 }
 
+/** Is this staff member away at training today? */
+export const atTraining = (s: Pick<GameState, 'day'>, m: Pick<StaffMember, 'awayUntil'>) => (m.awayUntil || 0) > s.day;
+
 export function train(s: GameState, id: string): GameState {
   const m = s.staff.find((x) => x.id === id);
-  if (!m || m.level >= 10) return s;
+  if (!m || m.level >= 10 || atTraining(s, m)) return s;
   const fee = STAFF.trainFee(m.level);
   if (s.cash < fee) return s;
-  const staff = s.staff.map((x) => (x.id === id ? { ...x, level: x.level + 1, wage: Math.round((x.wage * STAFF.raisePerLevel) / 500) * 500, loyalty: clamp(x.loyalty + (x.trained ? 8 : 3), 0, 100) } : x));
-  return money({ ...s, staff }, -fee, `Training: ${m.name}`);
+  const days = STAFF.trainDays(m.level);
+  // A rival who poaches her soon after training must repay half of what the training cost.
+  const bondLeft = m.bond && m.bond.until > s.day ? m.bond.amount : 0;
+  const bond = { amount: bondLeft + Math.round(fee / 2), until: s.day + STAFF.bondDays };
+  const staff = s.staff.map((x) => (x.id === id ? { ...x, level: x.level + 1, wage: Math.round((x.wage * STAFF.raisePerLevel) / 500) * 500, loyalty: clamp(x.loyalty + (x.trained ? 8 : 3), 0, 100), awayUntil: s.day + days, bond } : x));
+  const next = money({ ...s, staff }, -fee, `Training: ${m.name}`);
+  return msg(next, m.name, `Thank you ma! I'm going for level ${m.level + 1} training. I'll be away ${days === 1 ? 'today' : `for ${days} days`} and back on day ${s.day + days}.`, 'good');
 }
 
 export function fire(s: GameState, id: string): GameState {
@@ -2279,17 +2298,38 @@ export function answerRaise(s: GameState, id: string, answer: RaiseAnswer): Game
 }
 
 /** Fair weekly wage for a level: what other shops would pay. */
-export const marketWage = (level: number) => Math.round((STAFF.traineeWage * STAFF.raisePerLevel ** (level - STAFF.traineeLevel)) / 500) * 500;
+export const marketWage = (level: number) => level >= EXPERT_PRICE_LEVEL
+  // Stylists who charge from the client's budget are worth a lot to any shop.
+  ? Math.round((250_000 * 1.7 ** (level - EXPERT_PRICE_LEVEL)) / 500) * 500
+  : Math.round((STAFF.traineeWage * STAFF.raisePerLevel ** (level - STAFF.traineeLevel)) / 500) * 500;
 
-function weeklyStaff(s0: GameState): GameState {
+export function weeklyStaff(s0: GameState): GameState {
   let s = s0;
   for (const m0 of s0.staff) {
     const m = s.staff.find((x) => x.id === m0.id);
     if (!m) continue;
     s = money({ ...s, today: { ...s.today, costs: s.today.costs + m.wage } }, -m.wage, `Wages: ${m.name}`);
     let loyalty = clamp(m.loyalty + (m.trained ? 4 : 1), 0, 100);
-    // poaching offer
-    if (chance(0.05 + 0.015 * m.level)) {
+    // An offer Divine never answered: she decides for herself.
+    if (m.poachOffer) {
+      const o = m.poachOffer;
+      const extra = (o.wage / Math.max(1, m.wage) - 1) * 100;
+      if (extra > loyalty * (m.trained ? 1.5 : 0.6)) {
+        s = staffLeavesForRival(s, m.id, o);
+        continue;
+      }
+      s = msg(s, m.name, `You didn't answer about ${o.shop}'s offer, ma. I've decided to stay, but please remember me.`, 'warn');
+      loyalty = clamp(loyalty - 6, 0, 100);
+      s = { ...s, staff: s.staff.map((x) => (x.id === m.id ? { ...x, poachOffer: undefined } : x)) };
+    }
+    // Rivals chase experienced stylists hard: they ask Divine to match their offer.
+    if (m.level >= EXPERT_PRICE_LEVEL && !m.poachOffer && chance(POACH_CHANCE[Math.min(10, m.level)] || 0.45)) {
+      const who = poacher(s);
+      const wage = Math.round((Math.max(m.wage, marketWage(m.level)) * (1.5 + Math.random() * 1.5)) / 500) * 500;
+      const offer = { rivalId: who?.id, shop: who?.shop || 'Another boutique', owner: who?.owner || 'Another shop owner', wage, day: s.day };
+      s = { ...s, staff: s.staff.map((x) => (x.id === m.id ? { ...x, poachOffer: offer } : x)) };
+      s = msg(s, m.name, `Ma, ${offer.owner} from ${offer.shop} offered me ${naira(wage)} a week. You pay me ${naira(m.wage)}. Will you match it? (Answer in Staff before next week.)`, 'warn');
+    } else if (m.level < EXPERT_PRICE_LEVEL && chance(0.04 + 0.01 * m.level)) {
       const extra = 10 + Math.random() * 140; // % more pay
       const limit = loyalty * (m.trained ? 1.5 : 0.6);
       const offer = Math.round((m.wage * (1 + extra / 100)) / 500) * 500;
@@ -2306,13 +2346,48 @@ function weeklyStaff(s0: GameState): GameState {
     // raise demand when underpaid for their level
     let raiseAsk = m.raiseAsk;
     const fair = Math.max(marketWage(m.level), m.trained ? 0 : STAFF.expertWage);
-    if (!raiseAsk && m.wage < fair * 0.95 && chance(m.trained ? 0.15 : 0.35)) {
+    if (!raiseAsk && m.wage < fair * 0.95 && chance(m.level >= EXPERT_PRICE_LEVEL ? 0.5 : m.trained ? 0.15 : 0.35)) {
       raiseAsk = Math.round((fair * 1.05) / 500) * 500;
       s = msg(s, m.name, `Ma, I need a raise to ${naira(raiseAsk)} a week or I will have to go. Other shops pay that for my level.`, 'warn');
     }
     s = { ...s, staff: s.staff.map((x) => (x.id === m.id ? { ...x, loyalty, weeks: x.weeks + 1, raiseAsk } : x)) };
   }
   return s;
+}
+
+/** Weekly chance that a rival tries to poach a stylist of this level (7+). */
+const POACH_CHANCE: Record<number, number> = { 7: 0.25, 8: 0.35, 9: 0.4, 10: 0.45 };
+
+/** She leaves for the rival: the rival gets better, brags, and repays any training bond. */
+function staffLeavesForRival(s0: GameState, id: string, o: NonNullable<StaffMember['poachOffer']>): GameState {
+  const m = s0.staff.find((x) => x.id === id);
+  if (!m) return s0;
+  let s: GameState = { ...s0, staff: s0.staff.filter((x) => x.id !== id), hireOkDay: s0.day + STAFF.hireDelayDays };
+  s = msg(s, 'Deborah', `${m.name} has left for ${o.shop}. They're paying her ${naira(o.wage)} a week; you were paying ${naira(m.wage)}.`, 'danger');
+  if (m.bond && m.bond.until >= s.day && m.bond.amount > 0) {
+    s = money(s, m.bond.amount, `Training bond repaid by ${o.shop}`);
+    s = msg(s, 'Deborah', `At least ${o.shop} had to repay ${naira(m.bond.amount)} of her training bond.`, 'good');
+  }
+  if (o.rivalId) s = rivalHiresStylist(s, o.rivalId, m.name, m.level);
+  return s;
+}
+
+export type PoachAnswer = 'match' | 'counter' | 'release';
+/** Divine answers a rival's offer to one of her stylists. */
+export function answerPoach(s: GameState, id: string, answer: PoachAnswer): GameState {
+  const m = s.staff.find((x) => x.id === id);
+  if (!m || !m.poachOffer) return s;
+  const o = m.poachOffer;
+  if (answer === 'release') return staffLeavesForRival(s, id, o);
+  if (answer === 'match') {
+    const staff = s.staff.map((x) => (x.id === id ? { ...x, wage: o.wage, loyalty: clamp(x.loyalty + 10, 0, 100), poachOffer: undefined, raiseAsk: undefined } : x));
+    return msg({ ...s, staff }, m.name, `Thank you ma! I'm staying. ${o.shop} can keep their money.`, 'good');
+  }
+  const counter = Math.round((m.wage + o.wage) / 2 / 500) * 500;
+  const accepts = chance(clamp(0.3 + m.loyalty / 200 + (m.trained ? 0.2 : 0), 0.15, 0.9));
+  if (!accepts) return staffLeavesForRival(msg(s, m.name, `${naira(counter)} isn't enough, ma. I'm sorry, I'm taking the offer.`, 'danger'), id, o);
+  const staff = s.staff.map((x) => (x.id === id ? { ...x, wage: counter, loyalty: clamp(x.loyalty - 2, 0, 100), poachOffer: undefined, raiseAsk: undefined } : x));
+  return msg({ ...s, staff }, m.name, `Okay ma, ${naira(counter)} a week. I'll stay.`, 'good');
 }
 
 // ---------------------------------------------------------------------------
