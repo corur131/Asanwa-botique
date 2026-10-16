@@ -2211,6 +2211,11 @@ export function clearDesign(s: GameState, uid: string): GameState {
 // ---------------------------------------------------------------------------
 export const postsToday = (s: GameState) => (s.posts || []).filter((p) => p.day === s.day && !p.by).length;
 export const canPost = (s: GameState, score: number) => score >= 70 && postsToday(s) < 3;
+/** Staff share at most this many looks a day between them. */
+export const STAFF_POSTS_PER_DAY = 2;
+const staffPostsToday = (s: GameState) => (s.posts || []).filter((p) => p.day === s.day && !!p.by).length;
+/** A bigger page reaches more people, but the boost levels off (up to 11x) so growth can't run away. */
+export const reachBoost = (followers: number) => 1 + (10 * Math.max(0, followers)) / (Math.max(0, followers) + 60_000);
 
 const CAPTIONS = [
   'Styled by @divine.styles 🔥', 'Another happy client! Book your slot 💅🏾', 'Owambe ready ✨', 'From walk-in to wow.', 'Who did it better? Us. 😌', 'Fresh out of the chair 💇🏾‍♀️', "Clean look for a clean guy.", 'Na so we dey do am for Yaba 💯',
@@ -2219,10 +2224,12 @@ const CAPTIONS = [
 export function postLook(s: GameState, c: Customer, look: CharacterConfig, score: number, by?: string): GameState {
   // Divine's own posts are limited per day; a staff member posting their work isn't.
   if (!by && !canPost(s, score)) return s;
+  if (by && staffPostsToday(s) >= STAFF_POSTS_PER_DAY) return s;
   const clsMult = { poor: 0.6, middle: 1, rich: 2 }[c.cls];
-  const fatigue = 1 / (1 + postsToday(s));
+  // Every post today (Divine's and the staff's) makes the next one a little less fresh.
+  const fatigue = 1 / (1 + (s.posts || []).filter((p) => p.day === s.day).length);
   const flowerWall = s.furniture.some((p) => p.placed && p.id === 'flowerWall');
-  const gained = Math.max(5, Math.round((score - 60) * clsMult * (4 + Math.random() * 4) * fatigue * (1 + (s.followers || 0) / 6000) * (flowerWall ? 1.12 : 1)));
+  const gained = Math.max(5, Math.round((score - 60) * clsMult * (4 + Math.random() * 4) * fatigue * reachBoost(s.followers || 0) * (flowerWall ? 1.12 : 1)));
   const likes = Math.round(((s.followers || 0) + gained) * (0.08 + (score - 70) / 300) * (0.8 + Math.random() * 0.4) * (flowerWall ? 1.5 : 1));
   const caption = by ? pick([`Styled by ${by} at Asanwa Boutique ✨`, `${by} did that 🔥 Book ${by.split(' ')[0]} at Asanwa`, `Another masterpiece from ${by} 💅🏾`]) : pick(CAPTIONS);
   const post = { id: `p${s.day}-${Math.random().toString(36).slice(2, 7)}`, day: s.day, look, name: c.name, caption, score, likes, gained, ...(by ? { by } : {}) };
@@ -2466,11 +2473,30 @@ function normaliseCharacterMemories(value: unknown, day: number): NonNullable<Ga
   return clean;
 }
 
+/** The followers a save is reset to after the staff-post snowball bug (October 2026). */
+export const FOLLOWER_REPAIR_TARGET = 150_000;
+/**
+ * One-time repair: staff posts used to have no daily limit and grew with the follower count,
+ * so followers snowballed into the millions. Bring an affected save back to a believable number
+ * and scale its posts' numbers down to match. Money, staff and everything else stay.
+ */
+export function repairRunawayFollowers(s: GameState): GameState {
+  if (s.followerRepair || (s.followers || 0) <= 1_000_000 || !(s.posts || []).some((p) => !!p.by)) return s;
+  const ratio = FOLLOWER_REPAIR_TARGET / (s.followers || 1);
+  const shrink = (n: number) => Math.max(0, Math.round(n * ratio));
+  return {
+    ...s,
+    followers: FOLLOWER_REPAIR_TARGET,
+    followerRepair: true,
+    posts: (s.posts || []).map((p) => ({ ...p, likes: shrink(p.likes), gained: shrink(p.gained || 0) })),
+  };
+}
+
 function migrate(raw: GameState): GameState | null {
   type Old = Omit<GameState, 'version'> & { version: number; queue?: unknown; queueIndex?: unknown };
   let s = raw as unknown as Old;
   if (s.version === 5) {
-    const current = s as GameState;
+    const current = repairRunawayFollowers(s as GameState);
     return ensureBusinessState({
       ...sanitizeSavedCelebrityNameCollisions(current),
       characterMemories: normaliseCharacterMemories(current.characterMemories, current.day),
