@@ -74,18 +74,17 @@ const Rain: React.FC<{ area: Area; heavy: boolean }> = ({ area, heavy }) => {
   );
 };
 
-/** Floating harmattan dust, inside and out. */
+/** Floating harmattan dust on the street (not inside, where it speckled the floor). */
 const Dust: React.FC<{ area: Area }> = ({ area }) => {
   const ref = useRef<THREE.Points>(null);
   const geo = useMemo(() => {
-    const n = 420;
+    const n = 320;
     const pos = new Float32Array(n * 3);
     for (let i = 0; i < n; i++) {
-      const ang = Math.random() * Math.PI * 2;
-      const rad = Math.sqrt(Math.random()) * area.radius;
-      pos[i * 3] = area.w / 2 + Math.cos(ang) * rad;
+      const [x, z] = outsideSpot(area);
+      pos[i * 3] = x;
       pos[i * 3 + 1] = Math.random() * 4;
-      pos[i * 3 + 2] = area.d / 2 + Math.sin(ang) * rad;
+      pos[i * 3 + 2] = z;
     }
     const g = new THREE.BufferGeometry();
     g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
@@ -119,14 +118,25 @@ const Lightning: React.FC = () => {
   return <ambientLight ref={light} color="#dfe8ff" intensity={0} />;
 };
 
-/** Harmattan haze: the far edges of the street fade into dusty light. */
-const Haze: React.FC<{ dist: number }> = ({ dist }) => {
+/**
+ * Harmattan haze: the far edges of the street fade into dusty light. Fog is measured from the
+ * camera, so it follows the camera: the shop itself stays clear however far you zoom out.
+ */
+const Haze: React.FC<{ area: Area }> = ({ area }) => {
   const scene = useThree((st) => st.scene);
+  const fog = useMemo(() => new THREE.Fog('#cdb38a', 100, 300), []);
+  const centre = useMemo(() => new THREE.Vector3(area.w / 2, 0, area.d / 2), [area]);
   React.useEffect(() => {
     const prev = scene.fog;
-    scene.fog = new THREE.Fog('#cdb38a', dist * 1.5, dist * 4.2);
+    scene.fog = fog;
     return () => { scene.fog = prev; };
-  }, [scene, dist]);
+  }, [scene, fog]);
+  useFrame(({ camera }) => {
+    const cam = camera.position.distanceTo(centre);
+    // Everything up to the shop's far corner is clear; the haze starts beyond it.
+    fog.near = cam + Math.hypot(area.w, area.d) / 2 + 1;
+    fog.far = fog.near + area.radius * 2.2;
+  });
   return null;
 };
 
@@ -146,7 +156,7 @@ export const WeatherFx: React.FC<{ weather?: LagosWeather; w: number; d: number 
       )}
       {wet && <Rain area={area} heavy={weather === 'storm'} />}
       {weather === 'storm' && <Lightning />}
-      {weather === 'harmattan' && <><Haze dist={radius} /><Dust area={area} /></>}
+      {weather === 'harmattan' && <><Haze area={area} /><Dust area={area} /></>}
     </>
   );
 };
