@@ -816,6 +816,18 @@ export function reactToSale(s0: GameState, off: number, event: string | null): {
   return { s, counter: rival.id };
 }
 
+/** Rivals talk about one of Divine's giveaways in the group chat (and the blog may too). */
+export function giveawayChatter(s0: GameState, lines: string[], odds: number, news?: { title: string; body: string; hot?: boolean }, rivalId?: string): GameState {
+  let s = news ? gist(s0, news.title, news.body, rivalId || 'you', news.hot) : s0;
+  for (const r of mainRivals(s).filter((x) => x.id === rivalId || chance(odds))) s = inGroup(s, r, pick(lines));
+  return s;
+}
+
+/** A rival's loyal customer won Divine's giveaway: some of her followers come across. */
+export function rivalLosesFan(s: GameState, rivalId: string, followers: number): GameState {
+  return { ...s, rivals: (s.rivals || []).map((r) => (r.id === rivalId ? { ...r, followers: Math.max(0, r.followers - followers), feeling: r.feeling - 12 } : r)) };
+}
+
 export function poacher(s: GameState): Rival | undefined {
   const near = (s.rivals || []).filter((r) => r.tier >= s.tier && r.tier <= s.tier + 2);
   return near.length ? pick(near) : undefined;
