@@ -161,7 +161,7 @@ const Home: React.FC<{ s: GameState; unread: number; open: (a: AppId) => void }>
       </div>
       <div className="relative grid grid-cols-4 gap-x-2 gap-y-5">
         {APPS.map((a) => {
-          const badge = a.id === 'chats' ? unread : a.id === 'gidigram' ? E.newOrders(s) : 0;
+          const badge = a.id === 'chats' ? unread : a.id === 'gidigram' ? E.newOrders(s) + (E.awaitingWinner(s) ? 1 : 0) : 0;
           return (
             <button key={a.id} onClick={() => open(a.id)} className="group flex min-w-0 flex-col items-center gap-1.5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-white/80 rounded-xl">
               <span className={`relative flex h-[58px] w-[58px] items-center justify-center rounded-[18px] border border-white/20 text-white shadow-[0_8px_18px_rgba(0,0,0,.28)] ring-1 ring-black/10 transition duration-150 group-active:scale-90 ${a.bg}`}>

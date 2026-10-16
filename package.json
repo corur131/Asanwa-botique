@@ -9,7 +9,7 @@
     "preview": "vite preview",
     "clean": "rm -rf dist server.js",
     "lint": "tsc --noEmit",
-    "test": "tsx --test src/game/convos.test.ts src/game/business.test.ts src/game/shop-relocation.test.ts src/game/shopper.test.ts src/game/politician-contracts.test.ts src/game/market-catalog.test.ts src/game/customers.test.ts src/game/power.test.ts src/game/market-cart.test.ts src/game/staff-and-racks.test.ts src/game/rivals-balance.test.ts src/game/climate.test.ts src/game/shop-climate.test.ts src/game/expert-staff.test.ts src/game/staff-poaching.test.ts src/game/orders.test.ts src/game/wall-placement.test.ts src/game/sales.test.ts",
+    "test": "tsx --test src/game/convos.test.ts src/game/business.test.ts src/game/shop-relocation.test.ts src/game/shopper.test.ts src/game/politician-contracts.test.ts src/game/market-catalog.test.ts src/game/customers.test.ts src/game/power.test.ts src/game/market-cart.test.ts src/game/staff-and-racks.test.ts src/game/rivals-balance.test.ts src/game/climate.test.ts src/game/shop-climate.test.ts src/game/expert-staff.test.ts src/game/staff-poaching.test.ts src/game/orders.test.ts src/game/wall-placement.test.ts src/game/sales.test.ts src/game/giveaway.test.ts",
     "server": "tsx server.ts",
     "start": "npm run build && tsx server.ts",
     "check:locale-safe": "node tools/check-locale-safe.mjs"

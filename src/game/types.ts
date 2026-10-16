@@ -348,6 +348,39 @@ export interface BragEvent {
 
 /** A Gidigram notification: likes, follows, comments, mentions and industry news. */
 /** Someone DM'd on Gidigram to buy something they saw. */
+export type EntrantKind = 'influencer' | 'regular' | 'fan' | 'student' | 'bigSpender' | 'rivalFan' | 'fake' | 'friend';
+export interface GiveawayEntrant {
+  id: string;
+  handle: string;
+  name: string;
+  kind: EntrantKind;
+  /** Their own follower count. */
+  followers: number;
+  posts: number;
+  comment: string;
+  /** What their profile shows. */
+  tag: string;
+  rivalId?: string;
+  regularId?: string;
+}
+export interface Giveaway {
+  id: string;
+  start: number;
+  /** Entries close at the start of this day. */
+  end: number;
+  itemUid: string;
+  label: string;
+  color: string;
+  value: number;
+  entries: number;
+  /** Followers gained while it runs. */
+  gain: number;
+  status: 'live' | 'pick' | 'done';
+  entrants?: GiveawayEntrant[];
+  winner?: GiveawayEntrant;
+  outcome?: string;
+}
+
 export type SaleOff = 10 | 20 | 30;
 export interface SaleDay {
   /** The day the sale runs. */
@@ -931,6 +964,13 @@ export interface GameState {
   sale?: SaleDay;
   /** The day of the most recent sale (one per week). */
   lastSaleDay?: number;
+  giveaway?: Giveaway;
+  /** Start days of past giveaways (repeats pull fewer entries). */
+  giveawayDays?: number[];
+  /** Extra walk-ins for a few days (giveaway buzz). */
+  buzz?: { until: number; mult: number; why: string };
+  /** A rich client coming in on this day (a giveaway winner's family). */
+  vipGuestDay?: number;
   /** This week's trending colour and hashtags on Gidigram. */
   trend?: { week: number; color: string; name: string; tags: string[] };
   drop: Drop | null;

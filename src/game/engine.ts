@@ -20,6 +20,8 @@ import { SeasonId, festive, seasonOf, weatherFor } from './climate';
 import { OrderAnswer, answerOrder as answerOrderWith, receiveOrders, settleOrders } from './orders';
 export { newOrders } from './orders';
 import { salePrice, saleToday, saleEvent, saleTraffic } from './sales';
+import { closeGiveawayEntries, giveawayAtClose } from './giveaway';
+export { ENTRANT_FILTERS, GIVEAWAY_GAP, GIVEAWAY_MIN_FOLLOWERS, awaitingWinner, canStartGiveaway, expectedEntries, nextGiveawayDay, pickWinner, prizeOptions, startGiveaway } from './giveaway';
 export { SALE_BOOST, SALE_GAP, SALE_OFFS, canPlanSale, cancelSale, nextSaleDay, planSale, saleAhead, saleEvent, salePrice, saleToday, saleTraffic } from './sales';
 export type { OrderAnswer } from './orders';
 import { autoSaveAtClose, closeBrandDay, ensureBusinessState, getBrandMetrics, initialBankState, investmentValue, processBankWeekly, processFixedDepositMaturities, processInvestments, processPromotionAtClose, processExpansionAtClose, promotionTrafficBoost, recordWeeklyWealth, saveRentAtClose } from './business';
@@ -440,7 +442,7 @@ export function customersToday(s: GameState, slow: boolean) {
   const brandDemand = 0.55 + brand.awareness / 240 + brand.loyalty / 350 + brand.reliability / 400;
   // Storms keep people indoors; December is owambe season and the streets are full.
   const weatherTraffic = (s.weather === 'storm' ? 0.68 : s.weather === 'rainy' ? 0.82 : s.weather === 'sunny' ? 1.04 : 1) * (festive(s.day) ? 1.15 : 1);
-  return Math.max(4, Math.round(t.customers * traffic * brandDemand * (0.85 + Math.random() * 0.3) * (slow ? 0.55 : 1) * ramp * weatherTraffic * saleTraffic(s)));
+  return Math.max(4, Math.round(t.customers * traffic * brandDemand * (0.85 + Math.random() * 0.3) * (slow ? 0.55 : 1) * ramp * weatherTraffic * saleTraffic(s) * (s.buzz && s.day <= s.buzz.until ? s.buzz.mult : 1)));
 }
 
 /** How many people can wait inside: three standing, plus seats. */
@@ -559,6 +561,13 @@ export function openShop(s0: GameState): GameState {
   }
   const model = contestModel(s);
   if (model) arrivals.push(model);
+  // A giveaway winner's wealthy family member comes to shop.
+  if (s.vipGuestDay === s.day) {
+    const c = makeCustomer(s, [0, 0, 1]);
+    arrivals.push({ at: 150 + Math.random() * 300, c: { ...c, budget: Math.round((c.budget * 1.6) / 500) * 500 } });
+    s = { ...s, vipGuestDay: undefined };
+    s = addShout(s, 'Deborah', 'Sis, the giveaway winner\'s family is coming in today. Big money people, so be ready!', 'good');
+  }
   // Deborah's confirmed lead can add another guest if the property has remaining VIP capacity.
   const alreadyScheduledCelebrities = arrivals.filter((arrival) => !!arrival.c.celebrity).length;
   if (s.celebDay === s.day && highestEligibleCelebrityTier >= 0 &&
@@ -1184,6 +1193,7 @@ export function closeShop(s0: GameState): GameState {
   s = saveRentAtClose(s);
   s = autoSaveAtClose(s);
   s = settleOrders(s, money);
+  s = giveawayAtClose(s);
   s = closeGramDay(s);
 
   if (s.day % 7 === 0) {
@@ -1226,6 +1236,7 @@ export function nextMorning(s: GameState): GameState {
   let next = planDrop({ ...s, day: s.day + 1, weather: weatherForDay(s.day + 1, s.seed), phase: 'morning', ...freshDay, busy: null, energy: ENERGY.max, today: emptyLog(s.day + 1, s.cash) });
   next = seasonChange(next, s.day);
   next = receiveOrders(next);
+  next = closeGiveawayEntries(next);
   return ensurePoliticianContractOffer(next);
 }
 

@@ -14,7 +14,7 @@ import type { GameState, Rival } from '../types';
  * every boutique and @lagosfashiondaily (the news blog that replaced GistLagos).
  */
 type Up = (f: (g: GameState) => GameState) => void;
-type Tab = 'home' | 'explore' | 'post' | 'activity' | 'me' | 'dms';
+type Tab = 'home' | 'explore' | 'post' | 'activity' | 'me' | 'dms' | 'giveaway';
 
 interface FeedItem {
   id: string;
@@ -74,6 +74,9 @@ export const GidigramApp: React.FC<{ s: GameState; up: Up; profile: string | nul
   const [liked, setLiked] = useState<Set<string>>(new Set());
   const [meView, setMeView] = useState<'grid' | 'feed'>('grid');
   const [posted, setPosted] = useState<string>('');
+  const [prize, setPrize] = useState<string>('');
+  const [filter, setFilter] = useState('all');
+  const [chosen, setChosen] = useState<string>('');
   const trend = weeklyTrend(s);
   const rivalsById = useMemo(() => new Map((s.rivals || []).map((r) => [r.id, r])), [s.rivals]);
 
@@ -237,8 +240,83 @@ export const GidigramApp: React.FC<{ s: GameState; up: Up; profile: string | nul
   );
 
   const brags = openBrags(s);
+  const g = s.giveaway;
+  const canGive = E.canStartGiveaway(s);
+  const prizes = E.prizeOptions(s).slice(0, 8);
+  const GiveawayCard = (
+    <div className="mb-4 rounded-2xl border border-amber-400/30 bg-gradient-to-br from-amber-500/15 to-pink-600/10 p-3">
+      <div className="text-base font-bold text-white">🎁 Giveaway</div>
+      {g?.status === 'live' && (
+        <p className="mt-1 text-sm text-slate-200">Your <b>{g.label}</b> giveaway is live. Entries close on day {g.end} (about {n(g.entries)} people will enter). Then you pick the winner.</p>
+      )}
+      {g?.status === 'pick' && (
+        <>
+          <p className="mt-1 text-sm text-slate-200">Entries are closed: <b className="text-amber-200">{n(g.entries)} entries</b> for your {g.label}. Scroll the shortlist and choose wisely.</p>
+          <button onClick={() => setTab('giveaway')} className="mt-2 w-full rounded-xl bg-gradient-to-r from-amber-400 to-pink-500 py-2 text-sm font-bold text-black">Pick the winner →</button>
+        </>
+      )}
+      {(!g || g.status === 'done') && (
+        <>
+          {g?.winner && g.start >= s.day - 10 && <div className="mt-2 rounded-xl bg-black/30 p-2 text-xs text-slate-300"><b className="text-white">Last winner: @{g.winner.handle}.</b> {g.outcome}</div>}
+          <p className="mt-1 text-xs text-slate-300">Give away one piece from your stock. For two days people follow, like and tag friends to enter, then you pick the winner yourself. Who you pick matters.</p>
+          {!canGive.ok ? <p className="mt-2 text-xs text-amber-200">{canGive.reason}</p> : prizes.length === 0 ? <p className="mt-2 text-xs text-amber-200">You have nothing in stock to give away.</p> : (
+            <>
+              <div className="mt-2 text-[11px] font-semibold uppercase tracking-wide text-slate-400">Choose the prize</div>
+              <div className="mt-1 space-y-1">
+                {prizes.map((d) => (
+                  <button key={d.uid} onClick={() => setPrize(d.uid)} className={`flex w-full items-center gap-2 rounded-xl border px-2.5 py-2 text-left text-xs ${prize === d.uid ? 'border-amber-300 bg-amber-400/15' : 'border-white/10 bg-white/5'}`}>
+                    <span className="h-4 w-4 shrink-0 rounded-full border border-white/30" style={{ background: d.color }} />
+                    <span className="min-w-0 flex-1 truncate text-white">{d.label}</span>
+                    <span className="shrink-0 text-slate-300">{naira(Math.round(d.cost * 1.35 / 500) * 500)} · ~{n(E.expectedEntries(s, d))} entries</span>
+                  </button>
+                ))}
+              </div>
+              <button disabled={!prize} onClick={() => { up((x) => E.startGiveaway(x, prize)); setPrize(''); }} className="mt-2 w-full rounded-xl bg-gradient-to-r from-amber-400 to-pink-500 py-2 text-sm font-bold text-black disabled:opacity-40">Start the giveaway</button>
+              <p className="mt-1 text-[10px] text-slate-500">A pricier prize pulls more entries. Giveaways too close together get fewer.</p>
+            </>
+          )}
+        </>
+      )}
+    </div>
+  );
+  const shown = (g?.entrants || []).filter((e) => { const f = E.ENTRANT_FILTERS.find((x) => x.id === filter); return !f?.kinds || f.kinds.includes(e.kind); });
+  const Pick = g?.status === 'pick' ? (
+    <div>
+      <div className="sticky top-0 z-10 border-b border-white/10 bg-black/95 px-3 py-2">
+        <div className="text-sm text-white"><b>{n(g.entries)} entries</b> · shortlist of {g.entrants?.length}</div>
+        <div className="mt-2 flex gap-1.5 overflow-x-auto">
+          {E.ENTRANT_FILTERS.map((f) => (
+            <button key={f.id} onClick={() => setFilter(f.id)} className={`shrink-0 rounded-full px-3 py-1 text-xs font-semibold ${filter === f.id ? 'bg-white text-black' : 'bg-white/10 text-slate-200'}`}>{f.label}</button>
+          ))}
+        </div>
+      </div>
+      <div className="divide-y divide-white/10">
+        {shown.length === 0 && <p className="p-6 text-center text-sm text-slate-500">Nobody like that in the shortlist.</p>}
+        {shown.map((e) => (
+          <div key={e.id} className={`px-3 py-3 ${chosen === e.id ? 'bg-amber-400/10' : ''}`}>
+            <div className="flex items-center gap-2">
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-pink-500 to-purple-700 font-bold text-white">{e.handle[0].toUpperCase()}</span>
+              <span className="min-w-0 flex-1">
+                <span className="flex items-center text-sm font-semibold text-white">{e.handle}{e.followers >= 100_000 && <Verified />}</span>
+                <span className="block truncate text-[10px] text-slate-400">{e.tag}</span>
+              </span>
+              <span className="shrink-0 text-right text-[10px] text-slate-400"><b className="block text-xs text-white">{n(e.followers)}</b>followers</span>
+            </div>
+            <div className="mt-1.5 ml-11 text-[13px] text-slate-200">{e.comment}</div>
+            <div className="mt-1.5 ml-11">
+              {chosen === e.id
+                ? <span className="flex gap-1.5"><button onClick={() => { up((x) => E.pickWinner(x, e.id)); setChosen(''); setFilter('all'); setTab('post'); }} className="rounded-lg bg-amber-400 px-3 py-1.5 text-xs font-bold text-black">Announce @{e.handle} as winner 🎉</button><button onClick={() => setChosen('')} className="rounded-lg bg-white/10 px-2.5 py-1.5 text-xs text-slate-300">Cancel</button></span>
+                : <button onClick={() => setChosen(e.id)} className="rounded-lg bg-white/10 px-3 py-1.5 text-xs font-semibold text-white">Pick as winner</button>}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  ) : <p className="p-6 text-center text-sm text-slate-500">No giveaway waiting for a winner.</p>;
+
   const Post = (
     <div className="p-3">
+      {GiveawayCard}
       <div className="text-base font-bold text-white">Share a win</div>
       <p className="mt-1 text-xs text-slate-400">Celebrities, rich clients, contracts, trophies, a bigger shop or a new collection. Posting grows your followers, and the blog may pick it up. Rivals will notice.</p>
       {posted && <div className="mt-3 rounded-xl border border-emerald-400/30 bg-emerald-500/10 p-3 text-sm text-emerald-200">Posted! Check your profile for the likes.</div>}
@@ -351,13 +429,14 @@ export const GidigramApp: React.FC<{ s: GameState; up: Up; profile: string | nul
   );
 
   return (
-    <Frame title={tab === 'dms' ? 'Order DMs' : 'Gidigram'} back={tab === 'dms' ? () => setTab('home') : undefined} tab={tab} setTab={setTab} brags={brags.length} dms={E.newOrders(s)}>
+    <Frame title={tab === 'dms' ? 'Order DMs' : tab === 'giveaway' ? 'Pick a winner' : 'Gidigram'} back={tab === 'dms' ? () => setTab('home') : tab === 'giveaway' ? () => setTab('post') : undefined} tab={tab} setTab={setTab} brags={brags.length + (E.awaitingWinner(s) ? 1 : 0)} dms={E.newOrders(s)}>
       {tab === 'home' && Home}
       {tab === 'explore' && Explore}
       {tab === 'post' && Post}
       {tab === 'activity' && Activity}
       {tab === 'me' && Me}
       {tab === 'dms' && Dms}
+      {tab === 'giveaway' && Pick}
     </Frame>
   );
 };
