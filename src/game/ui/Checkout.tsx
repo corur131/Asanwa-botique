@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { CharacterSvg } from '../../components/renderer/renderCharacter';
 import { naira } from '../economy';
 import { buildLook, lookCost } from '../scoring';
+import { salePrice, saleToday } from '../sales';
 import { Customer, GameState, ScoreBreakdown, Settlement, StyleChoice } from '../types';
 import { Bar, Btn, Modal, Pill } from './kit';
 
@@ -11,8 +12,10 @@ export const PriceModal: React.FC<{ state: GameState; c: Customer; choice: Style
   const min = Math.max(1000, Math.round((Math.min(cost.fair * 0.6, c.budget * 0.8)) / 500) * 500);
   const max = Math.round((Math.max(cost.fair * 1.6, c.budget * 1.3)) / 500) * 500;
   const [price, setPrice] = useState(cost.fair);
-  const profit = price - cost.goods - cost.consumables;
-  const over = price > c.budget * 1.05;
+  const sale = saleToday(state);
+  const pays = salePrice(state, price);
+  const profit = pays - cost.goods - cost.consumables;
+  const over = pays > c.budget * 1.05;
   const pct = (v: number) => ((v - min) / (max - min)) * 100;
   return (
     <Modal onClose={onBack}>
@@ -22,6 +25,7 @@ export const PriceModal: React.FC<{ state: GameState; c: Customer; choice: Style
       </p>
       <div className="text-center mb-3">
         <div className={`text-4xl font-bold ${over ? 'text-rose-300' : 'text-white'}`}>{naira(price)}</div>
+        {sale && <div className="mt-1 inline-block rounded-full bg-rose-600/90 px-3 py-0.5 text-sm font-bold text-white">Sale −{sale.off}%: she pays {naira(pays)}</div>}
         <div className={`text-xs mt-1 ${profit >= 0 ? 'text-emerald-300' : 'text-rose-300'}`}>
           Profit {naira(profit)} (goods {naira(cost.goods)}, supplies {naira(cost.consumables)})
         </div>

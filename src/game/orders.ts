@@ -4,6 +4,7 @@
 // at the door, and Lagos traffic can push a delivery to the next day.
 import { MARKUP, naira } from './economy';
 import type { Design, DmOrder, GameState } from './types';
+import { saleOff } from './sales';
 
 const pick = <T,>(a: readonly T[]): T => a[Math.floor(Math.random() * a.length)];
 const chance = (p: number) => Math.random() < p;
@@ -31,15 +32,17 @@ export function ordersToday(s: GameState): number {
   const followers = s.followers || 0;
   if (followers < 300) return 0;
   const recentPosts = (s.posts || []).filter((p) => p.day >= s.day - 2).length;
-  const rate = Math.min(6, followers / 3_000 + recentPosts * 0.5 + 0.3);
-  return Math.min(6, Math.floor(rate + Math.random()));
+  // Sale days bring a rush of DMs too.
+  const sale = saleOff(s) * 6;
+  const rate = Math.min(6, followers / 3_000 + recentPosts * 0.5 + 0.3) + sale;
+  return Math.min(8, Math.floor(rate + Math.random()));
 }
 
 function makeOrder(s: GameState, d: Design, seq: number): DmOrder {
   const first = pick(FIRST);
   const [area, riderFee] = pick(AREAS);
   const rich = ['Ikoyi', 'Victoria Island', 'Lekki Phase 1'].includes(area);
-  const price = roundPrice(retail(d) * (rich ? 1.1 + Math.random() * 0.2 : 0.98 + Math.random() * 0.15));
+  const price = roundPrice(retail(d) * (rich ? 1.1 + Math.random() * 0.2 : 0.98 + Math.random() * 0.15) * (1 - saleOff(s)));
   const beg = chance(rich ? 0.2 : 0.45);
   const pay = chance(0.6) ? 'transfer' : 'pod';
   // Most buyers pay the rider themselves; some beg for free delivery (then the shop pays).

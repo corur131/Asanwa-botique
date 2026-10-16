@@ -348,6 +348,17 @@ export interface BragEvent {
 
 /** A Gidigram notification: likes, follows, comments, mentions and industry news. */
 /** Someone DM'd on Gidigram to buy something they saw. */
+export type SaleOff = 10 | 20 | 30;
+export interface SaleDay {
+  /** The day the sale runs. */
+  day: number;
+  off: SaleOff;
+  /** The previous sale's day, if any (back-to-back sales pull fewer people). */
+  prev?: number;
+  /** A rival who ran a sale the same day. */
+  rivalCounter?: string;
+}
+
 export interface DmOrder {
   id: string;
   day: number;
@@ -916,6 +927,10 @@ export interface GameState {
   gramNotes?: GramNote[];
   /** Gidigram order DMs (newest first). */
   dmOrders?: DmOrder[];
+  /** A planned or running sale day. */
+  sale?: SaleDay;
+  /** The day of the most recent sale (one per week). */
+  lastSaleDay?: number;
   /** This week's trending colour and hashtags on Gidigram. */
   trend?: { week: number; color: string; name: string; tags: string[] };
   drop: Drop | null;

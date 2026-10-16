@@ -796,6 +796,26 @@ export function rivalHiresStylist(s0: GameState, rivalId: string, name: string, 
   return s;
 }
 
+/**
+ * Divine announced a sale: the blog writes it up, rivals talk in the group chat, and
+ * sometimes one of them runs a sale the same day. Returns the rival who counters, if any.
+ */
+export function reactToSale(s0: GameState, off: number, event: string | null): { s: GameState; counter?: string } {
+  let s = gist(s0, event ? `${event}: Asanwa Boutique is slashing prices ${off}% 🛍️` : `Asanwa Boutique announces ${off}% off tomorrow 🛍️`, `Divine says everything in the shop goes ${off}% off for one day only. Expect a crowd.`, 'you');
+  const mains = mainRivals(s);
+  for (const r of mains.filter(() => chance(0.45))) {
+    s = inGroup(s, r, pick(off >= 30
+      ? ['30% off? Is the shop closing down? 😂', 'When business is slow, sale is the answer 😌', 'Desperation is not a good look, Divine 💅🏾']
+      : ['Una see sale o 👀', 'Sale again? Okay o 😏', 'Some of us sell at full price because our work is worth it 💅🏾', 'Let me go and buy something before it finishes 😂']));
+  }
+  const counterChance = off >= 30 ? 0.4 : off >= 20 ? 0.3 : 0.2;
+  const rival = mains.length && chance(counterChance) ? pick(mains) : undefined;
+  if (!rival) return { s };
+  s = rivalPost(s, rival, pick([`We too dey do sale o! ${off + 5}% off tomorrow 🔥 Come early`, `Why buy one when you can buy two? ${off + 5}% off at ${rival.shop} tomorrow ✨`, `Tomorrow only: ${off + 5}% off everything 💸 Who else is running a REAL sale? 😌`]), true, 'brag');
+  s = gist(s, `${rival.shop} fires back with a sale of its own 😳`, `${rival.owner} has announced ${off + 5}% off on the same day as Asanwa Boutique. Lagos shoppers will be split.`, rival.id, true);
+  return { s, counter: rival.id };
+}
+
 export function poacher(s: GameState): Rival | undefined {
   const near = (s.rivals || []).filter((r) => r.tier >= s.tier && r.tier <= s.tier + 2);
   return near.length ? pick(near) : undefined;
