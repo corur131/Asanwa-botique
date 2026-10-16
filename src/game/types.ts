@@ -988,6 +988,8 @@ export interface GameState {
   /** A rich client coming in on this day (a giveaway winner's family). */
   vipGuestDay?: number;
   owambe?: Owambe;
+  /** The one-time follower repair has run on this save. */
+  followerRepair?: boolean;
   /** Divine partied last night: she starts the day tired. */
   owambeTired?: boolean;
   /** Wealthy clients come more often until this day (after a great owambe). */
