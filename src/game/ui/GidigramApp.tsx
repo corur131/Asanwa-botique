@@ -1,8 +1,9 @@
 import React, { useMemo, useState } from 'react';
 import { CharacterSvg } from '../../components/renderer/renderCharacter';
 import type { CharacterConfig } from '../../types/character';
-import { TIERS } from '../economy';
+import { TIERS, naira } from '../economy';
 import * as E from '../engine';
+import { roundPrice } from '../orders';
 import { BLOG_HANDLE, BLOG_NAME, bragCaptions, openBrags, postBrag, weeklyTrend } from '../gram';
 import { ladder } from '../rivals';
 import type { GameState, Rival } from '../types';
@@ -13,7 +14,7 @@ import type { GameState, Rival } from '../types';
  * every boutique and @lagosfashiondaily (the news blog that replaced GistLagos).
  */
 type Up = (f: (g: GameState) => GameState) => void;
-type Tab = 'home' | 'explore' | 'post' | 'activity' | 'me';
+type Tab = 'home' | 'explore' | 'post' | 'activity' | 'me' | 'dms';
 
 interface FeedItem {
   id: string;
@@ -272,6 +273,47 @@ export const GidigramApp: React.FC<{ s: GameState; up: Up; profile: string | nul
     </div>
   );
 
+  const orders = s.dmOrders || [];
+  const STATUS: Record<string, { text: string; tone: string }> = {
+    accepted: { text: 'Rider on the way 🛵', tone: 'text-sky-300' },
+    delivered: { text: 'Delivered ✓', tone: 'text-emerald-300' },
+    failed: { text: 'Returned', tone: 'text-rose-300' },
+    declined: { text: 'Declined', tone: 'text-slate-400' },
+    expired: { text: 'Missed', tone: 'text-slate-500' },
+  };
+  const Dms = (
+    <div className="divide-y divide-white/10">
+      <p className="px-3 py-2 text-[11px] text-slate-400">People who saw your posts want to buy. Accept to send a dispatch rider (buyers usually pay delivery; free-delivery requests cost you the rider). Reply the same day or they buy elsewhere.</p>
+      {orders.length === 0 && <p className="p-6 text-center text-sm text-slate-500">No order DMs yet. Post great looks and grow your followers.</p>}
+      {orders.map((o) => (
+        <div key={o.id} className={`px-3 py-3 ${o.status === 'new' ? 'bg-pink-500/5' : ''}`}>
+          <div className="flex items-center gap-2">
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-pink-500 to-purple-700 font-bold text-white">{o.name[0]}</span>
+            <span className="min-w-0 flex-1">
+              <span className="block text-sm font-semibold text-white">{o.handle}</span>
+              <span className="block text-[10px] text-slate-400">Day {o.day} · {o.area} · {o.pay === 'transfer' ? 'Transfer first' : 'Pay on delivery'}</span>
+            </span>
+            {o.status !== 'new' && <span className={`text-[11px] font-semibold ${STATUS[o.status]?.tone}`}>{STATUS[o.status]?.text}</span>}
+          </div>
+          <div className="mt-2 ml-11 rounded-2xl rounded-tl-sm bg-white/10 px-3 py-2 text-[13px] text-white">{o.line}</div>
+          <div className="mt-1.5 ml-11 flex items-center gap-2 text-[11px] text-slate-300">
+            <span className="inline-block h-3.5 w-3.5 rounded-full border border-white/30" style={{ background: o.color }} />
+            {o.label} · <b className="text-white">{naira(o.price)}</b> · {o.freeDelivery ? <span className="text-amber-300">you pay rider {naira(o.riderFee)}</span> : <span>she pays delivery</span>}
+          </div>
+          {o.reply && <div className="mt-1.5 ml-auto mr-0 w-fit max-w-[80%] rounded-2xl rounded-tr-sm bg-gradient-to-r from-pink-600 to-purple-600 px-3 py-1.5 text-[12px] text-white">{o.reply}</div>}
+          {o.outcome && <div className="mt-1.5 ml-11 text-[11px] italic text-slate-400">{o.outcome}</div>}
+          {o.status === 'new' && (
+            <div className="mt-2 ml-11 flex flex-wrap gap-1.5">
+              <button onClick={() => up((g) => E.answerOrder(g, o.id, 'accept'))} className="rounded-lg bg-emerald-600 px-2.5 py-1.5 text-xs font-semibold text-white">Accept · {naira(o.price)}</button>
+              <button onClick={() => up((g) => E.answerOrder(g, o.id, 'discount'))} className={`rounded-lg px-2.5 py-1.5 text-xs font-semibold ${o.beg ? 'bg-amber-500 text-black' : 'bg-white/10 text-white'}`}>10% off · {naira(roundPrice(o.price * 0.9))}</button>
+              <button onClick={() => up((g) => E.answerOrder(g, o.id, 'decline'))} className="rounded-lg bg-white/10 px-2.5 py-1.5 text-xs font-semibold text-slate-300">Decline</button>
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+
   const myFeed = feed.filter((x) => x.who === 'you');
   const Me = (
     <>
@@ -309,21 +351,28 @@ export const GidigramApp: React.FC<{ s: GameState; up: Up; profile: string | nul
   );
 
   return (
-    <Frame title="Gidigram" tab={tab} setTab={setTab} brags={brags.length}>
+    <Frame title={tab === 'dms' ? 'Order DMs' : 'Gidigram'} back={tab === 'dms' ? () => setTab('home') : undefined} tab={tab} setTab={setTab} brags={brags.length} dms={E.newOrders(s)}>
       {tab === 'home' && Home}
       {tab === 'explore' && Explore}
       {tab === 'post' && Post}
       {tab === 'activity' && Activity}
       {tab === 'me' && Me}
+      {tab === 'dms' && Dms}
     </Frame>
   );
 };
 
-const Frame: React.FC<{ title: string; back?: () => void; tab: Tab; setTab: (t: Tab) => void; brags?: number; children: React.ReactNode }> = ({ title, back, tab, setTab, brags, children }) => (
+const Frame: React.FC<{ title: string; back?: () => void; tab: Tab; setTab: (t: Tab) => void; brags?: number; dms?: number; children: React.ReactNode }> = ({ title, back, tab, setTab, brags, dms, children }) => (
   <div className="flex min-h-0 flex-1 flex-col bg-black text-white">
     <div className="flex shrink-0 items-center gap-2 border-b border-white/10 px-3 py-2.5">
       {back && <button onClick={back} aria-label="Back" className="px-1 text-xl">‹</button>}
       <span className={back ? 'font-semibold' : 'font-serif text-2xl italic tracking-tight'}>{title}</span>
+      {tab !== 'dms' && (
+        <button onClick={() => setTab('dms')} aria-label="Order DMs" className="relative ml-auto px-1 text-xl">
+          ✉️
+          {!!dms && <span className="absolute -right-1 -top-1 rounded-full bg-rose-500 px-1.5 text-[9px] font-bold text-white">{dms}</span>}
+        </button>
+      )}
     </div>
     <div className="min-h-0 flex-1 overflow-y-auto">{children}</div>
     <nav className="grid shrink-0 grid-cols-5 border-t border-white/10 bg-black">

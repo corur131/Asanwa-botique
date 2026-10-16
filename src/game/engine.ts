@@ -17,6 +17,9 @@ import { FURNITURE, KIOSK_LISTING, Listing, Placed, STARTER_FURNITURE, arrangeSh
 import { CharacterMemory, CollaborationEvent, CollaborationReply, Customer, DayLog, Departure, Design, ReplyChoice, GameState, LedgerLine, Message, PoliticianContract, PoliticianContractRequirement, Regular, ScoreBreakdown, Settlement, SponsorshipOffer, StaffMember, StaffProfession, StyleChoice, Visitor } from './types';
 import { addBrag, blogPost, closeGramDay } from './gram';
 import { SeasonId, festive, seasonOf, weatherFor } from './climate';
+import { OrderAnswer, answerOrder as answerOrderWith, receiveOrders, settleOrders } from './orders';
+export { newOrders } from './orders';
+export type { OrderAnswer } from './orders';
 import { autoSaveAtClose, closeBrandDay, ensureBusinessState, getBrandMetrics, initialBankState, investmentValue, processBankWeekly, processFixedDepositMaturities, processInvestments, processPromotionAtClose, processExpansionAtClose, promotionTrafficBoost, recordWeeklyWealth, saveRentAtClose } from './business';
 
 export { brandPower, currentWealthRows, financialAssets, getBrandMetrics, creditProfile, creditRating, creditHistoryReport, premiumLoanEligible, takePremiumBusinessLoan, renegotiateBusinessLoan, loanRateForScore, maximumLoan, netWorthPlayer, netWorthRival, playerWeekTotals, totalLiabilities, unlocksForFollowers, availablePromotionLevels, promotionBudgetBounds, promotionTrafficBoost, startPromotion, stopPromotion, wholesaleUpgradeQuote, upgradeWholesaleInventory, transferBank, setRentSaving, setSavingsGoal, createFixedDeposit, breakFixedDeposit, fixedDepositRate, FIXED_DEPOSIT_TERMS, buyTreasuryBill, treasuryBillYield, TBILL_TENORS, buyBond, sellBond, bondCoupon, BOND_TERMS, MIN_INVESTMENT, bankMarket, investmentValue, setAutoSave, loanPayoffQuote, loanInterestToDate, LOAN_PROCESSING_FEE_RATE, takeBusinessLoan, repayBusinessLoan, arrangeBusinessLoanRepayment, expansionOptions, investInExpansion, financeExpansionPurchase } from './business';
@@ -1166,6 +1169,7 @@ export function closeShop(s0: GameState): GameState {
   s = settleLateRent(s);
   s = saveRentAtClose(s);
   s = autoSaveAtClose(s);
+  s = settleOrders(s, money);
   s = closeGramDay(s);
 
   if (s.day % 7 === 0) {
@@ -1207,6 +1211,7 @@ export function closeShop(s0: GameState): GameState {
 export function nextMorning(s: GameState): GameState {
   let next = planDrop({ ...s, day: s.day + 1, weather: weatherForDay(s.day + 1, s.seed), phase: 'morning', ...freshDay, busy: null, energy: ENERGY.max, today: emptyLog(s.day + 1, s.cash) });
   next = seasonChange(next, s.day);
+  next = receiveOrders(next);
   return ensurePoliticianContractOffer(next);
 }
 
@@ -2354,6 +2359,9 @@ export function weeklyStaff(s0: GameState): GameState {
   }
   return s;
 }
+
+/** Divine answers a Gidigram order DM. */
+export const answerOrder = (s: GameState, id: string, answer: OrderAnswer) => answerOrderWith(s, id, answer, money);
 
 /** Weekly chance that a rival tries to poach a stylist of this level (7+). */
 const POACH_CHANCE: Record<number, number> = { 7: 0.25, 8: 0.35, 9: 0.4, 10: 0.45 };
