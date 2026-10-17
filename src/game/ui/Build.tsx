@@ -7,6 +7,7 @@ import { useThumb } from '../scene/Thumbs';
 import type { CamCmd, DragMode, View } from '../scene/ShopScene';
 import { Btn } from './kit';
 import { useSound } from '../sound';
+import { setGfx, setShowFps, useGfx } from '../gfx';
 
 const Thumb: React.FC<{ id: string }> = ({ id }) => {
   const url = useThumb(id);
@@ -176,6 +177,7 @@ export const ActionMenu: React.FC<{ s: GameState; uid: string; onPick: (id: E.Ac
 /** On/off and volume for music, the generator and pops; mirror reflections. */
 export const SoundSettings: React.FC = () => {
   const snd = useSound();
+  const gfx = useGfx();
   const row = (label: string, on: boolean, vol: number, k: 'music' | 'gen' | 'sfx' | 'rain', vk: 'musicVol' | 'genVol' | 'sfxVol' | 'rainVol') => (
     <div className="flex items-center gap-2">
       <button onClick={() => snd.set({ [k]: !on })} className={`w-28 shrink-0 rounded-lg px-2 py-1.5 text-xs font-semibold text-left ${on ? 'bg-emerald-600/80 text-white' : 'bg-white/5 text-slate-400 border border-white/10'}`}>
@@ -192,6 +194,19 @@ export const SoundSettings: React.FC = () => {
       {row('Pops & NEPA', snd.sfx, snd.sfxVol, 'sfx', 'sfxVol')}
       {row('Rain', snd.rain, snd.rainVol, 'rain', 'rainVol')}
       <div className="text-[11px] uppercase tracking-wider text-amber-300/90 font-bold pt-1">Graphics</div>
+      <div className="grid grid-cols-4 gap-1" role="radiogroup" aria-label="Graphics quality">
+        {(['auto', 'low', 'medium', 'high'] as const).map((g) => (
+          <button key={g} role="radio" aria-checked={gfx.setting === g} onClick={() => setGfx(g)} className={`rounded-lg px-1 py-1.5 text-xs font-semibold capitalize ${gfx.setting === g ? 'bg-emerald-600/80 text-white' : 'bg-white/5 text-slate-400 border border-white/10'}`}>
+            {g}
+          </button>
+        ))}
+      </div>
+      <p className="text-[11px] leading-snug text-slate-400">
+        {gfx.setting === 'auto' ? `Auto is using ${gfx.level} on this phone. It drops to low if the shop stutters.` : gfx.level === 'low' ? 'Low: no shadows or live mirrors, lighter rain. Smoothest on older phones.' : gfx.level === 'medium' ? 'Medium: shadows in small shops and one live mirror.' : 'High: sharpest picture, shadows and up to two live mirrors.'}
+      </p>
+      <button onClick={() => setShowFps(!gfx.fps)} className={`w-full rounded-lg px-2 py-1.5 text-xs font-semibold text-left ${gfx.fps ? 'bg-emerald-600/80 text-white' : 'bg-white/5 text-slate-400 border border-white/10'}`}>
+        Show frame rate: {gfx.fps ? 'on' : 'off'}
+      </button>
       <button onClick={() => snd.set({ reflections: !snd.reflections })} className={`w-full rounded-lg px-2 py-1.5 text-xs font-semibold text-left ${snd.reflections ? 'bg-emerald-600/80 text-white' : 'bg-white/5 text-slate-400 border border-white/10'}`}>
         Mirror reflections: {snd.reflections ? 'on' : 'off (faster on old phones)'}
       </button>

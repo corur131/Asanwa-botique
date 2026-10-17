@@ -38,8 +38,8 @@ function outsideSpot(a: Area): [number, number] {
   return [-1, -1];
 }
 
-const Rain: React.FC<{ area: Area; heavy: boolean }> = ({ area, heavy }) => {
-  const count = heavy ? 900 : 520;
+const Rain: React.FC<{ area: Area; heavy: boolean; density?: number }> = ({ area, heavy, density = 1 }) => {
+  const count = Math.round((heavy ? 900 : 520) * density);
   const ref = useRef<THREE.InstancedMesh>(null);
   const drops = useMemo(() => Array.from({ length: count }, () => {
     const [x, z] = outsideSpot(area);
@@ -140,7 +140,7 @@ const Haze: React.FC<{ area: Area }> = ({ area }) => {
   return null;
 };
 
-export const WeatherFx: React.FC<{ weather?: LagosWeather; w: number; d: number }> = ({ weather, w, d }) => {
+export const WeatherFx: React.FC<{ weather?: LagosWeather; w: number; d: number; density?: number }> = ({ weather, w, d, density = 1 }) => {
   const radius = Math.max(w, d) * 1.1 + 4;
   const area = useMemo(() => ({ w, d, radius }), [w, d, radius]);
   if (!weather) return null;
@@ -154,7 +154,7 @@ export const WeatherFx: React.FC<{ weather?: LagosWeather; w: number; d: number 
           <meshStandardMaterial color="#1d2a3a" transparent opacity={weather === 'storm' ? 0.42 : 0.3} roughness={0.15} metalness={0.3} />
         </mesh>
       )}
-      {wet && <Rain area={area} heavy={weather === 'storm'} />}
+      {wet && <Rain area={area} heavy={weather === 'storm'} density={density} />}
       {weather === 'storm' && <Lightning />}
       {weather === 'harmattan' && <><Haze area={area} /><Dust area={area} /></>}
     </>
