@@ -13,11 +13,11 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 app.disable('x-powered-by');
 
-// Permit browser requests from the production Firebase site and the two Render
-// deployments. The Gemini key remains server-side; never put it in Vite config.
+// Permit browser requests from the production Firebase site, the two Render
+// deployments and the installed Android app (https://localhost). The Gemini key remains server-side; never put it in Vite config.
 const allowedOrigins = new Set(
   (process.env.ALLOWED_ORIGINS ||
-    'https://asanwa-boutique-game.web.app,https://asanwa-boutique-game.firebaseapp.com,https://asanwa-boutique.onrender.com,https://asanwa-boutique-business-preview.onrender.com')
+    'https://localhost,https://asanwa-boutique-game.web.app,https://asanwa-boutique-game.firebaseapp.com,https://asanwa-boutique.onrender.com,https://asanwa-boutique-business-preview.onrender.com')
     .split(',')
     .map((origin) => origin.trim())
     .filter(Boolean),

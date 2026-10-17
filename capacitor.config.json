@@ -1,0 +1,16 @@
+{
+  "appId": "com.corur131.asanwaboutique",
+  "appName": "Asanwa Boutique",
+  "webDir": "dist",
+  "plugins": {
+    "FirebaseAuthentication": {
+      "skipNativeAuth": true,
+      "providers": [
+        "google.com"
+      ]
+    },
+    "SystemBars": {
+      "insetsHandling": "css"
+    }
+  }
+}
