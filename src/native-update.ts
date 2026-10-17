@@ -7,8 +7,21 @@ import { Capacitor } from '@capacitor/core';
 const REPO = 'corur131/asanwa-botique';
 const BUILD = Number(import.meta.env.VITE_APP_BUILD || 0);
 
+let lastCheck = 0;
+let shown = false;
+
+/** Checks on start and again whenever the player comes back to the app (at most every 10 minutes). */
 export function checkForUpdate(): void {
   if (!Capacitor.isNativePlatform() || !BUILD) return;
+  check();
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible' && Date.now() - lastCheck > 10 * 60 * 1000) check();
+  });
+}
+
+function check(): void {
+  if (shown) return;
+  lastCheck = Date.now();
   fetch(`https://api.github.com/repos/${REPO}/releases/latest`, { headers: { Accept: 'application/vnd.github+json' } })
     .then((r) => (r.ok ? r.json() : null))
     .then((rel: { tag_name?: string } | null) => {
@@ -19,6 +32,8 @@ export function checkForUpdate(): void {
 }
 
 function showBanner(): void {
+  if (shown) return;
+  shown = true;
   const bar = document.createElement('div');
   bar.setAttribute('role', 'status');
   bar.style.cssText =
@@ -37,7 +52,11 @@ function showBanner(): void {
   close.textContent = '×';
   close.setAttribute('aria-label', 'Dismiss');
   close.style.cssText = 'background:none;border:0;color:#fff;font-size:20px;padding:0 4px';
-  close.onclick = () => bar.remove();
+  close.onclick = () => {
+    bar.remove();
+    shown = false;
+    lastCheck = Date.now();
+  };
   bar.append(text, get, close);
   document.body.appendChild(bar);
 }
