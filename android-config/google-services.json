@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "927672795502",
+    "project_id": "asanwa-boutique-game",
+    "storage_bucket": "asanwa-boutique-game.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:927672795502:android:cac135fba28a432180c17f",
+        "android_client_info": {
+          "package_name": "com.corur131.asanwaboutique"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "927672795502-93c630lp9h7tso36ltovh888bt1qpclc.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.corur131.asanwaboutique",
+            "certificate_hash": "35d3d2be3ca8319074b90a3f1a79ef5455494c72"
+          }
+        },
+        {
+          "client_id": "927672795502-3022ockad74l24jfk9ktbkrcngpscpt7.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyD7vbgeJ2PZwUw-xjC3f0SmTNdFjtKF2Wo"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "927672795502-3022ockad74l24jfk9ktbkrcngpscpt7.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
