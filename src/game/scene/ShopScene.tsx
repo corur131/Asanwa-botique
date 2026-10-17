@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
-import { OrbitControls } from '@react-three/drei';
+import { OrbitControls, PerformanceMonitor } from '@react-three/drei';
+import { GFX, autoFallback, autoStep, gfxNow, useGfx } from '../gfx';
 import * as THREE from 'three';
 import { GameState, Pose } from '../types';
 import { RoomStyle, finishes, room, cellsBlocked, footprint, furnitureById, wallLayout, wallFits, Placed, canPlace, yardCapacity, solarRackCapacity, Rot, rotAngle } from '../shop';
@@ -751,12 +752,12 @@ export function Room({ r, tier, painted }: { r: RoomStyle; tier: number; painted
 const yardOrder = (s: GameState) => s.furniture.filter((p) => p.placed && furnitureById(p.id).mount === 'yard' && !furnitureById(p.id).solar).sort((a, b) => Number(!!furnitureById(a.id).gen) - Number(!!furnitureById(b.id).gen));
 
 /** Which mirrors get a live reflection: the one or two biggest. */
-function liveMirrorUids(s: GameState, on: boolean): Set<string> {
-  if (!on) return new Set();
+function liveMirrorUids(s: GameState, on: boolean, max = 2): Set<string> {
+  if (!on || max <= 0) return new Set();
   const area = (id: string) => ({ mirrorWall: 6, wallMirror: 2.4, goldMirror: 1.2, archMirror: 1.1, standMirror: 0.9, vanity: 0.8, makeupStation: 0.7, crackedMirror: 0.6 } as Record<string, number>)[id] || 0;
   const ms = s.furniture.filter((p) => p.placed && area(p.id) > 0).sort((a, b) => area(b.id) - area(a.id));
   const n = ms[0] && area(ms[0].id) >= 2.4 ? 1 : 2; // one big wall mirror is enough
-  return new Set(ms.slice(0, n).filter((p) => area(p.id) >= 0.9).map((p) => p.uid));
+  return new Set(ms.slice(0, Math.min(n, max)).filter((p) => area(p.id) >= 0.9).map((p) => p.uid));
 }
 
 /** Where Divine stands to use a piece, and which way she faces. */
@@ -1126,7 +1127,8 @@ function Furniture({ s, selected, placing, wallPlacing, onTap, dark, reflections
   const r = room(s.listing);
   const wl = { ...wallLayout(s.furniture.filter((x) => x.uid !== wallPlacing?.uid), s.listing), ...(wallPlacing ? { [wallPlacing.uid]: { side: wallPlacing.side, at: wallPlacing.at } } : {}) };
   const wallOk = wallPlacing ? wallFits(s.furniture, s.listing, wallPlacing.uid, wallPlacing.side, wallPlacing.at) : true;
-  const live = useMemo(() => liveMirrorUids(s, reflections !== false), [s.furniture, reflections]); // eslint-disable-line react-hooks/exhaustive-deps
+  const maxMirrors = GFX[useGfx().level].liveMirrors;
+  const live = useMemo(() => liveMirrorUids(s, reflections !== false, maxMirrors), [s.furniture, reflections, maxMirrors]); // eslint-disable-line react-hooks/exhaustive-deps
   // One rack/drawer slot represents one style. Individual colourways stay in stock,
   // but only the first in-stock colour paints a representative garment on the rack.
   const shown: typeof s.stock = [];
@@ -1366,7 +1368,28 @@ function useDragGuard() {
   }, []);
 }
 
+/** Measures frames per second and writes it into the on-screen label (no React re-renders). */
+function FpsProbe() {
+  const acc = useRef({ frames: 0, since: 0 });
+  useFrame(({ clock }) => {
+    const a = acc.current;
+    a.frames++;
+    const t = clock.elapsedTime;
+    if (t - a.since >= 0.5) {
+      const el = document.getElementById('asanwa-fps');
+      if (el) el.textContent = `${Math.round(a.frames / (t - a.since))} fps · ${gfxNow().level}`;
+      a.frames = 0;
+      a.since = t;
+    }
+  });
+  return null;
+}
+
 export default function ShopScene(p: SceneProps) {
+  const gfx = useGfx();
+  const q = GFX[gfx.level];
+  // Smooth edges can only be chosen when the 3D view opens.
+  const [antialias] = useState(() => GFX[gfxNow().level].antialias);
   const { s } = p;
   const dragGuard = useDragGuard();
   const roomRef = useRef<THREE.Group>(null);
@@ -1542,10 +1565,10 @@ export default function ShopScene(p: SceneProps) {
   };
   return (
     <div ref={dragGuard} style={{ position: 'relative', width: '100%', height: '100%', touchAction: 'none' }}>
-      <Canvas onCreated={handleCanvasCreated} shadows={r.w * r.d <= 220} dpr={[1, 1.25]} camera={{ fov: 32, position: [cx + dist * 0.72, dist * 1.35, cz + dist], near: 0.1, far: 200 }} style={{ background: r.signatureTheme === 'botanical-atrium' ? 'linear-gradient(#9DCDBF,#263D35)' : r.signatureTheme === 'cobalt-gallery' ? 'linear-gradient(#C9D6ED,#37496D)' : skyFor(s.weather, !!p.night) }}>
+      <Canvas onCreated={handleCanvasCreated} shadows={q.shadows && r.w * r.d <= 220} dpr={q.dpr} gl={{ antialias, powerPreference: 'high-performance' }} camera={{ fov: 32, position: [cx + dist * 0.72, dist * 1.35, cz + dist], near: 0.1, far: 200 }} style={{ background: r.signatureTheme === 'botanical-atrium' ? 'linear-gradient(#9DCDBF,#263D35)' : r.signatureTheme === 'cobalt-gallery' ? 'linear-gradient(#C9D6ED,#37496D)' : skyFor(s.weather, !!p.night) }}>
         <ambientLight color={r.signatureTheme === 'botanical-atrium' ? '#D5F1E0' : r.signatureTheme === 'cobalt-gallery' ? '#DEE8FF' : '#FFFFFF'} intensity={(p.night ? 0.35 : p.dark ? 0.14 : r.signatureTheme ? 0.68 : 0.6) * (p.night || p.dark ? 1 : 0.6 + 0.4 * sun)} />
         <hemisphereLight args={[r.signatureTheme === 'botanical-atrium' ? '#E0F3DD' : r.signatureTheme === 'cobalt-gallery' ? '#E5EBFF' : '#FFF4E0', r.signatureTheme === 'botanical-atrium' ? '#23483A' : r.signatureTheme === 'cobalt-gallery' ? '#354668' : '#3A3A50', p.night ? 0.3 : p.dark ? 0.12 : r.signatureTheme ? 0.6 : 0.55]} />
-        <directionalLight position={[cx + 6, 12, cz + 8]} intensity={p.night ? 0.4 : p.dark ? 0.35 : 1.2 * sun} color={s.weather === 'harmattan' ? '#FFE2B8' : '#FFFFFF'} castShadow={r.w * r.d <= 220} shadow-mapSize={[512, 512]} shadow-camera-left={-12} shadow-camera-right={12} shadow-camera-top={12} shadow-camera-bottom={-12} />
+        <directionalLight position={[cx + 6, 12, cz + 8]} intensity={p.night ? 0.4 : p.dark ? 0.35 : 1.2 * sun} color={s.weather === 'harmattan' ? '#FFE2B8' : '#FFFFFF'} castShadow={q.shadows && r.w * r.d <= 220} shadow-mapSize={[512, 512]} shadow-camera-left={-12} shadow-camera-right={12} shadow-camera-top={12} shadow-camera-bottom={-12} />
         <OrbitControls
           makeDefault
           target={[cx, 0.6, cz]}
@@ -1564,7 +1587,9 @@ export default function ShopScene(p: SceneProps) {
         />
         <CameraRig view={view} r={r} reset={p.camReset || 0} />
         <CameraPad r={r} cmd={p.camCmd} view={view} />
-        <WeatherFx weather={s.weather} w={r.w} d={r.d} />
+        <WeatherFx weather={s.weather} w={r.w} d={r.d} density={q.weather} />
+        {gfx.setting === 'auto' && <PerformanceMonitor flipflops={3} onDecline={() => autoStep(-1)} onIncline={() => autoStep(1)} onFallback={autoFallback} />}
+        {gfx.fps && <FpsProbe />}
         <group ref={roomRef}><Room r={dressed} tier={s.tier} painted={!!fin.paint} /></group>
         <RoomGeometry.Provider value={roomGeo}>
         <Thermostat.Provider value={thermostatOf(s)}>
@@ -1620,6 +1645,7 @@ export default function ShopScene(p: SceneProps) {
           <meshBasicMaterial visible={false} />
         </mesh>
       </Canvas>
+      {gfx.fps && <div id="asanwa-fps" style={{ position: 'absolute', left: 8, top: 8, zIndex: 5, padding: '2px 6px', borderRadius: 6, background: 'rgba(0,0,0,.55)', color: '#fff', font: '600 11px system-ui, sans-serif', pointerEvents: 'none' }}>– fps · {gfx.level}</div>}
       {graphicsLost && (
         <div role="alert" className="absolute inset-0 z-50 flex items-center justify-center bg-[#10111a]/95 p-6 text-center text-white">
           <div className="max-w-md space-y-3 rounded-2xl border border-white/15 bg-[#191b27] p-6 shadow-2xl">
@@ -1639,7 +1665,7 @@ export function RoomPreview({ tier, stars, signature }: { tier: number; stars: n
   // Stable, elevated three-quarter view: show the full floor plan without a roof/canopy hiding it.
   const dist = Math.max(r.w, r.d) * 0.70 + 1.8;
   return (
-    <Canvas dpr={[1, 1.25]} camera={{ fov: 32, position: [r.w / 2 + dist * 0.70, dist * 1.15, r.d / 2 + dist * 0.95], near: 0.1, far: 200 }} style={{ background: 'linear-gradient(#24305a,#3a4a7a)' }}>
+    <Canvas dpr={GFX[gfxNow().level].dpr} camera={{ fov: 32, position: [r.w / 2 + dist * 0.70, dist * 1.15, r.d / 2 + dist * 0.95], near: 0.1, far: 200 }} style={{ background: 'linear-gradient(#24305a,#3a4a7a)' }}>
       <ambientLight color={r.signatureTheme === 'botanical-atrium' ? '#D5F1E0' : r.signatureTheme === 'cobalt-gallery' ? '#DEE8FF' : '#FFFFFF'} intensity={r.signatureTheme ? 0.68 : 0.6} />
       <hemisphereLight args={[r.signatureTheme === 'botanical-atrium' ? '#E0F3DD' : r.signatureTheme === 'cobalt-gallery' ? '#E5EBFF' : '#FFF4E0', r.signatureTheme === 'botanical-atrium' ? '#23483A' : r.signatureTheme === 'cobalt-gallery' ? '#354668' : '#3A3A50', r.signatureTheme ? 0.6 : 0.55]} />
       <directionalLight position={[r.w / 2 + 6, 12, r.d / 2 + 8]} intensity={r.signatureTheme === 'botanical-atrium' ? 1.1 : r.signatureTheme === 'cobalt-gallery' ? 1.0 : 1.2} />

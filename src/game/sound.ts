@@ -46,6 +46,11 @@ function write(next: Settings) {
   syncRain();
 }
 export const soundSettings = () => settings;
+/** The installed app replaces the web vibration with a proper haptic buzz. */
+let popBuzz: (() => void) | null = null;
+export function setPopBuzz(fn: () => void) {
+  popBuzz = fn;
+}
 
 // ---------------------------------------------------------------------------
 // Music
@@ -302,7 +307,8 @@ export function setGenSound(kind: 'small' | 'big' | null) {
 export function pop() {
   if (!settings.sfx) return;
   try {
-    navigator.vibrate?.(60);
+    if (popBuzz) popBuzz();
+    else navigator.vibrate?.(60);
   } catch {
     /* not supported */
   }

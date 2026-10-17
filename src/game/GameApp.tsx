@@ -24,6 +24,7 @@ import { ActionMenu, CameraPad, Catalogue, EnergyBar, SoundSettings, ViewPicker 
 import type { CamCmd, DragMode, View } from './scene/ShopScene';
 import type { Pose } from './types';
 import { OwambeCard, OwambeFlow } from './ui/Owambe';
+import { onBackButton } from '../native-shell';
 
 const ShopScene = lazy(() => import('./scene/ShopScene'));
 const ThumbStudio = lazy(() => import('./scene/Thumbs').then((m) => ({ default: m.ThumbStudio })));
@@ -251,6 +252,19 @@ export default function GameApp({ onLab, initial, storageKey, cloud, notice }: {
   // the generator hums while it runs
   const genKind = s && s.phase === 'shop' && s.power?.gen && E.source(s) === 'gen' ? E.stats(s).gen : null;
   useEffect(() => setGenSound(touring ? null : genKind), [genKind, touring]);
+  // Android back button: close the open phone app, then the phone, then a rival visit.
+  useEffect(() => onBackButton(() => {
+    if (phone) {
+      if (phoneApp !== 'home') setPhoneApp('home');
+      else setPhone(false);
+      return true;
+    }
+    if (touring) {
+      setTouring(null);
+      return true;
+    }
+    return false;
+  }), [phone, phoneApp, touring]);
   useEffect(() => () => setGenSound(null), []);
   // a quick job outside opening hours: Divine walks over and does it for a few seconds
   useEffect(() => {

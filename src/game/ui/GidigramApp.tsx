@@ -1,5 +1,5 @@
-import React, { useMemo, useState } from 'react';
-import { CharacterSvg } from '../../components/renderer/renderCharacter';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { CharacterImg } from '../../components/renderer/CharacterImg';
 import type { CharacterConfig } from '../../types/character';
 import { TIERS, naira } from '../economy';
 import * as E from '../engine';
@@ -60,7 +60,7 @@ const Ring: React.FC<{ look?: CharacterConfig; label: string; seen?: boolean; si
     <span className={`rounded-full p-[2.5px] ${seen ? 'bg-white/20' : 'bg-gradient-to-tr from-yellow-400 via-pink-500 to-purple-600'}`} style={{ width: size, height: size }}>
       <span className="block h-full w-full overflow-hidden rounded-full border-2 border-black bg-[#2a1f2e]">
         {blog ? <span className="flex h-full w-full items-center justify-center bg-gradient-to-br from-rose-600 to-red-900 text-lg font-black text-white">LFD</span>
-          : look ? <CharacterSvg config={look} idPrefix={`st-${id}`} camera="portrait" className="h-full w-full" /> : <span className="flex h-full w-full items-center justify-center font-serif text-xl font-bold text-white">D</span>}
+          : look ? <CharacterImg config={look} camera="portrait" className="h-full w-full" /> : <span className="flex h-full w-full items-center justify-center font-serif text-xl font-bold text-white">D</span>}
       </span>
     </span>
     <span className="w-full truncate text-center text-[10px] text-slate-300">{label}</span>
@@ -69,8 +69,23 @@ const Ring: React.FC<{ look?: CharacterConfig; label: string; seen?: boolean; si
 
 const Verified = () => <span className="ml-1 inline-flex h-3.5 w-3.5 items-center justify-center rounded-full bg-sky-500 text-[8px] font-black text-white">✓</span>;
 
+/** Invisible marker at the end of the feed: loads more posts when scrolled into view. */
+const MoreSentinel: React.FC<{ onMore: () => void }> = ({ onMore }) => {
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el || typeof IntersectionObserver === 'undefined') return;
+    const io = new IntersectionObserver((entries) => entries.some((e) => e.isIntersecting) && onMore(), { rootMargin: '400px 0px' });
+    io.observe(el);
+    return () => io.disconnect();
+  }, [onMore]);
+  return <div ref={ref} className="py-4 text-center text-xs text-slate-500">Loading more…</div>;
+};
+
 export const GidigramApp: React.FC<{ s: GameState; up: Up; profile: string | null; setProfile: (id: string | null) => void; onVisit: (id: string) => void }> = ({ s, up, profile, setProfile, onVisit }) => {
   const [tab, setTab] = useState<Tab>('home');
+  // The feed shows 10 posts and adds 10 more as you scroll near the end.
+  const [shownCount, setShownCount] = useState(10);
   const [liked, setLiked] = useState<Set<string>>(new Set());
   const [meView, setMeView] = useState<'grid' | 'feed'>('grid');
   const [posted, setPosted] = useState<string>('');
@@ -105,7 +120,7 @@ export const GidigramApp: React.FC<{ s: GameState; up: Up; profile: string | nul
           <span className="h-8 w-8 shrink-0 overflow-hidden rounded-full bg-gradient-to-tr from-yellow-400 via-pink-500 to-purple-600 p-[2px]">
             <span className="block h-full w-full overflow-hidden rounded-full bg-[#111]">
               {item.who === 'blog' ? <span className="flex h-full w-full items-center justify-center bg-gradient-to-br from-rose-600 to-red-900 text-[9px] font-black text-white">LFD</span>
-                : item.who === 'rival' && item.rival ? <CharacterSvg config={item.rival.look} idPrefix={`fa-${item.id}`} camera="portrait" className="h-full w-full" />
+                : item.who === 'rival' && item.rival ? <CharacterImg config={item.rival.look} camera="portrait" className="h-full w-full" />
                   : <span className="flex h-full w-full items-center justify-center text-xs font-bold text-white">D</span>}
             </span>
           </span>
@@ -123,7 +138,7 @@ export const GidigramApp: React.FC<{ s: GameState; up: Up; profile: string | nul
           </div>
         ) : (
           <div className="relative aspect-[4/5] overflow-hidden bg-gradient-to-b from-[#2a1f2e] to-[#141018]">
-            {item.look && <CharacterSvg config={item.look} idPrefix={`gg-${item.id}`} camera="full" />}
+            {item.look && <CharacterImg config={item.look} camera="full" />}
             {item.brag && item.title && <div className="absolute inset-x-3 bottom-3 rounded-xl bg-black/55 px-3 py-2 text-sm font-bold text-white backdrop-blur">🏆 {item.title}</div>}
           </div>
         )}
@@ -197,7 +212,7 @@ export const GidigramApp: React.FC<{ s: GameState; up: Up; profile: string | nul
       <div className="flex gap-2 overflow-x-auto border-b border-white/10 px-2 py-3">
         {storyAccounts.length ? storyAccounts.map((a) => <Ring key={a.id} id={`s-${a.id}`} label={a.label} look={a.look} blog={a.id === 'blog'} onClick={a.go} />) : <span className="px-2 text-xs text-slate-500">No stories today.</span>}
       </div>
-      {feed.length ? feed.slice(0, 40).map((item) => <Card key={item.id} item={item} />) : <p className="p-6 text-center text-sm text-slate-500">Your feed will fill up as Lagos gets busy.</p>}
+      {feed.length ? <>{feed.slice(0, Math.min(40, shownCount)).map((item) => <Card key={item.id} item={item} />)}{shownCount < Math.min(40, feed.length) && <MoreSentinel onMore={() => setShownCount((n) => n + 10)} />}</> : <p className="p-6 text-center text-sm text-slate-500">Your feed will fill up as Lagos gets busy.</p>}
     </>
   );
 
@@ -216,7 +231,7 @@ export const GidigramApp: React.FC<{ s: GameState; up: Up; profile: string | nul
       <div className="grid grid-cols-3 gap-0.5">
         {weekPosts.map((p) => (
           <button key={p.id} onClick={() => openProfile(p)} className="relative aspect-square overflow-hidden bg-gradient-to-b from-[#2a1f2e] to-[#141018]">
-            {p.look && <div className="absolute inset-x-0 -top-2"><CharacterSvg config={p.look} idPrefix={`ex-${p.id}`} camera="bust" /></div>}
+            {p.look && <div className="absolute inset-x-0 -top-2"><CharacterImg config={p.look} camera="bust" /></div>}
             <span className="absolute bottom-1 left-1 text-[10px] font-semibold text-white drop-shadow">♥ {n(p.likes)}</span>
             {p.brag && <span className="absolute right-1 top-1 text-xs">🏆</span>}
           </button>
@@ -230,7 +245,7 @@ export const GidigramApp: React.FC<{ s: GameState; up: Up; profile: string | nul
         </button>
         {[...(s.rivals || [])].sort((a, b) => b.followers - a.followers).map((r) => (
           <button key={r.id} onClick={() => setProfile(r.id)} className="flex w-full items-center gap-3 py-2 text-left">
-            <span className="h-11 w-11 shrink-0 overflow-hidden rounded-full bg-[#2a1f2e] ring-2 ring-pink-500/60"><CharacterSvg config={r.look} idPrefix={`bw-${r.id}`} camera="portrait" /></span>
+            <span className="h-11 w-11 shrink-0 overflow-hidden rounded-full bg-[#2a1f2e] ring-2 ring-pink-500/60"><CharacterImg config={r.look} camera="portrait" /></span>
             <span className="min-w-0 flex-1"><span className="block truncate text-sm font-semibold text-white">{r.handle} {r.main && <span className="text-[10px] text-pink-300">● rival</span>}</span><span className="block truncate text-[11px] text-slate-400">{r.shop} · {r.area}</span></span>
             <span className="shrink-0 text-[11px] text-slate-300">{n(r.followers)}</span>
           </button>
@@ -418,7 +433,7 @@ export const GidigramApp: React.FC<{ s: GameState; up: Up; profile: string | nul
           <div className="grid grid-cols-3 gap-0.5">
             {myFeed.map((p) => (
               <button key={p.id} onClick={() => setMeView('feed')} className="relative aspect-square overflow-hidden bg-gradient-to-b from-[#2a1f2e] to-[#141018]">
-                {p.look && <div className="absolute inset-x-0 -top-2"><CharacterSvg config={p.look} idPrefix={`gt-${p.id}`} camera="bust" /></div>}
+                {p.look && <div className="absolute inset-x-0 -top-2"><CharacterImg config={p.look} camera="bust" /></div>}
                 <span className="absolute bottom-1 left-1 text-[10px] font-semibold text-white drop-shadow">♥ {n(p.likes)}</span>
                 {p.brag && <span className="absolute right-1 top-1 text-xs">🏆</span>}
               </button>

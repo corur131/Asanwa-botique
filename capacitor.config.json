@@ -10,7 +10,8 @@
       ]
     },
     "SystemBars": {
-      "insetsHandling": "css"
+      "insetsHandling": "css",
+      "hidden": true
     }
   }
 }
