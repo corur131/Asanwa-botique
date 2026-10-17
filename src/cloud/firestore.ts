@@ -7,14 +7,19 @@
  *   adminLog/{id}                every admin money change, for the record
  */
 import { initializeApp } from 'firebase/app';
-import { GoogleAuthProvider, getAuth, onAuthStateChanged, signInWithPopup, signInWithRedirect, signOut as fbSignOut } from 'firebase/auth';
+import { GoogleAuthProvider, getAuth, indexedDBLocalPersistence, initializeAuth, onAuthStateChanged, signInWithCredential, signInWithPopup, signInWithRedirect, signOut as fbSignOut } from 'firebase/auth';
+import { Capacitor } from '@capacitor/core';
+import { FirebaseAuthentication } from '@capacitor-firebase/authentication';
 import { addDoc, collection, doc, getDoc, getDocs, getFirestore, onSnapshot, query, serverTimestamp, setDoc, updateDoc, where } from 'firebase/firestore';
 import { firebaseConfig } from './firebase-config';
 import { CloudSave, CloudStore, Grant, PlayerRow } from './types';
 
 export function firestoreStore(): CloudStore {
   const app = initializeApp(firebaseConfig);
-  const auth = getAuth(app);
+  // Inside the installed Android app, Google blocks web sign-in pop-ups, so we use the phone's own
+  // Google account picker and hand the result to the normal Firebase web SDK.
+  const native = Capacitor.isNativePlatform();
+  const auth = native ? initializeAuth(app, { persistence: indexedDBLocalPersistence }) : getAuth(app);
   const db = getFirestore(app);
   const provider = new GoogleAuthProvider();
   provider.setCustomParameters({ prompt: 'select_account' });
@@ -24,6 +29,18 @@ export function firestoreStore(): CloudStore {
       return onAuthStateChanged(auth, (u) => cb(u ? { uid: u.uid, name: u.displayName || u.email || 'Player', email: u.email || '', photo: u.photoURL || undefined } : null));
     },
     async signIn() {
+      if (native) {
+        try {
+          const result = await FirebaseAuthentication.signInWithGoogle();
+          const idToken = result.credential?.idToken;
+          if (!idToken) throw new Error('Google sign-in did not return an account token.');
+          await signInWithCredential(auth, GoogleAuthProvider.credential(idToken, result.credential?.accessToken));
+        } catch (e) {
+          const msg = String((e as { message?: string }).message || e).toLowerCase();
+          if (!msg.includes('cancel')) throw e;
+        }
+        return;
+      }
       try {
         await signInWithPopup(auth, provider);
       } catch (e) {
@@ -34,6 +51,7 @@ export function firestoreStore(): CloudStore {
       }
     },
     async signOut() {
+      if (native) await FirebaseAuthentication.signOut().catch(() => {});
       await fbSignOut(auth);
     },
     async loadSave(uid) {
