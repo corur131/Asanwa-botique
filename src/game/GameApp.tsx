@@ -506,7 +506,7 @@ export default function GameApp({ onLab, initial, storageKey, cloud, notice }: {
               ⌄ Show controls
             </button>
           ) : (
-            <div className="absolute top-3 right-3 left-3 sm:left-1/2 sm:right-auto sm:-translate-x-1/2 z-10 rounded-2xl border border-white/15 bg-[#12141c]/92 backdrop-blur px-3 py-2 flex flex-wrap items-center gap-x-3 gap-y-1.5 sm:w-max">
+            <div className="absolute top-3 left-3 right-3 sm:left-1/2 sm:right-auto sm:-translate-x-1/2 z-10 box-border w-auto sm:w-max max-w-[calc(100%_-_1.5rem)] rounded-2xl border border-white/15 bg-[#12141c]/92 backdrop-blur px-3 py-2 flex flex-wrap items-center justify-center gap-x-3 gap-y-1.5">
               <div className="leading-tight">
                 <div className={`text-xl font-bold tabular-nums ${closing ? 'text-rose-300' : 'text-white'}`}>{E.clockText(s.clock)}</div>
                 <div className="w-24 h-1 rounded-full bg-white/10 mt-1 overflow-hidden"><div className="h-full bg-amber-400" style={{ width: `${(s.clock / SHOP_MINUTES) * 100}%` }} /></div>
