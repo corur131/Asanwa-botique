@@ -79,7 +79,8 @@
             "x64"
           ]
         }
-      ]
+      ],
+      "icon": "assets/icon-only.png"
     },
     "nsis": {
       "oneClick": false,
