@@ -1,0 +1,56 @@
+# Build a real Windows installer from the bundled React game.
+# Keep Windows releases separate so the Android update checker remains unaffected.
+name: Windows PC game
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: windows-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install project dependencies
+        run: npm install --legacy-peer-deps --no-audit --no-fund
+
+      - name: Check TypeScript
+        run: npm run lint
+
+      - name: Build installer EXE
+        run: npm run desktop:package
+        env:
+          VITE_AI_API_BASE_URL: https://asanwa-botique.onrender.com
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+
+      - name: Upload downloadable Windows EXE
+        uses: actions/upload-artifact@v4
+        with:
+          name: asanwa-boutique-windows
+          path: desktop-dist/*.exe
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Publish Windows download in GitHub Releases
+        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $tag = 'windows-v1.${{ github.run_number }}'
+          $exe = Get-ChildItem -Path desktop-dist -Filter '*.exe' | Select-Object -First 1
+          if (-not $exe) { throw 'Windows installer was not built.' }
+          gh release create $tag $exe.FullName --title "Asanwa Boutique PC - Windows build ${{ github.run_number }}" --notes "Windows 64-bit installer. Installs Asanwa Boutique with F11 fullscreen and cloud-account sign in through your normal browser. This build is unsigned, so Windows SmartScreen may show a warning. Android APK releases remain separate." --latest=false
