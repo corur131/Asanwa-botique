@@ -1,7 +1,7 @@
 {
-  "name": "react-example",
+  "name": "asanwa-boutique",
   "private": true,
-  "version": "0.0.0",
+  "version": "1.0.0",
   "type": "module",
   "scripts": {
     "dev": "vite --port=3000 --host=0.0.0.0",
@@ -12,7 +12,9 @@
     "test": "tsx --test src/game/convos.test.ts src/game/business.test.ts src/game/shop-relocation.test.ts src/game/shopper.test.ts src/game/politician-contracts.test.ts src/game/market-catalog.test.ts src/game/customers.test.ts src/game/power.test.ts src/game/market-cart.test.ts src/game/staff-and-racks.test.ts src/game/rivals-balance.test.ts src/game/climate.test.ts src/game/shop-climate.test.ts src/game/expert-staff.test.ts src/game/staff-poaching.test.ts src/game/orders.test.ts src/game/wall-placement.test.ts src/game/sales.test.ts src/game/giveaway.test.ts src/game/owambe.test.ts src/game/staff-posts.test.ts",
     "server": "tsx server.ts",
     "start": "npm run build && tsx server.ts",
-    "check:locale-safe": "node tools/check-locale-safe.mjs"
+    "check:locale-safe": "node tools/check-locale-safe.mjs",
+    "desktop:run": "npm run build && electron .",
+    "desktop:package": "npm run build && electron-builder --win nsis --x64 --publish never"
   },
   "dependencies": {
     "@google/genai": "^2.4.0",
@@ -50,6 +52,42 @@
     "tailwindcss": "^4.3.3",
     "tsx": "^4.21.0",
     "typescript": "^7.0.2",
-    "@capacitor/cli": "8.5.2"
+    "@capacitor/cli": "8.5.2",
+    "electron": "^45.0.0",
+    "electron-builder": "^26.18.0"
+  },
+  "main": "desktop/main.cjs",
+  "build": {
+    "appId": "com.corur131.asanwaboutique",
+    "productName": "Asanwa Boutique",
+    "directories": {
+      "output": "desktop-dist"
+    },
+    "files": [
+      "dist/**/*",
+      "desktop/main.cjs",
+      "desktop/preload.cjs",
+      "assets/icon-only.png",
+      "package.json"
+    ],
+    "asar": true,
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "assets/icon-only.png"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
+    },
+    "artifactName": "Asanwa-Boutique-Windows-${version}-${arch}.${ext}"
   }
 }

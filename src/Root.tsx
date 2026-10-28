@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import App from './App';
+import BrowserLogin from './desktop/BrowserLogin';
 import AuthGate from './cloud/AuthGate';
 import { SharedDefs } from './components/SharedDefs';
 
@@ -59,6 +60,7 @@ export default function Root() {
     setMode(m);
     history.replaceState(null, '', m === 'lab' ? '#lab' : '#');
   };
+  if (new URLSearchParams(location.search).has('desktop_login')) return <BrowserLogin />;
   if (mode === 'lab')
     return (
       <GameRenderBoundary>

@@ -41,6 +41,13 @@ export function firestoreStore(): CloudStore {
         }
         return;
       }
+      if (window.asanwaDesktop) {
+        // Google OAuth is blocked in embedded desktop browsers. Sign in from
+        // the system browser, then exchange the Google ID token with Firebase.
+        const idToken = await window.asanwaDesktop.requestGoogleToken();
+        await signInWithCredential(auth, GoogleAuthProvider.credential(idToken));
+        return;
+      }
       try {
         await signInWithPopup(auth, provider);
       } catch (e) {

@@ -14,6 +14,7 @@ import { generatedFace, isBusinessName, knownFace } from '../faces';
 import { ContractsApp } from './ContractsApp';
 import { MovePanel, StaffActions, StaffPanel } from './Panels';
 import type { CartLine } from '../engine';
+import { postAiChat } from '../../desktop/ai';
 import { GROUP, ladder } from '../rivals';
 import { TIERS } from '../economy';
 
@@ -441,11 +442,7 @@ const Chats: React.FC<PhoneProps> = ({ s, up, chat, setChat, staff }) => {
       const timeoutId = window.setTimeout(() => controller.abort(), 60000);
       let response: Response;
       try {
-        response = await fetch(`${import.meta.env.VITE_AI_API_BASE_URL || ''}/api/ai-chat`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          signal: controller.signal,
-          body: JSON.stringify({
+        response = await postAiChat({
             characterName: targetChat,
             characterProfile: profileWithMemory,
             participants,
@@ -453,8 +450,7 @@ const Chats: React.FC<PhoneProps> = ({ s, up, chat, setChat, staff }) => {
             message: text,
             gameContext: { day: s.day, brandPower: E.brandPower(E.getBrandMetrics(s), s.followers || 0, s.tier), tier: s.tier, followers: s.followers, cash: s.cash, netWorth: E.netWorthPlayer(s), shopName: 'Asanwa Boutique', partnerTier: targetRival?.tier, partnerCash: targetRival?.cash },
             canDiscussCollaboration: Boolean(targetRival?.main && targetChat !== GROUP),
-          }),
-        });
+          }, controller.signal);
       } catch (fetchError) {
         if (controller.signal.aborted) {
           throw new Error('The AI took too long to respond. Please try again in a moment.');
